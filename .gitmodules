@@ -1,0 +1,18 @@
+[submodule "submodules/plog"]
+	path = submodules/plog
+	url = https://github.com/SergiusTheBest/plog
+[submodule "submodules/CLI11"]
+	path = submodules/CLI11
+	url = https://github.com/CLIUtils/CLI11
+[submodule "submodules/Matrix-Template"]
+	path = submodules/Matrix-Template
+	url = ssh://git@gitlab.stimulate.ovgu.de:2200/robert-frysch/Matrix-Template.git
+[submodule "submodules/ctpl"]
+	path = submodules/ctpl
+	url = https://github.com/vit-vit/ctpl
+[submodule "submodules/CTIOL"]
+	path = submodules/CTIOL
+	url = ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTIOL.git
+[submodule "submodules/CTMAL"]
+	path = submodules/CTMAL
+	url = ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTMAL.git

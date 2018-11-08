@@ -1,0 +1,8 @@
+#!/bin/bash
+shopt -s globstar
+for f in {src,include,tests}/**/*.{c,hpp,h,cpp,tpp}; do
+	if echo x"$f" | grep -v '*' > /dev/null; then #Process only matches that do not contain asterix
+		echo "Formating file $f."
+		clang-format -style=file -i "$f"
+	fi
+done
