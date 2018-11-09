@@ -7,10 +7,10 @@ namespace util {
     struct Cube
     {
         // Index of the pixel to which the corner of the Cube is projected
-        std::array<int64_t, 8> pixelIndex;
+        std::array<uint32_t, 8> pixelIndex;
 
         // There will also be
-        std::array<int64_t, 19> subPixelIndex;
+        std::array<uint32_t, 19> subPixelIndex;
         // Left lower bottom corner of the cube, needs to be increased by edgelength to get other
         // coords
         std::array<double, 3> corner;
@@ -24,7 +24,7 @@ namespace util {
             corner[1] = ly;
             corner[2] = lz;
             this->edgeLength = edgeLength;
-            this->halfLength = halfLength;
+            this->halfLength = edgeLength / 2;
             this->pdimx = pdimx;
             this->pdimy = pdimy;
             detectorPixels = pdimx * pdimy;
@@ -34,61 +34,61 @@ namespace util {
         // 010 corner + dy
         // 100 corner + dz
         // 00h corner + dx/2
-        int64_t get000() { return pixelIndex[0]; }
-        void set000(int64_t v) { pixelIndex[0] = v; }
-        int64_t get001() { return pixelIndex[1]; }
-        void set001(int64_t v) { pixelIndex[1] = v; }
-        int64_t get010() { return pixelIndex[2]; }
-        void set010(int64_t v) { pixelIndex[2] = v; }
-        int64_t get011() { return pixelIndex[3]; }
-        void set011(int64_t v) { pixelIndex[3] = v; }
-        int64_t get100() { return pixelIndex[4]; }
-        void set100(int64_t v) { pixelIndex[4] = v; }
-        int64_t get101() { return pixelIndex[5]; }
-        void set101(int64_t v) { pixelIndex[5] = v; }
-        int64_t get110() { return pixelIndex[6]; }
-        void set110(int64_t v) { pixelIndex[6] = v; }
-        int64_t get111() { return pixelIndex[7]; }
-        void set111(int64_t v) { pixelIndex[7] = v; }
+        uint32_t get000() { return pixelIndex[0]; }
+        void set000(uint32_t v) { pixelIndex[0] = v; }
+        uint32_t get001() { return pixelIndex[1]; }
+        void set001(uint32_t v) { pixelIndex[1] = v; }
+        uint32_t get010() { return pixelIndex[2]; }
+        void set010(uint32_t v) { pixelIndex[2] = v; }
+        uint32_t get011() { return pixelIndex[3]; }
+        void set011(uint32_t v) { pixelIndex[3] = v; }
+        uint32_t get100() { return pixelIndex[4]; }
+        void set100(uint32_t v) { pixelIndex[4] = v; }
+        uint32_t get101() { return pixelIndex[5]; }
+        void set101(uint32_t v) { pixelIndex[5] = v; }
+        uint32_t get110() { return pixelIndex[6]; }
+        void set110(uint32_t v) { pixelIndex[6] = v; }
+        uint32_t get111() { return pixelIndex[7]; }
+        void set111(uint32_t v) { pixelIndex[7] = v; }
 
-        int64_t get00H() { return subPixelIndex[0]; }
-        void set00H(int64_t v) { subPixelIndex[0] = v; }
-        int64_t get0H0() { return subPixelIndex[1]; }
-        void set0H0(int64_t v) { subPixelIndex[1] = v; }
-        int64_t get0HH() { return subPixelIndex[2]; }
-        void set0HH(int64_t v) { subPixelIndex[2] = v; }
-        int64_t get0H1() { return subPixelIndex[3]; }
-        void set0H1(int64_t v) { subPixelIndex[3] = v; }
-        int64_t get01H() { return subPixelIndex[4]; }
-        void set01H(int64_t v) { subPixelIndex[4] = v; }
-        int64_t getH00() { return subPixelIndex[5]; }
-        void setH00(int64_t v) { subPixelIndex[5] = v; }
-        int64_t getH0H() { return subPixelIndex[6]; }
-        void setH0H(int64_t v) { subPixelIndex[6] = v; }
-        int64_t getH01() { return subPixelIndex[7]; }
-        void setH01(int64_t v) { subPixelIndex[7] = v; }
-        int64_t getHH0() { return subPixelIndex[8]; }
-        void setHH0(int64_t v) { subPixelIndex[8] = v; }
-        int64_t getHHH() { return subPixelIndex[9]; }
-        void setHHH(int64_t v) { subPixelIndex[9] = v; }
-        int64_t getHH1() { return subPixelIndex[10]; }
-        void setHH1(int64_t v) { subPixelIndex[10] = v; }
-        int64_t getH10() { return subPixelIndex[11]; }
-        void setH10(int64_t v) { subPixelIndex[11] = v; }
-        int64_t getH1H() { return subPixelIndex[12]; }
-        void setH1H(int64_t v) { subPixelIndex[12] = v; }
-        int64_t getH11() { return subPixelIndex[13]; }
-        void setH11(int64_t v) { subPixelIndex[13] = v; }
-        int64_t get10H() { return subPixelIndex[14]; }
-        void set10H(int64_t v) { subPixelIndex[14] = v; }
-        int64_t get1H0() { return subPixelIndex[15]; }
-        void set1H0(int64_t v) { subPixelIndex[15] = v; }
-        int64_t get1HH() { return subPixelIndex[16]; }
-        void set1HH(int64_t v) { subPixelIndex[16] = v; }
-        int64_t get1H1() { return subPixelIndex[17]; }
-        void set1H1(int64_t v) { subPixelIndex[17] = v; }
-        int64_t get11H() { return subPixelIndex[18]; }
-        void set11H(int64_t v) { subPixelIndex[18] = v; }
+        uint32_t get00H() { return subPixelIndex[0]; }
+        void set00H(uint32_t v) { subPixelIndex[0] = v; }
+        uint32_t get0H0() { return subPixelIndex[1]; }
+        void set0H0(uint32_t v) { subPixelIndex[1] = v; }
+        uint32_t get0HH() { return subPixelIndex[2]; }
+        void set0HH(uint32_t v) { subPixelIndex[2] = v; }
+        uint32_t get0H1() { return subPixelIndex[3]; }
+        void set0H1(uint32_t v) { subPixelIndex[3] = v; }
+        uint32_t get01H() { return subPixelIndex[4]; }
+        void set01H(uint32_t v) { subPixelIndex[4] = v; }
+        uint32_t getH00() { return subPixelIndex[5]; }
+        void setH00(uint32_t v) { subPixelIndex[5] = v; }
+        uint32_t getH0H() { return subPixelIndex[6]; }
+        void setH0H(uint32_t v) { subPixelIndex[6] = v; }
+        uint32_t getH01() { return subPixelIndex[7]; }
+        void setH01(uint32_t v) { subPixelIndex[7] = v; }
+        uint32_t getHH0() { return subPixelIndex[8]; }
+        void setHH0(uint32_t v) { subPixelIndex[8] = v; }
+        uint32_t getHHH() { return subPixelIndex[9]; }
+        void setHHH(uint32_t v) { subPixelIndex[9] = v; }
+        uint32_t getHH1() { return subPixelIndex[10]; }
+        void setHH1(uint32_t v) { subPixelIndex[10] = v; }
+        uint32_t getH10() { return subPixelIndex[11]; }
+        void setH10(uint32_t v) { subPixelIndex[11] = v; }
+        uint32_t getH1H() { return subPixelIndex[12]; }
+        void setH1H(uint32_t v) { subPixelIndex[12] = v; }
+        uint32_t getH11() { return subPixelIndex[13]; }
+        void setH11(uint32_t v) { subPixelIndex[13] = v; }
+        uint32_t get10H() { return subPixelIndex[14]; }
+        void set10H(uint32_t v) { subPixelIndex[14] = v; }
+        uint32_t get1H0() { return subPixelIndex[15]; }
+        void set1H0(uint32_t v) { subPixelIndex[15] = v; }
+        uint32_t get1HH() { return subPixelIndex[16]; }
+        void set1HH(uint32_t v) { subPixelIndex[16] = v; }
+        uint32_t get1H1() { return subPixelIndex[17]; }
+        void set1H1(uint32_t v) { subPixelIndex[17] = v; }
+        uint32_t get11H() { return subPixelIndex[18]; }
+        void set11H(uint32_t v) { subPixelIndex[18] = v; }
         // Usually the biggest differences could be on the diagonal
         bool indicesAreEqual()
         {
@@ -215,13 +215,13 @@ namespace util {
             c111->set111(get111());
         }
 
-        int64_t centerIndex(ProjectionMatrix pm)
+        uint32_t centerIndex(ProjectionMatrix pm)
         {
             return getIndex(pm, corner[0] + halfLength, corner[1] + halfLength,
                             corner[2] + halfLength);
         }
 
-        int64_t getIndex(ProjectionMatrix pm, double x, double y, double z)
+        uint32_t getIndex(ProjectionMatrix pm, double x, double y, double z)
         {
             double px, py;
             int pi, pj;
@@ -256,14 +256,15 @@ namespace util {
             this->vdimy = vdimy;
             this->vdimz = vdimz;
             this->threads = threads;
-		this->totalWrites = 0;
+            this->totalWritesExact = 0;
+            this->totalWritesInexact = 0;
             this->voxelCornerNum = (vdimx + 1) * (vdimy + 1) * (vdimz + 1);
-		this->resultingIndices = new uint32_t[voxelCornerNum];
+            this->resultingIndices = new uint32_t[voxelCornerNum];
         }
 
         ~DivideAndConquerFootprintExecutor()
         {
-		delete[] resultingIndices;
+            delete[] resultingIndices;
             if(threadpool != nullptr)
             {
                 threadpool->stop(true);
@@ -271,7 +272,10 @@ namespace util {
             }
         }
 
-        void computeWeightFactors(Cube c, ProjectionMatrix pm, uint32_t voxelIndex, uint32_t pixelIndexOffset)
+        void computeWeightFactors(Cube c,
+                                  ProjectionMatrix pm,
+                                  uint32_t voxelIndex,
+                                  uint32_t pixelIndexOffset)
         {
             if(c.indicesAreEqual())
             {
@@ -282,8 +286,11 @@ namespace util {
                 double rsquared = x * x + y * y + z * z;
                 if(c.pixelIndex[0] != c.detectorPixels)
                 {
-                    w->insertValue(voxelIndex, c.pixelIndex[0] + pixelIndexOffset, volume / rsquared);
-                    totalWrites++;
+                    w->insertValue(voxelIndex, c.pixelIndex[0] + pixelIndexOffset,
+                                   volume / rsquared);
+                   // w->insertValue(voxelIndex, c.pixelIndex[0] + pixelIndexOffset,
+                   //                volume);
+                    totalWritesExact++;
                 }
             } else if(c.edgeLength <= stoppingEdgeLength)
             {
@@ -295,8 +302,9 @@ namespace util {
                 uint32_t pixelIndex = c.centerIndex(pm);
                 if(pixelIndex != c.detectorPixels)
                 {
-                    w->insertValue(voxelIndex, pixelIndex + pixelIndexOffset, volume / rsquared);
-                    totalWrites++;
+                    w->insertValue(voxelIndex, pixelIndex + pixelIndexOffset, volume/rsquared );
+                    //w->insertValue(voxelIndex, pixelIndex + pixelIndexOffset, volume);
+                    totalWritesInexact++;
                 }
             } else
             {
@@ -335,21 +343,22 @@ namespace util {
                 startThreadpool();
             }
             sourcePosition = pm.sourcePosition();
+		LOGD << io::xprintf("Source position is [%f, %f, %f]", sourcePosition[0], sourcePosition[1], sourcePosition[2]);
             double xcoord, ycoord, zcoord;
             // First I try to precompute indices of each corner that is
             // (vdimx+1)x(vdimy+1)x(vdimz+1)
-            xcoord = -(double(vdimx) / 2.0) - 0.5;
-            ycoord = -(double(vdimy) / 2.0) - 0.5;
-            zcoord = -(double(vdimz) / 2.0) - 0.5;
             uint32_t voxelindex = 0;
             double px, py;
             uint32_t pi, pj;
             uint32_t numberOfWrites = 0;
-            uint32_t nonwrites = 0;
-            for(uint32_t k = 0; k != vdimz + 1; k++)
+            uint32_t nonwrites = 0; 
+            zcoord = -(double(vdimz) / 2.0) - 0.5;
+	    for(uint32_t k = 0; k != vdimz + 1; k++)
             {
+		ycoord = -(double(vdimy) / 2.0) - 0.5;
                 for(uint32_t j = 0; j != vdimy + 1; j++)
                 {
+            		xcoord = -(double(vdimx) / 2.0) - 0.5;
                     for(uint32_t i = 0; i != vdimx + 1; i++)
                     {
                         pm.project(xcoord, ycoord, zcoord, &px, &py);
@@ -369,14 +378,11 @@ namespace util {
                         xcoord += 1.0;
                         voxelindex++;
                     }
-                    xcoord = -(double(vdimx) / 2.0) - 0.5;
                     ycoord += 1.0;
                 }
-                xcoord = -(double(vdimx) / 2.0) - 0.5;
-                ycoord = -(double(vdimy) / 2.0) - 0.5;
                 zcoord += 1.0;
             }
-            //w->flush();
+            // w->flush();
             // LOGI << io::xprintf("There were %d writes and %d non writes to the matrix that should
             // "
             //                    "result in the increase of its size by %d bytes.",
@@ -389,15 +395,17 @@ namespace util {
             // c.corner[1] = -(double(vdimy) / 2.0) - 0.5;
             // c.corner[2] = -(double(vdimz) / 2.0) - 0.5;
             voxelindex = 0;
-            //totalWrites = 0;
+            // totalWrites = 0;
+	    c.corner[2] = -(double(vdimz) / 2.0) - 0.5;
             for(uint32_t k = 0; k != vdimz; k++)
             {
+                c.corner[1] = -(double(vdimy) / 2.0) - 0.5;
                 for(uint32_t j = 0; j != vdimy; j++)
                 {
+                    c.corner[0] = -(double(vdimx) / 2.0) - 0.5;
                     for(uint32_t i = 0; i != vdimx; i++)
                     {
 
-                        c.corner[0] += 1.0;
                         c.set000(
                             resultingIndices[i + (vdimx + 1) * j + (vdimx + 1) * (vdimy + 1) * k]);
                         c.set001(resultingIndices[i + 1 + (vdimx + 1) * j
@@ -414,21 +422,23 @@ namespace util {
                                                   + (vdimx + 1) * (vdimy + 1) * (k + 1)]);
                         c.set111(resultingIndices[i + 1 + (vdimx + 1) * (j + 1)
                                                   + (vdimx + 1) * (vdimy + 1) * (k + 1)]);
-                        
-			threadpool->push(
-                            [&, this, c](int id) { computeWeightFactors(c, pm, voxelindex, pixelIndexOffset); });
-                       // computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
-                        voxelindex++;
+
+                        threadpool->push([&, this, c, voxelindex](int id) {
+                            computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
+                        });
+                        // computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
+			if(voxelindex != i+j*vdimx+k*vdimx*vdimy)
+{
+	LOGD << "WRONG INDEX";
+}        
+                voxelindex++;
+                        c.corner[0] += 1.0;
                     }
-                    c.corner[0] = -(double(vdimx) / 2.0) - 0.5;
                     c.corner[1] += 1.0;
                 }
-                c.corner[0] = -(double(vdimx) / 2.0) - 0.5;
-                c.corner[1] = -(double(vdimy) / 2.0) - 0.5;
                 c.corner[2] += 1.0;
             }
-            LOGD << io::xprintf("Performed %lu writes so far.",
-                                totalWrites);
+            LOGD << io::xprintf("Performed %lu exact writes and %lu inexact writes due to smallness so far.", totalWritesExact, totalWritesInexact);
         }
 
         // To manage threadpooling from outside
@@ -449,7 +459,7 @@ namespace util {
             {
                 threadpool->stop(true);
                 delete threadpool;
-		threadpool = nullptr;
+                threadpool = nullptr;
             }
             threadpoolstarted = false;
         }
@@ -458,8 +468,8 @@ namespace util {
         bool threadpoolstarted = false;
         ctpl::thread_pool* threadpool;
         std::shared_ptr<matrix::BufferedSparseMatrixWritter> w;
-		uint32_t voxelCornerNum;
-            uint32_t* resultingIndices;
+        uint32_t voxelCornerNum;
+        uint32_t* resultingIndices;
         // It is evaluated from -0.5, pixels are centerred at integer coordinates
         uint32_t pdimx = 616;
         uint32_t pdimy = 480;
@@ -470,7 +480,7 @@ namespace util {
         int threads = 1;
         double stoppingEdgeLength = 0.25;
         std::array<double, 3> sourcePosition;
-        uint64_t totalWrites;
+        uint64_t totalWritesExact, totalWritesInexact;
     };
 } // namespace util
 } // namespace CTL

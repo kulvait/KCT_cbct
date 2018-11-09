@@ -60,6 +60,22 @@ target_link_libraries (dacprojector ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
 install (TARGETS dacprojector RUNTIME DESTINATION .)
 
+
+
+SET(PROJECTVOL_SOURCES src/projectVolume.cpp)
+add_executable(volprojector ${PROJECTVOL_SOURCES})
+set_target_properties(
+    volprojector
+    PROPERTIES 
+        OUTPUT_NAME "volprojector"
+        SUFFIX ""
+)
+target_link_libraries(volprojector ctiol)
+target_link_libraries(volprojector ctmal)
+target_link_libraries (volprojector ${CMAKE_THREAD_LIBS_INIT})
+#target_link_libraries(dacprojector /usr/lib/liblapacke.so)
+#target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
+install (TARGETS volprojector RUNTIME DESTINATION .)
 #Documentation target
 find_package(Doxygen)
 if (DOXYGEN_FOUND)
