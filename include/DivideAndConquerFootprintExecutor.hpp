@@ -423,8 +423,8 @@ namespace util {
                         c.set111(resultingIndices[i + 1 + (vdimx + 1) * (j + 1)
                                                   + (vdimx + 1) * (vdimy + 1) * (k + 1)]);
 
-                        threadpool->push([&, this, c, voxelindex](int id) {
-                            computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
+                        threadpool->push([&, this, c, pm, voxelindex, pixelIndexOffset](int id) {
+                            this->computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
                         });
                         // computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
 			if(voxelindex != i+j*vdimx+k*vdimx*vdimy)
