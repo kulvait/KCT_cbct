@@ -104,19 +104,46 @@ int main(int argc, char* argv[])
             framesToOutput.push_back(framesToProcess[i]);
         }
     }
-    LOGD << io::xprintf("Number of projections to process is %d.", framesToOutput.size());
+bool submatrices = true;
+if(!submatrices)
+{
+	LOGD << io::xprintf("Number of projections to process is %d.", framesToOutput.size());
     // End parsing arguments
     std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter
         = std::make_shared<matrix::BufferedSparseMatrixWritter>(a_outputSystemMatrix);
     util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX, projectionSizeY,
-                                          volumeSizeX, volumeSizeY, volumeSizeZ, a_threads);
-    uint32_t projnum;
+                                                volumeSizeX, volumeSizeY, volumeSizeZ, a_threads);
+	uint32_t projnum;
     for(int i = 0; i != framesToOutput.size(); i++)
-   {	
+    {
+    dfe.startThreadpool();
         projnum = framesToOutput[i];
-LOGD << io::xprintf("Output of %d matrix.", projnum);
+        LOGD << io::xprintf("Processing projections from %dth position.", projnum);
         uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
         util::ProjectionMatrix pm = dr->readMatrix(projnum);
-	dfe.insertMatrixProjections(pm, pixelIndexOffset);
+        dfe.insertMatrixProjections(pm, pixelIndexOffset);
+	dfe.stopThreadpool();
     }
+}else
+{
+//Write individual submatrices
+
+    std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter;
+	uint32_t projnum;
+    for(int i = 0; i != framesToOutput.size(); i++)
+    {
+        matrixWritter = std::make_shared<matrix::BufferedSparseMatrixWritter>(io::xprintf("file%s_%03d.sm", a_outputSystemMatrix.c_str(), i));
+    util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX, projectionSizeY,
+                                                volumeSizeX, volumeSizeY, volumeSizeZ, a_threads);
+    dfe.startThreadpool();
+        projnum = framesToOutput[i];
+        LOGD << io::xprintf("Processing projections from %dth position.", projnum);
+        uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
+        util::ProjectionMatrix pm = dr->readMatrix(projnum);
+        dfe.insertMatrixProjections(pm, 0);
+	dfe.stopThreadpool();
+	matrixWritter->flush();
+    }
+}
+
 }
