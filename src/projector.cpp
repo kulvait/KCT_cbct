@@ -104,46 +104,79 @@ int main(int argc, char* argv[])
             framesToOutput.push_back(framesToProcess[i]);
         }
     }
-bool submatrices = true;
-if(!submatrices)
-{
-	LOGD << io::xprintf("Number of projections to process is %d.", framesToOutput.size());
-    // End parsing arguments
-    std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter
-        = std::make_shared<matrix::BufferedSparseMatrixWritter>(a_outputSystemMatrix);
-    util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX, projectionSizeY,
-                                                volumeSizeX, volumeSizeY, volumeSizeZ, a_threads);
-	uint32_t projnum;
-    for(int i = 0; i != framesToOutput.size(); i++)
-    {
-    dfe.startThreadpool();
-        projnum = framesToOutput[i];
-        LOGD << io::xprintf("Processing projections from %dth position.", projnum);
-        uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
-        util::ProjectionMatrix pm = dr->readMatrix(projnum);
-        dfe.insertMatrixProjections(pm, pixelIndexOffset);
-	dfe.stopThreadpool();
-    }
-}else
-{
-//Write individual submatrices
+    util::ProjectionMatrix pm = dr->readMatrix(0);
+    double pixelSpacingX = 0.616;
+    double pixelSpacingY = 0.616;
 
-    std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter;
-	uint32_t projnum;
-    for(int i = 0; i != framesToOutput.size(); i++)
-    {
-        matrixWritter = std::make_shared<matrix::BufferedSparseMatrixWritter>(io::xprintf("file%s_%03d.sm", a_outputSystemMatrix.c_str(), i));
-    util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX, projectionSizeY,
-                                                volumeSizeX, volumeSizeY, volumeSizeZ, a_threads);
-    dfe.startThreadpool();
-        projnum = framesToOutput[i];
-        LOGD << io::xprintf("Processing projections from %dth position.", projnum);
-        uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
-        util::ProjectionMatrix pm = dr->readMatrix(projnum);
-        dfe.insertMatrixProjections(pm, 0);
-	dfe.stopThreadpool();
-	matrixWritter->flush();
-    }
-}
+    std::array<double, 3> sourcePosition = pm.sourcePosition();
+    std::array<double, 3> normalToDetector = pm.normalToDetector();
 
+    double x1, x2, y1, y2;
+    pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
+               sourcePosition[2] + normalToDetector[2], &x1, &y1);
+    pm.project(100.0, 100.0, 100.0, &x2, &y2);
+    double xspacing2 = pixelSpacingX * pixelSpacingX;
+    double yspacing2 = pixelSpacingY * pixelSpacingY;
+    double distance
+        = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
+    double x = 100.0 - sourcePosition[0];
+    double y = 100.0 - sourcePosition[1];
+    double z = 100.0 - sourcePosition[2];
+    double norma = std::sqrt(x * x + y * y + z * z);
+    x /= norma;
+    y /= norma;
+    z /= norma;
+    double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
+    double theta = std::acos(cos);
+    double distToDetector = std::abs(distance / std::tan(theta));
+    double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;
+    LOGI << io::xprintf("Distance to the detector is %fmm therefore scaling factor is %f.",
+                        distToDetector, scalingFactor);
+
+    bool submatrices = true;
+    if(!submatrices)
+    {
+        LOGD << io::xprintf("Number of projections to process is %d.", framesToOutput.size());
+        // End parsing arguments
+        std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter
+            = std::make_shared<matrix::BufferedSparseMatrixWritter>(a_outputSystemMatrix);
+        util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX, projectionSizeY,
+                                                    volumeSizeX, volumeSizeY, volumeSizeZ,
+                                                    scalingFactor, a_threads);
+        uint32_t projnum;
+        for(int i = 0; i != framesToOutput.size(); i++)
+        {
+            dfe.startThreadpool();
+            projnum = framesToOutput[i];
+            LOGD << io::xprintf("Processing projections from %dth position.", projnum);
+            uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
+            util::ProjectionMatrix pm = dr->readMatrix(projnum);
+            dfe.insertMatrixProjections(pm, pixelIndexOffset);
+            dfe.stopThreadpool();
+            dfe.reportNumberOfWrites();
+        }
+    } else
+    {
+        // Write individual submatrices
+
+        std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter;
+        uint32_t projnum;
+        for(int i = 0; i != framesToOutput.size(); i++)
+        {
+            matrixWritter = std::make_shared<matrix::BufferedSparseMatrixWritter>(
+                io::xprintf("file%s_%03d.sm", a_outputSystemMatrix.c_str(), i), 8192, true);
+            util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX,
+                                                        projectionSizeY, volumeSizeX, volumeSizeY,
+                                                        volumeSizeZ, scalingFactor, a_threads);
+            dfe.startThreadpool();
+            projnum = framesToOutput[i];
+            LOGD << io::xprintf("Processing projections from %dth position.", projnum);
+            uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
+            util::ProjectionMatrix pm = dr->readMatrix(projnum);
+            dfe.insertMatrixProjections(pm, pixelIndexOffset);
+            dfe.stopThreadpool();
+            matrixWritter->flush();
+            dfe.reportNumberOfWrites();
+        }
+    }
 }

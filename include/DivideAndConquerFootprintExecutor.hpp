@@ -4,6 +4,18 @@
 namespace CTL {
 namespace util {
 
+    struct Elm
+    {
+        uint32_t pindex;
+        double val;
+        Elm(uint32_t pindex, double val)
+            : pindex(pindex)
+            , val(val)
+        {
+        }
+        bool operator<(const Elm& e) { return pindex < e.pindex; }
+    };
+
     struct Cube
     {
         // Index of the pixel to which the corner of the Cube is projected
@@ -24,7 +36,7 @@ namespace util {
             corner[1] = ly;
             corner[2] = lz;
             this->edgeLength = edgeLength;
-            this->halfLength = edgeLength / 2;
+            this->halfLength = edgeLength / 2.0;
             this->pdimx = pdimx;
             this->pdimy = pdimy;
             detectorPixels = pdimx * pdimy;
@@ -226,7 +238,7 @@ namespace util {
             double px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(px + 0.5);
+            pi = (int)(px + 0.5); // 0.5 is correct
             pj = (int)(py + 0.5);
             if(pi >= 0 && pj >= 0 && pi < pdimx && pj < pdimy)
             {
@@ -247,6 +259,7 @@ namespace util {
                                           uint32_t vdimx,
                                           uint32_t vdimy,
                                           uint32_t vdimz,
+                                          double scalingFactor,
                                           int threads)
         {
             this->w = w;
@@ -260,6 +273,7 @@ namespace util {
             this->totalWritesInexact = 0;
             this->voxelCornerNum = (vdimx + 1) * (vdimy + 1) * (vdimz + 1);
             this->resultingIndices = new uint32_t[voxelCornerNum];
+            this->scalingFactor = scalingFactor;
         }
 
         ~DivideAndConquerFootprintExecutor()
@@ -272,43 +286,15 @@ namespace util {
             }
         }
 
-        void computeWeightFactors(Cube c,
-                                  ProjectionMatrix pm,
-                                  uint32_t voxelIndex,
-                                  uint32_t pixelIndexOffset)
+        void insertWeightFactors(std::vector<Elm> &vec,
+                                 Cube& c,
+                                 ProjectionMatrix pm,
+                                 std::array<double, 3>& sourcePosition,
+                                 std::array<double, 3>& normalToDetector)
         {
-            if(c.indicesAreEqual())
+            bool equalIndices = c.indicesAreEqual();
+            if(c.edgeLength > stoppingEdgeLength && !equalIndices)
             {
-                double volume = std::pow(c.edgeLength, 3);
-                double x = sourcePosition[0] - c.corner[0] - c.halfLength;
-                double y = sourcePosition[1] - c.corner[1] - c.halfLength;
-                double z = sourcePosition[2] - c.corner[2] - c.halfLength;
-                double rsquared = x * x + y * y + z * z;
-                if(c.pixelIndex[0] != c.detectorPixels)
-                {
-                    w->insertValue(voxelIndex, c.pixelIndex[0] + pixelIndexOffset,
-                                   volume / rsquared);
-                   // w->insertValue(voxelIndex, c.pixelIndex[0] + pixelIndexOffset,
-                   //                volume);
-                    totalWritesExact++;
-                }
-            } else if(c.edgeLength <= stoppingEdgeLength)
-            {
-                double volume = std::pow(c.edgeLength, 3);
-                double x = sourcePosition[0] - c.corner[0] - c.halfLength;
-                double y = sourcePosition[1] - c.corner[1] - c.halfLength;
-                double z = sourcePosition[2] - c.corner[2] - c.halfLength;
-                double rsquared = x * x + y * y + z * z;
-                uint32_t pixelIndex = c.centerIndex(pm);
-                if(pixelIndex != c.detectorPixels)
-                {
-                    w->insertValue(voxelIndex, pixelIndex + pixelIndexOffset, volume/rsquared );
-                    //w->insertValue(voxelIndex, pixelIndex + pixelIndexOffset, volume);
-                    totalWritesInexact++;
-                }
-            } else
-            {
-
                 Cube c000(c.corner[0], c.corner[1], c.corner[2], c.halfLength, pdimx, pdimy);
                 Cube c001(c.corner[0] + c.halfLength, c.corner[1], c.corner[2], c.halfLength, pdimx,
                           pdimy);
@@ -325,14 +311,144 @@ namespace util {
                 Cube c111(c.corner[0] + c.halfLength, c.corner[1] + c.halfLength,
                           c.corner[2] + c.halfLength, c.halfLength, pdimx, pdimy);
                 c.fillSubcubes(pm, &c000, &c001, &c010, &c011, &c100, &c101, &c110, &c111);
-                computeWeightFactors(c000, pm, voxelIndex, pixelIndexOffset);
-                computeWeightFactors(c001, pm, voxelIndex, pixelIndexOffset);
-                computeWeightFactors(c010, pm, voxelIndex, pixelIndexOffset);
-                computeWeightFactors(c011, pm, voxelIndex, pixelIndexOffset);
-                computeWeightFactors(c100, pm, voxelIndex, pixelIndexOffset);
-                computeWeightFactors(c101, pm, voxelIndex, pixelIndexOffset);
-                computeWeightFactors(c110, pm, voxelIndex, pixelIndexOffset);
-                computeWeightFactors(c111, pm, voxelIndex, pixelIndexOffset);
+
+                insertWeightFactors(vec, c000, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c001, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c010, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c011, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c100, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c101, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c110, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c111, pm, sourcePosition, normalToDetector);
+            } else
+            {
+                uint32_t pixelIndex;
+                if(equalIndices)
+                {
+                    pixelIndex = c.pixelIndex[0];
+                    totalWritesExact++;
+                } else
+                {
+                    pixelIndex = c.centerIndex(pm);
+                    totalWritesInexact++;
+                }
+                if(pixelIndex != c.detectorPixels)
+                {
+                    double volume = c.edgeLength * c.edgeLength * c.edgeLength;
+                    double v_x = c.corner[0] + c.halfLength - sourcePosition[0];
+                    double v_y = c.corner[1] + c.halfLength - sourcePosition[1];
+                    double v_z = c.corner[2] + c.halfLength - sourcePosition[2];
+                    double distsquare = v_x * v_x + v_y * v_y + v_z * v_z;
+                    double norm = std::sqrt(distsquare);
+                    double cos = (normalToDetector[0] * v_x + normalToDetector[1] * v_y
+                                  + normalToDetector[2] * v_z)
+                        / norm;
+                    double cos3 = cos * cos * cos;
+                    // LOGD << io::xprintf("Edge length is %f, volume is %f, scaling factor is %f,
+                    // distsquare %f and cos3 is %f.", c.edgeLength, volume, scalingFactor,
+                    // distsquare, cos3);
+                        vec.push_back(Elm(pixelIndex, volume*scalingFactor/(cos3*distsquare)));
+                }
+            }
+        }
+
+        void computeWeightFactors(Cube c,
+                                  ProjectionMatrix pm,
+                                  uint32_t voxelIndex,
+                                  uint32_t pixelIndexOffset,
+                                  std::array<double, 3> sourcePosition,
+                                  std::array<double, 3> normalToDetector)
+        {
+
+            bool equalIndices = c.indicesAreEqual();
+            if(c.edgeLength > stoppingEdgeLength && !equalIndices)
+            {
+                std::vector<Elm> vec;
+                Cube c000(c.corner[0], c.corner[1], c.corner[2], c.halfLength, pdimx, pdimy);
+                Cube c001(c.corner[0] + c.halfLength, c.corner[1], c.corner[2], c.halfLength, pdimx,
+                          pdimy);
+                Cube c010(c.corner[0], c.corner[1] + c.halfLength, c.corner[2], c.halfLength, pdimx,
+                          pdimy);
+                Cube c011(c.corner[0] + c.halfLength, c.corner[1] + c.halfLength, c.corner[2],
+                          c.halfLength, pdimx, pdimy);
+                Cube c100(c.corner[0], c.corner[1], c.corner[2] + c.halfLength, c.halfLength, pdimx,
+                          pdimy);
+                Cube c101(c.corner[0] + c.halfLength, c.corner[1], c.corner[2] + c.halfLength,
+                          c.halfLength, pdimx, pdimy);
+                Cube c110(c.corner[0], c.corner[1] + c.halfLength, c.corner[2] + c.halfLength,
+                          c.halfLength, pdimx, pdimy);
+                Cube c111(c.corner[0] + c.halfLength, c.corner[1] + c.halfLength,
+                          c.corner[2] + c.halfLength, c.halfLength, pdimx, pdimy);
+                c.fillSubcubes(pm, &c000, &c001, &c010, &c011, &c100, &c101, &c110, &c111);
+                insertWeightFactors(vec, c000, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c001, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c010, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c011, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c100, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c101, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c110, pm, sourcePosition, normalToDetector);
+                insertWeightFactors(vec, c111, pm, sourcePosition, normalToDetector);
+
+                std::sort(vec.begin(), vec.end());
+                uint32_t prevind = c.detectorPixels;
+                double sum = 0.0;
+		//LOGI << "Calling vector iteration";
+                for(auto const& e : vec)
+                {
+		//	LOGD << io::xprintf("Vector index = %d, val = %f.", e.pindex, e.val);	
+                    if(e.pindex == prevind)
+                    {
+                        sum += e.val;
+                    } else
+                    {
+                        if(prevind != c.detectorPixels && sum != 0.0)
+                        {
+                            w->insertValue(voxelIndex, prevind + pixelIndexOffset, sum);
+                        }
+                        prevind = e.pindex;
+                        sum = e.val;
+                    }
+                }
+                if(prevind != c.detectorPixels && sum != 0.0)
+                {
+                    w->insertValue(voxelIndex, prevind + pixelIndexOffset, sum);
+                    sum = 0.0;
+                }
+            } else
+            {
+                uint32_t pixelIndex;
+                if(equalIndices)
+                {
+                    pixelIndex = c.pixelIndex[0];
+                    totalWritesExact++;
+                } else
+                {
+                    pixelIndex = c.centerIndex(pm);
+                    totalWritesInexact++;
+                }
+                if(pixelIndex != c.detectorPixels)
+                {
+                    double volume = c.edgeLength * c.edgeLength * c.edgeLength;
+                    double v_x = c.corner[0] + c.halfLength - sourcePosition[0];
+                    double v_y = c.corner[1] + c.halfLength - sourcePosition[1];
+                    double v_z = c.corner[2] + c.halfLength - sourcePosition[2];
+                    double distsquare = v_x * v_x + v_y * v_y + v_z * v_z;
+                    double norm = std::sqrt(distsquare);
+                    double cos = (normalToDetector[0] * v_x + normalToDetector[1] * v_y
+                                  + normalToDetector[2] * v_z)
+                        / norm;
+                    double cos3 = cos * cos * cos;
+                    // LOGD << io::xprintf("Edge length is %f, volume is %f, scaling factor is
+                    // %f, distsquare %f and cos3 is %f.", c.edgeLength, volume, scalingFactor,
+                    // distsquare, cos3);
+                    //   double d_x, d_y;
+                    //   pm.project(v_x, v_y, v_z, &d_x, &d_y);
+                    // LOGD << io::xprintf("(v_x, v_y, v_z) = (%f, %f, %f), (d_x, d_y) = (%f,
+                    // %f), normal=(%f, %f, %f).", v_x, v_y, v_z, d_x, d_y, normalToDetector[0],
+                    // normalToDetector[1], normalToDetector[2]);
+                    w->insertValue(voxelIndex, pixelIndex + pixelIndexOffset,
+                                   volume * scalingFactor / (distsquare * cos3));
+                }
             }
         }
 
@@ -342,23 +458,28 @@ namespace util {
             {
                 startThreadpool();
             }
-            sourcePosition = pm.sourcePosition();
-		LOGD << io::xprintf("Source position is [%f, %f, %f]", sourcePosition[0], sourcePosition[1], sourcePosition[2]);
+            std::array<double, 3> sourcePosition = pm.sourcePosition();
+            std::array<double, 3> normalToDetector = pm.normalToDetector();
+
+            LOGD << io::xprintf(
+                "Source position is [%f, %f, %f] and normal to detector [%f, %f, %f]",
+                sourcePosition[0], sourcePosition[1], sourcePosition[2], normalToDetector[0],
+                normalToDetector[1], normalToDetector[2]);
             double xcoord, ycoord, zcoord;
             // First I try to precompute indices of each corner that is
             // (vdimx+1)x(vdimy+1)x(vdimz+1)
             uint32_t voxelindex = 0;
             double px, py;
-            uint32_t pi, pj;
+            int pi, pj;
             uint32_t numberOfWrites = 0;
-            uint32_t nonwrites = 0; 
-            zcoord = -(double(vdimz) / 2.0) - 0.5;
-	    for(uint32_t k = 0; k != vdimz + 1; k++)
+            uint32_t nonwrites = 0;
+            zcoord = -(double(vdimz) / 2.0);
+            for(uint32_t k = 0; k != vdimz + 1; k++)
             {
-		ycoord = -(double(vdimy) / 2.0) - 0.5;
+                ycoord = -(double(vdimy) / 2.0);
                 for(uint32_t j = 0; j != vdimy + 1; j++)
                 {
-            		xcoord = -(double(vdimx) / 2.0) - 0.5;
+                    xcoord = -(double(vdimx) / 2.0);
                     for(uint32_t i = 0; i != vdimx + 1; i++)
                     {
                         pm.project(xcoord, ycoord, zcoord, &px, &py);
@@ -383,12 +504,13 @@ namespace util {
                 zcoord += 1.0;
             }
             // w->flush();
-            // LOGI << io::xprintf("There were %d writes and %d non writes to the matrix that should
+            // LOGI << io::xprintf("There were %d writes and %d non writes to the matrix that
+            // should
             // "
             //                    "result in the increase of its size by %d bytes.",
             //                    numberOfWrites, nonwrites, numberOfWrites * 16);
-            Cube c(-(double(vdimx) / 2.0) - 0.5, -(double(vdimy) / 2.0) - 0.5,
-                   -(double(vdimz) / 2.0) - 0.5, 1.0, pdimx, pdimy);
+            Cube c(-(double(vdimx) / 2.0), -(double(vdimy) / 2.0), -(double(vdimz) / 2.0), 1.0,
+                   pdimx, pdimy);
             // c.edgeLength = 1.0;
             // c.halfLength = 0.5;
             // c.corner[0] = -(double(vdimx) / 2.0) - 0.5;
@@ -396,13 +518,13 @@ namespace util {
             // c.corner[2] = -(double(vdimz) / 2.0) - 0.5;
             voxelindex = 0;
             // totalWrites = 0;
-	    c.corner[2] = -(double(vdimz) / 2.0) - 0.5;
+            c.corner[2] = -(double(vdimz) / 2.0);
             for(uint32_t k = 0; k != vdimz; k++)
             {
-                c.corner[1] = -(double(vdimy) / 2.0) - 0.5;
+                c.corner[1] = -(double(vdimy) / 2.0);
                 for(uint32_t j = 0; j != vdimy; j++)
                 {
-                    c.corner[0] = -(double(vdimx) / 2.0) - 0.5;
+                    c.corner[0] = -(double(vdimx) / 2.0);
                     for(uint32_t i = 0; i != vdimx; i++)
                     {
 
@@ -423,22 +545,29 @@ namespace util {
                         c.set111(resultingIndices[i + 1 + (vdimx + 1) * (j + 1)
                                                   + (vdimx + 1) * (vdimy + 1) * (k + 1)]);
 
-                        threadpool->push([&, this, c, pm, voxelindex, pixelIndexOffset](int id) {
-                            this->computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
+                        threadpool->push([&, this, c, pm, voxelindex, pixelIndexOffset,
+                                          sourcePosition, normalToDetector](int id) {
+                            this->computeWeightFactors(c, pm, voxelindex, pixelIndexOffset,
+                                                       sourcePosition, normalToDetector);
                         });
                         // computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
-			if(voxelindex != i+j*vdimx+k*vdimx*vdimy)
-{
-	LOGD << "WRONG INDEX";
-}        
-                voxelindex++;
+                        //            if(voxelindex != i + j * vdimx + k * vdimx * vdimy)
+                        //            {
+                        //                LOGD << "WRONG INDEX";
+                        //            }
+                        voxelindex++;
                         c.corner[0] += 1.0;
                     }
                     c.corner[1] += 1.0;
                 }
                 c.corner[2] += 1.0;
             }
-            LOGD << io::xprintf("Performed %lu exact writes and %lu inexact writes due to smallness so far.", totalWritesExact, totalWritesInexact);
+        }
+
+        void reportNumberOfWrites()
+        {
+            LOGD << io::xprintf("Performed %lu exact writes and %lu inexact writes.",
+                                totalWritesExact, totalWritesInexact);
         }
 
         // To manage threadpooling from outside
@@ -478,9 +607,10 @@ namespace util {
         uint32_t vdimy = 256;
         uint32_t vdimz = 199;
         int threads = 1;
-        double stoppingEdgeLength = 0.25;
-        std::array<double, 3> sourcePosition;
+        double stoppingEdgeLength = double(1)/double(16);
         uint64_t totalWritesExact, totalWritesInexact;
-    };
+        // Square distance from source to detector divided by the area of pixel.
+        double scalingFactor;
+    }; // namespace util
 } // namespace util
 } // namespace CTL

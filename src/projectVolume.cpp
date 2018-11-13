@@ -73,51 +73,57 @@ int main(int argc, char* argv[])
     bool* acessed = new bool[totalProjectionSize](); // Initialized by zeros
 
     uint8_t buf[6];
-    
-    float * testVolumeSlice = new float[volumeSizeX * volumeSizeY]();
 
-    std::memcpy(testVolumeSlice, &volume[198*volumeSizeX*volumeSizeY], volumeSizeX*volumeSizeY*4);
-        util::putUint16((uint16_t)volumeSizeY, &buf[0]);
-        util::putUint16((uint16_t)volumeSizeX, &buf[2]);
-        util::putUint16((uint16_t)1, &buf[4]);
-    io::createEmptyFile("/b/git/DivideConquerProjector/build/xxx", 6+ volumeSizeX*volumeSizeY*4,
-    true); io::writeFirstBytes("/b/git/DivideConquerProjector/build/xxx", buf, 6);
+    float* testVolumeSlice = new float[volumeSizeX * volumeSizeY]();
+
+    std::memcpy(testVolumeSlice, &volume[198 * volumeSizeX * volumeSizeY],
+                volumeSizeX * volumeSizeY * 4);
+    util::putUint16((uint16_t)volumeSizeY, &buf[0]);
+    util::putUint16((uint16_t)volumeSizeX, &buf[2]);
+    util::putUint16((uint16_t)1, &buf[4]);
+    io::createEmptyFile("/b/git/DivideConquerProjector/build/xxx",
+                        6 + volumeSizeX * volumeSizeY * 4, true);
+    io::writeFirstBytes("/b/git/DivideConquerProjector/build/xxx", buf, 6);
     io::writeBytesFrom("/b/git/DivideConquerProjector/build/xxx", 6, (uint8_t*)testVolumeSlice,
-    volumeSizeX*volumeSizeY*4);
-    
-	float addme;
+                       volumeSizeX * volumeSizeY * 4);
+
+    float addme;
     while(elements != 0)
     {
         A.readNextValue(&i, &j, &v);
-	if(i>=totalVolumeSize)
-	{
-		LOGE << io::xprintf("Coordinates vol=(%d, %d, %d) are invalid!", i%volumeSizeX, (i/volumeSizeX)%volumeSizeY, (i/volumeSizeX)/volumeSizeY);  
-	}
-/*
-	if(j%projectionSizeX == 2 && j/projectionSizeX ==2)
-	{
-		LOGE << io::xprintf("v=%e,i=%d,vol=(%d, %d, %d), volume[i] =%e, v*volume[i]=%e ", v,i, i%volumeSizeX, (i/volumeSizeX)%volumeSizeY, (i/volumeSizeX)/volumeSizeY, volume[i], v*volume[i]);
-		LOGE << io::xprintf("vol(0,0,199)=%e", volume[199*volumeSizeX*volumeSizeY]);
-	}
-*/
-	if(j>=totalProjectionSize)
-		{
-			LOGD << "BIG";
-		}
+        if(i >= totalVolumeSize)
+        {
+            LOGE << io::xprintf("Coordinates vol=(%d, %d, %d) are invalid!", i % volumeSizeX,
+                                (i / volumeSizeX) % volumeSizeY, (i / volumeSizeX) / volumeSizeY);
+        }
+        /*
+                if(j%projectionSizeX == 2 && j/projectionSizeX ==2)
+                {
+                        LOGE << io::xprintf("v=%e,i=%d,vol=(%d, %d, %d), volume[i] =%e,
+           v*volume[i]=%e ", v,i, i%volumeSizeX, (i/volumeSizeX)%volumeSizeY,
+           (i/volumeSizeX)/volumeSizeY, volume[i], v*volume[i]); LOGE <<
+           io::xprintf("vol(0,0,199)=%e", volume[199*volumeSizeX*volumeSizeY]);
+                }
+        */
+        if(j >= totalProjectionSize)
+        {
+            LOGD << "BIG";
+        }
         //	LOGD << io::xprintf("elements = %lu, i=%d, j=%d, v=%e.", elements, i, j, v);
-	addme = volume[i] * v;
+        addme = volume[i] * v;
         projection[j] += addme;
-	acessed[j] = true;
+        acessed[j] = true;
         elements--;
     }
-/*
+    /*
 	for(j = 0; j!= totalProjectionSize; j++)
 	{
 		
 		if(acessed[j] == true)
 			LOGD << io::xprintf("The (i,j) = (%d, %d) was acessed", j%projectionSizeX, j/projectionSizeX);
 	}
-  */  uint64_t totalFileSize = uint64_t(6) + totalProjectionSize * 4;
+  */ uint64_t totalFileSize
+        = uint64_t(6) + totalProjectionSize * 4;
     io::createEmptyFile(a_projectionFile, totalFileSize, true);
     /// io::createEmptyFile(a_projectionFile, 0, true); //Try if this is faster
     util::putUint16((uint16_t)projectionSizeY, &buf[0]);
