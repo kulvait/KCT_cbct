@@ -1,5 +1,6 @@
 #pragma once
-#include "SMA/BufferedSparseMatrixWritter.hpp"
+#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
+#include "MATRIX/ProjectionMatrix.hpp"
 
 namespace CTL {
 namespace util {
@@ -330,7 +331,8 @@ namespace util {
                 } else
                 {
                     pixelIndex = c.centerIndex(pm);
-                    totalWritesInexact++;
+			return;
+                    //totalWritesInexact++;
                 }
                 if(pixelIndex != c.detectorPixels)
                 {
@@ -607,7 +609,7 @@ namespace util {
         uint32_t vdimy = 256;
         uint32_t vdimz = 199;
         int threads = 1;
-        double stoppingEdgeLength = double(1)/double(16);
+        double stoppingEdgeLength = 0.25;
         uint64_t totalWritesExact, totalWritesInexact;
         // Square distance from source to detector divided by the area of pixel.
         double scalingFactor;

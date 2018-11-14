@@ -16,7 +16,7 @@
 // Internal libraries
 #include "ARGPARSE/parseArgs.h"
 #include "DEN/DenProjectionMatrixReader.hpp"
-#include "SMA/BufferedSparseMatrixWritter.hpp"
+#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 
 #include "DivideAndConquerFootprintExecutor.hpp"
 

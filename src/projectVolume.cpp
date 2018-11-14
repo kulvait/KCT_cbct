@@ -15,7 +15,7 @@
 
 // Internal libraries
 #include "ARGPARSE/parseArgs.h"
-#include "SMA/BufferedSparseMatrixReader.hpp"
+#include "SMA/BufferedSparseMatrixDoubleReader.hpp"
 #include "rawop.h"
 
 using namespace CTL;
@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
     int i, j;
     double v;
 
-    matrix::BufferedSparseMatrixReader A(a_inputSystemMatrix);
+    matrix::BufferedSparseMatrixDoubleReader A(a_inputSystemMatrix);
     uint64_t elements = A.getNumberOfElements();
     uint64_t totalProjectionSize = projectionSizeX * projectionSizeY * projectionSizeZ;
     float* projection = new float[totalProjectionSize](); // Initialized by zeros

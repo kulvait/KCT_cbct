@@ -60,7 +60,65 @@ target_link_libraries (dacprojector ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
 install (TARGETS dacprojector RUNTIME DESTINATION .)
 
+SET(MRG_SOURCES src/mergeFiles.cpp)
+add_executable(dacmerge ${MRG_SOURCES})
+set_target_properties(
+    dacmerge
+    PROPERTIES 
+        OUTPUT_NAME "dacmerge"
+        SUFFIX ""
+)
+target_link_libraries(dacmerge ctiol)
+target_link_libraries(dacmerge ctmal)
+target_link_libraries (dacmerge ${CMAKE_THREAD_LIBS_INIT})
+#target_link_libraries(dacprojector /usr/lib/liblapacke.so)
+#target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
+install (TARGETS dacmerge RUNTIME DESTINATION .)
 
+SET(SRTJJ_SOURCES src/sortFileJ.cpp)
+add_executable(sortdacj ${SRTJJ_SOURCES})
+set_target_properties(
+    sortdacj
+    PROPERTIES 
+        OUTPUT_NAME "sortdacj"
+        SUFFIX ""
+)
+target_link_libraries(sortdacj ctiol)
+target_link_libraries(sortdacj ctmal)
+target_link_libraries (sortdacj ${CMAKE_THREAD_LIBS_INIT})
+#target_link_libraries(dacprojector /usr/lib/liblapacke.so)
+#target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
+install (TARGETS sortdacj RUNTIME DESTINATION .)
+
+SET(SRT_SOURCES src/sortFile.cpp)
+add_executable(sortdac ${SRT_SOURCES})
+set_target_properties(
+    sortdac
+    PROPERTIES 
+        OUTPUT_NAME "sortdac"
+        SUFFIX ""
+)
+target_link_libraries(sortdac ctiol)
+target_link_libraries(sortdac ctmal)
+target_link_libraries (sortdac ${CMAKE_THREAD_LIBS_INIT})
+#target_link_libraries(dacprojector /usr/lib/liblapacke.so)
+#target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
+install (TARGETS sortdac RUNTIME DESTINATION .)
+
+SET(PROJECTF_SOURCES src/projectFloats.cpp)
+add_executable(volprojectorf ${PROJECTF_SOURCES})
+set_target_properties(
+    volprojectorf
+    PROPERTIES 
+        OUTPUT_NAME "volprojectorf"
+        SUFFIX ""
+)
+target_link_libraries(volprojectorf ctiol)
+target_link_libraries(volprojectorf ctmal)
+target_link_libraries (volprojectorf ${CMAKE_THREAD_LIBS_INIT})
+#target_link_libraries(dacprojector /usr/lib/liblapacke.so)
+#target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
+install (TARGETS volprojectorf RUNTIME DESTINATION .)
 
 SET(PROJECTVOL_SOURCES src/projectVolume.cpp)
 add_executable(volprojector ${PROJECTVOL_SOURCES})
