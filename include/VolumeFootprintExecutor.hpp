@@ -1,6 +1,6 @@
 #pragma once
-#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
+#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 
 namespace CTL {
 namespace util {
@@ -15,6 +15,28 @@ namespace util {
         {
         }
         bool operator<(const Elm& e) { return pindex < e.pindex; }
+    };
+
+    struct 2DPoint
+    {
+        float x;
+        float y;
+        2DPoint(float x, float y)
+            : x(x)
+            , y(y)
+        {
+        }
+    }
+
+    struct Prism
+    {
+        std::vector<2DPoint> points;
+        float surface;
+	uint32_t vxindex;
+        Prism(float surface, vxindex)
+            : surface(surface), vxindex(vxindex)
+        {
+        }
     };
 
     struct Cube
@@ -251,17 +273,17 @@ namespace util {
         }
     };
 
-    class DivideAndConquerFootprintExecutor
+    class VolumeFootprintExecutor
     {
     public:
-        DivideAndConquerFootprintExecutor(std::shared_ptr<matrix::BufferedSparseMatrixWritter> w,
-                                          uint32_t pdimx,
-                                          uint32_t pdimy,
-                                          uint32_t vdimx,
-                                          uint32_t vdimy,
-                                          uint32_t vdimz,
-                                          double scalingFactor,
-                                          int threads)
+        VolumeFootprintExecutor(std::shared_ptr<matrix::BufferedSparseMatrixWritter> w,
+                                uint32_t pdimx,
+                                uint32_t pdimy,
+                                uint32_t vdimx,
+                                uint32_t vdimy,
+                                uint32_t vdimz,
+                                double scalingFactor,
+                                int threads)
         {
             this->w = w;
             this->pdimx = pdimx;
@@ -275,10 +297,10 @@ namespace util {
             this->voxelCornerNum = (vdimx + 1) * (vdimy + 1) * (vdimz + 1);
             this->resultingIndices = new uint32_t[voxelCornerNum];
             this->scalingFactor = scalingFactor;
-		this->threadpool = nullptr;
+            this->threadpool = nullptr;
         }
 
-        ~DivideAndConquerFootprintExecutor()
+        ~VolumeFootprintExecutor()
         {
             delete[] resultingIndices;
             if(threadpool != nullptr)
@@ -288,7 +310,7 @@ namespace util {
             }
         }
 
-        void insertWeightFactors(std::vector<Elm> &vec,
+        void insertWeightFactors(std::vector<Elm>& vec,
                                  Cube& c,
                                  ProjectionMatrix pm,
                                  std::array<double, 3>& sourcePosition,
@@ -349,10 +371,125 @@ namespace util {
                     // LOGD << io::xprintf("Edge length is %f, volume is %f, scaling factor is %f,
                     // distsquare %f and cos3 is %f.", c.edgeLength, volume, scalingFactor,
                     // distsquare, cos3);
-                        vec.push_back(Elm(pixelIndex, volume*scalingFactor/(cos3*distsquare)));
+                    vec.push_back(Elm(pixelIndex, volume * scalingFactor / (cos3 * distsquare)));
                 }
             }
         }
+
+
+//It should increase clock and counterclock
+	void insertFollowingPrisms(std::vector<Prism> prisms, Cube c, int startingCorner, double clock, double counterclock)
+	{
+
+                double px00, px01, px10, px11, py;
+                pm.project(c.corner[0], c.corner[1], c.corner[2], &px00, &py);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1], c.corner[2], &px01, &py10);
+                pm.project(c.corner[0], c.corner[1] + c.edgeLength, c.corner[2], &px10, &py20);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength, c.corner[2],
+                           &px11, &py);
+
+		if(int(clock)==0)//Left
+		{
+			float edgeStep = float(c.edgeLength)/(px10-px00);
+			if(edgeStep < 0)
+			{
+				LOGD << "Wrong edge step";
+			}
+			if(int(clock+edgeStep)==0)
+			{
+				clock = clock+edgeStep;
+			}else
+			{
+				clock = 1.0;
+				insertFollowingPrisms
+				return;
+			}
+		}else if(int(clock)==1)//Top
+		{
+			float edgeStep = float(c.edgeLength)/(px11-px10);
+			if(edgeStep < 0)
+			{
+				LOGD << "Wrong edge step";
+			}
+			if(int(clock+edgeStep)==1)
+			{
+				clock = clock+edgeStep;
+			}else
+			{
+				clock = 2.0;
+			}
+		}else if(int(clock)==2)//Right
+		{
+			float edgeStep = float(c.edgeLength)/(px01-px11);
+			if(edgeStep < 0)
+			{
+				LOGD << "Wrong edge step";
+			}
+			if(int(clock+edgeStep)==2)
+			{
+				clock = clock+edgeStep;
+			}else
+			{
+				clock = 3.0;
+			}
+		}else if(int(clock)==3)//Bottom
+		{
+			float edgeStep = float(c.edgeLength)/(px00-px01);
+			if(edgeStep < 0)
+
+			{
+				LOGD << "Wrong edge step";
+			}
+			if(int(clock+edgeStep)==3)
+			{
+				clock = clock+edgeStep;
+			}else
+			{
+				clock = 4.0;
+			}
+		}
+
+		if(startingCorner == 0)
+		{
+		//Clock and counterclock should be different
+
+
+	
+	
+                if(int(px00 + 0.5) == int(px01 + 0.5))
+                {
+                    if(int(px00 + 0.5) == int(px10 + 0.5))
+                    {
+                        if(int(px10 + 0.5) == int(px11 + 0.5))
+                        {
+				Prism p(1.0, int(px10 + 0.5));//Ale to se nestane
+				p.points.insert(2DPoint(c.corner[0], c.corner[1], c.corner[2]);
+				p.points.insert(2DPoint(c.corner[0]+c.edgeLength, c.corner[1], c.corner[2]);
+				p.points.insert(2DPoint(c.corner[0], c.corner[1]+c.edgeLength, c.corner[2]);
+				p.points.insert(2DPoint(c.corner[0]+c.edgeLength, c.corner[1]+c.edgeLength, c.corner[2]);
+				insertWeightFactors(p, pm, sourcePosition, normalToDetector);
+                        }else
+			{
+				float upperEdgeStep = float(c.edgeLength)/(px11-px10);
+				float upperEdgeMin = c.corner[0] + (0.5 +  int(px10 + 0.5)-px10)*upperEdgeStep;
+				
+				float rightEdgeStep = float(c.edgeLength)/(px11-px10);
+				float rightEdgeMin = c.corner[0] + (0.5 +  int(px01 + 0.5)-px01)*rightEdgeStep;
+				//We can subtract the upper right triangle from the solution
+			}
+                    }
+                }
+			
+		}
+	}
+
+
+void findBoundaryPoints(std::vector<double> boundaryPoints, double x, double y, double z,
+                                double x1, double y1, double z1,
+                                double x2, double y2, double z2)
+{
+
+}
 
         void computeWeightFactors(Cube c,
                                   ProjectionMatrix pm,
@@ -361,96 +498,134 @@ namespace util {
                                   std::array<double, 3> sourcePosition,
                                   std::array<double, 3> normalToDetector)
         {
-
             bool equalIndices = c.indicesAreEqual();
-            if(c.edgeLength > stoppingEdgeLength && !equalIndices)
+            if(equalIndices)
             {
-                std::vector<Elm> vec;
-                Cube c000(c.corner[0], c.corner[1], c.corner[2], c.halfLength, pdimx, pdimy);
-                Cube c001(c.corner[0] + c.halfLength, c.corner[1], c.corner[2], c.halfLength, pdimx,
-                          pdimy);
-                Cube c010(c.corner[0], c.corner[1] + c.halfLength, c.corner[2], c.halfLength, pdimx,
-                          pdimy);
-                Cube c011(c.corner[0] + c.halfLength, c.corner[1] + c.halfLength, c.corner[2],
-                          c.halfLength, pdimx, pdimy);
-                Cube c100(c.corner[0], c.corner[1], c.corner[2] + c.halfLength, c.halfLength, pdimx,
-                          pdimy);
-                Cube c101(c.corner[0] + c.halfLength, c.corner[1], c.corner[2] + c.halfLength,
-                          c.halfLength, pdimx, pdimy);
-                Cube c110(c.corner[0], c.corner[1] + c.halfLength, c.corner[2] + c.halfLength,
-                          c.halfLength, pdimx, pdimy);
-                Cube c111(c.corner[0] + c.halfLength, c.corner[1] + c.halfLength,
-                          c.corner[2] + c.halfLength, c.halfLength, pdimx, pdimy);
-                c.fillSubcubes(pm, &c000, &c001, &c010, &c011, &c100, &c101, &c110, &c111);
-                insertWeightFactors(vec, c000, pm, sourcePosition, normalToDetector);
-                insertWeightFactors(vec, c001, pm, sourcePosition, normalToDetector);
-                insertWeightFactors(vec, c010, pm, sourcePosition, normalToDetector);
-                insertWeightFactors(vec, c011, pm, sourcePosition, normalToDetector);
-                insertWeightFactors(vec, c100, pm, sourcePosition, normalToDetector);
-                insertWeightFactors(vec, c101, pm, sourcePosition, normalToDetector);
-                insertWeightFactors(vec, c110, pm, sourcePosition, normalToDetector);
-                insertWeightFactors(vec, c111, pm, sourcePosition, normalToDetector);
+                if(c.corner[0] == c.detectorPixels)
+                {
+                    return;
+                }
+                double volume = c.edgeLength * c.edgeLength * c.edgeLength;
+                double v_x = c.corner[0] + c.halfLength - sourcePosition[0];
+                double v_y = c.corner[1] + c.halfLength - sourcePosition[1];
+                double v_z = c.corner[2] + c.halfLength - sourcePosition[2];
+                double distsquare = v_x * v_x + v_y * v_y + v_z * v_z;
+                double norm = std::sqrt(distsquare);
+                double cos = (normalToDetector[0] * v_x + normalToDetector[1] * v_y
+                              + normalToDetector[2] * v_z)
+                    / norm;
+                double cos3 = cos * cos * cos;
+                w->insertValue(voxelIndex, c.get000() + pixelIndexOffset,
+                               volume * scalingFactor / (distsquare * cos3));
 
-                std::sort(vec.begin(), vec.end());
-                uint32_t prevind = c.detectorPixels;
-                double sum = 0.0;
-		//LOGI << "Calling vector iteration";
-                for(auto const& e : vec)
-                {
-		//	LOGD << io::xprintf("Vector index = %d, val = %f.", e.pindex, e.val);	
-                    if(e.pindex == prevind)
-                    {
-                        sum += e.val;
-                    } else
-                    {
-                        if(prevind != c.detectorPixels && sum != 0.0)
-                        {
-                            w->insertValue(voxelIndex, prevind + pixelIndexOffset, sum);
-                        }
-                        prevind = e.pindex;
-                        sum = e.val;
-                    }
-                }
-                if(prevind != c.detectorPixels && sum != 0.0)
-                {
-                    w->insertValue(voxelIndex, prevind + pixelIndexOffset, sum);
-                    sum = 0.0;
-                }
             } else
             {
-                uint32_t pixelIndex;
-                if(equalIndices)
+                // First I determine volumes of the objects that will have the same px coordinate
+
+                double py;
+                double px00, px01, px10, px11;
+                pm.project(c.corner[0], c.corner[1], c.corner[2], &px00, &py);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1], c.corner[2], &px01, &py10);
+                pm.project(c.corner[0], c.corner[1] + c.edgeLength, c.corner[2], &px10, &py20);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength, c.corner[2],
+                           &px11, &py);
+
+		//There is a corner with minimal px; ... find this corner
+
+
+
+
+		if(px00 <= px01 && px00 <= px10 && px00 <= px11)
+		{//Lets say its px00
+			std::vector<double> boundaryPointsA, boundaryPointsB;
+			findBoundaryPoints(boundaryPointsA, c.corner[0], c.corner[1], c.corner[2], 
+				c.corner[0]+c.edgeLength, c.corner[1], c.corner[2], 
+				c.corner[0]+c.edgeLength, c.corner[1] + c.edgeLength, c.corner[2]);
+			findBoundaryPoints(boundaryPointsB, c.corner[0], c.corner[1], c.corner[2], 
+				c.corner[0], c.corner[1]+c.edgeLength, c.corner[2], 
+				c.corner[0]+c.edgeLength, c.corner[1] + c.edgeLength, c.corner[2]);
+
+			std::vector<Prism> prisms;
+			std::vector<double> volumes;
+			int boundaryXvalue = int(px00+0.5); 
+			for(int i =0; i!= boundaryPointsA.size(); i++)
+			{//I expect there are two edges and the value of px grows along these.
+				double a, b;
+				a = boundaryPointsA[i];
+				b = boundaryPointsB[i];
+				if(a <= 1.0 && b <= 1.0)
+				{
+					volumes.add(a*b);
+				}else if(a>1.0 && b<=1.0)
+				{
+					double al = a-1.0;
+					volumes.add(1.0*al+(b-al)/2.0);
+				}else if(a>1.0 && b>1.0)
+				{
+					volumes.add(1.0-(2.0-a)*(2.0-b));
+				}
+			}
+			for(int i = boundaryPointsA.size()-1; i > 0; i--)
+			{
+				volumes[i] -= volumes[i-1];
+			}
+			//Now find parts of the square that maps into the given index or indices below it
+			insertFollowingPrisms(prisms, c, 0, 0.0, 4.0);
+		}
+
+                if(int(px00 + 0.5) == int(px01 + 0.5))
                 {
-                    pixelIndex = c.pixelIndex[0];
-                    totalWritesExact++;
-                } else
-                {
-                    pixelIndex = c.centerIndex(pm);
-                    totalWritesInexact++;
+                    if(int(px00 + 0.5) == int(px10 + 0.5))
+                    {
+                        if(int(px10 + 0.5) == int(px11 + 0.5))
+                        {
+				Prism p(1.0, int(px10 + 0.5));//Ale to se nestane
+				p.points.insert(2DPoint(c.corner[0], c.corner[1], c.corner[2]);
+				p.points.insert(2DPoint(c.corner[0]+c.edgeLength, c.corner[1], c.corner[2]);
+				p.points.insert(2DPoint(c.corner[0], c.corner[1]+c.edgeLength, c.corner[2]);
+				p.points.insert(2DPoint(c.corner[0]+c.edgeLength, c.corner[1]+c.edgeLength, c.corner[2]);
+				insertWeightFactors(p, pm, sourcePosition, normalToDetector);
+                        }else
+			{
+				float upperEdgeStep = float(c.edgeLength)/(px11-px10);
+				float upperEdgeMin = c.corner[0] + (0.5 +  int(px10 + 0.5)-px10)*upperEdgeStep;
+				
+				float rightEdgeStep = float(c.edgeLength)/(px11-px10);
+				float rightEdgeMin = c.corner[0] + (0.5 +  int(px01 + 0.5)-px01)*rightEdgeStep;
+				//We can subtract the upper right triangle from the solution
+			}
+                    }
                 }
-                if(pixelIndex != c.detectorPixels)
-                {
-                    double volume = c.edgeLength * c.edgeLength * c.edgeLength;
-                    double v_x = c.corner[0] + c.halfLength - sourcePosition[0];
-                    double v_y = c.corner[1] + c.halfLength - sourcePosition[1];
-                    double v_z = c.corner[2] + c.halfLength - sourcePosition[2];
-                    double distsquare = v_x * v_x + v_y * v_y + v_z * v_z;
-                    double norm = std::sqrt(distsquare);
-                    double cos = (normalToDetector[0] * v_x + normalToDetector[1] * v_y
-                                  + normalToDetector[2] * v_z)
-                        / norm;
-                    double cos3 = cos * cos * cos;
-                    // LOGD << io::xprintf("Edge length is %f, volume is %f, scaling factor is
-                    // %f, distsquare %f and cos3 is %f.", c.edgeLength, volume, scalingFactor,
-                    // distsquare, cos3);
-                    //   double d_x, d_y;
-                    //   pm.project(v_x, v_y, v_z, &d_x, &d_y);
-                    // LOGD << io::xprintf("(v_x, v_y, v_z) = (%f, %f, %f), (d_x, d_y) = (%f,
-                    // %f), normal=(%f, %f, %f).", v_x, v_y, v_z, d_x, d_y, normalToDetector[0],
-                    // normalToDetector[1], normalToDetector[2]);
-                    w->insertValue(voxelIndex, pixelIndex + pixelIndexOffset,
-                                   volume * scalingFactor / (distsquare * cos3));
-                }
+            }
+
+            if(c.get000() != c.detectorPixels && c.get001() != c.detectorPixels
+               && c.get011() != c.detectorPixels && c.get100() != c.detectorPixels
+               && c.get101() != c.detectorPixels && c.get110() != c.detectorPixels
+               && c.get111() != c.detectorPixels)
+            {
+                // The x coordinate on the detector is the same. It is sufficient to
+                double py00, py01, py10, py11, py20, py21, py30, py31;
+                double px00, px01, px10, px11, px20, px21, px30, px31;
+                pm.project(c.corner[0], c.corner[1], c.corner[2], &px00, &py00);
+                pm.project(c.corner[0], c.corner[1], c.corner[2] + c.edgeLength, &px01, &py01);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1], c.corner[2], &px10, &py10);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1], c.corner[2] + c.edgeLength,
+                           &px11, &py11);
+                pm.project(c.corner[0], c.corner[1] + c.edgeLength, c.corner[2], &px20, &py20);
+                pm.project(c.corner[0], c.corner[1] + c.edgeLength, c.corner[2] + c.edgeLength,
+                           &px21, &py21);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength, c.corner[2],
+                           &px30, &py30);
+                pm.project(c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength,
+                           c.corner[2] + c.edgeLength, &px31, &py31);
+                std::cout << io::xprintf(
+                    "Cube of edge %f: [%f, %f, %f] (%d, %d, %d, %d), (%d, %d, %d, %d): \n",
+                    c.edgeLength, c.corner[0], c.corner[1], c.corner[2], c.get000(), c.get001(),
+                    c.get010(), c.get011(), c.get100(), c.get101(), c.get110(), c.get111());
+                std::cout << io::xprintf("X:[%f, %f], [%f, %f], [%f, %f], [%f, %f]\n", px00, px01,
+                                         px10, px11, px20, px21, px30, px31);
+                std::cout << io::xprintf("Y:[%f, %f], [%f, %f], [%f, %f], [%f, %f]\n", py00, py01,
+                                         py10, py11, py20, py21, py30, py31);
             }
         }
 
@@ -609,7 +784,7 @@ namespace util {
         uint32_t vdimy = 256;
         uint32_t vdimz = 199;
         int threads = 1;
-        double stoppingEdgeLength = double(1)/double(16);
+        double stoppingEdgeLength = double(1) / double(16);
         uint64_t totalWritesExact, totalWritesInexact;
         // Square distance from source to detector divided by the area of pixel.
         double scalingFactor;

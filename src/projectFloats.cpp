@@ -48,6 +48,8 @@ int main(int argc, char* argv[])
     CLI::App app{ "Using divide and conquer techniques to construct CT system matrix.." };
     app.add_option("-j,--threads", a_threads, "Number of extra threads that application can use.")
         ->check(CLI::Range(1, 65535));
+    app.add_option("-n,--number_of_projections", projectionSizeZ, "Number of projections, defaults to 1.")
+        ->check(CLI::Range(1, 65535));
     app.add_option("input_volume", a_inputVolume,
                    "Files in a DEN format to process. These files represents projection matrices.")
         ->required()

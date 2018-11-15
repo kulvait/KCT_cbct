@@ -5,7 +5,7 @@ set(CMAKE_INSTALL_PREFIX $ENV{HOME}/bin)
 set(CMAKE_CXX_STANDARD 14)#Supported values are 98, 11 and 14.
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 set(BUILD_SHARED_LIBS False)
 
 #Header directories for the project
@@ -39,18 +39,17 @@ FILE( GLOB CTMAL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTMAL/src/*.cpp )
 add_library(ctmal ${CTMAL_SRC})
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTMAL/include)
 
-#file(GLOB GLOBAL_SOURCES "src/*.cpp")
-SET(GLOBAL_SOURCES src/projector.cpp)
-
 add_custom_target(formatWebkit
 ./formatWebkit
 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+#file(GLOB GLOBAL_SOURCES "src/*.cpp")
+SET(GLOBAL_SOURCES src/projector.cpp)
 add_executable(dacprojector ${GLOBAL_SOURCES})
 set_target_properties(
     dacprojector
     PROPERTIES 
-        OUTPUT_NAME "dac"
+        OUTPUT_NAME "alg-systemmatrix"
         SUFFIX ""
 )
 target_link_libraries(dacprojector ctiol)
@@ -60,12 +59,26 @@ target_link_libraries (dacprojector ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
 install (TARGETS dacprojector RUNTIME DESTINATION .)
 
+#file(GLOB GLOBAL_SOURCES "src/*.cpp")
+SET(XXX_SOURCES src/exactProjector.cpp)
+add_executable(systemmatrixxx ${XXX_SOURCES})
+set_target_properties(
+    systemmatrixxx
+    PROPERTIES 
+        OUTPUT_NAME "alg-systemmatrix-exact"
+        SUFFIX ""
+)
+target_link_libraries(systemmatrixxx ctiol)
+target_link_libraries(systemmatrixxx ctmal)
+target_link_libraries (systemmatrixxx ${CMAKE_THREAD_LIBS_INIT})
+install (TARGETS systemmatrixxx RUNTIME DESTINATION .)
+
 SET(MRG_SOURCES src/mergeFiles.cpp)
 add_executable(dacmerge ${MRG_SOURCES})
 set_target_properties(
     dacmerge
     PROPERTIES 
-        OUTPUT_NAME "dacmerge"
+        OUTPUT_NAME "alg-merge"
         SUFFIX ""
 )
 target_link_libraries(dacmerge ctiol)
@@ -80,7 +93,7 @@ add_executable(sortdacj ${SRTJJ_SOURCES})
 set_target_properties(
     sortdacj
     PROPERTIES 
-        OUTPUT_NAME "sortdacj"
+        OUTPUT_NAME "alg-sortj"
         SUFFIX ""
 )
 target_link_libraries(sortdacj ctiol)
@@ -95,7 +108,7 @@ add_executable(sortdac ${SRT_SOURCES})
 set_target_properties(
     sortdac
     PROPERTIES 
-        OUTPUT_NAME "sortdac"
+        OUTPUT_NAME "alg-sorti"
         SUFFIX ""
 )
 target_link_libraries(sortdac ctiol)
@@ -110,7 +123,7 @@ add_executable(volprojectorf ${PROJECTF_SOURCES})
 set_target_properties(
     volprojectorf
     PROPERTIES 
-        OUTPUT_NAME "volprojectorf"
+        OUTPUT_NAME "alg-projectf"
         SUFFIX ""
 )
 target_link_libraries(volprojectorf ctiol)
@@ -125,7 +138,7 @@ add_executable(volprojector ${PROJECTVOL_SOURCES})
 set_target_properties(
     volprojector
     PROPERTIES 
-        OUTPUT_NAME "volprojector"
+        OUTPUT_NAME "alg-projectd"
         SUFFIX ""
 )
 target_link_libraries(volprojector ctiol)
