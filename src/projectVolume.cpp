@@ -60,10 +60,10 @@ int main(int argc, char* argv[])
         ->required();
     CLI11_PARSE(app, argc, argv);
     // Frames to process
-    int totalVolumeSize = volumeSizeX * volumeSizeY * volumeSizeZ;
+    uint32_t totalVolumeSize = volumeSizeX * volumeSizeY * volumeSizeZ;
     float* volume = new float[volumeSizeX * volumeSizeY * volumeSizeZ];
     io::readBytesFrom(a_inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
-    int i, j;
+    uint32_t i, j;
     double v;
 
     matrix::BufferedSparseMatrixDoubleReader A(a_inputSystemMatrix);

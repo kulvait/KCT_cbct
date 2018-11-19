@@ -45,10 +45,10 @@ int main(int argc, char* argv[])
     CLI11_PARSE(app, argc, argv);
     // Frames to process
     std::vector<std::shared_ptr<matrix::BufferedSparseMatrixFloatReader>> readers;
-    for(int k = 0; k != a_unsortedDoubles.size(); k++)
+    for(std::string const& v : a_unsortedDoubles)
     {
         std::shared_ptr<matrix::BufferedSparseMatrixFloatReader> r
-            = std::make_shared<matrix::BufferedSparseMatrixFloatReader>(a_unsortedDoubles[k], 16384);
+            = std::make_shared<matrix::BufferedSparseMatrixFloatReader>(v, 16384);
         readers.push_back(r);
     }
     matrix::BufferedSparseMatrixFloatWritter output(a_sortedFloat, 16384);
@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
     while(true)
     {
         uint32_t mini = 256 * 256 * 199;
-        for(int k = 0; k != a_unsortedDoubles.size(); k++)
+        for(std::size_t k = 0; k != a_unsortedDoubles.size(); k++)
         {
             readers[k]->getNextValue(&i, &j, &v);
             if(i < mini)
@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
         }
         if(mini == 256 * 256 * 199)
         {
-            for(int k = 0; k != a_unsortedDoubles.size(); k++)
+            for(std::size_t k = 0; k != a_unsortedDoubles.size(); k++)
             {
                 if(!readers[k]->atEnd())
                 {

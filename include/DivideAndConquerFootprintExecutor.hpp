@@ -1,6 +1,6 @@
 #pragma once
-#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
+#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 
 namespace CTL {
 namespace util {
@@ -239,9 +239,10 @@ namespace util {
             double px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(px + 0.5); // 0.5 is correct
+            pi = (int)(px + 0.5); // 0.5 is correct since the grid of the projector starts on -0.5,
+                                  // -0.5
             pj = (int)(py + 0.5);
-            if(pi >= 0 && pj >= 0 && pi < pdimx && pj < pdimy)
+            if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
                 return pj * pdimx + pi;
             } else
@@ -275,7 +276,7 @@ namespace util {
             this->voxelCornerNum = (vdimx + 1) * (vdimy + 1) * (vdimz + 1);
             this->resultingIndices = new uint32_t[voxelCornerNum];
             this->scalingFactor = scalingFactor;
-		this->threadpool = nullptr;
+            this->threadpool = nullptr;
         }
 
         ~DivideAndConquerFootprintExecutor()
@@ -288,7 +289,24 @@ namespace util {
             }
         }
 
-        void insertWeightFactors(std::vector<Elm> &vec,
+        uint32_t getPixelIndex(ProjectionMatrix pm, float x, float y, float z)
+        {
+            float px, py;
+            int pi, pj;
+            pm.project(x, y, z, &px, &py);
+            pi = (int)(px + 0.5); // 0.5 is correct since the grid of the projector starts on -0.5,
+                                  // -0.5
+            pj = (int)(py + 0.5);
+            if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
+            {
+                return pj * pdimx + pi;
+            } else
+            {
+                return pdimx * pdimy;
+            }
+        }
+
+        void insertWeightFactors(std::vector<Elm>& vec,
                                  Cube& c,
                                  ProjectionMatrix pm,
                                  std::array<double, 3>& sourcePosition,
@@ -349,7 +367,7 @@ namespace util {
                     // LOGD << io::xprintf("Edge length is %f, volume is %f, scaling factor is %f,
                     // distsquare %f and cos3 is %f.", c.edgeLength, volume, scalingFactor,
                     // distsquare, cos3);
-                        vec.push_back(Elm(pixelIndex, volume*scalingFactor/(cos3*distsquare)));
+                    vec.push_back(Elm(pixelIndex, volume * scalingFactor / (cos3 * distsquare)));
                 }
             }
         }
@@ -394,10 +412,10 @@ namespace util {
                 std::sort(vec.begin(), vec.end());
                 uint32_t prevind = c.detectorPixels;
                 double sum = 0.0;
-		//LOGI << "Calling vector iteration";
+                // LOGI << "Calling vector iteration";
                 for(auto const& e : vec)
                 {
-		//	LOGD << io::xprintf("Vector index = %d, val = %f.", e.pindex, e.val);	
+                    //	LOGD << io::xprintf("Vector index = %d, val = %f.", e.pindex, e.val);
                     if(e.pindex == prevind)
                     {
                         sum += e.val;
@@ -471,10 +489,6 @@ namespace util {
             // First I try to precompute indices of each corner that is
             // (vdimx+1)x(vdimy+1)x(vdimz+1)
             uint32_t voxelindex = 0;
-            double px, py;
-            int pi, pj;
-            uint32_t numberOfWrites = 0;
-            uint32_t nonwrites = 0;
             zcoord = -(double(vdimz) / 2.0);
             for(uint32_t k = 0; k != vdimz + 1; k++)
             {
@@ -484,20 +498,8 @@ namespace util {
                     xcoord = -(double(vdimx) / 2.0);
                     for(uint32_t i = 0; i != vdimx + 1; i++)
                     {
-                        pm.project(xcoord, ycoord, zcoord, &px, &py);
-                        pi = (int)(px + 0.5);
-                        pj = (int)(py + 0.5); // Rounding to integer
-                        if(pi >= 0 && pj >= 0 && pi < pdimx && pj < pdimy)
-                        {
-                            resultingIndices[voxelindex] = pj * pdimx + pi;
-                            //                            w->insertValue(voxelindex, pj * vdimx
-                            //                            + pi, 1.0);
-                            //              numberOfWrites++;
-                        } else
-                        {
-                            resultingIndices[voxelindex] = pdimx * pdimy;
-                            nonwrites++;
-                        }
+                        resultingIndices[voxelindex]
+                            = this->getPixelIndex(pm, xcoord, ycoord, zcoord);
                         xcoord += 1.0;
                         voxelindex++;
                     }
@@ -609,7 +611,7 @@ namespace util {
         uint32_t vdimy = 256;
         uint32_t vdimz = 199;
         int threads = 1;
-        double stoppingEdgeLength = double(1)/double(16);
+        double stoppingEdgeLength = double(1) / double(16);
         uint64_t totalWritesExact, totalWritesInexact;
         // Square distance from source to detector divided by the area of pixel.
         double scalingFactor;

@@ -4,8 +4,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 set(CMAKE_INSTALL_PREFIX $ENV{HOME}/bin)
 set(CMAKE_CXX_STANDARD 14)#Supported values are 98, 11 and 14.
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g")
+set(CMAKE_BUILD_TYPE Debug)
 set(BUILD_SHARED_LIBS False)
 
 #Header directories for the project
@@ -43,35 +43,33 @@ add_custom_target(formatWebkit
 ./formatWebkit
 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-#file(GLOB GLOBAL_SOURCES "src/*.cpp")
-SET(GLOBAL_SOURCES src/projector.cpp)
-add_executable(dacprojector ${GLOBAL_SOURCES})
-set_target_properties(
-    dacprojector
-    PROPERTIES 
-        OUTPUT_NAME "alg-systemmatrix"
-        SUFFIX ""
-)
-target_link_libraries(dacprojector ctiol)
-target_link_libraries(dacprojector ctmal)
-target_link_libraries (dacprojector ${CMAKE_THREAD_LIBS_INIT})
-#target_link_libraries(dacprojector /usr/lib/liblapacke.so)
-#target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
-install (TARGETS dacprojector RUNTIME DESTINATION .)
+#####################START PROGRAM DEFS##################################
 
-#file(GLOB GLOBAL_SOURCES "src/*.cpp")
-SET(XXX_SOURCES src/exactProjector.cpp)
-add_executable(systemmatrixxx ${XXX_SOURCES})
+SET(CTMATRIX_SOURCES src/CTMatrix.cpp)
+add_executable(ctmatrix ${CTMATRIX_SOURCES})
 set_target_properties(
-    systemmatrixxx
+    ctmatrix
     PROPERTIES 
-        OUTPUT_NAME "alg-systemmatrix-exact"
+        OUTPUT_NAME "alg-ctmatrix"
         SUFFIX ""
 )
-target_link_libraries(systemmatrixxx ctiol)
-target_link_libraries(systemmatrixxx ctmal)
-target_link_libraries (systemmatrixxx ${CMAKE_THREAD_LIBS_INIT})
-install (TARGETS systemmatrixxx RUNTIME DESTINATION .)
+target_link_libraries(ctmatrix ctiol)
+target_link_libraries(ctmatrix ctmal)
+target_link_libraries (ctmatrix ${CMAKE_THREAD_LIBS_INIT})
+install (TARGETS ctmatrix RUNTIME DESTINATION .)
+
+SET(CTMATRIXEXACT_SOURCES src/CTMatrixExact.cpp)
+add_executable(exactmatrix ${CTMATRIXEXACT_SOURCES})
+set_target_properties(
+    exactmatrix
+    PROPERTIES 
+        OUTPUT_NAME "alg-exactmatrix"
+        SUFFIX ""
+)
+target_link_libraries(exactmatrix ctiol)
+target_link_libraries(exactmatrix ctmal)
+target_link_libraries (exactmatrix ${CMAKE_THREAD_LIBS_INIT})
+install (TARGETS exactmatrix RUNTIME DESTINATION .)
 
 SET(MRG_SOURCES src/mergeFiles.cpp)
 add_executable(dacmerge ${MRG_SOURCES})

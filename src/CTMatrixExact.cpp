@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
     //                    a_inputDenFiles[0].c_str(), dimx, dimy, dimz);
     std::vector<int> framesToProcess = util::processFramesSpecification(a_frameSpecs, count);
     std::vector<int> framesToOutput;
-    for(int i = 0; i != framesToProcess.size(); i++)
+    for(std::size_t i = 0; i != framesToProcess.size(); i++)
     {
         if(i % a_eachkth == 0)
         {
@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
 
         std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter;
         uint32_t projnum;
-        for(int i = 0; i != framesToOutput.size(); i++)
+        for(std::size_t i = 0; i != framesToOutput.size(); i++)
         {
             projnum = framesToOutput[i];
             LOGD << io::xprintf("Processing projections from %dth position.", projnum);
