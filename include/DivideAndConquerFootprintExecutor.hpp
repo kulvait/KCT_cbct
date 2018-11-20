@@ -239,9 +239,9 @@ namespace util {
             double px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(px + 0.5); // 0.5 is correct since the grid of the projector starts on -0.5,
+            pi = (int)(std::lround(px)); // 0.5 is correct since the grid of the projector starts on -0.5,
                                   // -0.5
-            pj = (int)(py + 0.5);
+            pj = (int)(std::lround(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
                 return pj * pdimx + pi;
@@ -262,7 +262,8 @@ namespace util {
                                           uint32_t vdimy,
                                           uint32_t vdimz,
                                           double scalingFactor,
-                                          int threads)
+                                          int threads,
+					double terminatingEdgeLength=0.25)
         {
             this->w = w;
             this->pdimx = pdimx;
@@ -277,6 +278,7 @@ namespace util {
             this->resultingIndices = new uint32_t[voxelCornerNum];
             this->scalingFactor = scalingFactor;
             this->threadpool = nullptr;
+		this->terminatingEdgeLength = terminatingEdgeLength;
         }
 
         ~DivideAndConquerFootprintExecutor()
@@ -294,9 +296,9 @@ namespace util {
             float px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(px + 0.5); // 0.5 is correct since the grid of the projector starts on -0.5,
+            pi = (int)(std::lround(px)); // 0.5 is correct since the grid of the projector starts on -0.5,
                                   // -0.5
-            pj = (int)(py + 0.5);
+            pj = (int)(std::lround(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
                 return pj * pdimx + pi;
@@ -313,7 +315,7 @@ namespace util {
                                  std::array<double, 3>& normalToDetector)
         {
             bool equalIndices = c.indicesAreEqual();
-            if(c.edgeLength > stoppingEdgeLength && !equalIndices)
+            if(c.edgeLength > terminatingEdgeLength && !equalIndices)
             {
                 Cube c000(c.corner[0], c.corner[1], c.corner[2], c.halfLength, pdimx, pdimy);
                 Cube c001(c.corner[0] + c.halfLength, c.corner[1], c.corner[2], c.halfLength, pdimx,
@@ -381,7 +383,7 @@ namespace util {
         {
 
             bool equalIndices = c.indicesAreEqual();
-            if(c.edgeLength > stoppingEdgeLength && !equalIndices)
+            if(c.edgeLength > terminatingEdgeLength && !equalIndices)
             {
                 std::vector<Elm> vec;
                 Cube c000(c.corner[0], c.corner[1], c.corner[2], c.halfLength, pdimx, pdimy);
@@ -611,7 +613,7 @@ namespace util {
         uint32_t vdimy = 256;
         uint32_t vdimz = 199;
         int threads = 1;
-        double stoppingEdgeLength = double(1) / double(16);
+        double terminatingEdgeLength;
         uint64_t totalWritesExact, totalWritesInexact;
         // Square distance from source to detector divided by the area of pixel.
         double scalingFactor;

@@ -265,8 +265,8 @@ namespace util {
             float px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(px + 0.5); // 0.5 is correct
-            pj = (int)(py + 0.5);
+            pi = (int)(std::lround(px)); //Pixel (0,0) starts at (-0.5,-0.5) exclusive.
+            pj = (int)(std::lround(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
                 return pj * pdimx + pi;
@@ -319,8 +319,8 @@ namespace util {
             float px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(px + 0.5); // 0.5 is correct
-            pj = (int)(py + 0.5);
+            pi = (int)(std::lround(px)); // 0.5 is correct
+            pj = (int)(std::lround(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
                 return pj * pdimx + pi;
@@ -450,7 +450,7 @@ namespace util {
             int vx_i; // Integer representation of the points
             pm.project(x, y, z, &vx, &vy); // z coordinate is the same for all points
             pm.project(x1, y1, z, &vx1, &vy);
-            vx_i = int(vx + 0.5);
+            vx_i = int(std::lround(vx));
             float edgeLength1 = std::sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1));
             float stepLength1 = edgeLength1 / (vx1 - vx);
             if(stepLength1 < 0.0)
@@ -513,7 +513,7 @@ namespace util {
                 int vxindex;
                 if(px00 == std::min({ px00, px01, px10, px11 }))
                 {
-                    vxindex = int(px00 + 0.5);
+                    vxindex = int(std::lround(px00));
                     findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0], c.corner[1],
                                        c.corner[2], c.corner[0] + c.edgeLength, c.corner[1], 0.0);
                     findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0] + c.edgeLength,
@@ -526,7 +526,7 @@ namespace util {
                                        c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength, 1.0);
                 } else if(px01 == std::min({ px00, px01, px10, px11 }))
                 {
-                    vxindex = int(px01 + 0.5);
+                    vxindex = int(std::lround(px01));
                     findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0] + c.edgeLength,
                                        c.corner[1], c.corner[2], c.corner[0] + c.edgeLength,
                                        c.corner[1] + c.edgeLength, 0.0);
@@ -539,7 +539,7 @@ namespace util {
                                        c.corner[2], c.corner[0], c.corner[1] + c.edgeLength, 1.0);
                 } else if(px10 == std::min({ px00, px01, px10, px11 }))
                 {
-                    vxindex = int(px10 + 0.5);
+                    vxindex = int(std::lround(px10));
                     findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0],
                                        c.corner[1] + c.edgeLength, c.corner[2], c.corner[0],
                                        c.corner[1], 0.0);
@@ -553,7 +553,7 @@ namespace util {
                                        c.corner[0] + c.edgeLength, c.corner[1], 1.0);
                 } else // its px11
                 {
-                    vxindex = int(px11 + 0.5);
+                    vxindex = int(std::lround(px11));
                     findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0] + c.edgeLength,
                                        c.corner[1] + c.edgeLength, c.corner[2], c.corner[0],
                                        c.corner[1] + c.edgeLength, 0.0);

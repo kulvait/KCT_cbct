@@ -22,20 +22,13 @@
 
 using namespace CTL;
 
-int main(int argc, char* argv[])
+struct Args
 {
-    plog::Severity verbosityLevel = plog::debug; // Set to debug to see the
-                                                 // debug messages, info
-                                                 // messages
-    std::string csvLogFile = "/tmp/dacprojector.csv"; // Set NULL to disable
-    bool logToConsole = true;
-    plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);
-    plogSetup.initLogging();
-    LOGI << "projector";
-    // Argument parsing
-    std::string a_frameSpecs = "";
-    int a_eachkth = 1;
-    int a_threads = 1;
+    int parseArguments(int argc, char* argv[]);
+    std::string frameSpecs = "";
+    int eachkth = 1;
+    std::vector<int> frames;
+    int threads = 1;
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     int projectionSizeX = 616;
     int projectionSizeY = 480;
@@ -43,66 +36,121 @@ int main(int argc, char* argv[])
     int volumeSizeX = 256;
     int volumeSizeY = 256;
     int volumeSizeZ = 199;
+    double terminatingEdgeLength = 0.25;
+    std::string projectionMatrices;
+    std::string outputSystemMatrix;
+};
 
-    std::string a_outputSystemMatrix;
-    std::string a_projectionMatrices;
+/**Argument parsing
+ *
+ */
+int Args::parseArguments(int argc, char* argv[])
+{
+
     CLI::App app{ "Using divide and conquer techniques to construct CT system matrix.." };
-    app.add_option(
-        "-f,--frames", a_frameSpecs,
-        "Specify only particular projection matrices to process. You can input range i.e. 0-20 or "
-        "also individual comma separated frames i.e. 1,8,9. Order does matter. Accepts "
-        "end literal that means total number of slices of the input.");
-    app.add_option("-k,--each-kth", a_eachkth,
-                   "Process only each k-th frame intended to output. The frames to output "
+    app.add_option("-f,--frames", frameSpecs,
+                   "Specify only particular projection matrices to process. You can input "
+                   "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "
+                   "does matter. Accepts end literal that means total number of slices of the "
+                   "input.");
+    app.add_option("-k,--each-kth", eachkth,
+                   "Process only each k-th frame intended for output. The frames to output "
                    "are then 1st specified, 1+kN, N=1...\\infty if such frame exists. Parameter k "
                    "must be positive integer.")
         ->check(CLI::Range(1, 65535));
-    app.add_option("-j,--threads", a_threads, "Number of extra threads that application can use.")
+    app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
         ->check(CLI::Range(1, 65535));
-    app.add_option("output_system_matrix", a_outputSystemMatrix,
-                   "File in a sparse matrix format to output.")
+    app.add_option("-e,--terminating_edge_length", terminatingEdgeLength,
+                   "Terminating edge length under which no subdivision occurs.")
+        ->check(CLI::Range(1, 65535));
+    app.add_option("output_system_matrix", outputSystemMatrix,
+                   "File in a sparse matrix format to output or prefix of files.")
         ->required()
         ->check(CLI::NonexistentPath);
-    app.add_option("input_matrices", a_projectionMatrices,
-                   "Files in a DEN format to process. These files represents projection matrices.")
+    app.add_option("input_matrices", projectionMatrices,
+                   "Files in a DEN format that contains projection matricess to process.")
         ->required()
         ->check(CLI::ExistingFile);
-    CLI::Option* px = app.add_option("--projx", projectionSizeX, "Dimension of detector");
-    CLI::Option* py = app.add_option("--projy", projectionSizeY, "Dimension of detector");
-    CLI::Option* vx = app.add_option("--volumex", projectionSizeY, "Dimension of volume");
-    CLI::Option* vy = app.add_option("--volumey", projectionSizeY, "Dimension of volume");
-    CLI::Option* vz = app.add_option("--volumez", projectionSizeY, "Dimension of volume");
+    CLI::Option* px
+        = app.add_option("--projx", projectionSizeX, "Dimension of detector, defaults to 616.");
+    CLI::Option* py
+        = app.add_option("--projy", projectionSizeY, "Dimension of detector, defaults to 480.");
+    CLI::Option* vx
+        = app.add_option("--volumex", volumeSizeX, "Dimension of volume, defaults to 256.");
+    CLI::Option* vy
+        = app.add_option("--volumey", volumeSizeY, "Dimension of volume, defaults to 256.");
+    CLI::Option* vz
+        = app.add_option("--volumez", volumeSizeZ, "Dimension of volume, defaults to 199.");
     px->needs(py);
     py->needs(px);
     vx->needs(vy)->needs(vz);
     vy->needs(vx)->needs(vz);
     vz->needs(vx)->needs(vy);
-    CLI11_PARSE(app, argc, argv);
-    LOGD << io::xprintf("Optional parameters: frames=%s, eachkth=%d, threads=%d.",
-                        a_frameSpecs.c_str(), a_eachkth, a_threads);
+    try
+    {
+        app.parse(argc, argv);
+        // How many projection matrices is there in total
+        io::DenFileInfo di(projectionMatrices);
+        std::vector<int> f = util::processFramesSpecification(frameSpecs, di.getNumSlices());
+        for(std::size_t i = 0; i != f.size(); i++)
+        {
+            if(i % eachkth == 0)
+            {
+                frames.push_back(f[i]);
+            }
+        }
+    } catch(const CLI::ParseError& e)
+    {
+        int exitcode = app.exit(e);
+        if(exitcode == 0) // Help message was printed
+        {
+            return 1;
+        } else
+        {
+            LOGE << "Parse error catched";
+            return -1;
+        }
+    }
+    return 0;
+}
+
+int main(int argc, char* argv[])
+{
+    plog::Severity verbosityLevel = plog::debug; // debug, info, ...
+    std::string csvLogFile = io::xprintf("/tmp/%s.csv", argv[0]); // Set NULL to disable
+    bool logToConsole = true;
+    plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);
+    plogSetup.initLogging();
+    LOGI << io::xprintf("%s", argv[0]);
+    // Argument parsing
+    Args a;
+    int parseResult = a.parseArguments(argc, argv);
+    if(parseResult != 0)
+    {
+        if(parseResult > 0)
+        {
+            return 0; // Exited sucesfully, help message printed
+        } else
+        {
+            return -1; // Exited somehow wrong
+        }
+    }
+    //LOGD << io::xprintf("Input matrices %s and output %s.", a.projectionMatrices,
+    //                    a.outputSystemMatrix);
+    // LOGD << io::xprintf("Values of parameters: frames=%s, eachkth=%d, threads=%d.",
+    //                   a.frameSpecs.c_str(), a.eachkth, a.threads);
     // Frames to process
     std::shared_ptr<io::DenProjectionMatrixReader> dr
-        = std::make_shared<io::DenProjectionMatrixReader>(a_projectionMatrices);
+        = std::make_shared<io::DenProjectionMatrixReader>(a.projectionMatrices);
     int count = dr->count();
-    if(uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ) > INT_MAX)
+    if(uint64_t(a.volumeSizeX) * uint64_t(a.volumeSizeY) * uint64_t(a.volumeSizeZ) > INT_MAX)
     {
         io::throwerr("Implement indexing by uint64_t matrix dimension overflow of voxels count.");
     }
-    if(uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(count) > INT_MAX)
+    if(uint64_t(a.projectionSizeX) * uint64_t(a.projectionSizeY) * uint64_t(count) > INT_MAX)
     {
         io::throwerr(
             "Implement indexing by uint64_t matrix dimension overflow of projection pixels count.");
-    }
-    // LOGD << io::xprintf("The file %s has dimensions (x,y,z)=(%d, %d, %d)",
-    //                    a_inputDenFiles[0].c_str(), dimx, dimy, dimz);
-    std::vector<int> framesToProcess = util::processFramesSpecification(a_frameSpecs, count);
-    std::vector<int> framesToOutput;
-    for(std::size_t i = 0; i != framesToProcess.size(); i++)
-    {
-        if(i % a_eachkth == 0)
-        {
-            framesToOutput.push_back(framesToProcess[i]);
-        }
     }
     util::ProjectionMatrix pm = dr->readMatrix(0);
     double pixelSpacingX = 0.616;
@@ -136,20 +184,20 @@ int main(int argc, char* argv[])
     bool submatrices = true;
     if(!submatrices)
     {
-        LOGD << io::xprintf("Number of projections to process is %d.", framesToOutput.size());
+        LOGD << io::xprintf("Number of projections to process is %d.", a.frames.size());
         // End parsing arguments
         std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter
-            = std::make_shared<matrix::BufferedSparseMatrixWritter>(a_outputSystemMatrix);
-        util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX, projectionSizeY,
-                                                    volumeSizeX, volumeSizeY, volumeSizeZ,
-                                                    scalingFactor, a_threads);
+            = std::make_shared<matrix::BufferedSparseMatrixWritter>(a.outputSystemMatrix, 8192, true);
+        util::DivideAndConquerFootprintExecutor dfe(
+            matrixWritter, a.projectionSizeX, a.projectionSizeY, a.volumeSizeX, a.volumeSizeY,
+            a.volumeSizeZ, scalingFactor, a.threads, a.terminatingEdgeLength);
         uint32_t projnum;
-        for(std::size_t i = 0; i != framesToOutput.size(); i++)
+        for(std::size_t i = 0; i != a.frames.size(); i++)
         {
             dfe.startThreadpool();
-            projnum = framesToOutput[i];
+            projnum = a.frames[i];
             LOGD << io::xprintf("Processing projections from %dth position.", projnum);
-            uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
+            uint32_t pixelIndexOffset = projnum * a.projectionSizeX * a.projectionSizeY;
             util::ProjectionMatrix pm = dr->readMatrix(projnum);
             dfe.insertMatrixProjections(pm, pixelIndexOffset);
             dfe.stopThreadpool();
@@ -161,17 +209,17 @@ int main(int argc, char* argv[])
 
         std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter;
         uint32_t projnum;
-        for(std::size_t i = 0; i != framesToOutput.size(); i++)
+        for(std::size_t i = 0; i != a.frames.size(); i++)
         {
-            projnum = framesToOutput[i];
+            projnum = a.frames[i];
             LOGD << io::xprintf("Processing projections from %dth position.", projnum);
             matrixWritter = std::make_shared<matrix::BufferedSparseMatrixWritter>(
-                io::xprintf("%s_%03d", a_outputSystemMatrix.c_str(), projnum), 8192, true);
-            util::DivideAndConquerFootprintExecutor dfe(matrixWritter, projectionSizeX,
-                                                        projectionSizeY, volumeSizeX, volumeSizeY,
-                                                        volumeSizeZ, scalingFactor, a_threads);
+                io::xprintf("%s_%03d", a.outputSystemMatrix.c_str(), projnum), 8192, true);
+            util::DivideAndConquerFootprintExecutor dfe(
+                matrixWritter, a.projectionSizeX, a.projectionSizeY, a.volumeSizeX, a.volumeSizeY,
+                a.volumeSizeZ, scalingFactor, a.threads, a.terminatingEdgeLength);
             dfe.startThreadpool();
-            uint32_t pixelIndexOffset = projnum * projectionSizeX * projectionSizeY;
+            uint32_t pixelIndexOffset = projnum * a.projectionSizeX * a.projectionSizeY;
             util::ProjectionMatrix pm = dr->readMatrix(projnum);
             dfe.insertMatrixProjections(pm, pixelIndexOffset);
             dfe.stopThreadpool();
