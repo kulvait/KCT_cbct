@@ -1,4 +1,5 @@
 #pragma once
+#include "MATH/round.h"
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 
@@ -21,6 +22,13 @@ namespace util {
     {
         float x;
         float y;
+
+        Point2D()
+            : x(0)
+            , y(0)
+        {
+        }
+
         Point2D(float x, float y)
             : x(x)
             , y(y)
@@ -52,12 +60,12 @@ namespace util {
         std::array<uint32_t, 19> subPixelIndex;
         // Left lower bottom corner of the cube, needs to be increased by edgelength to get other
         // coords
-        std::array<double, 3> corner;
-        double edgeLength;
-        double halfLength;
+        std::array<float, 3> corner;
+        float edgeLength;
+        float halfLength;
         uint32_t pdimx, pdimy;
         uint32_t detectorPixels;
-        Cube(double lx, double ly, double lz, double edgeLength, uint32_t pdimx, uint32_t pdimy)
+        Cube(float lx, float ly, float lz, double edgeLength, uint32_t pdimx, uint32_t pdimy)
         {
             corner[0] = lx;
             corner[1] = ly;
@@ -265,8 +273,8 @@ namespace util {
             float px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(std::lround(px)); //Pixel (0,0) starts at (-0.5,-0.5) exclusive.
-            pj = (int)(std::lround(py));
+            pi = (int)(math::lroundLow(px)); // Pixel (0,0) has boundaries (-0.5,+0.5].
+            pj = (int)(math::lroundLow(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
                 return pj * pdimx + pi;
@@ -286,7 +294,7 @@ namespace util {
                                 uint32_t vdimx,
                                 uint32_t vdimy,
                                 uint32_t vdimz,
-                                double scalingFactor,
+                                float scalingFactor,
                                 int threads)
         {
             this->w = w;
@@ -319,8 +327,8 @@ namespace util {
             float px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(std::lround(px)); // 0.5 is correct
-            pj = (int)(std::lround(py));
+            pi = (int)(math::lroundLow(px)); // 0.5 is correct
+            pj = (int)(math::lroundLow(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
                 return pj * pdimx + pi;
@@ -331,8 +339,13 @@ namespace util {
         }
 
         // Now cut it in z slices
-        void
-        insertPrism(std::shared_ptr<Prism> prism, Cube c, uint32_t voxelIndex, ProjectionMatrix pm)
+        void insertPrism(std::shared_ptr<Prism> prism,
+                         Cube c,
+                         uint32_t voxelIndex,
+                         ProjectionMatrix pm,
+                         uint32_t pixelIndexOffset,
+                         std::array<float, 3> sourcePosition,
+                         std::array<float, 3> normalToDetector)
         {
             // If prism projection x index is not on the detector, write nothing
             if(prism->pxindex < 0 || prism->pxindex > (int)pdimx)
@@ -345,81 +358,110 @@ namespace util {
                 std::vector<ElmInt> zindices;
                 for(std::size_t i = 0; i != prism->points.size(); i++)
                 {
-                    float vx, vy, vy1;
-                    int vy_i, vy1_i; // Integer representation of the points
-                    pm.project(prism->points[i].x, prism->points[i].y, (float)c.corner[2], &vx,
-                               &vy); // z coordinate is the same for all points
+                    float px, py, py1;
+                    int py_i, py1_i; // Integer representation of the points
+                    pm.project(prism->points[i].x, prism->points[i].y, (float)c.corner[2], &px,
+                               &py); // Coordinate px should not differ when projecting points where
+                                     // only z coordinate varies.
                     pm.project(prism->points[i].x, prism->points[i].y,
-                               (float)(c.corner[2] + c.edgeLength), &vx, &vy1);
-                    vy_i = int(vy + 0.5);
-                    vy1_i = int(vy1 + 0.5);
-                    if(vy_i == vy1_i)
+                               (float)(c.corner[2] + c.edgeLength), &px, &py1);
+                    if(py == py1)
                     {
-                        zindices.push_back(ElmInt(vy_i, c.edgeLength));
+                        // There is no point to add along this line
+                        return;
+                    }
+                    py_i = math::lroundLow(py);
+                    py1_i = math::lroundLow(py1);
+                    if(py_i == py1_i)
+                    {
+                        zindices.push_back(ElmInt(py_i, c.edgeLength));
                         continue;
                     }
-                    int curvy;
-                    float stepLength = c.edgeLength / (vy1 - vy);
-                    float vxtoedge;
+                    int py_cur = py_i;
+                    float stepLength
+                        = c.edgeLength / (py1 - py); // Length of step for which py increases by one
+                    float nextGridPy; // Which will be the next intersection with the projector grid
+                                      // on the lixe [vx, vy, vz] -- [vx, vy, vz+edgeLength]
                     if(stepLength > 0)
                     {
-                        vxtoedge
-                            = (0.5 + vy_i) - vy; // How far in vx I am from the corner to boundary
+                        nextGridPy = (float(py_i) + 0.5);
                     } else
                     {
-                        vxtoedge = (-0.5 + vy_i) - vy;
+                        nextGridPy = (float(py_i) - 0.5);
                     }
-                    float intersection = stepLength * vxtoedge;
-                    zindices.push_back(ElmInt(curvy, intersection));
-                    if(stepLength > 0)
-                    {
-                        curvy++;
-                    } else
-                    {
-                        curvy--;
-                    }
+                    float intersection = stepLength * (nextGridPy - py);
+                    zindices.push_back(ElmInt(py_cur, intersection));
                     while(intersection < c.edgeLength)
                     {
-                        zindices.push_back(ElmInt(curvy, stepLength));
                         if(stepLength > 0)
                         {
-                            curvy++;
+                            py_cur++;
                         } else
                         {
-                            curvy--;
+                            py_cur--;
                         }
                         intersection += std::abs(stepLength);
+                        if(intersection < c.edgeLength)
+                        {
+                            zindices.push_back(ElmInt(py_cur, std::abs(stepLength)));
+                        } else
+                        {
+                            zindices.push_back(
+                                ElmInt(py_cur, c.edgeLength - intersection + std::abs(stepLength)));
+                        }
                     }
-                    zindices.push_back(
-                        ElmInt(curvy, c.edgeLength - intersection - std::abs(stepLength)));
                 }
                 std::sort(zindices.begin(), zindices.end());
+                assert(zindices.size() > 0);
+                // Now duplicates will be represented by one object with the value that is sum of
+                // values of
+                int lastpindex = zindices[0].pindex;
+                int previndex = 0;
+                for(std::size_t i = 1; i < zindices.size(); i++)
+                {
+                    if(lastpindex == zindices[i].pindex)
+                    {
+                        zindices[previndex].val += zindices[i].val;
+                        zindices[i].val = 0.0;
+                    } else
+                    {
+                        lastpindex = zindices[i].pindex;
+                        previndex = i;
+                    }
+                }
+                // Remove all zero elements
+                zindices.erase(std::remove_if(zindices.begin(), zindices.end(),
+                                              [](const ElmInt& e) { return e.val == 0; }),
+                               zindices.end());
+
                 float totalSum = 0;
                 for(std::size_t i = 0; i != zindices.size(); i++)
                 {
                     totalSum += zindices[i].val;
                 }
-                std::vector<ElmInt> singleElements;
-                int vyindex = zindices[0].pindex;
-                float sum = 0.0;
                 for(std::size_t i = 0; i != zindices.size(); i++)
                 {
-                    if(vyindex == zindices[i].pindex)
-                    {
-                        sum += zindices[i].val / totalSum;
-                    } else
-                    {
-                        w->insertValue(voxelIndex, vyindex * vdimx + prism->pxindex,
-                                       prism->surface * sum);
-                        sum = zindices[i].val / totalSum;
-                        vyindex = zindices[i].pindex;
-                    }
+                    zindices[i].val /= totalSum;
                 }
-                if(sum != 0)
+                for(std::size_t i = 0; i != zindices.size(); i++)
                 {
-
-                    w->insertValue(voxelIndex, vyindex * vdimx + prism->pxindex,
-                                   prism->surface * sum);
+                    if(zindices[i].pindex >= 0 && zindices[i].pindex < (int)pdimy)
+                    {
+                        double volume = prism->surface * zindices[i].val;
+                        double v_x = prism->points[0].x - sourcePosition[0];
+                        double v_y = prism->points[0].y - sourcePosition[1];
+                        double v_z = c.corner[2] + c.halfLength - sourcePosition[2];
+                        double distsquare = v_x * v_x + v_y * v_y + v_z * v_z;
+                        double norm = std::sqrt(distsquare);
+                        double cos = (normalToDetector[0] * v_x + normalToDetector[1] * v_y
+                                      + normalToDetector[2] * v_z)
+                            / norm;
+                        double cos3 = cos * cos * cos;
+                        w->insertValue(voxelIndex,
+                                       zindices[i].pindex * pdimx + prism->pxindex
+                                           + pixelIndexOffset,
+                                       scalingFactor * volume / (distsquare * cos3));
+                    }
                 }
             }
         }
@@ -427,43 +469,54 @@ namespace util {
         /** Find the time of intersection of voxel and pixel grid in a plane projected to pixel x
          *coordinate.
          *
-         *Let's have t \in [0,1) that parametrizes the segment (x+t(x1-x), y+t(y1-y), z). Suppose
-         *that the value of vx coordinate on the projection plane is non decreasing with the value
-         *of x. Function finds all the values of parameter t \in [0,1) on the segment (x, y, z) --
-         *(x1, y1, z), for which projection of (x+t(x1-x), y+t(y1-y), z) to (px, py) is exactly on
-         *the boundary of the pixel, that means px + 0.5 is integer. It adds the values of
-         *t+pointOffset to the boundaryPoints vector and adds the values of (x+t(x1-x), y+t(y1-y))
-         *inte the points vector.
+         *Lets a=(x,y) and b =(x1,y1), z coordinate of both points iz a z. Let's have t \in [0,1)
+         *that parametrizes the segment (x+t(x1-x), y+t(y1-y), z). Suppose that the value of vx
+         *coordinate on the projection plane is non decreasing with the value of x. Function finds
+         *all the values of parameter t \in [0,1) on the segment (x, y, z) -- (x1, y1, z), for which
+         *projection of (x+t(x1-x), y+t(y1-y), z) to (px, py) is exactly on the boundary of the
+         *pixel, that means px + 0.5 is integer. It adds the values of t+pointOffset to the
+         *boundaryPoints vector and adds the values of (x+t(x1-x), y+t(y1-y)) inte the points
+         *vector.
          */
-        void findBoundaryPoints(std::vector<float> boundaryPoints,
-                                std::vector<Point2D> points,
+        void findBoundaryPoints(std::shared_ptr<std::vector<float>> boundaryPoints,
+                                std::shared_ptr<std::vector<Point2D>> points,
                                 ProjectionMatrix pm,
-                                float x,
-                                float y,
+                                Point2D* a,
+                                Point2D* b,
                                 float z,
-                                float x1,
-                                float y1,
                                 float pointOffset)
         {
 
-            float vx, vx1, vy;
-            int vx_i; // Integer representation of the points
-            pm.project(x, y, z, &vx, &vy); // z coordinate is the same for all points
-            pm.project(x1, y1, z, &vx1, &vy);
-            vx_i = int(std::lround(vx));
-            float edgeLength1 = std::sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1));
-            float stepLength1 = edgeLength1 / (vx1 - vx);
-            if(stepLength1 < 0.0)
+            float px, px1, py;
+            float px_boundary; // The highest px coordinate that maps to the same pixel (or to the
+                               // boundary)
+            int ax_i, bx_i;
+            int boundarySteps;
+            pm.project(a->x, a->y, z, &px, &py); // z coordinate is the same for all points
+            pm.project(b->x, b->y, z, &px1, &py);
+            px_boundary = math::roundLow(px) + 0.5; // Here it is beneficial to have the point as a
+                                                    // float since I am working with it as with the
+                                                    // coordinate of the boundary
+            assert(px - math::roundLow(px) != -0.5);
+            ax_i = math::lroundLow(px);
+            bx_i = math::lroundLow(px1);
+            boundarySteps = bx_i - ax_i;
+            float edgeLength
+                = std::sqrt((a->x - b->x) * (a->x - b->x) + (a->y - b->y) * (a->y - b->y));
+            float stepLength = edgeLength / (px1 - px);
+            if(stepLength < 0.0)
             {
                 io::throwerr("Step length is negative!");
             }
-            float vxtoedge = (0.5 + vx_i) - vx; // How far in vx I am from the corner to boundary
-            float intersection = stepLength1 * vxtoedge;
-            while(intersection < edgeLength1)
+            float pxtoedge = px_boundary - px; // How far is the boundary on the detector in x from
+                                               // the place to which x,y,z maps
+            float intersection = stepLength * pxtoedge; // Due to rounding errors rather use for
+            for(int i = 0; i != boundarySteps; i++)
             {
-                boundaryPoints.push_back(intersection + pointOffset);
-                points.push_back(Point2D(x + intersection * (x1 - x), y + intersection * (y1 - y)));
-                intersection += stepLength1;
+                boundaryPoints->push_back(intersection + pointOffset);
+                points->push_back(Point2D(a->x + intersection * (b->x - a->x),
+                                          a->y + intersection * (b->y - a->y)));
+                intersection += stepLength;
             }
         }
 
@@ -471,8 +524,8 @@ namespace util {
                                   ProjectionMatrix pm,
                                   uint32_t voxelIndex,
                                   uint32_t pixelIndexOffset,
-                                  std::array<double, 3> sourcePosition,
-                                  std::array<double, 3> normalToDetector)
+                                  std::array<float, 3> sourcePosition,
+                                  std::array<float, 3> normalToDetector)
         {
             bool equalIndices = c.indicesAreEqual();
             if(equalIndices)
@@ -499,8 +552,8 @@ namespace util {
                 // First I determine volumes of the objects that will have the same px
                 // coordinate
 
-                double py;
-                double px00, px01, px10, px11;
+                float py;
+                float px00, px01, px10, px11;
                 pm.project(c.corner[0], c.corner[1], c.corner[2], &px00, &py);
                 pm.project(c.corner[0] + c.edgeLength, c.corner[1], c.corner[2], &px01, &py);
                 pm.project(c.corner[0], c.corner[1] + c.edgeLength, c.corner[2], &px10, &py);
@@ -508,140 +561,168 @@ namespace util {
                            &px11, &py);
 
                 // There is a corner with minimal px; ... find this corner
-                std::vector<float> boundaryPointsA, boundaryPointsB;
-                std::vector<Point2D> pointsA, pointsB;
-                int vxindex;
+                std::shared_ptr<std::vector<float>> intersectionsCCW
+                    = std::make_shared<std::vector<float>>();
+                std::shared_ptr<std::vector<float>> intersectionsCW
+                    = std::make_shared<std::vector<float>>();
+                std::shared_ptr<std::vector<Point2D>> pointsCCW
+                    = std::make_shared<std::vector<Point2D>>();
+                std::shared_ptr<std::vector<Point2D>> pointsCW
+                    = std::make_shared<std::vector<Point2D>>();
+                int pxindex;
+                // Four points in the four corners of the down square of voxel
+                Point2D V00(c.corner[0], c.corner[1]);
+                Point2D V01(c.corner[0] + c.edgeLength, c.corner[1]);
+                Point2D V10(c.corner[0], c.corner[1] + c.edgeLength);
+                Point2D V11(c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength);
+
+                Point2D* V_max;
+                Point2D* V_ccw[4];
                 if(px00 == std::min({ px00, px01, px10, px11 }))
                 {
-                    vxindex = int(std::lround(px00));
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0], c.corner[1],
-                                       c.corner[2], c.corner[0] + c.edgeLength, c.corner[1], 0.0);
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1], c.corner[2], c.corner[0] + c.edgeLength,
-                                       c.corner[1] + c.edgeLength, 1.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0], c.corner[1],
-                                       c.corner[2], c.corner[0], c.corner[1] + c.edgeLength, 0.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0],
-                                       c.corner[1] + c.edgeLength, c.corner[2],
-                                       c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength, 1.0);
+                    pxindex = int(math::lroundLow(px00));
+                    V_ccw[0] = &V00;
+                    V_ccw[1] = &V01;
+                    V_ccw[2] = &V11;
+                    V_ccw[3] = &V10;
                 } else if(px01 == std::min({ px00, px01, px10, px11 }))
                 {
-                    vxindex = int(std::lround(px01));
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1], c.corner[2], c.corner[0] + c.edgeLength,
-                                       c.corner[1] + c.edgeLength, 0.0);
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1] + c.edgeLength, c.corner[2], c.corner[0],
-                                       c.corner[1] + c.edgeLength, 1.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1], c.corner[2], c.corner[0], c.corner[1], 0.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0], c.corner[1],
-                                       c.corner[2], c.corner[0], c.corner[1] + c.edgeLength, 1.0);
+                    pxindex = int(math::lroundLow(px01));
+                    V_ccw[0] = &V01;
+                    V_ccw[1] = &V11;
+                    V_ccw[2] = &V10;
+                    V_ccw[3] = &V00;
                 } else if(px10 == std::min({ px00, px01, px10, px11 }))
                 {
-                    vxindex = int(std::lround(px10));
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0],
-                                       c.corner[1] + c.edgeLength, c.corner[2], c.corner[0],
-                                       c.corner[1], 0.0);
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0], c.corner[1],
-                                       c.corner[2], c.corner[0] + c.edgeLength, c.corner[1], 1.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0],
-                                       c.corner[1] + c.edgeLength, c.corner[2],
-                                       c.corner[0] + c.edgeLength, c.corner[1] + c.edgeLength, 0.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1] + c.edgeLength, c.corner[2],
-                                       c.corner[0] + c.edgeLength, c.corner[1], 1.0);
+                    pxindex = int(math::lroundLow(px10));
+                    V_ccw[0] = &V10;
+                    V_ccw[1] = &V00;
+                    V_ccw[2] = &V01;
+                    V_ccw[3] = &V11;
                 } else // its px11
                 {
-                    vxindex = int(std::lround(px11));
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1] + c.edgeLength, c.corner[2], c.corner[0],
-                                       c.corner[1] + c.edgeLength, 0.0);
-                    findBoundaryPoints(boundaryPointsA, pointsA, pm, c.corner[0],
-                                       c.corner[1] + c.edgeLength, c.corner[2], c.corner[0],
-                                       c.corner[1], 1.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1] + c.edgeLength, c.corner[2],
-                                       c.corner[0] + c.edgeLength, c.corner[1], 0.0);
-                    findBoundaryPoints(boundaryPointsB, pointsB, pm, c.corner[0] + c.edgeLength,
-                                       c.corner[1], c.corner[2], c.corner[0], c.corner[1], 1.0);
+                    pxindex = int(math::lroundLow(px11));
+                    V_ccw[0] = &V11;
+                    V_ccw[1] = &V10;
+                    V_ccw[2] = &V00;
+                    V_ccw[3] = &V01;
                 }
-
-                std::vector<double> volumes;
-                for(std::size_t i = 0; i != boundaryPointsA.size(); i++)
-                { // I expect there are two edges and the value of px grows along these.
-                    double a, b;
-                    a = boundaryPointsA[i];
-                    b = boundaryPointsB[i];
-                    if(a <= 1.0 && b <= 1.0)
+                if(px00 == std::max({ px00, px01, px10, px11 }))
+                {
+                    V_max = &V00;
+                } else if(px01 == std::max({ px00, px01, px10, px11 }))
+                {
+                    V_max = &V01;
+                } else if(px10 == std::max({ px00, px01, px10, px11 }))
+                {
+                    V_max = &V10;
+                } else // its px11
+                {
+                    V_max = &V11;
+                }
+                for(int i = 0; i != 4; i++)
+                {
+                    findBoundaryPoints(intersectionsCCW, pointsCCW, pm, V_ccw[i], V_ccw[i + 1],
+                                       c.corner[2], float(i));
+                    if(V_ccw[i + 1] == V_max)
                     {
-                        volumes.push_back(a * b);
-                    } else if(a > 1.0 && b <= 1.0)
+                        break;
+                    }
+                }
+                // Go against the clock until reaching p_max point
+                for(int i = 0; i != 4; i++)
+                {
+                    findBoundaryPoints(intersectionsCW, pointsCW, pm, V_ccw[(4 - i) % 4],
+                                       V_ccw[(4 - i - 1) % 4], c.corner[2], float(i));
+                    if(V_ccw[(4 - i - 1) % 4] == V_max)
                     {
-                        double al = a - 1.0;
-                        volumes.push_back(1.0 * al + (b - al) / 2.0);
-                    } else if(a > 1.0 && b > 1.0)
+                        break;
+                    }
+                }
+                if(intersectionsCCW->size() != intersectionsCW->size())
+                {
+                    assert(intersectionsCCW->size() == intersectionsCW->size());
+                    assert(pointsCCW->size() == pointsCW->size());
+                    assert(pointsCCW->size() == intersectionsCCW->size());
+                }
+                std::vector<float> volumes;
+                // From the values of intersection I can compute the area of the square that
+                // contains point 0,0 and points of intersections
+                // Volumes are relative to unit square area of one.
+                for(std::size_t i = 0; i != intersectionsCW->size(); i++)
+                {
+                    float a, b;
+                    a = (*intersectionsCCW)[i];
+                    b = (*intersectionsCW)[i];
+                    if(a > b)
                     {
-                        volumes.push_back(1.0 - (2.0 - a) * (2.0 - b));
+                        std::swap(a, b);
+                    }
+                    // a<=b
+                    if(a <= 1.0)
+                    {
+                        if(b <= 1.0)
+                        {
+                            volumes.push_back(
+                                a * b / 2.0); // Triangle that is bounded by corners (0, a, b)
+                        } else if(b <= 2.0)
+                        {
+                            b = b - 1.0; // Upper edge length
+                            volumes.push_back(a + (b - a) / 2.0);
+                        } else if(b <= 3.0)
+                        {
+                            a = 1.0 - a;
+                            b = 3.0 - b;
+                            volumes.push_back(1.0 - (a * b) / 2.0); // Whole square but the area of
+                                                                    // the triangle bounded by
+                                                                    // corners (a, 1, b)
+                        }
+                    } else if(a <= 2.0)
+                    {
+                        assert(b <= 3.0);
+                        a = 2.0 - a;
+                        b = 2.0 - b;
+                        volumes.push_back(1 - (a * b) / 2.0); // Whole square but the area of the
+                                                              // triangle bounded by (a, 2, b)
                     }
                 }
                 volumes.push_back(1.0);
-                for(int i = boundaryPointsA.size(); i > 0; i--)
+                assert(pointsCCW->size() + 1 == volumes.size());
+                for(int i = intersectionsCW->size(); i > 0; i--)
                 {
                     volumes[i] -= volumes[i - 1];
                 }
-                for(std::size_t i = 0; i <= boundaryPointsA.size(); i++)
+                // Suppose that in volumes there is one point more than in intersectionsCCW
+                for(std::size_t i = 0; i != volumes.size(); i++)
                 {
-                    std::shared_ptr<Prism> p = std::make_shared<Prism>(volumes[i], vxindex++);
-                    if(i == 0)
+                    std::shared_ptr<Prism> p = std::make_shared<Prism>(volumes[i], pxindex);
+                    if(pxindex >= 0 && pxindex < (int)pdimx)
                     {
-                        p->addPoint(pointsA[0]);
-                        p->addPoint(pointsA[1]);
-                        p->addPoint(pointsB[1]);
-                    } else if(i == boundaryPointsA.size())
-                    {
-                        p->addPoint(pointsA[i - 1]);
-                        p->addPoint(pointsA[i]);
-                        p->addPoint(pointsB[i - 1]);
-                    } else
-                    {
-                        p->addPoint(pointsA[i]);
-                        p->addPoint(pointsB[i]);
-                        p->addPoint(pointsA[i + 1]);
-                        p->addPoint(pointsB[i + 1]);
+                        if(i == 0)
+                        {
+                            p->addPoint(*V_ccw[0]); // minimum
+                            p->addPoint(pointsCCW->operator[](i));
+                            p->addPoint(pointsCW->operator[](i));
+                        } else if(i == volumes.size() - 1)
+                        {
+                            p->addPoint(pointsCCW->operator[](i - 1));
+                            p->addPoint(pointsCW->operator[](i - 1));
+                            p->addPoint(*V_max);
+                        } else
+                        {
+                            p->addPoint(pointsCCW->operator[](i - 1));
+                            p->addPoint(pointsCW->operator[](i - 1));
+                            p->addPoint(pointsCCW->operator[](i));
+                            p->addPoint(pointsCW->operator[](i));
+                        }
+                        insertPrism(p, c, voxelIndex, pm, pixelIndexOffset, sourcePosition,
+                                    normalToDetector);
                     }
-                    insertPrism(p, c, voxelIndex, pm);
+                    pxindex++;
                 }
                 // Now find parts of the square that maps into the given index or indices below
                 // it
             }
-
-            /*
-                        if(c.get000() != c.detectorPixels && c.get001() != c.detectorPixels
-                           && c.get011() != c.detectorPixels && c.get100() != c.detectorPixels
-                           && c.get101() != c.detectorPixels && c.get110() != c.detectorPixels
-                           && c.get111() != c.detectorPixels)
-                        {
-                            // The x coordinate on the detector is the same. It is sufficient to
-                            double py00, py01, py10, py11, py20, py21, py30, py31;
-                            double px00, px01, px10, px11, px20, px21, px30, px31;
-                            pm.project(c.corner[0], c.corner[1], c.corner[2], &px00, &py00);
-                            pm.project(c.corner[0], c.corner[1], c.corner[2] + c.edgeLength,
-               &px01, &py01); pm.project(c.corner[0] + c.edgeLength, c.corner[1], c.corner[2],
-               &px10, &py10); pm.project(c.corner[0] + c.edgeLength, c.corner[1], c.corner[2] +
-               c.edgeLength, &px11, &py11); pm.project(c.corner[0], c.corner[1] + c.edgeLength,
-               c.corner[2], &px20, &py20); pm.project(c.corner[0], c.corner[1] + c.edgeLength,
-               c.corner[2] + c.edgeLength, &px21, &py21); pm.project(c.corner[0] + c.edgeLength,
-               c.corner[1] + c.edgeLength, c.corner[2], &px30, &py30); pm.project(c.corner[0] +
-               c.edgeLength, c.corner[1] + c.edgeLength, c.corner[2] + c.edgeLength, &px31,
-               &py31); std::cout << io::xprintf( "Cube of edge %f: [%f, %f, %f] (%d, %d, %d,
-               %d), (%d, %d, %d, %d): \n", c.edgeLength, c.corner[0], c.corner[1], c.corner[2],
-               c.get000(), c.get001(), c.get010(), c.get011(), c.get100(), c.get101(),
-               c.get110(), c.get111()); std::cout << io::xprintf("X:[%f, %f], [%f, %f], [%f,
-               %f], [%f, %f]\n", px00, px01, px10, px11, px20, px21, px30, px31); std::cout <<
-               io::xprintf("Y:[%f, %f], [%f, %f], [%f, %f], [%f, %f]\n", py00, py01, py10, py11,
-               py20, py21, py30, py31);
-                        }*/
         }
 
         void insertMatrixProjections(ProjectionMatrix pm, uint32_t pixelIndexOffset)
@@ -650,8 +731,15 @@ namespace util {
             {
                 startThreadpool();
             }
-            std::array<double, 3> sourcePosition = pm.sourcePosition();
-            std::array<double, 3> normalToDetector = pm.normalToDetector();
+            std::array<double, 3> sourcePositionD = pm.sourcePosition();
+            std::array<double, 3> normalToDetectorD = pm.normalToDetector();
+            std::array<float, 3> sourcePosition;
+            std::array<float, 3> normalToDetector;
+            for(int i = 0; i != 3; i++)
+            {
+                sourcePosition[i] = sourcePositionD[i];
+                normalToDetector[i] = normalToDetectorD[i];
+            }
 
             LOGD << io::xprintf(
                 "Source position is [%f, %f, %f] and normal to detector [%f, %f, %f]",
@@ -670,7 +758,8 @@ namespace util {
                     xcoord = -(double(vdimx) / 2.0);
                     for(uint32_t i = 0; i != vdimx + 1; i++)
                     {
-                        resultingIndices[voxelindex] = getProjectionIndex(pm, xcoord, ycoord, zcoord);
+                        resultingIndices[voxelindex]
+                            = getProjectionIndex(pm, xcoord, ycoord, zcoord);
                         xcoord += 1.0;
                         voxelindex++;
                     }
@@ -785,7 +874,7 @@ namespace util {
         int threads = 1;
         uint64_t totalWritesExact, totalWritesInexact;
         // Square distance from source to detector divided by the area of pixel.
-        double scalingFactor;
+        float scalingFactor;
     }; // namespace util
 } // namespace util
 } // namespace CTL
