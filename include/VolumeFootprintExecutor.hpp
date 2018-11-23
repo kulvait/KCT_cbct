@@ -809,12 +809,12 @@ namespace util {
                         c.set111(resultingIndices[i + 1 + (vdimx + 1) * (j + 1)
                                                   + (vdimx + 1) * (vdimy + 1) * (k + 1)]);
 
-                        //            threadpool->push([&, this, c, pm, voxelindex,
-                        //            pixelIndexOffset,
-                        //                              sourcePosition, normalToDetector](int id) {
+                                    threadpool->push([&, this, c, pm, voxelindex,
+                                    pixelIndexOffset,
+                                                      sourcePosition, normalToDetector](int id) {
                         this->computeWeightFactors(c, pm, voxelindex, pixelIndexOffset,
                                                    sourcePosition, normalToDetector);
-                        //            });
+                                    });
                         // computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
                         //            if(voxelindex != i + j * vdimx + k * vdimx * vdimy)
                         //            {

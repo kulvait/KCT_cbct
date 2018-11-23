@@ -42,7 +42,7 @@ struct Args
     bool noFrameOffset = false;
     std::string projectionMatrices;
     std::string outputSystemMatrix;
-	bool force = false;
+    bool force = false;
 };
 
 /**Argument parsing
@@ -55,8 +55,7 @@ int Args::parseArguments(int argc, char* argv[])
     app.add_option("output_system_matrix", outputSystemMatrix,
                    "File in a sparse matrix format to output or prefix of files.")
         ->required();
-    app.add_flag("--force", force,
-                 "Overwrite outputSystemMatrix if it exists.");
+    app.add_flag("--force", force, "Overwrite outputSystemMatrix if it exists.");
     app.add_option("input_matrices", projectionMatrices,
                    "Files in a DEN format that contains projection matricess to process.")
         ->required()
@@ -104,12 +103,13 @@ int Args::parseArguments(int argc, char* argv[])
     try
     {
         app.parse(argc, argv);
-	//If force is not set, then check if output file does not exist
+        // If force is not set, then check if output file does not exist
         if(!force)
         {
             if(io::fileExists(outputSystemMatrix))
             {
-                std::string msg = "Error: output file already exists, use --force to force overwrite.";
+                std::string msg
+                    = "Error: output file already exists, use --force to force overwrite.";
                 LOGE << msg;
                 return 1;
             }
@@ -142,7 +142,8 @@ int Args::parseArguments(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
     plog::Severity verbosityLevel = plog::debug; // debug, info, ...
-    std::string csvLogFile = io::xprintf("/tmp/%s.csv", io::getBasename(std::string(argv[0])).c_str()); // Set NULL to disable
+    std::string csvLogFile = io::xprintf(
+        "/tmp/%s.csv", io::getBasename(std::string(argv[0])).c_str()); // Set NULL to disable
     bool logToConsole = true;
     plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);
     plogSetup.initLogging();
