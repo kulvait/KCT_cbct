@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
                    "File in a sparse matrix format to output.")
         ->required()
         ->check(CLI::ExistingFile);
-    CLI11_PARSE(app, argc, argv);
+    app.parse(argc, argv);
     // Frames to process
     std::vector<std::shared_ptr<matrix::BufferedSparseMatrixFloatReader>> readers;
     for(std::string const& v : a_unsortedDoubles)

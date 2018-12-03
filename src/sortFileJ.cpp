@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
                    "Files in a DEN format to process. These files represents projection matrices.")
         ->required()
         ->check(CLI::NonexistentPath);
-    CLI11_PARSE(app, argc, argv);
+    app.parse(argc, argv);
     // Frames to process
 	matrix::BufferedSparseMatrixDoubleReader input(a_unsortedDouble);
 	uint64_t numberOfElements = input.getNumberOfElements();

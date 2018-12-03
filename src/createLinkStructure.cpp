@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
     app.add_option("pixtoorder", a_floats, "Contains floats.")
         ->required()
         ->check(CLI::NonexistentPath);
-    CLI11_PARSE(app, argc, argv);
+    app.parse(argc, argv);
     // Frames to process
     matrix::BufferedSparseMatrixFloatReader readmatrix(a_sortedFloat);
     io::createEmptyFile(a_vectopix, 0, true); // Try if this is faster

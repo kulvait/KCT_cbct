@@ -104,20 +104,20 @@ target_link_libraries (sortdacj ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
 install (TARGETS sortdacj RUNTIME DESTINATION .)
 
-SET(SRT_SOURCES src/sortFile.cpp)
-add_executable(sortdac ${SRT_SOURCES})
+SET(SRT_SOURCES src/linalg-sort.cpp)
+add_executable(linalgsort ${SRT_SOURCES})
 set_target_properties(
-    sortdac
+    linalgsort
     PROPERTIES 
-        OUTPUT_NAME "alg-sorti"
+        OUTPUT_NAME "linalg-sort"
         SUFFIX ""
 )
-target_link_libraries(sortdac ctiol)
-target_link_libraries(sortdac ctmal)
-target_link_libraries (sortdac ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(linalgsort ctiol)
+target_link_libraries(linalgsort ctmal)
+target_link_libraries (linalgsort ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector /usr/lib/liblapacke.so)
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
-install (TARGETS sortdac RUNTIME DESTINATION .)
+install (TARGETS linalgsort RUNTIME DESTINATION .)
 
 SET(PROJECTF_SOURCES src/projectFloats.cpp)
 add_executable(volprojectorf ${PROJECTF_SOURCES})

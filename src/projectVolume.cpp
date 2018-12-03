@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
         ->check(CLI::ExistingFile);
     app.add_option("output_file", a_projectionFile, "File in a sparse matrix format to output.")
         ->required();
-    CLI11_PARSE(app, argc, argv);
+    app.parse(argc, argv);
     // Frames to process
     uint32_t totalVolumeSize = volumeSizeX * volumeSizeY * volumeSizeZ;
     float* volume = new float[volumeSizeX * volumeSizeY * volumeSizeZ];

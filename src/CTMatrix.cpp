@@ -213,8 +213,8 @@ int main(int argc, char* argv[])
 
     LOGD << io::xprintf("Number of projections to process is %d.", a.frames.size());
     // End parsing arguments
-    std::shared_ptr<matrix::BufferedSparseMatrixWritter> matrixWritter
-        = std::make_shared<matrix::BufferedSparseMatrixWritter>(a.outputSystemMatrix, 8192, true);
+    std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> matrixWritter
+        = std::make_shared<matrix::BufferedSparseMatrixDoubleWritter>(a.outputSystemMatrix, 8192, true);
     util::DivideAndConquerFootprintExecutor dfe(matrixWritter, a.projectionSizeX, a.projectionSizeY,
                                                 a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ,
                                                 scalingFactor, a.threads, a.terminatingEdgeLength);

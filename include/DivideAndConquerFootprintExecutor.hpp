@@ -255,7 +255,7 @@ namespace util {
     class DivideAndConquerFootprintExecutor
     {
     public:
-        DivideAndConquerFootprintExecutor(std::shared_ptr<matrix::BufferedSparseMatrixWritter> w,
+        DivideAndConquerFootprintExecutor(std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> w,
                                           uint32_t pdimx,
                                           uint32_t pdimy,
                                           uint32_t vdimx,
@@ -602,7 +602,7 @@ namespace util {
     private:
         bool threadpoolstarted = false;
         ctpl::thread_pool* threadpool;
-        std::shared_ptr<matrix::BufferedSparseMatrixWritter> w;
+        std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> w;
         uint32_t voxelCornerNum;
         uint32_t* resultingIndices;
         // It is evaluated from -0.5, pixels are centerred at integer coordinates
