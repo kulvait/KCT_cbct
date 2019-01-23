@@ -48,7 +48,8 @@ int main(int argc, char* argv[])
     CLI::App app{ "Using divide and conquer techniques to construct CT system matrix.." };
     app.add_option("-j,--threads", a_threads, "Number of extra threads that application can use.")
         ->check(CLI::Range(1, 65535));
-    app.add_option("-n,--number_of_projections", projectionSizeZ, "Number of projections, defaults to 1.")
+    app.add_option("-n,--number_of_projections", projectionSizeZ,
+                   "Number of projections, defaults to 1.")
         ->check(CLI::Range(1, 65535));
     app.add_option("input_volume", a_inputVolume,
                    "Files in a DEN format to process. These files represents projection matrices.")
@@ -74,31 +75,31 @@ int main(int argc, char* argv[])
     float* projection = new float[totalProjectionSize](); // Initialized by zeros
 
     uint16_t buf[3];
-	buf[0] = projectionSizeY;
-	buf[1] = projectionSizeX;
-	buf[2] = projectionSizeZ;
+    buf[0] = projectionSizeY;
+    buf[1] = projectionSizeX;
+    buf[2] = projectionSizeZ;
     while(elements != 0)
     {
         A.readNextValue(&i, &j, &v);
         projection[j] += volume[i] * v;
         elements--;
-    }/*
-	float curvol;
-	uint32_t previ = totalProjectionSize;
-    while(elements != 0)
-    {
-        A.readNextValue(&i, &j, &v);
-	if(i!=previ)
-	{
-		curvol = volume[i];
-		previ = i;	
-	}
-        projection[j] += curvol * v;
-        elements--;
-    }*/
-     io::createEmptyFile(a_projectionFile, 0, true); //Try if this is faster
-     io::appendBytes(a_projectionFile, (uint8_t*)buf, 6);
-     io::appendBytes(a_projectionFile, (uint8_t*)projection, totalProjectionSize*4);
+    } /*
+         float curvol;
+         uint32_t previ = totalProjectionSize;
+     while(elements != 0)
+     {
+         A.readNextValue(&i, &j, &v);
+         if(i!=previ)
+         {
+                 curvol = volume[i];
+                 previ = i;
+         }
+         projection[j] += curvol * v;
+         elements--;
+     }*/
+    io::createEmptyFile(a_projectionFile, 0, true); // Try if this is faster
+    io::appendBytes(a_projectionFile, (uint8_t*)buf, 6);
+    io::appendBytes(a_projectionFile, (uint8_t*)projection, totalProjectionSize * 4);
     delete[] volume;
     delete[] projection;
     LOGI << "END";

@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
             if(i == mini)
             {
                 output.insertValue(i, j, v);
-		readers[mink]->increaseCounter();
+                readers[mink]->increaseCounter();
             } else
             {
                 break;

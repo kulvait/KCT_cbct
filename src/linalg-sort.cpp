@@ -86,7 +86,7 @@ int Args::parseArguments(int argc, char* argv[])
         }
     } catch(const CLI::CallForHelp e)
     {
-	app.exit(e);//Prints help message
+        app.exit(e); // Prints help message
         return 1;
     } catch(const CLI::ParseError& e)
     {

@@ -16,12 +16,14 @@
 // Internal libraries
 #include "ARGPARSE/parseArgs.h"
 #include "DEN/DenProjectionMatrixReader.hpp"
-#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
+#include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
-#include "DivideAndConquerFootprintExecutor.hpp"
+#include "VolumeFootprintExecutor.hpp"
 
 using namespace CTL;
 
+/**Arguments parsed by the main function.
+ */
 struct Args
 {
     int parseArguments(int argc, char* argv[]);
@@ -38,27 +40,32 @@ struct Args
     uint32_t volumeSizeX = 256;
     uint32_t volumeSizeY = 256;
     uint32_t volumeSizeZ = 199;
-    double terminatingEdgeLength = 0.25;
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
-    std::string projectionMatrices;
-    std::string outputSystemMatrix;
+    std::string inputVolume;
+    std::string inputProjectionMatrices;
+    std::string outputProjection;
     bool force = false;
 };
 
 /**Argument parsing
  *
+ * @param argc
+ * @param argv[]
+ *
+ * @return Returns 0 on success and nonzero for some error.
  */
 int Args::parseArguments(int argc, char* argv[])
 {
 
-    CLI::App app{ "Using divide and conquer techniques to construct CT system matrix.." };
-    app.add_option("output_system_matrix", outputSystemMatrix,
-                   "File in a sparse matrix format to output or prefix of files.")
+    CLI::App app{ "OpenCL implementation of the voxel cutting projector." };
+    app.add_option("input_projection_matrices", inputProjectionMatrices,
+                   "Projection matrices to be input of the computation."
+                   "Files in a DEN format that contains projection matricess to process.")
         ->required();
+
     app.add_flag("--force", force, "Overwrite outputSystemMatrix if it exists.");
     app.add_option("input_matrices", projectionMatrices,
-                   "Files in a DEN format that contains projection matricess to process.")
         ->required()
         ->check(CLI::ExistingFile);
     app.add_option("-f,--frames", frameSpecs,
@@ -72,9 +79,6 @@ int Args::parseArguments(int argc, char* argv[])
                    "must be positive integer.")
         ->check(CLI::Range(1, 65535));
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
-        ->check(CLI::Range(1, 65535));
-    app.add_option("-e,--terminating_edge_length", terminatingEdgeLength,
-                   "Terminating edge length under which no subdivision occurs.")
         ->check(CLI::Range(1, 65535));
     app.add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
     app.add_flag("-n,--no_frame_offset", noFrameOffset,
@@ -128,17 +132,20 @@ int Args::parseArguments(int argc, char* argv[])
                 frames.push_back(f[i]);
             }
         }
+    } catch(const CLI::CallForHelp e)
+    {
+        app.exit(e); // Prints help message
+        return 1;
     } catch(const CLI::ParseError& e)
     {
         int exitcode = app.exit(e);
-        if(exitcode == 0) // Help message was printed
-        {
-            return 1;
-        } else
-        {
-            LOGE << "Parse error catched";
-            return -1;
-        }
+        LOGE << io::xprintf("There was perse error with exit code %d catched.\n %s", exitcode,
+                            app.help().c_str());
+        return -1;
+    } catch(...)
+    {
+        LOGE << "Unknown exception catched";
+        return -1;
     }
     return 0;
 }
@@ -151,7 +158,7 @@ int main(int argc, char* argv[])
     bool logToConsole = true;
     plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);
     plogSetup.initLogging();
-    LOGI << io::xprintf("%s", argv[0]);
+    LOGI << io::xprintf("START %s", argv[0]);
     // Argument parsing
     Args a;
     int parseResult = a.parseArguments(argc, argv);
@@ -165,11 +172,6 @@ int main(int argc, char* argv[])
             return -1; // Exited somehow wrong
         }
     }
-    // LOGD << io::xprintf("Input matrices %s and output %s.", a.projectionMatrices,
-    //                    a.outputSystemMatrix);
-    // LOGD << io::xprintf("Values of parameters: frames=%s, eachkth=%d, threads=%d.",
-    //                   a.frameSpecs.c_str(), a.eachkth, a.threads);
-    // Frames to process
     std::shared_ptr<io::DenProjectionMatrixReader> dr
         = std::make_shared<io::DenProjectionMatrixReader>(a.projectionMatrices);
     int count = dr->count();
@@ -183,8 +185,6 @@ int main(int argc, char* argv[])
             "Implement indexing by uint64_t matrix dimension overflow of projection pixels count.");
     }
     util::ProjectionMatrix pm = dr->readMatrix(0);
-    double pixelSpacingX = 0.616;
-    double pixelSpacingY = 0.616;
 
     std::array<double, 3> sourcePosition = pm.sourcePosition();
     std::array<double, 3> normalToDetector = pm.normalToDetector();
@@ -193,8 +193,8 @@ int main(int argc, char* argv[])
     pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
                sourcePosition[2] + normalToDetector[2], &x1, &y1);
     pm.project(100.0, 100.0, 100.0, &x2, &y2);
-    double xspacing2 = pixelSpacingX * pixelSpacingX;
-    double yspacing2 = pixelSpacingY * pixelSpacingY;
+    double xspacing2 = a.pixelSpacingX * a.pixelSpacingX;
+    double yspacing2 = a.pixelSpacingY * a.pixelSpacingY;
     double distance
         = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
     double x = 100.0 - sourcePosition[0];
@@ -207,19 +207,21 @@ int main(int argc, char* argv[])
     double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
     double theta = std::acos(cos);
     double distToDetector = std::abs(distance / std::tan(theta));
-    double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;
+    double scalingFactor = distToDetector * distToDetector / a.pixelSpacingX / a.pixelSpacingY;
     LOGI << io::xprintf("Distance to the detector is %fmm therefore scaling factor is %f.",
                         distToDetector, scalingFactor);
 
+    // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", a.frames.size());
     // End parsing arguments
-    std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> matrixWritter
-        = std::make_shared<matrix::BufferedSparseMatrixDoubleWritter>(a.outputSystemMatrix, 8192,
-                                                                      true);
-    util::DivideAndConquerFootprintExecutor dfe(matrixWritter, a.projectionSizeX, a.projectionSizeY,
-                                                a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ,
-                                                scalingFactor, a.threads, a.terminatingEdgeLength);
-    uint32_t projnum, pixelIndexOffset;
+    std::shared_ptr<matrix::BufferedSparseMatrixFloatWritter> matrixWritter
+        = std::make_shared<matrix::BufferedSparseMatrixFloatWritter>(a.outputSystemMatrix, 8192,
+                                                                     true);
+    util::VolumeFootprintExecutor dfe(matrixWritter, a.projectionSizeX, a.projectionSizeY,
+                                      a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, scalingFactor,
+                                      a.threads);
+    uint32_t projnum;
+    uint32_t pixelIndexOffset;
     for(std::size_t i = 0; i != a.frames.size(); i++)
     {
         dfe.startThreadpool();
@@ -237,4 +239,5 @@ int main(int argc, char* argv[])
         dfe.stopThreadpool();
         dfe.reportNumberOfWrites();
     }
+    LOGI << io::xprintf("END %s", argv[0]);
 }

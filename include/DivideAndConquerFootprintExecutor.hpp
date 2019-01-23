@@ -239,8 +239,9 @@ namespace util {
             double px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(std::lround(px)); // 0.5 is correct since the grid of the projector starts on -0.5,
-                                  // -0.5
+            pi = (int)(std::lround(
+                px)); // 0.5 is correct since the grid of the projector starts on -0.5,
+                      // -0.5
             pj = (int)(std::lround(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {
@@ -255,15 +256,16 @@ namespace util {
     class DivideAndConquerFootprintExecutor
     {
     public:
-        DivideAndConquerFootprintExecutor(std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> w,
-                                          uint32_t pdimx,
-                                          uint32_t pdimy,
-                                          uint32_t vdimx,
-                                          uint32_t vdimy,
-                                          uint32_t vdimz,
-                                          double scalingFactor,
-                                          int threads,
-					double terminatingEdgeLength=0.25)
+        DivideAndConquerFootprintExecutor(
+            std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> w,
+            uint32_t pdimx,
+            uint32_t pdimy,
+            uint32_t vdimx,
+            uint32_t vdimy,
+            uint32_t vdimz,
+            double scalingFactor,
+            int threads,
+            double terminatingEdgeLength = 0.25)
         {
             this->w = w;
             this->pdimx = pdimx;
@@ -278,7 +280,7 @@ namespace util {
             this->resultingIndices = new uint32_t[voxelCornerNum];
             this->scalingFactor = scalingFactor;
             this->threadpool = nullptr;
-		this->terminatingEdgeLength = terminatingEdgeLength;
+            this->terminatingEdgeLength = terminatingEdgeLength;
         }
 
         ~DivideAndConquerFootprintExecutor()
@@ -296,8 +298,9 @@ namespace util {
             float px, py;
             int pi, pj;
             pm.project(x, y, z, &px, &py);
-            pi = (int)(std::lround(px)); // 0.5 is correct since the grid of the projector starts on -0.5,
-                                  // -0.5
+            pi = (int)(std::lround(
+                px)); // 0.5 is correct since the grid of the projector starts on -0.5,
+                      // -0.5
             pj = (int)(std::lround(py));
             if(pi >= 0 && pj >= 0 && pi < (int)pdimx && pj < (int)pdimy)
             {

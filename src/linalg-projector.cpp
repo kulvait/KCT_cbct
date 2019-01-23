@@ -97,7 +97,6 @@ int Args::parseArguments(int argc, char* argv[])
     vx->needs(vy)->needs(vz);
     vy->needs(vx)->needs(vz);
     vz->needs(vx)->needs(vy);
-    app.parse(argc, argv);
     try
     {
         app.parse(argc, argv);
@@ -111,7 +110,7 @@ int Args::parseArguments(int argc, char* argv[])
                 return 1;
             }
         }
-    } catch(const CLI::CallForHelp e)
+    } catch(const CLI::CallForHelp& e)
     {
         app.exit(e); // Prints help message
         return 1;
@@ -157,7 +156,8 @@ int main(int argc, char* argv[])
     uint64_t totalVolumeSize = uint64_t(a.volumeSizeX) * a.volumeSizeY * a.volumeSizeZ;
     float* volume = new float[totalVolumeSize];
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
-    uint64_t totalProjectionSize = uint64_t(a.projectionSizeX) * a.projectionSizeY * a.projectionSizeZ;
+    uint64_t totalProjectionSize
+        = uint64_t(a.projectionSizeX) * a.projectionSizeY * a.projectionSizeZ;
     float* projection = new float[totalProjectionSize](); // Initialized by zeros
     if(a.systemMatrixType == "float")
     {
