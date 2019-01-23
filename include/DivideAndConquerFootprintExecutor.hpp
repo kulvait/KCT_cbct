@@ -113,7 +113,7 @@ namespace util {
             return true;
         }
 
-        void fillSubindices(ProjectionMatrix pm)
+        void fillSubindices(matrix::ProjectionMatrix pm)
         {
             set00H(getIndex(pm, corner[0] + halfLength, corner[1], corner[2]));
             set0H0(getIndex(pm, corner[0], corner[1] + halfLength, corner[2]));
@@ -143,7 +143,7 @@ namespace util {
                             corner[2] + edgeLength));
         }
 
-        void fillSubcubes(ProjectionMatrix pm,
+        void fillSubcubes(matrix::ProjectionMatrix pm,
                           Cube* c000,
                           Cube* c001,
                           Cube* c010,
@@ -228,13 +228,13 @@ namespace util {
             c111->set111(get111());
         }
 
-        uint32_t centerIndex(ProjectionMatrix pm)
+        uint32_t centerIndex(matrix::ProjectionMatrix pm)
         {
             return getIndex(pm, corner[0] + halfLength, corner[1] + halfLength,
                             corner[2] + halfLength);
         }
 
-        uint32_t getIndex(ProjectionMatrix pm, double x, double y, double z)
+        uint32_t getIndex(matrix::ProjectionMatrix pm, double x, double y, double z)
         {
             double px, py;
             int pi, pj;
@@ -293,7 +293,7 @@ namespace util {
             }
         }
 
-        uint32_t getPixelIndex(ProjectionMatrix pm, float x, float y, float z)
+        uint32_t getPixelIndex(matrix::ProjectionMatrix pm, float x, float y, float z)
         {
             float px, py;
             int pi, pj;
@@ -313,7 +313,7 @@ namespace util {
 
         void insertWeightFactors(std::vector<Elm>& vec,
                                  Cube& c,
-                                 ProjectionMatrix pm,
+                                 matrix::ProjectionMatrix pm,
                                  std::array<double, 3>& sourcePosition,
                                  std::array<double, 3>& normalToDetector)
         {
@@ -378,7 +378,7 @@ namespace util {
         }
 
         void computeWeightFactors(Cube c,
-                                  ProjectionMatrix pm,
+                                  matrix::ProjectionMatrix pm,
                                   uint32_t voxelIndex,
                                   uint32_t pixelIndexOffset,
                                   std::array<double, 3> sourcePosition,
@@ -477,7 +477,7 @@ namespace util {
             }
         }
 
-        void insertMatrixProjections(ProjectionMatrix pm, uint32_t pixelIndexOffset)
+        void insertMatrixProjections(matrix::ProjectionMatrix pm, uint32_t pixelIndexOffset)
         {
             if(!threadpoolstarted)
             {

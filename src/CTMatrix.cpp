@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
         io::throwerr(
             "Implement indexing by uint64_t matrix dimension overflow of projection pixels count.");
     }
-    util::ProjectionMatrix pm = dr->readMatrix(0);
+    matrix::ProjectionMatrix pm = dr->readMatrix(0);
     double pixelSpacingX = 0.616;
     double pixelSpacingY = 0.616;
 
@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
         {
             pixelIndexOffset = a.baseOffset + projnum * a.projectionSizeX * a.projectionSizeY;
         }
-        util::ProjectionMatrix pm = dr->readMatrix(projnum);
+        matrix::ProjectionMatrix pm = dr->readMatrix(projnum);
         dfe.insertMatrixProjections(pm, pixelIndexOffset);
         dfe.stopThreadpool();
         dfe.reportNumberOfWrites();

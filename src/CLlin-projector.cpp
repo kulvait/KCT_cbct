@@ -15,10 +15,10 @@
 
 // Internal libraries
 #include "ARGPARSE/parseArgs.h"
+#include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
-
-#include "VolumeFootprintExecutor.hpp"
+#include "CuttingVoxelProjector.hpp"
 
 using namespace CTL;
 
@@ -62,12 +62,15 @@ int Args::parseArguments(int argc, char* argv[])
     app.add_option("input_projection_matrices", inputProjectionMatrices,
                    "Projection matrices to be input of the computation."
                    "Files in a DEN format that contains projection matricess to process.")
-        ->required();
-
-    app.add_flag("--force", force, "Overwrite outputSystemMatrix if it exists.");
-    app.add_option("input_matrices", projectionMatrices,
         ->required()
         ->check(CLI::ExistingFile);
+
+    app.add_option("input_volume", inputVolume, "Volume to project")
+        ->required()
+        ->check(CLI::ExistingFile);
+    app.add_option("output_projection", outputProjection, "Output projection")->required();
+
+    app.add_flag("--force", force, "Overwrite outputSystemMatrix if it exists.");
     app.add_option("-f,--frames", frameSpecs,
                    "Specify only particular projection matrices to process. You can input "
                    "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "
@@ -114,7 +117,7 @@ int Args::parseArguments(int argc, char* argv[])
         // If force is not set, then check if output file does not exist
         if(!force)
         {
-            if(io::fileExists(outputSystemMatrix))
+            if(io::fileExists(outputProjection))
             {
                 std::string msg
                     = "Error: output file already exists, use --force to force overwrite.";
@@ -123,7 +126,7 @@ int Args::parseArguments(int argc, char* argv[])
             }
         }
         // How many projection matrices is there in total
-        io::DenFileInfo di(projectionMatrices);
+        io::DenFileInfo di(inputProjectionMatrices);
         std::vector<int> f = util::processFramesSpecification(frameSpecs, di.getNumSlices());
         for(std::size_t i = 0; i != f.size(); i++)
         {
@@ -173,18 +176,18 @@ int main(int argc, char* argv[])
         }
     }
     std::shared_ptr<io::DenProjectionMatrixReader> dr
-        = std::make_shared<io::DenProjectionMatrixReader>(a.projectionMatrices);
-    int count = dr->count();
+        = std::make_shared<io::DenProjectionMatrixReader>(a.inputProjectionMatrices);
+    io::DenFileInfo pmi(a.inputProjectionMatrices);
     if(uint64_t(a.volumeSizeX) * uint64_t(a.volumeSizeY) * uint64_t(a.volumeSizeZ) > INT_MAX)
     {
         io::throwerr("Implement indexing by uint64_t matrix dimension overflow of voxels count.");
     }
-    if(uint64_t(a.projectionSizeX) * uint64_t(a.projectionSizeY) * uint64_t(count) > INT_MAX)
+    if(uint64_t(a.projectionSizeX) * uint64_t(a.projectionSizeY) * uint64_t(pmi.dimz()) > INT_MAX)
     {
         io::throwerr(
             "Implement indexing by uint64_t matrix dimension overflow of projection pixels count.");
     }
-    util::ProjectionMatrix pm = dr->readMatrix(0);
+    matrix::ProjectionMatrix pm = dr->readMatrix(0);
 
     std::array<double, 3> sourcePosition = pm.sourcePosition();
     std::array<double, 3> normalToDetector = pm.normalToDetector();
@@ -214,30 +217,7 @@ int main(int argc, char* argv[])
     // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", a.frames.size());
     // End parsing arguments
-    std::shared_ptr<matrix::BufferedSparseMatrixFloatWritter> matrixWritter
-        = std::make_shared<matrix::BufferedSparseMatrixFloatWritter>(a.outputSystemMatrix, 8192,
-                                                                     true);
-    util::VolumeFootprintExecutor dfe(matrixWritter, a.projectionSizeX, a.projectionSizeY,
-                                      a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, scalingFactor,
-                                      a.threads);
-    uint32_t projnum;
-    uint32_t pixelIndexOffset;
-    for(std::size_t i = 0; i != a.frames.size(); i++)
-    {
-        dfe.startThreadpool();
-        projnum = a.frames[i];
-        LOGD << io::xprintf("Processing projections from %dth position.", projnum);
-        if(a.noFrameOffset)
-        {
-            pixelIndexOffset = a.baseOffset;
-        } else
-        {
-            pixelIndexOffset = a.baseOffset + projnum * a.projectionSizeX * a.projectionSizeY;
-        }
-        util::ProjectionMatrix pm = dr->readMatrix(projnum);
-        dfe.insertMatrixProjections(pm, pixelIndexOffset);
-        dfe.stopThreadpool();
-        dfe.reportNumberOfWrites();
-    }
+    std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>();
+    cvp->initializeOpenCL();
     LOGI << io::xprintf("END %s", argv[0]);
 }

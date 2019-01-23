@@ -10,10 +10,14 @@ set(CMAKE_CXX_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_BUILD_TYPE Debug)
 set(BUILD_SHARED_LIBS False)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 #Header directories for the project
 set(GLOBAL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories(${GLOBAL_INCLUDE_DIR})
+
+#OpenCL
+find_package(OpenCL REQUIRED)
 
 #Plog logger
 include_directories(${CMAKE_SOURCE_DIR}/submodules/plog/include)
@@ -29,24 +33,49 @@ include_directories(${CMAKE_SOURCE_DIR}/submodules/ctpl)
 find_package (Threads)#include pthreads
 
 #Intel MKL
-#find_package(MKL)
-#include_directories(${MKL_INCLUDE_DIRS})
+find_package(MKL)
+include_directories(${MKL_INCLUDE_DIRS})
 
 #CT input output library
 FILE( GLOB CTIOL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/*.cpp ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/ARGPARSE/*.cpp)
 add_library(ctiol ${CTIOL_SRC})
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTIOL/include)
 
-#CTMAL
+#CTMAL library
+include_directories(${CMAKE_SOURCE_DIR}/submodules/CTMAL/include)
 FILE( GLOB CTMAL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTMAL/src/*.cpp )
 add_library(ctmal ${CTMAL_SRC})
-include_directories(${CMAKE_SOURCE_DIR}/submodules/CTMAL/include)
+target_link_libraries(ctmal ctiol)
+target_link_libraries(ctmal ${MKL_CORE_LIBRARY})
+set_target_properties(
+    ctmal
+    PROPERTIES 
+        OUTPUT_NAME "ctmal.so"
+        SUFFIX ""
+)
 
 add_custom_target(formatWebkit
 ./formatWebkit
 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #####################START PROGRAM DEFS##################################
+SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/CuttingVoxelProjector.cpp)
+add_executable(CLlin-projector ${CLLINPROJECTOR_SOURCES})
+set_target_properties(
+    CLlin-projector
+    PROPERTIES 
+        OUTPUT_NAME "cllin-projector"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-projector ctiol)
+target_link_libraries(CLlin-projector ctmal)
+target_link_libraries(CLlin-projector OpenCL::OpenCL)
+target_include_directories(CLlin-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-projector ${CMAKE_THREAD_LIBS_INIT})
+install (TARGETS CLlin-projector RUNTIME DESTINATION .)
+
+
 
 SET(CTMATRIX_SOURCES src/CTMatrix.cpp)
 add_executable(ctmatrix ${CTMATRIX_SOURCES})
