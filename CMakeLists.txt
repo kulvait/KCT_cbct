@@ -41,6 +41,21 @@ FILE( GLOB CTIOL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/*.cpp ${CMAKE_SOUR
 add_library(ctiol ${CTIOL_SRC})
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTIOL/include)
 
+#CTIOL_OPENCL
+IF(OpenCL_FOUND)
+FILE( GLOB LIBCTIOLOPENCLSRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/OPENCL/*.cpp )
+add_library(CTIOL_OPENCL ${LIBCTIOLOPENCLSRC})
+set_target_properties(
+        CTIOL_OPENCL
+        PROPERTIES 
+        OUTPUT_NAME "ctiol_opencl.so"
+        SUFFIX ""
+)
+target_link_libraries(CTIOL_OPENCL OpenCL::OpenCL)
+target_link_libraries(CTIOL_OPENCL ctiol)
+ENDIF()
+
+
 #CTMAL library
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTMAL/include)
 FILE( GLOB CTMAL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTMAL/src/*.cpp )
@@ -70,6 +85,7 @@ set_target_properties(
 target_link_libraries(CLlin-projector ctiol)
 target_link_libraries(CLlin-projector ctmal)
 target_link_libraries(CLlin-projector OpenCL::OpenCL)
+target_link_libraries(CLlin-projector CTIOL_OPENCL)
 target_include_directories(CLlin-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-projector ${CMAKE_THREAD_LIBS_INIT})
