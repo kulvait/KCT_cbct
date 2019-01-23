@@ -16,7 +16,7 @@
 // Internal libraries
 #include "ARGPARSE/parseArgs.h"
 #include "DEN/DenProjectionMatrixReader.hpp"
-#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
+#include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
 #include "VolumeFootprintExecutor.hpp"
 
@@ -124,17 +124,20 @@ int Args::parseArguments(int argc, char* argv[])
                 frames.push_back(f[i]);
             }
         }
+    } catch(const CLI::CallForHelp e)
+    {
+        app.exit(e); // Prints help message
+        return 1;
     } catch(const CLI::ParseError& e)
     {
         int exitcode = app.exit(e);
-        if(exitcode == 0) // Help message was printed
-        {
-            return 1;
-        } else
-        {
-            LOGE << "Parse error catched";
-            return -1;
-        }
+        LOGE << io::xprintf("There was perse error with exit code %d catched.\n %s", exitcode,
+                            app.help().c_str());
+        return -1;
+    } catch(...)
+    {
+        LOGE << "Unknown exception catched";
+        return -1;
     }
     return 0;
 }
@@ -203,8 +206,8 @@ int main(int argc, char* argv[])
     // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", a.frames.size());
     // End parsing arguments
-    std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> matrixWritter
-        = std::make_shared<matrix::BufferedSparseMatrixDoubleWritter>(a.outputSystemMatrix, 8192, true);
+    std::shared_ptr<matrix::BufferedSparseMatrixFloatWritter> matrixWritter
+        = std::make_shared<matrix::BufferedSparseMatrixFloatWritter>(a.outputSystemMatrix, 8192, true);
     util::VolumeFootprintExecutor dfe(matrixWritter, a.projectionSizeX, a.projectionSizeY,
                                       a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, scalingFactor,
                                       a.threads);

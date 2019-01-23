@@ -31,10 +31,10 @@ struct Args
         typeStrings.push_back("float");
         typeStrings.push_back("double");
     }
-    std::string unsortedType;
     std::string unsortedMatrix;
-    std::string sortedType;
+    std::string unsortedType;
     std::string sortedMatrix;
+    std::string sortedType;
     bool force = false;
     bool bySecondIndex = false;
     int parseArguments(int argc, char* argv[]);
@@ -42,7 +42,7 @@ struct Args
     {
         if(std::find(typeStrings.begin(), typeStrings.end(), s) == typeStrings.end())
         {
-            return io::xprintf("Unknown string %s that represents type, should be float or double.",
+            return io::xprintf("The string that represents type is float or double not %s!",
                                s.c_str());
         }
         return "";
@@ -59,18 +59,18 @@ int Args::parseArguments(int argc, char* argv[])
 
     std::function<std::string(const std::string&)> f
         = std::bind(&Args::checkTypeConsistency, this, std::placeholders::_1);
+    app.add_option("unsorted_matrix", unsortedMatrix, "File with the unsorted matrix.")
+        ->required()
+        ->check(CLI::ExistingFile);
     app.add_option("unsorted_type", unsortedType,
                    "Type of the unsorted matrix, that is float or double.")
         ->required()
         ->check(f);
-    app.add_option("unsorted_matrix", unsortedMatrix, "File with the unsorted matrix.")
-        ->required()
-        ->check(CLI::ExistingFile);
+    app.add_option("sorted_matrix", sortedMatrix, "Output file with the sorted matrix.")
+        ->required();
     app.add_option("sorted_type", sortedType, "Type of the sorted matrix, that is float or double.")
         ->required()
         ->check(f);
-    app.add_option("sorted_matrix", sortedMatrix, "Output file with the sorted matrix.")
-        ->required();
     try
     {
         app.parse(argc, argv);

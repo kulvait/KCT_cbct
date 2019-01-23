@@ -61,12 +61,12 @@ target_link_libraries(ctmatrix ctmal)
 target_link_libraries (ctmatrix ${CMAKE_THREAD_LIBS_INIT})
 install (TARGETS ctmatrix RUNTIME DESTINATION .)
 
-SET(CTMATRIXEXACT_SOURCES src/CTMatrixExact.cpp)
+SET(CTMATRIXEXACT_SOURCES src/linalg-exactmatrix.cpp)
 add_executable(exactmatrix ${CTMATRIXEXACT_SOURCES})
 set_target_properties(
     exactmatrix
     PROPERTIES 
-        OUTPUT_NAME "alg-exactmatrix"
+        OUTPUT_NAME "linalg-exactmatrix"
         SUFFIX ""
 )
 target_link_libraries(exactmatrix ctiol)
@@ -89,20 +89,20 @@ target_link_libraries (dacmerge ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
 install (TARGETS dacmerge RUNTIME DESTINATION .)
 
-SET(SRTJJ_SOURCES src/sortFileJ.cpp)
-add_executable(sortdacj ${SRTJJ_SOURCES})
-set_target_properties(
-    sortdacj
-    PROPERTIES 
-        OUTPUT_NAME "alg-sortj"
-        SUFFIX ""
-)
-target_link_libraries(sortdacj ctiol)
-target_link_libraries(sortdacj ctmal)
-target_link_libraries (sortdacj ${CMAKE_THREAD_LIBS_INIT})
+#SET(SRTJJ_SOURCES src/sortFileJ.cpp)
+#add_executable(sortdacj ${SRTJJ_SOURCES})
+#set_target_properties(
+#    sortdacj
+#    PROPERTIES 
+#        OUTPUT_NAME "alg-sortj"
+#        SUFFIX ""
+#)
+#target_link_libraries(sortdacj ctiol)
+#target_link_libraries(sortdacj ctmal)
+#target_link_libraries (sortdacj ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector /usr/lib/liblapacke.so)
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
-install (TARGETS sortdacj RUNTIME DESTINATION .)
+#install (TARGETS sortdacj RUNTIME DESTINATION .)
 
 SET(SRT_SOURCES src/linalg-sort.cpp)
 add_executable(linalgsort ${SRT_SOURCES})
@@ -119,20 +119,20 @@ target_link_libraries (linalgsort ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
 install (TARGETS linalgsort RUNTIME DESTINATION .)
 
-SET(PROJECTF_SOURCES src/projectFloats.cpp)
-add_executable(volprojectorf ${PROJECTF_SOURCES})
+SET(PROJECTF_SOURCES src/linalg-projector.cpp)
+add_executable(linalgprojector ${PROJECTF_SOURCES})
 set_target_properties(
-    volprojectorf
+    linalgprojector
     PROPERTIES 
-        OUTPUT_NAME "alg-projectf"
+        OUTPUT_NAME "linalg-projector"
         SUFFIX ""
 )
-target_link_libraries(volprojectorf ctiol)
-target_link_libraries(volprojectorf ctmal)
-target_link_libraries (volprojectorf ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(linalgprojector ctiol)
+target_link_libraries(linalgprojector ctmal)
+target_link_libraries (linalgprojector ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector /usr/lib/liblapacke.so)
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
-install (TARGETS volprojectorf RUNTIME DESTINATION .)
+install (TARGETS linalgprojector RUNTIME DESTINATION .)
 
 SET(PROJECTVOL_SOURCES src/projectVolume.cpp)
 add_executable(volprojector ${PROJECTVOL_SOURCES})

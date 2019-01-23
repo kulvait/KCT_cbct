@@ -1,7 +1,7 @@
 #pragma once
 #include "MATH/round.h"
 #include "MATRIX/ProjectionMatrix.hpp"
-#include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
+#include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
 namespace CTL {
 namespace util {
@@ -288,7 +288,7 @@ namespace util {
     class VolumeFootprintExecutor
     {
     public:
-        VolumeFootprintExecutor(std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> w,
+        VolumeFootprintExecutor(std::shared_ptr<matrix::BufferedSparseMatrixFloatWritter> w,
                                 uint32_t pdimx,
                                 uint32_t pdimy,
                                 uint32_t vdimx,
@@ -460,7 +460,7 @@ namespace util {
                         w->insertValue(voxelIndex,
                                        zindices[i].pindex * pdimx + prism->pxindex
                                            + pixelIndexOffset,
-                                       scalingFactor * volume / (distsquare * cos3));
+                                       float(scalingFactor * volume / (distsquare * cos3)));
                     }
                 }
             }
@@ -545,7 +545,7 @@ namespace util {
                     / norm;
                 double cos3 = cos * cos * cos;
                 w->insertValue(voxelIndex, c.get000() + pixelIndexOffset,
-                               volume * scalingFactor / (distsquare * cos3));
+                               float(volume * scalingFactor / (distsquare * cos3)));
 
             } else
             {
@@ -809,12 +809,11 @@ namespace util {
                         c.set111(resultingIndices[i + 1 + (vdimx + 1) * (j + 1)
                                                   + (vdimx + 1) * (vdimy + 1) * (k + 1)]);
 
-                                    threadpool->push([&, this, c, pm, voxelindex,
-                                    pixelIndexOffset,
-                                                      sourcePosition, normalToDetector](int id) {
-                        this->computeWeightFactors(c, pm, voxelindex, pixelIndexOffset,
-                                                   sourcePosition, normalToDetector);
-                                    });
+                        threadpool->push([&, this, c, pm, voxelindex, pixelIndexOffset,
+                                          sourcePosition, normalToDetector](int id) {
+                            this->computeWeightFactors(c, pm, voxelindex, pixelIndexOffset,
+                                                       sourcePosition, normalToDetector);
+                        });
                         // computeWeightFactors(c, pm, voxelindex, pixelIndexOffset);
                         //            if(voxelindex != i + j * vdimx + k * vdimx * vdimy)
                         //            {
@@ -861,7 +860,7 @@ namespace util {
     private:
         bool threadpoolstarted = false;
         ctpl::thread_pool* threadpool;
-        std::shared_ptr<matrix::BufferedSparseMatrixDoubleWritter> w;
+        std::shared_ptr<matrix::BufferedSparseMatrixFloatWritter> w;
         uint32_t voxelCornerNum;
         uint32_t* resultingIndices;
         // It is evaluated from -0.5, pixels are centerred at integer coordinates
