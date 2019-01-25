@@ -15,10 +15,11 @@
 
 // Internal libraries
 #include "ARGPARSE/parseArgs.h"
+#include "CuttingVoxelProjector.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
+#include "DEN/DenSupportedType.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
-#include "CuttingVoxelProjector.hpp"
 
 using namespace CTL;
 
@@ -217,7 +218,34 @@ int main(int argc, char* argv[])
     // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", a.frames.size());
     // End parsing arguments
-    std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>();
+    io::DenFileInfo inf(a.inputVolume);
+    io::DenSupportedType t = inf.getDataType();
+    if(t != io::DenSupportedType::float_)
+    {
+        io::throwerr(
+            "This program supports float volumes only but the supplied volume is of type %s!",
+            io::DenSupportedTypeToString(t).c_str());
+    }
+    uint64_t totalVolumeSize = uint64_t(inf.dimx()) * uint64_t(inf.dimy()) * uint64_t(inf.dimz());
+    float* volume = new float[totalVolumeSize];
+    io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
+    std::shared_ptr<CuttingVoxelProjector> cvp
+        = std::make_shared<CuttingVoxelProjector>(volume, inf.dimx(), inf.dimy(), inf.dimz());
     cvp->initializeOpenCL();
+    cvp->initializeVolumeImage();
+    uint32_t projectionElementsCount = a.projectionSizeX * a.projectionSizeY;
+    float* projection = new float[projectionElementsCount]();
+    cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+    uint16_t buf[3];
+    buf[0] = a.projectionSizeY;
+    buf[1] = a.projectionSizeX;
+    buf[2] = 1;
+    io::createEmptyFile(a.outputProjection, 0, true); // Try if this is faster
+    io::appendBytes(a.outputProjection, (uint8_t*)buf, 6);
+    io::appendBytes(a.outputProjection, (uint8_t*)projection, projectionElementsCount * sizeof(float));
+    delete[] volume;
+    delete[] projection;
+
+
     LOGI << io::xprintf("END %s", argv[0]);
 }
