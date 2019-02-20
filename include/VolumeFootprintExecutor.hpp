@@ -348,7 +348,7 @@ namespace util {
                          std::array<float, 3> normalToDetector)
         {
             // If prism projection x index is not on the detector, write nothing
-            if(prism->pxindex < 0 || prism->pxindex > (int)pdimx)
+            if(prism->pxindex < 0 || prism->pxindex >= (int)pdimx)
             {
                 return;
             } else

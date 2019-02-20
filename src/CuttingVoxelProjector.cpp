@@ -86,7 +86,10 @@ int CuttingVoxelProjector::project(float* projection,
 {
 //FIXME
 //https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
+    //std::string projectorSource
+    //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/projector.cl"));
     std::string projectorSource
+    //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/centerVoxelProjector.cl"));
         = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/projector.cl"));
     cl::Program program(*context, projectorSource);
     if(program.build({ *device }, "-g") != CL_SUCCESS)
@@ -94,7 +97,13 @@ int CuttingVoxelProjector::project(float* projection,
         LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
         return -1;
     }
-
+/*    
+if(program.build({ *device }, "-g") != CL_SUCCESS)
+    {
+        LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
+        return -1;
+    }
+*/
     double* P = matrix.getPtr();
     std::array<double, 3> sourcePosition = matrix.sourcePosition();
     std::array<double, 3> normalToDetector = matrix.normalToDetector();
