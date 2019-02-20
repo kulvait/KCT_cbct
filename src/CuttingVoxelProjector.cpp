@@ -2,10 +2,10 @@
 
 namespace CTL {
 
-int CuttingVoxelProjector::initializeOpenCL()
+int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
 {
     // Select the first available platform.
-    std::shared_ptr<cl::Platform> platform = util::OpenCLManager::getPlatform(1, true);
+    std::shared_ptr<cl::Platform> platform = util::OpenCLManager::getPlatform(platformId, true);
     if(platform == nullptr)
     {
         return -1;
@@ -90,7 +90,8 @@ int CuttingVoxelProjector::project(float* projection,
     //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/projector.cl"));
     std::string projectorSource
     //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/centerVoxelProjector.cl"));
-        = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/projector.cl"));
+    //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/projector.cl"));
+        = io::fileToString(std::string("/home/kulvait/git/DACProjector/opencl/projector.cl"));
     cl::Program program(*context, projectorSource);
     if(program.build({ *device }, "-g") != CL_SUCCESS)
     {

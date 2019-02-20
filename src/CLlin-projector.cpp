@@ -28,6 +28,7 @@ using namespace CTL;
 struct Args
 {
     int parseArguments(int argc, char* argv[]);
+    uint32_t platformId = 0;
     std::string frameSpecs = "";
     int eachkth = 1;
     std::vector<int> frames;
@@ -82,8 +83,10 @@ int Args::parseArguments(int argc, char* argv[])
                    "are then 1st specified, 1+kN, N=1...\\infty if such frame exists. Parameter k "
                    "must be positive integer.")
         ->check(CLI::Range(1, 65535));
+    app.add_option("-p,--platform_id", platformId, "OpenCL platform ID to use.")
+        ->check(CLI::Range(0, 65535));
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
-        ->check(CLI::Range(1, 65535));
+        ->check(CLI::Range(0, 65535));
     app.add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
     app.add_flag("-n,--no_frame_offset", noFrameOffset,
                  "When this flag is specified no offset of the projections will be used when "
@@ -231,7 +234,13 @@ int main(int argc, char* argv[])
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
     std::shared_ptr<CuttingVoxelProjector> cvp
         = std::make_shared<CuttingVoxelProjector>(volume, inf.dimx(), inf.dimy(), inf.dimz());
-    cvp->initializeOpenCL();
+    int res = cvp->initializeOpenCL(a.platformId);
+    if(res < 0)
+    {
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", a.platformId);
+        LOGE << ERR;
+        io::throwerr(ERR);
+    }
     cvp->initializeVolumeImage();
     uint32_t projectionElementsCount = a.projectionSizeX * a.projectionSizeY;
     float* projection = new float[projectionElementsCount]();
@@ -242,10 +251,10 @@ int main(int argc, char* argv[])
     buf[2] = 1;
     io::createEmptyFile(a.outputProjection, 0, true); // Try if this is faster
     io::appendBytes(a.outputProjection, (uint8_t*)buf, 6);
-    io::appendBytes(a.outputProjection, (uint8_t*)projection, projectionElementsCount * sizeof(float));
+    io::appendBytes(a.outputProjection, (uint8_t*)projection,
+                    projectionElementsCount * sizeof(float));
     delete[] volume;
     delete[] projection;
-
 
     LOGI << io::xprintf("END %s", argv[0]);
 }

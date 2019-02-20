@@ -37,7 +37,7 @@ public:
      * @see [OpenCL C++
      * tutorial](http://simpleopencl.blogspot.com/2013/06/tutorial-simple-start-with-opencl-and-c.html)
      */
-    int initializeOpenCL();
+    int initializeOpenCL(uint32_t platformId = 0);
 
     int initializeVolumeImage();
 
