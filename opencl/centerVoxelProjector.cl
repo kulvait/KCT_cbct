@@ -37,8 +37,8 @@ int2 projectionIndex(private double16 P, private double4 vdim, int2 pdims)
     coord.x /= coord.z;
     coord.y /= coord.z;
     int2 ind;
-    ind.x = convert_int_rtp(coord.x);
-    ind.y = convert_int_rtp(coord.y);
+    ind.x = convert_int_rtp(coord.x + 0.5);
+    ind.y = convert_int_rtp(coord.y + 0.5);
     if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
     {
         return ind;

@@ -71,31 +71,6 @@ void project(private double16* CM, private double4* v, private double2* P_out)
     P_out->y = coord.y / coord.z;
 }
 
-// How far from A is the next boundary point on the line |AB|
-/*
-float nextBoundaryPoint(private double16* P, double4* A, double4* B)
-{
-    int A_pi, B_pi;
-    projectX(P, A, &A_pi);
-    projectX(P, B, &B_pi);
-    // Find the pixels to which corresponds points A and B
-    A_pi = convert_int_rtn(A_p);
-    B_pi = convert_int_rtn(B_p);
-    int edgeCount = B_pi - A_pi;
-    float edgeLength = length(A - B);
-    float stepLength = edgeLength / (B_p - A_p);
-    float boundary = float(A_pi) + float(0.5);
-    float Aptoedge = boundary - A_p;
-    float k = stepLength * Aptoedge;
-    if(k == 0)
-    {
-        return stepLength;
-    } else
-    {
-        return k;
-    }
-}*/
-
 int2 projectionIndices(private double16 P, private double4 vdim, int2 pdims)
 {
     double4 coord;
@@ -105,8 +80,8 @@ int2 projectionIndices(private double16 P, private double4 vdim, int2 pdims)
     coord.x /= coord.z;
     coord.y /= coord.z;
     int2 ind;
-    ind.x = convert_int_rtn(coord.x);
-    ind.y = convert_int_rtn(coord.y);
+    ind.x = convert_int_rtn(coord.x + 0.5);
+    ind.y = convert_int_rtn(coord.y + 0.5);
     if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
     {
         return ind;
@@ -125,8 +100,8 @@ int projectionIndex(private double16* CM, private double4 v, int2 pdims)
     coord.x /= coord.z;
     coord.y /= coord.z;
     int2 ind;
-    ind.x = convert_int_rtn(coord.x);
-    ind.y = convert_int_rtn(coord.y);
+    ind.x = convert_int_rtn(coord.x + 0.5);
+    ind.y = convert_int_rtn(coord.y + 0.5);
     if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
     {
         return ind.x + pdims.x * ind.y;
@@ -153,8 +128,8 @@ void insertEdgeValues(int PX,
     v_up = v + voxelSizes * (double4)(0, 0, +0.5, 0);
     projectY(&CM, &v_down, &PY_down);
     projectY(&CM, &v_up, &PY_up);
-    PJ_down = convert_int_rtn(PY_down);
-    PJ_up = convert_int_rtn(PY_up);
+    PJ_down = convert_int_rtn(PY_down + 0.5);
+    PJ_up = convert_int_rtn(PY_up + 0.5);
     int increment = 1;
     if(PJ_down == PJ_up)
     {
@@ -178,7 +153,7 @@ void insertEdgeValues(int PX,
         for(int j = PJ_down + increment; j != PJ_up; j += increment)
         {
             AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                          value * stepSize); // Atomic version of projection[ind] += value;
+                          value * stepSize * increment); // Atomic version of projection[ind] += value;
         }
 
         // Add part that maps to PJ_down
@@ -215,7 +190,7 @@ void insertEdgeValues(int PX,
             if(j >= 0 && j < pdims.y)
             {
                 AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                              value * stepSize); // Atomic version of projection[ind] += value;
+                              value * stepSize * increment); // Atomic version of projection[ind] += value;
             }
         }
 
@@ -251,25 +226,222 @@ void insertEdgeValues(int PX,
     }
 }
 
+/**
+ * We parametrize the line segment from A to B by parameter t such that t=0 for A and t=1 for B.
+ * Then we will find the t corresponding to the point v = t*B+(1-t)A  that maps to the coordinate PX
+ * on the detector. We assume that the mapping is linear. If A and B maps to the same PX, t=MAXFLOAT
+ *
+ * @param CM
+ * @param PX
+ * @param A
+ * @param B
+ *
+ * @return Parametrization of the line that maps to PX.
+ */
+inline double intersectionXTime(private double16* CM, double* PX, double4* A, double4* B)
+{
+    double PX_A, PX_B;
+    projectX(CM, A, &PX_A);
+    projectX(CM, B, &PX_B);
+    if(PX_A == PX_B)
+    {
+        return DBL_MAX;
+    }
+    return ((*PX) - PX_A) / (PX_B - PX_A);
+}
+
+/** Find the position parametrization as double2 in the range [0,4) and [0,4) of the piecewise lines
+ * V_ccw0 ... V_ccw1 ... V_ccw2 ... V_ccw3 and V_ccw0 ... V_ccw3 ... V_ccw2 ... V_ccw1 that maps to
+ * a start of PI coordinate, that means to PI-0.5.
+ *
+ *
+ * @param CM Projection camera matrix
+ * @param PX PX coordinate to be mapped on projector.
+ * @param lastIntersections Start search from these points
+ * @param V_ccw0
+ * @param V_ccw1
+ * @param V_ccw2
+ * @param V_ccw3
+ * @param V_max Point where maximum X is achieved
+ *
+ * @return position parametrization as double2
+ */
 double2 findIntersectionPoints(private double16* CM,
-                               int i,
+                               int PI,
                                double2 lastIntersections,
                                double4* V_ccw0,
                                double4* V_ccw1,
                                double4* V_ccw2,
-                               double4* V_ccw,
+                               double4* V_ccw3,
                                double4* V_max)
 {
-    return (double2)(0, 0);
+    double PX = (double)PI - 0.5;
+    double intersectionTime;
+    double2 nextIntersections = ((double2)(-1.0, -1.0));
+    while(nextIntersections.x < 0)
+    {
+        if(lastIntersections.x < 1.0)
+        {
+            intersectionTime = intersectionXTime(CM, &PX, V_ccw0, V_ccw1);
+            if(intersectionTime <= 1.0 && intersectionTime >= 0)
+            {
+                nextIntersections.x = intersectionTime;
+            } else if(V_ccw1 == V_max)
+            {
+                nextIntersections.x = 1.0;
+            } else
+            {
+                lastIntersections.x = 1.0;
+            }
+        } else if(lastIntersections.x < 2.0)
+        {
+            intersectionTime = intersectionXTime(CM, &PX, V_ccw1, V_ccw2);
+            if(intersectionTime <= 1.0 && intersectionTime >= 0)
+            {
+                nextIntersections.x = 1.0 + intersectionTime;
+            } else if(V_ccw2 == V_max)
+            {
+                nextIntersections.x = 2.0;
+            } else
+            {
+                lastIntersections.x = 2.0;
+            }
+
+        } else if(lastIntersections.x < 3.0)
+        {
+            intersectionTime = intersectionXTime(CM, &PX, V_ccw2, V_ccw3);
+            if(intersectionTime <= 1.0 && intersectionTime >= 0)
+            {
+                nextIntersections.x = 2.0 + intersectionTime;
+            } else if(V_ccw3 == V_max)
+            {
+                nextIntersections.x = 3.0;
+            } else
+            {
+                // I should not get here
+            }
+        }
+    }
+    while(nextIntersections.y < 0)
+    {
+
+        if(lastIntersections.y < 1.0)
+        {
+            intersectionTime = intersectionXTime(CM, &PX, V_ccw0, V_ccw3);
+            if(intersectionTime <= 1.0 && intersectionTime >= 0)
+            {
+                nextIntersections.y = intersectionTime;
+            } else if(V_ccw3 == V_max)
+            {
+                nextIntersections.y = 1.0;
+            } else
+            {
+                lastIntersections.y = 1.0;
+            }
+        } else if(lastIntersections.y < 2.0)
+        {
+            intersectionTime = intersectionXTime(CM, &PX, V_ccw3, V_ccw2);
+            if(intersectionTime <= 1.0 && intersectionTime >= 0)
+            {
+                nextIntersections.y = 1.0 + intersectionTime;
+            } else if(V_ccw2 == V_max)
+            {
+                nextIntersections.y = 2.0;
+            } else
+            {
+                lastIntersections.y = 2.0;
+            }
+
+        } else if(lastIntersections.y < 3.0)
+        {
+            intersectionTime = intersectionXTime(CM, &PX, V_ccw2, V_ccw1);
+            if(intersectionTime <= 1.0 && intersectionTime >= 0)
+            {
+                nextIntersections.y = 2.0 + intersectionTime;
+            } else if(V_ccw1 == V_max)
+            {
+                nextIntersections.y = 3.0;
+            } else
+            {
+                // I should not get here
+            }
+        }
+    }
+    return nextIntersections;
 }
 
+/**
+ * Compute point parametrized by p on piecewise line segments V_ccw0 ... V_ccw1 ... V_ccw2 ...
+ * V_ccw3
+ *
+ * @param p
+ * @param V_ccw0
+ * @param V_ccw1
+ * @param V_ccw2
+ * @param V_ccw3
+ */
 double4
 intersectionPoint(double p, double4* V_ccw0, double4* V_ccw1, double4* V_ccw2, double4* V_ccw3)
 {
-    return (double4)(0, 0, 0, 0);
+    double4 v;
+    if(p <= 1.0)
+    {
+        v = (*V_ccw0) * (1.0 - p) + p * (*V_ccw1);
+    } else if(p <= 2.0)
+    {
+        p -= 1.0;
+        v = (*V_ccw1) * (1.0 - p) + p * (*V_ccw2);
+    } else if(p <= 3.0)
+    {
+        p -= 2.0;
+        v = (*V_ccw2) * (1.0 - p) + p * (*V_ccw3);
+    }
+    return v;
 }
 
-double computeSquareSize(double2 nextIntersections) { return 0.0; }
+/**
+ * From parameters dox.x and dox.y compute the size of the square that is parametrized by these
+ * parameters starting from single vertex.
+ *
+ * @param abc
+ *
+ * @return
+ */
+double computeSquareSize(double2 abc)
+{
+    if(abc.x > abc.y)
+    {
+        double tmp = abc.x;
+        abc.x = abc.y;
+        abc.y = tmp;
+    }
+    // abc.x<=abc.y
+    if(abc.x <= 1.0)
+    {
+        if(abc.y <= 1.0)
+        {
+            return abc.x * abc.y / 2.0; // Triangle that is bounded by corners (0, a, b)
+        } else if(abc.y <= 2.0)
+        {
+            abc.y = abc.y - 1.0; // Upper edge length
+            return abc.x + (abc.y - abc.x) / 2.0;
+        } else if(abc.y <= 3.0)
+        {
+            abc.x = 1.0 - abc.x;
+            abc.y = 3.0 - abc.y;
+            return 1.0 - (abc.x * abc.y) / 2.0; // Whole square but the area of
+                                                // the triangle bounded by // corners (a, 1, b)
+        }
+    } else if(abc.x <= 2.0)
+    {
+        // abc.y<=2
+        abc.x = 2.0 - abc.x;
+        abc.y = 2.0 - abc.y;
+        return 1.0 - (abc.x * abc.y) / 2.0; // Whole square but the area of the
+                                            // triangle bounded by (a, 2, b)
+    }
+    return 0; // This is not gonna happen
+}
 
 inline int volIndex(int* i, int* j, int* k, int4* vdims)
 {
@@ -365,8 +537,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     int max_PX, min_PX; // Pixel to which are the voxels with minimum and maximum values projected
     pxx_min = min(min(min(px00.x, px01.x), px10.x), px11.x);
     pxx_max = max(max(max(px00.x, px01.x), px10.x), px11.x);
-    max_PX = convert_int_rtn(pxx_max);
-    min_PX = convert_int_rtn(pxx_min);
+    max_PX = convert_int_rtn(pxx_max + 0.5);
+    min_PX = convert_int_rtn(pxx_min + 0.5);
     double4 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
                                // from the minimum voxel
     if(px00.x == pxx_min)
@@ -411,136 +583,64 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     double previousSectionsSize = 0.0;
     // CCW and CW coordinates of the last intersection on the lines specified by the points in V_ccw
     double2 lastIntersections = { 0.0, 0.0 };
-    for(int i = min_PX; i < max_PX; i++)
+    for(int I = min_PX; I < max_PX; I++)
     {
-        if(i >= 0 && i < pdims.x)
+        if(I >= -1 && I < pdims.x)
         {
             double2 nextIntersections = findIntersectionPoints(
-                &CM, i + 1, lastIntersections, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], V_max);
+                &CM, I + 1, lastIntersections, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], V_max);
             double newSectionsSize = computeSquareSize(nextIntersections);
             double cutSize = newSectionsSize - previousSectionsSize;
-            // Number of edges is a number of vertical edges that we cut according to PY coordinate
-            int numberOfEdges = 0; // NextIntersections
-            if(lastIntersections.x == 0 && lastIntersections.y == 0)
+            if(I >= 0)
             {
-                numberOfEdges += 1;
-            } else
-            {
-                numberOfEdges += 2;
+                // Number of edges is a number of vertical edges that we cut according to PY
+                // coordinate
+                int numberOfEdges = 0; // NextIntersections
+                if(lastIntersections.x == 0 && lastIntersections.y == 0)
+                {
+                    numberOfEdges += 1;
+                } else
+                {
+                    numberOfEdges += 2;
+                }
+                if(nextIntersections.x + nextIntersections.y == 4)
+                {
+                    numberOfEdges += 1;
+                } else
+                {
+                    numberOfEdges += 2;
+                }
+                double4 V;
+                double factor = value * cutSize / numberOfEdges;
+                if(lastIntersections.x == 0 && lastIntersections.y == 0)
+                {
+                    V = *V_ccw[0];
+                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                } else
+                {
+                    V = intersectionPoint(lastIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2],
+                                          V_ccw[3]);
+                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                    V = intersectionPoint(lastIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2],
+                                          V_ccw[1]);
+                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                }
+                if(nextIntersections.x + nextIntersections.y == 4)
+                {
+                    V = *V_max;
+                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                } else
+                {
+                    V = intersectionPoint(nextIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2],
+                                          V_ccw[3]);
+                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                    V = intersectionPoint(nextIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2],
+                                          V_ccw[1]);
+                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                }
             }
-            if(nextIntersections.x == nextIntersections.y)
-            {
-                numberOfEdges += 1;
-            } else
-            {
-                numberOfEdges += 2;
-            }
-            double4 V;
-            double factor = value * cutSize / numberOfEdges;
-            if(lastIntersections.x == 0 && lastIntersections.y == 0)
-            {
-                V = *V_ccw[0];
-                insertEdgeValues(i, factor, V, CM, projection, voxelSizes, pdims);
-            } else
-            {
-                V = intersectionPoint(lastIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3]);
-                insertEdgeValues(i, factor, V, CM, projection, voxelSizes, pdims);
-                V = intersectionPoint(lastIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2], V_ccw[1]);
-                insertEdgeValues(i, factor, V, CM, projection, voxelSizes, pdims);
-            }
-            if(nextIntersections.x == nextIntersections.y)
-            {
-                V = *V_max;
-                insertEdgeValues(i, factor, V, CM, projection, voxelSizes, pdims);
-            } else
-            {
-                V = intersectionPoint(nextIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3]);
-                insertEdgeValues(i, factor, V, CM, projection, voxelSizes, pdims);
-                V = intersectionPoint(nextIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2], V_ccw[1]);
-                insertEdgeValues(i, factor, V, CM, projection, voxelSizes, pdims);
-            }
-            /*
-                        // numberOfEdges
-                        //    += convert_int_rtn(floor(nextIntersections.x) -
-               floor(lastIntersections.x));
-                        // numberOfEdges
-                        //    += convert_int_rtn(floor(nextIntersections.y) -
-               floor(lastIntersections.y));
-                        // Now climb over edges CCW
-
-                        double intersectionk = lastIntersections.x;
-                        double4 V;
-                        double2 P_MIN;
-                        double2 P_MAX;
-                        intersectionk = lastIntersections.y;
-                        while(intersectionk <= nextIntersections.y)
-                        {
-                            int arrayIndex = convert_int_rtn(floor(intersectionk));
-                            double k = intersectionk - floor(intersectionk);
-                            V = (*V_ccw[(-arrayIndex) % 4]) * (1 - k) + k * (*V_ccw[(-arrayIndex -
-               1) % 4]); project(&P, V, &P_MIN); project(&P, V + voxelSizes * (double4)(0, 0, 1, 0),
-               &P_MAX);
-                            // Now assign values to the sections of the line that projects between
-               P_MIN and
-                            // P_MAX
-
-                            int max_PY, min_PY;
-                            min_PY = convert_int_rtn(P_MIN.y);
-                            max_PY = convert_int_rtn(P_MAX.y);
-                            double totalY = P_MAX.y - P_MIN.y;
-                            double intersection = (nextGridY - P_MIN.y) / totalY;
-
-                            for(int j = min_PY; j != max_PY; j++)
-                            {
-                                if(j >= 0 && j < pdims.y)
-                                {
-                                    double factor = 1.0;
-                                    if(j == min_PY)
-                                    {
-                                        double nextGridY;
-                                        if(totalY > 0)
-                                        {
-                                            nextGridY = ceil(P_MIN.y) + 0.5;
-                                        } else
-                                        {
-                                            nextGridY = ceil(P_MIN.y) - 0.5;
-                                        }
-                                        factor = (nextGridY - P_MIN.y) / totalY;
-                                    } else if(j < max_PY - 1)
-                                    {
-                                        factor = 1.0 / totalY;
-                                    } else
-                                    {
-                                        double nextGridY;
-                                        if(totalY > 0)
-                                        {
-                                            nextGridY = ceil(P_MAX.y) - 0.5;
-                                        } else
-                                        {
-                                            nextGridY = ceil(P_MAX.y) + 0.5;
-                                        }
-                                        factor = (P_MAX.y - nextGridY) / totalY;
-                                    }
-
-                                    factor = factor * cutSize / numberOfEdges;
-
-                                    AtomicAdd_g_f(&projection[i + pdims.x * j],
-                                                  value
-                                                      * factor); // Atomic version of
-               projection[ind] += value;
-                                }
-                            }
-                            if(floor(intersectionk) < floor(nextIntersections.y))
-                            {
-                                intersectionk = floor(intersectionk) + 1.0;
-                            } else if(intersectionk == nextIntersections.y)
-                            {
-                                intersectionk += 1.0;
-                            } else
-                            {
-                                intersectionk = nextIntersections.y;
-                            }
-                        }*/
+            previousSectionsSize = newSectionsSize;
+            lastIntersections = nextIntersections;
         }
     }
 }

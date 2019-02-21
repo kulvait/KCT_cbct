@@ -94,7 +94,7 @@ int CuttingVoxelProjector::project(float* projection,
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
-    if(program.build({ *device }, "-g") != CL_SUCCESS)
+    if(program.build({ *device }, io::xprintf("-g -s \"%s\"", clFile.c_str()).c_str()) != CL_SUCCESS)
     {
         LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
         return -1;
