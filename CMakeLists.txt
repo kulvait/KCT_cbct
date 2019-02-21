@@ -89,7 +89,11 @@ target_link_libraries(CLlin-projector CTIOL_OPENCL)
 target_include_directories(CLlin-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-projector ${CMAKE_THREAD_LIBS_INIT})
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/programs.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
 install (TARGETS CLlin-projector RUNTIME DESTINATION .)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 
 

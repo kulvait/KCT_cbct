@@ -1,28 +1,32 @@
 
-/** Atomic float addition. 
-* 
-* Function from https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
-* 
-*
-* @param source Pointer to the memory to perform atomic operation on.
-* @param operand Float to add.
-*/
-inline void AtomicAdd_g_f(volatile __global float *source, const float operand) {
-    union {
+/** Atomic float addition.
+ *
+ * Function from
+ * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
+ *
+ *
+ * @param source Pointer to the memory to perform atomic operation on.
+ * @param operand Float to add.
+ */
+inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
+{
+    union
+    {
         unsigned int intVal;
         float floatVal;
     } newVal;
-    union {
+    union
+    {
         unsigned int intVal;
         float floatVal;
     } prevVal;
-    do {
+    do
+    {
         prevVal.floatVal = *source;
         newVal.floatVal = prevVal.floatVal + operand;
-    } while (atomic_cmpxchg((volatile __global unsigned int *)source, prevVal.intVal, 
-            newVal.intVal) != prevVal.intVal);
+    } while(atomic_cmpxchg((volatile __global unsigned int*)source, prevVal.intVal, newVal.intVal)
+            != prevVal.intVal);
 }
-
 
 int2 projectionIndex(private double16 P, private double4 vdim, int2 pdims)
 {
@@ -44,6 +48,11 @@ int2 projectionIndex(private double16 P, private double4 vdim, int2 pdims)
     }
 }
 
+int volIndex(int* i, int* j, int* k, int4* vdims)
+{
+    return (*i) + (*j) * vdims->x + (*k) * (vdims->x * vdims->y);
+}
+
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -60,7 +69,7 @@ int2 projectionIndex(private double16 P, private double4 vdim, int2 pdims)
  *
  * @return
  */
-void kernel FLOATcutting_voxel_project(read_only const image3d_t volume,
+void kernel FLOATcutting_voxel_project(read_only global float* volume,
                                        global float* projection,
                                        private double16 PM,
                                        private double4 sourcePosition,
@@ -72,7 +81,7 @@ void kernel FLOATcutting_voxel_project(read_only const image3d_t volume,
 {
     int i = get_global_id(2);
     int j = get_global_id(1);
-    int k = get_global_id(0);//This is more effective from the perspective of atomic colisions
+    int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     const double4 IND_ijk = { (double)(i), (double)(j), (double)(k), 0.0 };
     const double4 zerocorner_xyz = -convert_double4(vdims) / 2.0;
     const double4 voxelcenter_xyz = zerocorner_xyz
@@ -80,14 +89,15 @@ void kernel FLOATcutting_voxel_project(read_only const image3d_t volume,
     int2 p_ab = projectionIndex(PM, voxelcenter_xyz, pdims);
     if(p_ab.x != pdims.x && p_ab.y != pdims.y)
     {
-        float4 voxelValue = read_imagef(volume, (int4)(i, j, k, 0.0));
+        float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
 
         double4 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
         double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
         double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
         double cosPowThree = cosine * cosine * cosine;
-        float value = voxelValue.x * scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+        float value = voxelValue * scalingFactor
+            / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
         int ind = p_ab.y * pdims.x + p_ab.x;
-        AtomicAdd_g_f(&projection[ind], value);//Atomic version of projection[ind] += value;
+        AtomicAdd_g_f(&projection[ind], value); // Atomic version of projection[ind] += value;
     }
 }

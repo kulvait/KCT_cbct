@@ -18,12 +18,14 @@ namespace CTL {
 class CuttingVoxelProjector
 {
 public:
-    CuttingVoxelProjector(float* volume, uint32_t vdimx, uint32_t vdimy, uint32_t vdimz)
+    CuttingVoxelProjector(
+        float* volume, uint32_t vdimx, uint32_t vdimy, uint32_t vdimz, std::string xpath)
+        : volume(volume)
+        , vdimx(vdimx)
+        , vdimy(vdimy)
+        , vdimz(vdimz)
+        , xpath(xpath)
     {
-        this->volume = volume;
-        this->vdimx = vdimx;
-        this->vdimy = vdimy;
-        this->vdimz = vdimz;
     }
 
     /** Initializes OpenCL.
@@ -50,11 +52,13 @@ public:
 private:
     float* volume = nullptr;
     uint32_t vdimx, vdimy, vdimz;
+    std::string xpath; // Path where the program executes
 
     std::shared_ptr<cl::Device> device = nullptr;
     std::shared_ptr<cl::Context> context = nullptr;
     std::shared_ptr<cl::Image3D> volumeImage = nullptr;
     std::shared_ptr<cl::CommandQueue> Q = nullptr;
+    std::shared_ptr<cl::Buffer> volumeBuffer = nullptr;
 };
 
 } // namespace CTL

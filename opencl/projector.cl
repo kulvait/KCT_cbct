@@ -271,6 +271,11 @@ intersectionPoint(double p, double4* V_ccw0, double4* V_ccw1, double4* V_ccw2, d
 
 double computeSquareSize(double2 nextIntersections) { return 0.0; }
 
+inline int volIndex(int* i, int* j, int* k, int4* vdims)
+{
+    return (*i) + (*j) * vdims->x + (*k) * (vdims->x * vdims->y);
+}
+
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -287,7 +292,7 @@ double computeSquareSize(double2 nextIntersections) { return 0.0; }
  *
  * @return
  */
-void kernel FLOATcutting_voxel_project(read_only const image3d_t volume,
+void kernel FLOATcutting_voxel_project(read_only global float* volume,
                                        global float* projection,
                                        private double16 CM,
                                        private double4 sourcePosition,
@@ -328,13 +333,13 @@ void kernel FLOATcutting_voxel_project(read_only const image3d_t volume,
     }
     const double4 voxelcenter_xyz = zerocorner_xyz
         + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
-    float4 voxelValue = read_imagef(volume, (int4)(i, j, k, 0));
+    float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
 
     double4 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
     double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
     double cosPowThree = cosine * cosine * cosine;
-    float value = voxelValue.x * scalingFactor
+    float value = voxelValue * scalingFactor
         / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
     if(all(cube_abi == cube_abi.x)) // When all projections are the same
     {
@@ -454,84 +459,88 @@ void kernel FLOATcutting_voxel_project(read_only const image3d_t volume,
                 V = intersectionPoint(nextIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2], V_ccw[1]);
                 insertEdgeValues(i, factor, V, CM, projection, voxelSizes, pdims);
             }
-/*
-            // numberOfEdges
-            //    += convert_int_rtn(floor(nextIntersections.x) - floor(lastIntersections.x));
-            // numberOfEdges
-            //    += convert_int_rtn(floor(nextIntersections.y) - floor(lastIntersections.y));
-            // Now climb over edges CCW
+            /*
+                        // numberOfEdges
+                        //    += convert_int_rtn(floor(nextIntersections.x) -
+               floor(lastIntersections.x));
+                        // numberOfEdges
+                        //    += convert_int_rtn(floor(nextIntersections.y) -
+               floor(lastIntersections.y));
+                        // Now climb over edges CCW
 
-            double intersectionk = lastIntersections.x;
-            double4 V;
-            double2 P_MIN;
-            double2 P_MAX;
-            intersectionk = lastIntersections.y;
-            while(intersectionk <= nextIntersections.y)
-            {
-                int arrayIndex = convert_int_rtn(floor(intersectionk));
-                double k = intersectionk - floor(intersectionk);
-                V = (*V_ccw[(-arrayIndex) % 4]) * (1 - k) + k * (*V_ccw[(-arrayIndex - 1) % 4]);
-                project(&P, V, &P_MIN);
-                project(&P, V + voxelSizes * (double4)(0, 0, 1, 0), &P_MAX);
-                // Now assign values to the sections of the line that projects between P_MIN and
-                // P_MAX
-
-                int max_PY, min_PY;
-                min_PY = convert_int_rtn(P_MIN.y);
-                max_PY = convert_int_rtn(P_MAX.y);
-                double totalY = P_MAX.y - P_MIN.y;
-                double intersection = (nextGridY - P_MIN.y) / totalY;
-
-                for(int j = min_PY; j != max_PY; j++)
-                {
-                    if(j >= 0 && j < pdims.y)
-                    {
-                        double factor = 1.0;
-                        if(j == min_PY)
+                        double intersectionk = lastIntersections.x;
+                        double4 V;
+                        double2 P_MIN;
+                        double2 P_MAX;
+                        intersectionk = lastIntersections.y;
+                        while(intersectionk <= nextIntersections.y)
                         {
-                            double nextGridY;
-                            if(totalY > 0)
+                            int arrayIndex = convert_int_rtn(floor(intersectionk));
+                            double k = intersectionk - floor(intersectionk);
+                            V = (*V_ccw[(-arrayIndex) % 4]) * (1 - k) + k * (*V_ccw[(-arrayIndex -
+               1) % 4]); project(&P, V, &P_MIN); project(&P, V + voxelSizes * (double4)(0, 0, 1, 0),
+               &P_MAX);
+                            // Now assign values to the sections of the line that projects between
+               P_MIN and
+                            // P_MAX
+
+                            int max_PY, min_PY;
+                            min_PY = convert_int_rtn(P_MIN.y);
+                            max_PY = convert_int_rtn(P_MAX.y);
+                            double totalY = P_MAX.y - P_MIN.y;
+                            double intersection = (nextGridY - P_MIN.y) / totalY;
+
+                            for(int j = min_PY; j != max_PY; j++)
                             {
-                                nextGridY = ceil(P_MIN.y) + 0.5;
+                                if(j >= 0 && j < pdims.y)
+                                {
+                                    double factor = 1.0;
+                                    if(j == min_PY)
+                                    {
+                                        double nextGridY;
+                                        if(totalY > 0)
+                                        {
+                                            nextGridY = ceil(P_MIN.y) + 0.5;
+                                        } else
+                                        {
+                                            nextGridY = ceil(P_MIN.y) - 0.5;
+                                        }
+                                        factor = (nextGridY - P_MIN.y) / totalY;
+                                    } else if(j < max_PY - 1)
+                                    {
+                                        factor = 1.0 / totalY;
+                                    } else
+                                    {
+                                        double nextGridY;
+                                        if(totalY > 0)
+                                        {
+                                            nextGridY = ceil(P_MAX.y) - 0.5;
+                                        } else
+                                        {
+                                            nextGridY = ceil(P_MAX.y) + 0.5;
+                                        }
+                                        factor = (P_MAX.y - nextGridY) / totalY;
+                                    }
+
+                                    factor = factor * cutSize / numberOfEdges;
+
+                                    AtomicAdd_g_f(&projection[i + pdims.x * j],
+                                                  value
+                                                      * factor); // Atomic version of
+               projection[ind] += value;
+                                }
+                            }
+                            if(floor(intersectionk) < floor(nextIntersections.y))
+                            {
+                                intersectionk = floor(intersectionk) + 1.0;
+                            } else if(intersectionk == nextIntersections.y)
+                            {
+                                intersectionk += 1.0;
                             } else
                             {
-                                nextGridY = ceil(P_MIN.y) - 0.5;
+                                intersectionk = nextIntersections.y;
                             }
-                            factor = (nextGridY - P_MIN.y) / totalY;
-                        } else if(j < max_PY - 1)
-                        {
-                            factor = 1.0 / totalY;
-                        } else
-                        {
-                            double nextGridY;
-                            if(totalY > 0)
-                            {
-                                nextGridY = ceil(P_MAX.y) - 0.5;
-                            } else
-                            {
-                                nextGridY = ceil(P_MAX.y) + 0.5;
-                            }
-                            factor = (P_MAX.y - nextGridY) / totalY;
-                        }
-
-                        factor = factor * cutSize / numberOfEdges;
-
-                        AtomicAdd_g_f(&projection[i + pdims.x * j],
-                                      value
-                                          * factor); // Atomic version of projection[ind] += value;
-                    }
-                }
-                if(floor(intersectionk) < floor(nextIntersections.y))
-                {
-                    intersectionk = floor(intersectionk) + 1.0;
-                } else if(intersectionk == nextIntersections.y)
-                {
-                    intersectionk += 1.0;
-                } else
-                {
-                    intersectionk = nextIntersections.y;
-                }
-            }*/
+                        }*/
         }
     }
 }

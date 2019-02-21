@@ -69,11 +69,13 @@ int CuttingVoxelProjector::initializeVolumeImage()
 {
     cl::ImageFormat f(CL_INTENSITY, CL_FLOAT);
     cl_int err;
-    volumeImage = std::make_shared<cl::Image3D>(*context, CL_MEM_COPY_HOST_PTR, f, vdimx, vdimy,
-                                                vdimz, 0, 0, (void*)volume, &err);
+    volumeBuffer
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR | CL_MEM_HOST_READ_ONLY,
+                                       sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of Image3D with error code %d!", err);
+        return -1;
     }
     return 0;
 }
@@ -84,38 +86,35 @@ int CuttingVoxelProjector::project(float* projection,
                                    matrix::ProjectionMatrix matrix,
                                    float scalingFactor)
 {
-//FIXME
-//https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
-    //std::string projectorSource
-    //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/projector.cl"));
+    // FIXME
+    // https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
     std::string projectorSource
-    //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/centerVoxelProjector.cl"));
-    //    = io::fileToString(std::string("/b/git/DivideConquerProjector/opencl/projector.cl"));
-        = io::fileToString(std::string("/home/kulvait/git/DACProjector/opencl/projector.cl"));
+        = io::fileToString(
+            io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()));
     cl::Program program(*context, projectorSource);
     if(program.build({ *device }, "-g") != CL_SUCCESS)
     {
         LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
         return -1;
     }
-/*    
-if(program.build({ *device }, "-g") != CL_SUCCESS)
-    {
-        LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
-        return -1;
-    }
-*/
+    /*
+    if(program.build({ *device }, "-g") != CL_SUCCESS)
+        {
+            LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
+            return -1;
+        }
+    */
     double* P = matrix.getPtr();
     std::array<double, 3> sourcePosition = matrix.sourcePosition();
     std::array<double, 3> normalToDetector = matrix.normalToDetector();
-//    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
+    //    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
     cl::Buffer buffer_projection(*context, CL_MEM_COPY_HOST_PTR, sizeof(float) * pdimx * pdimy,
                                  (void*)projection);
 
     // OpenCL 1.2 got rid of KernelFunctor
     // https://forums.khronos.org/showthread.php/8317-cl-hpp-KernelFunctor-gone-replaced-with-KernelFunctorGlobal
     // https://stackoverflow.com/questions/23992369/what-should-i-use-instead-of-clkernelfunctor/54344990#54344990
-    cl::make_kernel<cl::Image3D&, cl::Buffer&, cl_double16&, cl_double4&, cl_double4&, cl_int4&,
+    cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&, cl_double4&, cl_int4&,
                     cl_double4&, cl_int2&, float&>
         FLOATcutting_voxel_project(cl::Kernel(program, "FLOATcutting_voxel_project"));
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
@@ -123,14 +122,15 @@ if(program.build({ *device }, "-g") != CL_SUCCESS)
     cl_double4 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2], 0.0 });
     cl_double4 NORMALTODETECTOR(
         { normalToDetector[0], normalToDetector[1], normalToDetector[2], 0.0 });
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimx, vdimy, vdimz));
-    cl_int4 vdims({ int(vdimz), int(vdimy), int(vdimx), 0 });
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
     cl_double4 voxelSizes({ 1.0, 1.0, 1.0, 0.0 });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
-    FLOATcutting_voxel_project(eargs, *volumeImage, buffer_projection, PM, SOURCEPOSITION,
-                               NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingFactor).wait();
+    FLOATcutting_voxel_project(eargs, *volumeBuffer, buffer_projection, PM, SOURCEPOSITION,
+                               NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingFactor)
+        .wait();
 
-    Q->enqueueReadBuffer(buffer_projection, CL_TRUE, 0, sizeof(float) * pdimx*pdimy, projection);
+    Q->enqueueReadBuffer(buffer_projection, CL_TRUE, 0, sizeof(float) * pdimx * pdimy, projection);
     return 0;
 }
 

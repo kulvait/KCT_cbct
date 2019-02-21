@@ -9,6 +9,8 @@
 #include <regex>
 #include <string>
 
+#include <unistd.h>
+
 // External libraries
 #include "CLI/CLI.hpp" //Command line parser
 #include "ctpl_stl.h" //Threadpool
@@ -160,11 +162,17 @@ int Args::parseArguments(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
     plog::Severity verbosityLevel = plog::debug; // debug, info, ...
-    std::string csvLogFile = io::xprintf(
-        "/tmp/%s.csv", io::getBasename(std::string(argv[0])).c_str()); // Set NULL to disable
+    char exepath[PATH_MAX + 1] = { 0 };
+    readlink("/proc/self/exe", exepath, sizeof(exepath));
+    std::string argv0(exepath);
+    std::string csvLogFile
+        = io::xprintf("/tmp/%s.csv", io::getBasename(argv0.c_str())); // Set NULL to disable
+    std::string xpath = io::getParent(argv0);
     bool logToConsole = true;
     plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);
     plogSetup.initLogging();
+    LOGI << io::xprintf("Xpath is %s", xpath.c_str());
+    LOGI << io::xprintf("argv[0] is %s", argv[0]);
     LOGI << io::xprintf("START %s", argv[0]);
     // Argument parsing
     Args a;
@@ -232,8 +240,8 @@ int main(int argc, char* argv[])
     uint64_t totalVolumeSize = uint64_t(inf.dimx()) * uint64_t(inf.dimy()) * uint64_t(inf.dimz());
     float* volume = new float[totalVolumeSize];
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
-    std::shared_ptr<CuttingVoxelProjector> cvp
-        = std::make_shared<CuttingVoxelProjector>(volume, inf.dimx(), inf.dimy(), inf.dimz());
+    std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
+        volume, inf.dimx(), inf.dimy(), inf.dimz(), xpath);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {
