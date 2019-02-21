@@ -292,7 +292,7 @@ inline int volIndex(int* i, int* j, int* k, int4* vdims)
  *
  * @return
  */
-void kernel FLOATcutting_voxel_project(read_only global float* volume,
+void kernel FLOATcutting_voxel_project(global float* volume,
                                        global float* projection,
                                        private double16 CM,
                                        private double4 sourcePosition,

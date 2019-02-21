@@ -88,10 +88,12 @@ int CuttingVoxelProjector::project(float* projection,
 {
     // FIXME
     // https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
-    std::string projectorSource
-        = io::fileToString(
-            io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()));
+    std::string clFile;
+    //clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
+    clFile = io::xprintf("%s/opencl/projector.cl", this->xpath.c_str());
+    std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
+    LOGI << io::xprintf("Building file %s.", clFile.c_str());
     if(program.build({ *device }, "-g") != CL_SUCCESS)
     {
         LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
