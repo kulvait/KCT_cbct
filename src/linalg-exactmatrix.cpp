@@ -52,14 +52,14 @@ int Args::parseArguments(int argc, char* argv[])
 {
 
     CLI::App app{ "Using divide and conquer techniques to construct CT system matrix.." };
-    app.add_option("output_system_matrix", outputSystemMatrix,
-                   "File in a sparse matrix format to output or prefix of files.")
-        ->required();
-    app.add_flag("--force", force, "Overwrite outputSystemMatrix if it exists.");
     app.add_option("input_matrices", projectionMatrices,
                    "Files in a DEN format that contains projection matricess to process.")
         ->required()
         ->check(CLI::ExistingFile);
+    app.add_option("output_system_matrix", outputSystemMatrix,
+                   "File in a sparse matrix format to output or prefix of files.")
+        ->required();
+    app.add_flag("--force", force, "Overwrite outputSystemMatrix if it exists.");
     app.add_option("-f,--frames", frameSpecs,
                    "Specify only particular projection matrices to process. You can input "
                    "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "

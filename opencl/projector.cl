@@ -583,7 +583,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     double previousSectionsSize = 0.0;
     // CCW and CW coordinates of the last intersection on the lines specified by the points in V_ccw
     double2 lastIntersections = { 0.0, 0.0 };
-    for(int I = min_PX; I < max_PX; I++)
+    for(int I = min_PX; I < max_PX + 1; I++)
     {
         if(I >= -1 && I < pdims.x)
         {
