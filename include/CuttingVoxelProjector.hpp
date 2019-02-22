@@ -18,13 +18,28 @@ namespace CTL {
 class CuttingVoxelProjector
 {
 public:
-    CuttingVoxelProjector(
-        float* volume, uint32_t vdimx, uint32_t vdimy, uint32_t vdimz, std::string xpath)
+    /**
+     * Initialize Cutting Voxel Projector
+     *
+     * @param volume Pointer to volume file
+     * @param vdimx Volume x dimension
+     * @param vdimy Volume y dimension
+     * @param vdimz Volume z dimension
+     * @param xpath Path of cl kernel files
+     * @param debug Should debugging be used by suppliing source and -g as options
+     */
+    CuttingVoxelProjector(float* volume,
+                          uint32_t vdimx,
+                          uint32_t vdimy,
+                          uint32_t vdimz,
+                          std::string xpath,
+                          bool debug)
         : volume(volume)
         , vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
         , xpath(xpath)
+        , debug(debug)
     {
     }
 
@@ -53,12 +68,24 @@ private:
     float* volume = nullptr;
     uint32_t vdimx, vdimy, vdimz;
     std::string xpath; // Path where the program executes
+    bool debug;
 
     std::shared_ptr<cl::Device> device = nullptr;
     std::shared_ptr<cl::Context> context = nullptr;
     std::shared_ptr<cl::Image3D> volumeImage = nullptr;
     std::shared_ptr<cl::CommandQueue> Q = nullptr;
     std::shared_ptr<cl::Buffer> volumeBuffer = nullptr;
+
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl_double16&,
+                                    cl_double4&,
+                                    cl_double4&,
+                                    cl_int4&,
+                                    cl_double4&,
+                                    cl_int2&,
+                                    float&>>
+        FLOATcutting_voxel_project;
 };
 
 } // namespace CTL

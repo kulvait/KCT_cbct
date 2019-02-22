@@ -31,6 +31,7 @@ struct Args
 {
     int parseArguments(int argc, char* argv[]);
     uint32_t platformId = 0;
+    bool debug = false;
     std::string frameSpecs = "";
     int eachkth = 1;
     std::vector<int> frames;
@@ -63,18 +64,17 @@ int Args::parseArguments(int argc, char* argv[])
 {
 
     CLI::App app{ "OpenCL implementation of the voxel cutting projector." };
+    app.add_option("input_volume", inputVolume, "Volume to project")
+        ->required()
+        ->check(CLI::ExistingFile);
     app.add_option("input_projection_matrices", inputProjectionMatrices,
                    "Projection matrices to be input of the computation."
                    "Files in a DEN format that contains projection matricess to process.")
         ->required()
         ->check(CLI::ExistingFile);
-
-    app.add_option("input_volume", inputVolume, "Volume to project")
-        ->required()
-        ->check(CLI::ExistingFile);
     app.add_option("output_projection", outputProjection, "Output projection")->required();
+    app.add_flag("--force", force, "Overwrite outputProjection if it exists.");
 
-    app.add_flag("--force", force, "Overwrite outputSystemMatrix if it exists.");
     app.add_option("-f,--frames", frameSpecs,
                    "Specify only particular projection matrices to process. You can input "
                    "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "
@@ -85,10 +85,6 @@ int Args::parseArguments(int argc, char* argv[])
                    "are then 1st specified, 1+kN, N=1...\\infty if such frame exists. Parameter k "
                    "must be positive integer.")
         ->check(CLI::Range(1, 65535));
-    app.add_option("-p,--platform_id", platformId, "OpenCL platform ID to use.")
-        ->check(CLI::Range(0, 65535));
-    app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
-        ->check(CLI::Range(0, 65535));
     app.add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
     app.add_flag("-n,--no_frame_offset", noFrameOffset,
                  "When this flag is specified no offset of the projections will be used when "
@@ -110,6 +106,16 @@ int Args::parseArguments(int argc, char* argv[])
         = app.add_option("--volumey", volumeSizeY, "Dimension of volume, defaults to 256.");
     CLI::Option* vz
         = app.add_option("--volumez", volumeSizeZ, "Dimension of volume, defaults to 199.");
+
+    // Program flow parameters
+    app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
+        ->check(CLI::Range(0, 65535))
+        ->group("Platform settings");
+    app.add_option("-p,--platform_id", platformId, "OpenCL platform ID to use.")
+        ->check(CLI::Range(0, 65535))
+        ->group("Platform settings");
+    app.add_flag("-d,--debug", debug, "OpenCL compilation including debugging information.")
+        ->group("Platform settings");
     px->needs(py);
     py->needs(px);
     psx->needs(psy);
@@ -199,32 +205,6 @@ int main(int argc, char* argv[])
         io::throwerr(
             "Implement indexing by uint64_t matrix dimension overflow of projection pixels count.");
     }
-    matrix::ProjectionMatrix pm = dr->readMatrix(0);
-
-    std::array<double, 3> sourcePosition = pm.sourcePosition();
-    std::array<double, 3> normalToDetector = pm.normalToDetector();
-
-    double x1, x2, y1, y2;
-    pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
-               sourcePosition[2] + normalToDetector[2], &x1, &y1);
-    pm.project(100.0, 100.0, 100.0, &x2, &y2);
-    double xspacing2 = a.pixelSpacingX * a.pixelSpacingX;
-    double yspacing2 = a.pixelSpacingY * a.pixelSpacingY;
-    double distance
-        = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
-    double x = 100.0 - sourcePosition[0];
-    double y = 100.0 - sourcePosition[1];
-    double z = 100.0 - sourcePosition[2];
-    double norma = std::sqrt(x * x + y * y + z * z);
-    x /= norma;
-    y /= norma;
-    z /= norma;
-    double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
-    double theta = std::acos(cos);
-    double distToDetector = std::abs(distance / std::tan(theta));
-    double scalingFactor = distToDetector * distToDetector / a.pixelSpacingX / a.pixelSpacingY;
-    LOGI << io::xprintf("Distance to the detector is %fmm therefore scaling factor is %f.",
-                        distToDetector, scalingFactor);
 
     // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", a.frames.size());
@@ -241,7 +221,7 @@ int main(int argc, char* argv[])
     float* volume = new float[totalVolumeSize];
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        volume, inf.dimx(), inf.dimy(), inf.dimz(), xpath);
+        volume, inf.dimx(), inf.dimy(), inf.dimz(), xpath, a.debug);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {
@@ -252,15 +232,47 @@ int main(int argc, char* argv[])
     cvp->initializeVolumeImage();
     uint32_t projectionElementsCount = a.projectionSizeX * a.projectionSizeY;
     float* projection = new float[projectionElementsCount]();
-    cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
     uint16_t buf[3];
     buf[0] = a.projectionSizeY;
     buf[1] = a.projectionSizeX;
-    buf[2] = 1;
+    buf[2] = a.frames.size();
     io::createEmptyFile(a.outputProjection, 0, true); // Try if this is faster
     io::appendBytes(a.outputProjection, (uint8_t*)buf, 6);
-    io::appendBytes(a.outputProjection, (uint8_t*)projection,
-                    projectionElementsCount * sizeof(float));
+    for(int f : a.frames)
+    {
+        matrix::ProjectionMatrix pm = dr->readMatrix(f);
+
+        std::array<double, 3> sourcePosition = pm.sourcePosition();
+        std::array<double, 3> normalToDetector = pm.normalToDetector();
+
+        double x1, x2, y1, y2;
+        pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
+                   sourcePosition[2] + normalToDetector[2], &x1, &y1);
+        pm.project(100.0, 100.0, 100.0, &x2, &y2);
+        double xspacing2 = a.pixelSpacingX * a.pixelSpacingX;
+        double yspacing2 = a.pixelSpacingY * a.pixelSpacingY;
+        double distance
+            = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
+        double x = 100.0 - sourcePosition[0];
+        double y = 100.0 - sourcePosition[1];
+        double z = 100.0 - sourcePosition[2];
+        double norma = std::sqrt(x * x + y * y + z * z);
+        x /= norma;
+        y /= norma;
+        z /= norma;
+        double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
+        double theta = std::acos(cos);
+        double distToDetector = std::abs(distance / std::tan(theta));
+        double scalingFactor = distToDetector * distToDetector / a.pixelSpacingX / a.pixelSpacingY;
+        //        LOGI << io::xprintf("Distance to the detector is %fmm therefore scaling factor is
+        //        %f.",
+        //                            distToDetector, scalingFactor);
+
+        cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+        io::appendBytes(a.outputProjection, (uint8_t*)projection,
+                        projectionElementsCount * sizeof(float));
+        std::fill_n(projection, projectionElementsCount, float(0.0));
+    }
     delete[] volume;
     delete[] projection;
 
