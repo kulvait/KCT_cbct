@@ -34,9 +34,9 @@ inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
  * @param v Volume point
  * @param PX_out Output
  */
-inline void projectX(private const double16* CM, private const double3* v, private double* PX_out)
+inline double projectX(private double16 CM, private const double3 v)
 {
-    (*PX_out) = (dot(*v, CM->s012) + CM->s3) / (dot(*v, CM->s89a) + CM->sb);
+    return (dot(v, CM.s012) + CM.s3) / (dot(v, CM.s89a) + CM.sb);
 }
 
 /** Projection of a volume point v onto Y coordinate on projector.
@@ -46,9 +46,9 @@ inline void projectX(private const double16* CM, private const double3* v, priva
  * @param v Volume point
  * @param PY_out Output
  */
-inline void projectY(private const double16* CM, private const double3* v, private double* PY_out)
+inline double projectY(private double16 CM, private double3 v)
 {
-    (*PY_out) = (dot(*v, CM->s456) + CM->s7) / (dot(*v, CM->s89a) + CM->sb);
+    return (dot(v, CM.s456) + CM.s7) / (dot(v, CM.s89a) + CM.sb);
 }
 
 /** Projection of a volume point v onto P coordinate on projector.
@@ -69,12 +69,12 @@ inline void project(private const double16* CM, private const double3* v, privat
     P_out->y = coord.y / coord.z;
 }
 
-int2 projectionIndices(private double16 P, private double3 vdim, int2 pdims)
+int2 projectionIndices(private double16 CM, private double3 v, int2 pdims)
 {
     double3 coord;
-    coord.x = vdim.x * P[0] + vdim.y * P[1] + vdim.z * P[2] + P[3];
-    coord.y = vdim.x * P[4] + vdim.y * P[5] + vdim.z * P[6] + P[7];
-    coord.z = vdim.x * P[8] + vdim.y * P[9] + vdim.z * P[10] + P[11];
+    coord.x = dot(v, CM.s012) + CM.s3;
+    coord.y = dot(v, CM.s456) + CM.s7;
+    coord.z = dot(v, CM.s89a) + CM.sb;
     coord.x /= coord.z;
     coord.y /= coord.z;
     int2 ind;
@@ -89,12 +89,13 @@ int2 projectionIndices(private double16 P, private double3 vdim, int2 pdims)
     }
 }
 
-int projectionIndex(private double16* CM, private double3 v, int2 pdims)
+int projectionIndex(private double16 CM, private double3 v, int2 pdims)
 {
     double3 coord;
-    coord.x = v.x * (*CM)[0] + v.y * (*CM)[1] + v.z * (*CM)[2] + (*CM)[3];
-    coord.y = v.x * (*CM)[4] + v.y * (*CM)[5] + v.z * (*CM)[6] + (*CM)[7];
-    coord.z = v.x * (*CM)[8] + v.y * (*CM)[9] + v.z * (*CM)[10] + (*CM)[11];
+    coord.x = dot(v, CM.s012);
+    coord.y = dot(v, CM.s456);
+    coord.z = dot(v, CM.s89a);
+    coord = coord + CM.s37b;
     coord.x /= coord.z;
     coord.y /= coord.z;
     int2 ind;
@@ -110,31 +111,30 @@ int projectionIndex(private double16* CM, private double3 v, int2 pdims)
 }
 
 /// insertEdgeValues(factor, V, P, projection, pdims);
-void insertEdgeValues(global float* projection,
-                      private const double16* CM,
-                      private const double3* v,
-                      private const int PX,
-                      private double value,
-                      private const double3* voxelSizes,
-                      private const int2* pdims)
+void inline insertEdgeValues(global float* projection,
+                             private double16 CM,
+                             private double3 v,
+                             private int PX,
+                             private double value,
+                             private double3 voxelSizes,
+                             private int2 pdims)
 {
-
     double3 v_down, v_up;
     double PY_down, PY_up;
     int PJ_down, PJ_up;
-    v_down = (*v) + (*voxelSizes) * (double3)(0.0, 0.0, -0.5);
-    v_up = (*v) + (*voxelSizes) * (double3)(0.0, 0.0, +0.5);
-    projectY(CM, &v_down, &PY_down);
-    projectY(CM, &v_up, &PY_up);
+    v_down = v + voxelSizes * (double3)(0.0, 0.0, -0.5);
+    v_up = v + voxelSizes * (double3)(0.0, 0.0, +0.5);
+    PY_down = projectY(CM, v_down);
+    PY_up = projectY(CM, v_up);
     PJ_down = convert_int_rtn(PY_down + 0.5);
     PJ_up = convert_int_rtn(PY_up + 0.5);
     int increment = 1;
     if(PJ_down == PJ_up)
     {
-        if(PJ_down >= 0 && PJ_down < pdims->y)
+        if(PJ_down >= 0 && PJ_down < pdims.y)
         {
-            AtomicAdd_g_f(&projection[PX + pdims->x * PJ_down],
-                          value * voxelSizes->z); // Atomic version of projection[ind] += value;
+            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+                          value * voxelSizes.z); // Atomic version of projection[ind] += value;
         }
         return;
     }
@@ -142,15 +142,15 @@ void insertEdgeValues(global float* projection,
     {
         increment = -1;
     }
-    double stepSize = voxelSizes->z
+    double stepSize = voxelSizes.z
         / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
     double factor;
-    if(PJ_up >= 0 && PJ_up < pdims->y && PJ_down >= 0 && PJ_down < pdims->y)
+    if(PJ_up >= 0 && PJ_up < pdims.y && PJ_down >= 0 && PJ_down < pdims.y)
     { // Do not check for every insert
 
         for(int j = PJ_down + increment; j != PJ_up; j += increment)
         {
-            AtomicAdd_g_f(&projection[PX + pdims->x * j],
+            AtomicAdd_g_f(&projection[PX + pdims.x * j],
                           value * stepSize
                               * increment); // Atomic version of projection[ind] += value;
         }
@@ -165,7 +165,7 @@ void insertEdgeValues(global float* projection,
             nextGridY = (double)PJ_down - 0.5;
         }
         factor = (nextGridY - PY_down) * stepSize;
-        AtomicAdd_g_f(&projection[PX + pdims->x * PJ_down],
+        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
                       value * factor); // Atomic version of projection[ind] += value;
         // Add part that maps to PJ_up
         double prevGridY;
@@ -177,7 +177,7 @@ void insertEdgeValues(global float* projection,
             prevGridY = (double)PJ_up + 0.5;
         }
         factor = (PY_up - prevGridY) * stepSize;
-        AtomicAdd_g_f(&projection[PX + pdims->x * PJ_up],
+        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
                       value * factor); // Atomic version of projection[ind] += value;
 
     } else
@@ -186,16 +186,16 @@ void insertEdgeValues(global float* projection,
         for(int j = PJ_down + increment; j != PJ_up; j += increment)
         {
 
-            if(j >= 0 && j < pdims->y)
+            if(j >= 0 && j < pdims.y)
             {
-                AtomicAdd_g_f(&projection[PX + pdims->x * j],
+                AtomicAdd_g_f(&projection[PX + pdims.x * j],
                               value * stepSize
                                   * increment); // Atomic version of projection[ind] += value;
             }
         }
 
         // Add part that maps to PJ_down
-        if(PJ_down >= 0 && PJ_down < pdims->y)
+        if(PJ_down >= 0 && PJ_down < pdims.y)
         {
             double nextGridY;
             if(increment > 0)
@@ -206,10 +206,10 @@ void insertEdgeValues(global float* projection,
                 nextGridY = (double)PJ_down - 0.5;
             }
             factor = (nextGridY - PY_down) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims->x * PJ_down],
+            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
                           value * factor); // Atomic version of projection[ind] += value;
         } // Add part that maps to PJ_up
-        if(PJ_up >= 0 && PJ_up < pdims->y)
+        if(PJ_up >= 0 && PJ_up < pdims.y)
         {
             double prevGridY;
             if(increment > 0)
@@ -220,7 +220,7 @@ void insertEdgeValues(global float* projection,
                 prevGridY = (double)PJ_up + 0.5;
             }
             factor = (PY_up - prevGridY) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims->x * PJ_up],
+            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
                           value * factor); // Atomic version of projection[ind] += value;
         }
     }
@@ -232,23 +232,21 @@ void insertEdgeValues(global float* projection,
  * on the detector. We assume that the mapping is linear and that A maps to PX_A and B maps to PX_B.
  * If A and B maps to the same PX, t=MAXFLOAT
  *
- * @param CM
  * @param PX
  * @param PX_A PX index related to A
  * @param PX_B PX index related to B
  *
  * @return Parametrization of the line that maps to PX.
  */
-inline double intersectionXTime(private const double16* CM,
-                                const double* PX,
-                                const double* PX_A,
-                                const double* PX_B)
+inline double intersectionXTime(double PX, double PX_A, double PX_B)
 {
-    if(*PX_A == *PX_B)
+    if(PX_A == PX_B)
     {
         return DBL_MAX;
+    } else
+    {
+        return (PX - PX_A) / (PX_B - PX_A);
     }
-    return ((*PX) - (*PX_A)) / ((*PX_B) - (*PX_A));
 }
 
 /**
@@ -275,63 +273,61 @@ inline double intersectionXTime(private const double16* CM,
  * @param v_cw Output first coordinate that maps to PX on the parametrized piecewise line
  * v0,v3,v2,v1.
  */
-inline void findIntersectionPoints(private const double16* CM,
-                                   const double PX,
-                                   const double3* v0,
-                                   const double3* v1,
-                                   const double3* v2,
-                                   const double3* v3,
-                                   const double* PX_ccw0,
-                                   const double* PX_ccw1,
-                                   const double* PX_ccw2,
-                                   const double* PX_ccw3,
-                                   double* surfaceFromZero,
-                                   double3* v_ccw,
-                                   double3* v_cw)
+inline double findIntersectionPoints(const double PX,
+                                     const double3* v0,
+                                     const double3* v1,
+                                     const double3* v2,
+                                     const double3* v3,
+                                     const double* PX_ccw0,
+                                     const double* PX_ccw1,
+                                     const double* PX_ccw2,
+                                     const double* PX_ccw3,
+                                     double3* v_ccw,
+                                     double3* v_cw)
 {
     double p, q;
     if(PX <= (*PX_ccw1))
     {
-        p = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw1);
+        p = intersectionXTime(PX, *PX_ccw0, *PX_ccw1);
         (*v_ccw) = (*v0) * (1.0 - p) + (*v1) * p;
         if(PX <= (*PX_ccw3))
         {
-            q = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
+            q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
             (*v_cw) = (*v0) * (1.0 - q) + (*v3) * q;
-            *surfaceFromZero = p * q * 0.5;
+            return p * q * 0.5;
         } else if(PX <= (*PX_ccw2))
         {
-            q = intersectionXTime(CM, &PX, PX_ccw3, PX_ccw2);
+            q = intersectionXTime(PX, *PX_ccw3, *PX_ccw2);
             (*v_cw) = (*v3) * (1.0 - p) + (*v2) * p;
-            *surfaceFromZero = *surfaceFromZero = p + (q - p) * 0.5;
+            return p + (q - p) * 0.5;
         } else
         {
-            q = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw1);
+            q = intersectionXTime(PX, *PX_ccw2, *PX_ccw1);
             (*v_cw) = (*v2) * (1.0 - p) + (*v1) * p;
-            *surfaceFromZero = 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
+            return 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
         }
     } else if(PX <= (*PX_ccw2))
     {
-        p = intersectionXTime(CM, &PX, PX_ccw1, PX_ccw2);
+        p = intersectionXTime(PX, *PX_ccw1, *PX_ccw2);
         (*v_ccw) = (*v1) * (1.0 - p) + (*v2) * p;
         if(PX <= (*PX_ccw3))
         {
-            q = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
+            q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
             (*v_cw) = (*v0) * (1.0 - p) + (*v3) * p;
-            *surfaceFromZero = p + (q - p) * 0.5;
+            return p + (q - p) * 0.5;
         } else
         {
-            q = intersectionXTime(CM, &PX, PX_ccw3, PX_ccw2);
+            q = intersectionXTime(PX, *PX_ccw3, *PX_ccw2);
             (*v_cw) = (*v3) * (1.0 - p) + (*v2) * p;
-            *surfaceFromZero = 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
+            return 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
         }
     } else
     {
-        p = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw3);
+        p = intersectionXTime(PX, *PX_ccw2, *PX_ccw3);
         (*v_ccw) = (*v2) * (1.0 - p) + (*v3) * p;
-        q = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
+        q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
         (*v_cw) = (*v0) * (1.0 - p) + (*v3) * p;
-        *surfaceFromZero = 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
+        return 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
     }
 }
 
@@ -449,20 +445,20 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     // on the center
     int pdimMax = pdims.x * pdims.y;
     int8 cube_abi
-        = { projectionIndex(&CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.0)),
+        = { projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.0)),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.0)),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 1.0)),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 1.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 1.0)),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 1.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 1.0)),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 1.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 1.0)),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 1.0)),
                             pdims) };
     if(all(cube_abi
            == pdimMax)) // When all projections of the voxel corners points outside projector area
@@ -494,13 +490,14 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     vx01 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.5));
     vx10 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.5));
     vx11 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.5));
-    projectX(&CM, &vx00, &px00);
-    projectX(&CM, &vx01, &px01);
-    projectX(&CM, &vx10, &px10);
-    projectX(&CM, &vx11, &px11);
+    px00 = projectX(CM, vx00);
+    px01 = projectX(CM, vx01);
+    px10 = projectX(CM, vx10);
+    px11 = projectX(CM, vx11);
     // We now figure out the vertex that projects to minimum and maximum px
     double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
-    int max_PX, min_PX; // Pixel to which are the voxels with minimum and maximum values projected
+    int max_PX,
+        min_PX; // Pixel to which are the voxels with minimum and maximum values are projected
     pxx_min = min(min(min(px00, px01), px10), px11);
     pxx_max = max(max(max(px00, px01), px10), px11);
     max_PX = convert_int_rtn(pxx_max + 0.5);
@@ -510,18 +507,19 @@ void kernel FLOATcutting_voxel_project(global float* volume,
         if(min_PX >= 0 && min_PX < pdims.x)
         {
             double factor = value / 4.0;
-            insertEdgeValues(projection, &CM, &vx00, min_PX, factor, &voxelSizes, &pdims);
-            insertEdgeValues(projection, &CM, &vx10, min_PX, factor, &voxelSizes, &pdims);
-            insertEdgeValues(projection, &CM, &vx01, min_PX, factor, &voxelSizes, &pdims);
-            insertEdgeValues(projection, &CM, &vx11, min_PX, factor, &voxelSizes, &pdims);
+            insertEdgeValues(projection, CM, vx00, min_PX, factor, voxelSizes, pdims);
+            insertEdgeValues(projection, CM, vx10, min_PX, factor, voxelSizes, pdims);
+            insertEdgeValues(projection, CM, vx01, min_PX, factor, voxelSizes, pdims);
+            insertEdgeValues(projection, CM, vx11, min_PX, factor, voxelSizes, pdims);
         }
         return;
     }
 
     double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
-                               // from the minimum voxel
-    double *PX_max, *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise points
-                                // from the minimum voxel
+    // from the minimum voxel
+    double *PX_max,
+        *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise  points
+    // from the minimum voxel
     if(px00 == pxx_min)
     {
         V_ccw[0] = &vx00;
@@ -589,27 +587,27 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     // Section of the square that corresponds to the indices < i
     // CCW and CW coordinates of the last intersection on the lines specified by the points in
     // V_ccw
-    findIntersectionPoints(&CM, ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                           PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastSectionSize, &lastV1,
-                           &lastV2);
+    lastSectionSize
+        = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+                                 PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastV1, &lastV2);
     if(I >= 0)
     {
         factor = value * lastSectionSize / 3.0;
-        insertEdgeValues(projection, &CM, V_ccw[0], I, factor, &voxelSizes, &pdims);
-        insertEdgeValues(projection, &CM, &lastV1, I, factor, &voxelSizes, &pdims);
-        insertEdgeValues(projection, &CM, &lastV2, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, CM, *V_ccw[0], I, factor, voxelSizes, pdims);
+        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
     }
     for(I = I + 1; I < I_STOP; I++)
     {
-        findIntersectionPoints(&CM, ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                               PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextSectionSize,
-                               &nextV1, &nextV2);
+        nextSectionSize
+            = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+                                     PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextV1, &nextV2);
         polygonSize = nextSectionSize - lastSectionSize;
         double factor = value * polygonSize / 4.0;
-        insertEdgeValues(projection, &CM, &lastV1, I, factor, &voxelSizes, &pdims);
-        insertEdgeValues(projection, &CM, &lastV2, I, factor, &voxelSizes, &pdims);
-        insertEdgeValues(projection, &CM, &nextV1, I, factor, &voxelSizes, &pdims);
-        insertEdgeValues(projection, &CM, &nextV2, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
+        insertEdgeValues(projection, CM, nextV1, I, factor, voxelSizes, pdims);
+        insertEdgeValues(projection, CM, nextV2, I, factor, voxelSizes, pdims);
         lastSectionSize = nextSectionSize;
         lastV1 = nextV1;
         lastV2 = nextV2;
@@ -617,8 +615,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     if(I_STOP < pdims.x)
     {
         factor = value * (1 - lastSectionSize) / 3.0;
-        insertEdgeValues(projection, &CM, V_max, I, factor, &voxelSizes, &pdims);
-        insertEdgeValues(projection, &CM, &lastV1, I, factor, &voxelSizes, &pdims);
-        insertEdgeValues(projection, &CM, &lastV2, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, CM, *V_max, I, factor, voxelSizes, pdims);
+        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
     }
 }
