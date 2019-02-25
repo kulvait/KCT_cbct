@@ -153,7 +153,8 @@ void insertEdgeValues(int PX,
         for(int j = PJ_down + increment; j != PJ_up; j += increment)
         {
             AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                          value * stepSize * increment); // Atomic version of projection[ind] += value;
+                          value * stepSize
+                              * increment); // Atomic version of projection[ind] += value;
         }
 
         // Add part that maps to PJ_down
@@ -190,7 +191,8 @@ void insertEdgeValues(int PX,
             if(j >= 0 && j < pdims.y)
             {
                 AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                              value * stepSize * increment); // Atomic version of projection[ind] += value;
+                              value * stepSize
+                                  * increment); // Atomic version of projection[ind] += value;
             }
         }
 
@@ -477,26 +479,27 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     int i = get_global_id(2);
     int j = get_global_id(1);
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
-    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k)};
-    const double3 zerocorner_xyz = {-0.5 * (double)vdims.x, -0.5 * (double)vdims.y, -0.5 * (double)vdims.z };// -convert_double3(vdims) / 2.0;
+    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
+    const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
+                                     -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
     int pdimMax = pdims.x * pdims.y;
     int8 cube_abi
         = { projectionIndex(&CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 0.0, 0.0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1, 0.0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 1, 0.0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 1)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 1.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 0.0, 1)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 1.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1, 1)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 1.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 1, 1)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 1.0)),
                             pdims) };
     if(all(cube_abi
            == pdimMax)) // When all projections of the voxel corners points outside projector area
@@ -583,64 +586,57 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     double previousSectionsSize = 0.0;
     // CCW and CW coordinates of the last intersection on the lines specified by the points in V_ccw
     double2 lastIntersections = { 0.0, 0.0 };
-    for(int I = min_PX; I < max_PX + 1; I++)
+    for(int I = max(-1, min_PX); I < min(max_PX + 1, pdims.x); I++)
     {
-        if(I >= -1 && I < pdims.x)
+        double2 nextIntersections = findIntersectionPoints(&CM, I + 1, lastIntersections, V_ccw[0],
+                                                           V_ccw[1], V_ccw[2], V_ccw[3], V_max);
+        double newSectionsSize = computeSquareSize(nextIntersections);
+        double cutSize = newSectionsSize - previousSectionsSize;
+        if(I >= 0)
         {
-            double2 nextIntersections = findIntersectionPoints(
-                &CM, I + 1, lastIntersections, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], V_max);
-            double newSectionsSize = computeSquareSize(nextIntersections);
-            double cutSize = newSectionsSize - previousSectionsSize;
-            if(I >= 0)
+            // Number of edges is a number of vertical edges that we cut according to PY
+            // coordinate
+            int numberOfEdges = 0; // NextIntersections
+            if(lastIntersections.x == 0 && lastIntersections.y == 0)
             {
-                // Number of edges is a number of vertical edges that we cut according to PY
-                // coordinate
-                int numberOfEdges = 0; // NextIntersections
-                if(lastIntersections.x == 0 && lastIntersections.y == 0)
-                {
-                    numberOfEdges += 1;
-                } else
-                {
-                    numberOfEdges += 2;
-                }
-                if(nextIntersections.x + nextIntersections.y == 4)
-                {
-                    numberOfEdges += 1;
-                } else
-                {
-                    numberOfEdges += 2;
-                }
-                double3 V;
-                double factor = value * cutSize / numberOfEdges;
-                if(lastIntersections.x == 0 && lastIntersections.y == 0)
-                {
-                    V = *V_ccw[0];
-                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                } else
-                {
-                    V = intersectionPoint(lastIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2],
-                                          V_ccw[3]);
-                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                    V = intersectionPoint(lastIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2],
-                                          V_ccw[1]);
-                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                }
-                if(nextIntersections.x + nextIntersections.y == 4)
-                {
-                    V = *V_max;
-                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                } else
-                {
-                    V = intersectionPoint(nextIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2],
-                                          V_ccw[3]);
-                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                    V = intersectionPoint(nextIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2],
-                                          V_ccw[1]);
-                    insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                }
+                numberOfEdges += 1;
+            } else
+            {
+                numberOfEdges += 2;
             }
-            previousSectionsSize = newSectionsSize;
-            lastIntersections = nextIntersections;
+            if(nextIntersections.x + nextIntersections.y == 4)
+            {
+                numberOfEdges += 1;
+            } else
+            {
+                numberOfEdges += 2;
+            }
+            double3 V;
+            double factor = value * cutSize / numberOfEdges;
+            if(lastIntersections.x == 0 && lastIntersections.y == 0)
+            {
+                V = *V_ccw[0];
+                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+            } else
+            {
+                V = intersectionPoint(lastIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3]);
+                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                V = intersectionPoint(lastIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2], V_ccw[1]);
+                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+            }
+            if(nextIntersections.x + nextIntersections.y == 4)
+            {
+                V = *V_max;
+                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+            } else
+            {
+                V = intersectionPoint(nextIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3]);
+                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+                V = intersectionPoint(nextIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2], V_ccw[1]);
+                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
+            }
         }
+        previousSectionsSize = newSectionsSize;
+        lastIntersections = nextIntersections;
     }
 }
