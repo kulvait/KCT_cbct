@@ -266,11 +266,11 @@ inline double intersectionXTime(private const double16* CM, const double* PX, co
 double2 findIntersectionPoints(private const double16* CM,
                                int PI,
                                double2 lastIntersections,
-                               double3* V_ccw0,
-                               double3* V_ccw1,
-                               double3* V_ccw2,
-                               double3* V_ccw3,
-                               double3* V_max)
+                               const double* PX_ccw0,
+                               const double* PX_ccw1,
+                               const double* PX_ccw2,
+                               const double* PX_ccw3,
+                               const double* PX_max)
 {
     double PX = (double)PI - 0.5;
     double intersectionTime;
@@ -279,11 +279,11 @@ double2 findIntersectionPoints(private const double16* CM,
     {
         if(lastIntersections.x < 1.0)
         {
-            intersectionTime = intersectionXTime(CM, &PX, V_ccw0, V_ccw1);
+            intersectionTime = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw1);
             if(intersectionTime <= 1.0 && intersectionTime >= 0)
             {
                 nextIntersections.x = intersectionTime;
-            } else if(V_ccw1 == V_max)
+            } else if(PX_ccw1 == PX_max)
             {
                 nextIntersections.x = 1.0;
             } else
@@ -292,11 +292,11 @@ double2 findIntersectionPoints(private const double16* CM,
             }
         } else if(lastIntersections.x < 2.0)
         {
-            intersectionTime = intersectionXTime(CM, &PX, V_ccw1, V_ccw2);
+            intersectionTime = intersectionXTime(CM, &PX, PX_ccw1, PX_ccw2);
             if(intersectionTime <= 1.0 && intersectionTime >= 0)
             {
                 nextIntersections.x = 1.0 + intersectionTime;
-            } else if(V_ccw2 == V_max)
+            } else if(PX_ccw2 == PX_max)
             {
                 nextIntersections.x = 2.0;
             } else
@@ -306,11 +306,11 @@ double2 findIntersectionPoints(private const double16* CM,
 
         } else if(lastIntersections.x < 3.0)
         {
-            intersectionTime = intersectionXTime(CM, &PX, V_ccw2, V_ccw3);
+            intersectionTime = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw3);
             if(intersectionTime <= 1.0 && intersectionTime >= 0)
             {
                 nextIntersections.x = 2.0 + intersectionTime;
-            } else if(V_ccw3 == V_max)
+            } else if(PX_ccw3 == PX_max)
             {
                 nextIntersections.x = 3.0;
             } else
@@ -324,11 +324,11 @@ double2 findIntersectionPoints(private const double16* CM,
 
         if(lastIntersections.y < 1.0)
         {
-            intersectionTime = intersectionXTime(CM, &PX, V_ccw0, V_ccw3);
+            intersectionTime = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
             if(intersectionTime <= 1.0 && intersectionTime >= 0)
             {
                 nextIntersections.y = intersectionTime;
-            } else if(V_ccw3 == V_max)
+            } else if(PX_ccw3 == PX_max)
             {
                 nextIntersections.y = 1.0;
             } else
@@ -337,11 +337,11 @@ double2 findIntersectionPoints(private const double16* CM,
             }
         } else if(lastIntersections.y < 2.0)
         {
-            intersectionTime = intersectionXTime(CM, &PX, V_ccw3, V_ccw2);
+            intersectionTime = intersectionXTime(CM, &PX, PX_ccw3, PX_ccw2);
             if(intersectionTime <= 1.0 && intersectionTime >= 0)
             {
                 nextIntersections.y = 1.0 + intersectionTime;
-            } else if(V_ccw2 == V_max)
+            } else if(PX_ccw2 == PX_max)
             {
                 nextIntersections.y = 2.0;
             } else
@@ -351,11 +351,11 @@ double2 findIntersectionPoints(private const double16* CM,
 
         } else if(lastIntersections.y < 3.0)
         {
-            intersectionTime = intersectionXTime(CM, &PX, V_ccw2, V_ccw1);
+            intersectionTime = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw1);
             if(intersectionTime <= 1.0 && intersectionTime >= 0)
             {
                 nextIntersections.y = 2.0 + intersectionTime;
-            } else if(V_ccw1 == V_max)
+            } else if(PX_ccw1 == PX_max)
             {
                 nextIntersections.y = 3.0;
             } else
