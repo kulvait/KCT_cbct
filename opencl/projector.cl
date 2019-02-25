@@ -525,38 +525,38 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
-    double2 px00, px01, px10, px11;
+    double px00, px01, px10, px11;
     double3 vx00, vx01, vx10, vx11;
     vx00 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 0.5));
     vx01 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.5));
     vx10 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.5));
     vx11 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.5));
-    project(&CM, &vx00, &px00);
-    project(&CM, &vx01, &px01);
-    project(&CM, &vx10, &px10);
-    project(&CM, &vx11, &px11);
+    projectX(&CM, &vx00, &px00);
+    projectX(&CM, &vx01, &px01);
+    projectX(&CM, &vx10, &px10);
+    projectX(&CM, &vx11, &px11);
     // We now figure out the vertex that projects to minimum and maximum px
     double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
     int max_PX, min_PX; // Pixel to which are the voxels with minimum and maximum values projected
-    pxx_min = min(min(min(px00.x, px01.x), px10.x), px11.x);
-    pxx_max = max(max(max(px00.x, px01.x), px10.x), px11.x);
+    pxx_min = min(min(min(px00, px01), px10), px11);
+    pxx_max = max(max(max(px00, px01), px10), px11);
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
     double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
                                // from the minimum voxel
-    if(px00.x == pxx_min)
+    if(px00 == pxx_min)
     {
         V_ccw[0] = &vx00;
         V_ccw[1] = &vx01;
         V_ccw[2] = &vx11;
         V_ccw[3] = &vx10;
-    } else if(px01.x == pxx_min)
+    } else if(px01 == pxx_min)
     {
         V_ccw[0] = &vx01;
         V_ccw[1] = &vx11;
         V_ccw[2] = &vx10;
         V_ccw[3] = &vx00;
-    } else if(px10.x == pxx_min)
+    } else if(px10 == pxx_min)
     {
         V_ccw[0] = &vx10;
         V_ccw[1] = &vx00;
@@ -569,18 +569,18 @@ void kernel FLOATcutting_voxel_project(global float* volume,
         V_ccw[2] = &vx00;
         V_ccw[3] = &vx01;
     }
-    if(px00.x == pxx_max)
-    {
-        V_max = &vx00;
-    } else if(px01.x == pxx_max)
-    {
-        V_max = &vx01;
-    } else if(px10.x == pxx_max)
+    if(px10 == pxx_max)
     {
         V_max = &vx10;
-    } else // its px11
+    } else if(px11 == pxx_max)
     {
         V_max = &vx11;
+    } else if(px00 == pxx_max)
+    {
+        V_max = &vx00;
+    } else // its px01
+    {
+        V_max = &vx01;
     }
     // Section of the square that corresponds to the indices < i
     double previousSectionsSize = 0.0;
