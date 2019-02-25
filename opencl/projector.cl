@@ -36,8 +36,8 @@ inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
  */
 void projectX(private double16* CM, private double3* v, private double* PX_out)
 {
-    (*PX_out) = ((*v).x * (*CM)[0] + (*v).y * (*CM)[1] + (*v).z * (*CM)[2] + (*CM)[3])
-        / ((*v).x * (*CM)[8] + (*v).y * (*CM)[9] + (*v).z * (*CM)[10] + (*CM)[11]);
+    (*PX_out) = (v->x * (*CM)[0] + v->y * (*CM)[1] + v->z * (*CM)[2] + (*CM)[3])
+        / (v->x * (*CM)[8] + v->y * (*CM)[9] + v->z * (*CM)[10] + (*CM)[11]);
 }
 
 /** Projection of a volume point v onto Y coordinate on projector.
