@@ -110,31 +110,31 @@ int projectionIndex(private double16* CM, private double3 v, int2 pdims)
 }
 
 /// insertEdgeValues(factor, V, P, projection, pdims);
-void insertEdgeValues(int PX,
-                      double value,
-                      double3 v,
-                      private double16 CM,
-                      global float* projection,
-                      private double3 voxelSizes,
-                      private int2 pdims)
+void insertEdgeValues(global float* projection,
+                      private const double16* CM,
+                      private const double3* v,
+                      private const int PX,
+                      private double value,
+                      private const double3* voxelSizes,
+                      private const int2* pdims)
 {
 
     double3 v_down, v_up;
     double PY_down, PY_up;
     int PJ_down, PJ_up;
-    v_down = v + voxelSizes * (double3)(0.0, 0.0, -0.5);
-    v_up = v + voxelSizes * (double3)(0.0, 0.0, +0.5);
-    projectY(&CM, &v_down, &PY_down);
-    projectY(&CM, &v_up, &PY_up);
+    v_down = (*v) + (*voxelSizes) * (double3)(0.0, 0.0, -0.5);
+    v_up = (*v) + (*voxelSizes) * (double3)(0.0, 0.0, +0.5);
+    projectY(CM, &v_down, &PY_down);
+    projectY(CM, &v_up, &PY_up);
     PJ_down = convert_int_rtn(PY_down + 0.5);
     PJ_up = convert_int_rtn(PY_up + 0.5);
     int increment = 1;
     if(PJ_down == PJ_up)
     {
-        if(PJ_down >= 0 && PJ_down < pdims.y)
+        if(PJ_down >= 0 && PJ_down < pdims->y)
         {
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
-                          value * voxelSizes.z); // Atomic version of projection[ind] += value;
+            AtomicAdd_g_f(&projection[PX + pdims->x * PJ_down],
+                          value * voxelSizes->z); // Atomic version of projection[ind] += value;
         }
         return;
     }
@@ -142,15 +142,15 @@ void insertEdgeValues(int PX,
     {
         increment = -1;
     }
-    double stepSize = voxelSizes.z
+    double stepSize = voxelSizes->z
         / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
     double factor;
-    if(PJ_up >= 0 && PJ_up < pdims.y && PJ_down >= 0 && PJ_down < pdims.y)
+    if(PJ_up >= 0 && PJ_up < pdims->y && PJ_down >= 0 && PJ_down < pdims->y)
     { // Do not check for every insert
 
         for(int j = PJ_down + increment; j != PJ_up; j += increment)
         {
-            AtomicAdd_g_f(&projection[PX + pdims.x * j],
+            AtomicAdd_g_f(&projection[PX + pdims->x * j],
                           value * stepSize
                               * increment); // Atomic version of projection[ind] += value;
         }
@@ -165,7 +165,7 @@ void insertEdgeValues(int PX,
             nextGridY = (double)PJ_down - 0.5;
         }
         factor = (nextGridY - PY_down) * stepSize;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+        AtomicAdd_g_f(&projection[PX + pdims->x * PJ_down],
                       value * factor); // Atomic version of projection[ind] += value;
         // Add part that maps to PJ_up
         double prevGridY;
@@ -177,7 +177,7 @@ void insertEdgeValues(int PX,
             prevGridY = (double)PJ_up + 0.5;
         }
         factor = (PY_up - prevGridY) * stepSize;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
+        AtomicAdd_g_f(&projection[PX + pdims->x * PJ_up],
                       value * factor); // Atomic version of projection[ind] += value;
 
     } else
@@ -186,16 +186,16 @@ void insertEdgeValues(int PX,
         for(int j = PJ_down + increment; j != PJ_up; j += increment)
         {
 
-            if(j >= 0 && j < pdims.y)
+            if(j >= 0 && j < pdims->y)
             {
-                AtomicAdd_g_f(&projection[PX + pdims.x * j],
+                AtomicAdd_g_f(&projection[PX + pdims->x * j],
                               value * stepSize
                                   * increment); // Atomic version of projection[ind] += value;
             }
         }
 
         // Add part that maps to PJ_down
-        if(PJ_down >= 0 && PJ_down < pdims.y)
+        if(PJ_down >= 0 && PJ_down < pdims->y)
         {
             double nextGridY;
             if(increment > 0)
@@ -206,10 +206,10 @@ void insertEdgeValues(int PX,
                 nextGridY = (double)PJ_down - 0.5;
             }
             factor = (nextGridY - PY_down) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+            AtomicAdd_g_f(&projection[PX + pdims->x * PJ_down],
                           value * factor); // Atomic version of projection[ind] += value;
         } // Add part that maps to PJ_up
-        if(PJ_up >= 0 && PJ_up < pdims.y)
+        if(PJ_up >= 0 && PJ_up < pdims->y)
         {
             double prevGridY;
             if(increment > 0)
@@ -220,7 +220,7 @@ void insertEdgeValues(int PX,
                 prevGridY = (double)PJ_up + 0.5;
             }
             factor = (PY_up - prevGridY) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
+            AtomicAdd_g_f(&projection[PX + pdims->x * PJ_up],
                           value * factor); // Atomic version of projection[ind] += value;
         }
     }
@@ -229,7 +229,8 @@ void insertEdgeValues(int PX,
 /**
  * We parametrize the line segment from A to B by parameter t such that t=0 for A and t=1 for B.
  * Then we will find the t corresponding to the point v = t*B+(1-t)A  that maps to the coordinate PX
- * on the detector. We assume that the mapping is linear and that A maps to PX_A and B maps to PX_B. If A and B maps to the same PX, t=MAXFLOAT
+ * on the detector. We assume that the mapping is linear and that A maps to PX_A and B maps to PX_B.
+ * If A and B maps to the same PX, t=MAXFLOAT
  *
  * @param CM
  * @param PX
@@ -238,7 +239,10 @@ void insertEdgeValues(int PX,
  *
  * @return Parametrization of the line that maps to PX.
  */
-inline double intersectionXTime(private const double16* CM, const double* PX, const double* PX_A, const double *PX_B)
+inline double intersectionXTime(private const double16* CM,
+                                const double* PX,
+                                const double* PX_A,
+                                const double* PX_B)
 {
     if(*PX_A == *PX_B)
     {
@@ -247,124 +251,88 @@ inline double intersectionXTime(private const double16* CM, const double* PX, co
     return ((*PX) - (*PX_A)) / ((*PX_B) - (*PX_A));
 }
 
-/** Find the position parametrization as double2 in the range [0,4) and [0,4) of the piecewise lines
- * V_ccw0 ... V_ccw1 ... V_ccw2 ... V_ccw3 and V_ccw0 ... V_ccw3 ... V_ccw2 ... V_ccw1 that maps to
- * a start of PI coordinate, that means to PI-0.5.
+/**
+ * Let v0,v1,v2,v3 and v0,v3,v2,v1 be a piecewise lines that maps on detector on values PX_ccw0,
+ * PX_ccw1, PX_ccw2, PX_ccw3. Find a two parametrization factors that maps to a PX on these
+ * piecewise lines. We expect that the mappings are linear and nondecreasing up to the certain point
+ * from both sides. Parametrization is returned in nextIntersections variable first from
+ * v0,v1,v2,v3,v0 lines and next from v0,v3,v2,v1,v0. It expects that PX is between min(*PX_ccw0,
+ * *PX_ccw1, *PX_ccw2, *PX_ccw3) and max(*PX_ccw0, *PX_ccw1, *PX_ccw2, *PX_ccw3).
  *
- *
- * @param CM Projection camera matrix
- * @param PX PX coordinate to be mapped on projector.
- * @param lastIntersections Start search from these points
- * @param V_ccw0
- * @param V_ccw1
- * @param V_ccw2
- * @param V_ccw3
- * @param V_max Point where maximum X is achieved
- *
- * @return position parametrization as double2
+ * @param CM Projection camera matrix.
+ * @param PX Mapping of projector
+ * @param v0 Point v0
+ * @param v1 Point v1
+ * @param v2 Point v2
+ * @param v3 Point v3
+ * @param PX_ccw0 Mapping of v0
+ * @param PX_ccw1 Mapping of v1
+ * @param PX_ccw2 Mapping of v2
+ * @param PX_ccw3 Mapping of v3
+ * @param nextIntersections Output tuple of parametrizations that maps to PX.
+ * @param v_ccw Output first coordinate that maps to PX on the parametrized piecewise line
+ * v0,v1,v2,v3.
+ * @param v_cw Output first coordinate that maps to PX on the parametrized piecewise line
+ * v0,v3,v2,v1.
  */
-double2 findIntersectionPoints(private const double16* CM,
-                               int PI,
-                               double2 lastIntersections,
-                               const double* PX_ccw0,
-                               const double* PX_ccw1,
-                               const double* PX_ccw2,
-                               const double* PX_ccw3,
-                               const double* PX_max)
+inline void findIntersectionPoints(private const double16* CM,
+                                   const double PX,
+                                   const double3* v0,
+                                   const double3* v1,
+                                   const double3* v2,
+                                   const double3* v3,
+                                   const double* PX_ccw0,
+                                   const double* PX_ccw1,
+                                   const double* PX_ccw2,
+                                   const double* PX_ccw3,
+                                   double* surfaceFromZero,
+                                   double3* v_ccw,
+                                   double3* v_cw)
 {
-    double PX = (double)PI - 0.5;
-    double intersectionTime;
-    double2 nextIntersections = ((double2)(-1.0, -1.0));
-    while(nextIntersections.x < 0)
+    double p, q;
+    if(PX <= (*PX_ccw1))
     {
-        if(lastIntersections.x < 1.0)
+        p = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw1);
+        (*v_ccw) = (*v0) * (1.0 - p) + (*v1) * p;
+        if(PX <= (*PX_ccw3))
         {
-            intersectionTime = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw1);
-            if(intersectionTime <= 1.0 && intersectionTime >= 0)
-            {
-                nextIntersections.x = intersectionTime;
-            } else if(PX_ccw1 == PX_max)
-            {
-                nextIntersections.x = 1.0;
-            } else
-            {
-                lastIntersections.x = 1.0;
-            }
-        } else if(lastIntersections.x < 2.0)
+            q = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
+            (*v_cw) = (*v0) * (1.0 - q) + (*v3) * q;
+            *surfaceFromZero = p * q * 0.5;
+        } else if(PX <= (*PX_ccw2))
         {
-            intersectionTime = intersectionXTime(CM, &PX, PX_ccw1, PX_ccw2);
-            if(intersectionTime <= 1.0 && intersectionTime >= 0)
-            {
-                nextIntersections.x = 1.0 + intersectionTime;
-            } else if(PX_ccw2 == PX_max)
-            {
-                nextIntersections.x = 2.0;
-            } else
-            {
-                lastIntersections.x = 2.0;
-            }
-
-        } else if(lastIntersections.x < 3.0)
+            q = intersectionXTime(CM, &PX, PX_ccw3, PX_ccw2);
+            (*v_cw) = (*v3) * (1.0 - p) + (*v2) * p;
+            *surfaceFromZero = *surfaceFromZero = p + (q - p) * 0.5;
+        } else
         {
-            intersectionTime = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw3);
-            if(intersectionTime <= 1.0 && intersectionTime >= 0)
-            {
-                nextIntersections.x = 2.0 + intersectionTime;
-            } else if(PX_ccw3 == PX_max)
-            {
-                nextIntersections.x = 3.0;
-            } else
-            {
-                // I should not get here
-            }
+            q = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw1);
+            (*v_cw) = (*v2) * (1.0 - p) + (*v1) * p;
+            *surfaceFromZero = 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
         }
-    }
-    while(nextIntersections.y < 0)
+    } else if(PX <= (*PX_ccw2))
     {
-
-        if(lastIntersections.y < 1.0)
+        p = intersectionXTime(CM, &PX, PX_ccw1, PX_ccw2);
+        (*v_ccw) = (*v1) * (1.0 - p) + (*v2) * p;
+        if(PX <= (*PX_ccw3))
         {
-            intersectionTime = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
-            if(intersectionTime <= 1.0 && intersectionTime >= 0)
-            {
-                nextIntersections.y = intersectionTime;
-            } else if(PX_ccw3 == PX_max)
-            {
-                nextIntersections.y = 1.0;
-            } else
-            {
-                lastIntersections.y = 1.0;
-            }
-        } else if(lastIntersections.y < 2.0)
+            q = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
+            (*v_cw) = (*v0) * (1.0 - p) + (*v3) * p;
+            *surfaceFromZero = p + (q - p) * 0.5;
+        } else
         {
-            intersectionTime = intersectionXTime(CM, &PX, PX_ccw3, PX_ccw2);
-            if(intersectionTime <= 1.0 && intersectionTime >= 0)
-            {
-                nextIntersections.y = 1.0 + intersectionTime;
-            } else if(PX_ccw2 == PX_max)
-            {
-                nextIntersections.y = 2.0;
-            } else
-            {
-                lastIntersections.y = 2.0;
-            }
-
-        } else if(lastIntersections.y < 3.0)
-        {
-            intersectionTime = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw1);
-            if(intersectionTime <= 1.0 && intersectionTime >= 0)
-            {
-                nextIntersections.y = 2.0 + intersectionTime;
-            } else if(PX_ccw1 == PX_max)
-            {
-                nextIntersections.y = 3.0;
-            } else
-            {
-                // I should not get here
-            }
+            q = intersectionXTime(CM, &PX, PX_ccw3, PX_ccw2);
+            (*v_cw) = (*v3) * (1.0 - p) + (*v2) * p;
+            *surfaceFromZero = 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
         }
+    } else
+    {
+        p = intersectionXTime(CM, &PX, PX_ccw2, PX_ccw3);
+        (*v_ccw) = (*v2) * (1.0 - p) + (*v3) * p;
+        q = intersectionXTime(CM, &PX, PX_ccw0, PX_ccw3);
+        (*v_cw) = (*v0) * (1.0 - p) + (*v3) * p;
+        *surfaceFromZero = 1.0 - (1.0 - p) * (1.0 - q) * 0.5;
     }
-    return nextIntersections;
 }
 
 /**
@@ -537,10 +505,23 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     pxx_max = max(max(max(px00, px01), px10), px11);
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
+    if(max_PX == min_PX)
+    {
+        if(min_PX >= 0 && min_PX < pdims.x)
+        {
+            double factor = value / 4.0;
+            insertEdgeValues(projection, &CM, &vx00, min_PX, factor, &voxelSizes, &pdims);
+            insertEdgeValues(projection, &CM, &vx10, min_PX, factor, &voxelSizes, &pdims);
+            insertEdgeValues(projection, &CM, &vx01, min_PX, factor, &voxelSizes, &pdims);
+            insertEdgeValues(projection, &CM, &vx11, min_PX, factor, &voxelSizes, &pdims);
+        }
+        return;
+    }
+
     double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
                                // from the minimum voxel
     double *PX_max, *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise points
-                               // from the minimum voxel
+                                // from the minimum voxel
     if(px00 == pxx_min)
     {
         V_ccw[0] = &vx00;
@@ -599,61 +580,45 @@ void kernel FLOATcutting_voxel_project(global float* volume,
         V_max = &vx01;
         PX_max = &px01;
     }
+    double lastSectionSize, nextSectionSize, polygonSize;
+    double3 lastV1, lastV2, nextV1, nextV2;
+    int I = max(-1, min_PX);
+    int I_STOP = min(max_PX, pdims.x);
+    int numberOfEdges;
+    double factor;
     // Section of the square that corresponds to the indices < i
-    double previousSectionsSize = 0.0;
-    // CCW and CW coordinates of the last intersection on the lines specified by the points in V_ccw
-    double2 lastIntersections = { 0.0, 0.0 };
-    for(int I = max(-1, min_PX); I < min(max_PX + 1, pdims.x); I++)
+    // CCW and CW coordinates of the last intersection on the lines specified by the points in
+    // V_ccw
+    findIntersectionPoints(&CM, ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+                           PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastSectionSize, &lastV1,
+                           &lastV2);
+    if(I >= 0)
     {
-        double2 nextIntersections = findIntersectionPoints(&CM, I + 1, lastIntersections, PX_ccw[0],
-                                                           PX_ccw[1], PX_ccw[2], PX_ccw[3], PX_max);
-        double newSectionsSize = computeSquareSize(nextIntersections);
-        double cutSize = newSectionsSize - previousSectionsSize;
-        if(I >= 0)
-        {
-            // Number of edges is a number of vertical edges that we cut according to PY
-            // coordinate
-            int numberOfEdges = 0; // NextIntersections
-            if(lastIntersections.x == 0 && lastIntersections.y == 0)
-            {
-                numberOfEdges += 1;
-            } else
-            {
-                numberOfEdges += 2;
-            }
-            if(nextIntersections.x + nextIntersections.y == 4)
-            {
-                numberOfEdges += 1;
-            } else
-            {
-                numberOfEdges += 2;
-            }
-            double3 V;
-            double factor = value * cutSize / numberOfEdges;
-            if(lastIntersections.x == 0 && lastIntersections.y == 0)
-            {
-                V = *V_ccw[0];
-                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-            } else
-            {
-                V = intersectionPoint(lastIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3]);
-                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                V = intersectionPoint(lastIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2], V_ccw[1]);
-                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-            }
-            if(nextIntersections.x + nextIntersections.y == 4)
-            {
-                V = *V_max;
-                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-            } else
-            {
-                V = intersectionPoint(nextIntersections.x, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3]);
-                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-                V = intersectionPoint(nextIntersections.y, V_ccw[0], V_ccw[3], V_ccw[2], V_ccw[1]);
-                insertEdgeValues(I, factor, V, CM, projection, voxelSizes, pdims);
-            }
-        }
-        previousSectionsSize = newSectionsSize;
-        lastIntersections = nextIntersections;
+        factor = value * lastSectionSize / 3.0;
+        insertEdgeValues(projection, &CM, V_ccw[0], I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, &CM, &lastV1, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, &CM, &lastV2, I, factor, &voxelSizes, &pdims);
+    }
+    for(I = I + 1; I < I_STOP; I++)
+    {
+        findIntersectionPoints(&CM, ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+                               PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextSectionSize,
+                               &nextV1, &nextV2);
+        polygonSize = nextSectionSize - lastSectionSize;
+        double factor = value * polygonSize / 4.0;
+        insertEdgeValues(projection, &CM, &lastV1, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, &CM, &lastV2, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, &CM, &nextV1, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, &CM, &nextV2, I, factor, &voxelSizes, &pdims);
+        lastSectionSize = nextSectionSize;
+        lastV1 = nextV1;
+        lastV2 = nextV2;
+    }
+    if(I_STOP < pdims.x)
+    {
+        factor = value * (1 - lastSectionSize) / 3.0;
+        insertEdgeValues(projection, &CM, V_max, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, &CM, &lastV1, I, factor, &voxelSizes, &pdims);
+        insertEdgeValues(projection, &CM, &lastV2, I, factor, &voxelSizes, &pdims);
     }
 }
