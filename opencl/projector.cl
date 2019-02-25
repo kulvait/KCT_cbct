@@ -34,10 +34,9 @@ inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
  * @param v Volume point
  * @param PX_out Output
  */
-void projectX(private double16* CM, private double3* v, private double* PX_out)
+inline void projectX(private const double16* CM, private const double3* v, private double* PX_out)
 {
-    (*PX_out) = (v->x * (*CM)[0] + v->y * (*CM)[1] + v->z * (*CM)[2] + (*CM)[3])
-        / (v->x * (*CM)[8] + v->y * (*CM)[9] + v->z * (*CM)[10] + (*CM)[11]);
+    (*PX_out) = (dot(*v, CM->s012) + CM->s3) / (dot(*v, CM->s89a) + CM->sb);
 }
 
 /** Projection of a volume point v onto Y coordinate on projector.
@@ -47,10 +46,9 @@ void projectX(private double16* CM, private double3* v, private double* PX_out)
  * @param v Volume point
  * @param PY_out Output
  */
-void projectY(private double16* CM, private double3* v, private double* PY_out)
+inline void projectY(private const double16* CM, private const double3* v, private double* PY_out)
 {
-    (*PY_out) = ((*v).x * (*CM)[4] + (*v).y * (*CM)[5] + (*v).z * (*CM)[6] + (*CM)[7])
-        / ((*v).x * (*CM)[8] + (*v).y * (*CM)[9] + (*v).z * (*CM)[10] + (*CM)[11]);
+    (*PY_out) = (dot(*v, CM->s456) + CM->s7) / (dot(*v, CM->s89a) + CM->sb);
 }
 
 /** Projection of a volume point v onto P coordinate on projector.
@@ -60,13 +58,13 @@ void projectY(private double16* CM, private double3* v, private double* PY_out)
  * @param v Volume point
  * @param P_out Output
  */
-void project(private double16* CM, private double3* v, private double2* P_out)
+inline void project(private const double16* CM, private const double3* v, private double2* P_out)
 {
 
     double3 coord;
-    coord.x = v->x * (*CM)[0] + v->y * (*CM)[1] + v->z * (*CM)[2] + (*CM)[3];
-    coord.y = v->x * (*CM)[4] + v->y * (*CM)[5] + v->z * (*CM)[6] + (*CM)[7];
-    coord.z = v->x * (*CM)[8] + v->y * (*CM)[9] + v->z * (*CM)[10] + (*CM)[11];
+    coord.x = dot(*v, CM->s012) + CM->s3;
+    coord.y = dot(*v, CM->s456) + CM->s7;
+    coord.z = dot(*v, CM->s89a) + CM->sb;
     P_out->x = coord.x / coord.z;
     P_out->y = coord.y / coord.z;
 }
@@ -231,25 +229,22 @@ void insertEdgeValues(int PX,
 /**
  * We parametrize the line segment from A to B by parameter t such that t=0 for A and t=1 for B.
  * Then we will find the t corresponding to the point v = t*B+(1-t)A  that maps to the coordinate PX
- * on the detector. We assume that the mapping is linear. If A and B maps to the same PX, t=MAXFLOAT
+ * on the detector. We assume that the mapping is linear and that A maps to PX_A and B maps to PX_B. If A and B maps to the same PX, t=MAXFLOAT
  *
  * @param CM
  * @param PX
- * @param A
- * @param B
+ * @param PX_A PX index related to A
+ * @param PX_B PX index related to B
  *
  * @return Parametrization of the line that maps to PX.
  */
-inline double intersectionXTime(private double16* CM, double* PX, double3* A, double3* B)
+inline double intersectionXTime(private const double16* CM, const double* PX, const double* PX_A, const double *PX_B)
 {
-    double PX_A, PX_B;
-    projectX(CM, A, &PX_A);
-    projectX(CM, B, &PX_B);
-    if(PX_A == PX_B)
+    if(*PX_A == *PX_B)
     {
         return DBL_MAX;
     }
-    return ((*PX) - PX_A) / (PX_B - PX_A);
+    return ((*PX) - (*PX_A)) / ((*PX_B) - (*PX_A));
 }
 
 /** Find the position parametrization as double2 in the range [0,4) and [0,4) of the piecewise lines
@@ -268,7 +263,7 @@ inline double intersectionXTime(private double16* CM, double* PX, double3* A, do
  *
  * @return position parametrization as double2
  */
-double2 findIntersectionPoints(private double16* CM,
+double2 findIntersectionPoints(private const double16* CM,
                                int PI,
                                double2 lastIntersections,
                                double3* V_ccw0,
@@ -544,43 +539,65 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     min_PX = convert_int_rtn(pxx_min + 0.5);
     double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
                                // from the minimum voxel
+    double *PX_max, *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise points
+                               // from the minimum voxel
     if(px00 == pxx_min)
     {
         V_ccw[0] = &vx00;
         V_ccw[1] = &vx01;
         V_ccw[2] = &vx11;
         V_ccw[3] = &vx10;
+        PX_ccw[0] = &px00;
+        PX_ccw[1] = &px01;
+        PX_ccw[2] = &px11;
+        PX_ccw[3] = &px10;
     } else if(px01 == pxx_min)
     {
         V_ccw[0] = &vx01;
         V_ccw[1] = &vx11;
         V_ccw[2] = &vx10;
         V_ccw[3] = &vx00;
+        PX_ccw[0] = &px01;
+        PX_ccw[1] = &px11;
+        PX_ccw[2] = &px10;
+        PX_ccw[3] = &px00;
     } else if(px10 == pxx_min)
     {
         V_ccw[0] = &vx10;
         V_ccw[1] = &vx00;
         V_ccw[2] = &vx01;
         V_ccw[3] = &vx11;
+        PX_ccw[0] = &px10;
+        PX_ccw[1] = &px00;
+        PX_ccw[2] = &px01;
+        PX_ccw[3] = &px11;
     } else // its px11
     {
         V_ccw[0] = &vx11;
         V_ccw[1] = &vx10;
         V_ccw[2] = &vx00;
         V_ccw[3] = &vx01;
+        PX_ccw[0] = &px11;
+        PX_ccw[1] = &px10;
+        PX_ccw[2] = &px00;
+        PX_ccw[3] = &px01;
     }
     if(px10 == pxx_max)
     {
         V_max = &vx10;
+        PX_max = &px10;
     } else if(px11 == pxx_max)
     {
         V_max = &vx11;
+        PX_max = &px11;
     } else if(px00 == pxx_max)
     {
         V_max = &vx00;
+        PX_max = &px00;
     } else // its px01
     {
         V_max = &vx01;
+        PX_max = &px01;
     }
     // Section of the square that corresponds to the indices < i
     double previousSectionsSize = 0.0;
@@ -588,8 +605,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     double2 lastIntersections = { 0.0, 0.0 };
     for(int I = max(-1, min_PX); I < min(max_PX + 1, pdims.x); I++)
     {
-        double2 nextIntersections = findIntersectionPoints(&CM, I + 1, lastIntersections, V_ccw[0],
-                                                           V_ccw[1], V_ccw[2], V_ccw[3], V_max);
+        double2 nextIntersections = findIntersectionPoints(&CM, I + 1, lastIntersections, PX_ccw[0],
+                                                           PX_ccw[1], PX_ccw[2], PX_ccw[3], PX_max);
         double newSectionsSize = computeSquareSize(nextIntersections);
         double cutSize = newSectionsSize - previousSectionsSize;
         if(I >= 0)
