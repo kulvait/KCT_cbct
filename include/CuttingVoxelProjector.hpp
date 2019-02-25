@@ -79,10 +79,10 @@ private:
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     cl_double16&,
-                                    cl_double4&,
-                                    cl_double4&,
+                                    cl_double3&,
+                                    cl_double3&,
                                     cl_int4&,
-                                    cl_double4&,
+                                    cl_double3&,
                                     cl_int2&,
                                     float&>>
         FLOATcutting_voxel_project;

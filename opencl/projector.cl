@@ -34,7 +34,7 @@ inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
  * @param v Volume point
  * @param PX_out Output
  */
-void projectX(private double16* CM, private double4* v, private double* PX_out)
+void projectX(private double16* CM, private double3* v, private double* PX_out)
 {
     (*PX_out) = ((*v).x * (*CM)[0] + (*v).y * (*CM)[1] + (*v).z * (*CM)[2] + (*CM)[3])
         / ((*v).x * (*CM)[8] + (*v).y * (*CM)[9] + (*v).z * (*CM)[10] + (*CM)[11]);
@@ -47,7 +47,7 @@ void projectX(private double16* CM, private double4* v, private double* PX_out)
  * @param v Volume point
  * @param PY_out Output
  */
-void projectY(private double16* CM, private double4* v, private double* PY_out)
+void projectY(private double16* CM, private double3* v, private double* PY_out)
 {
     (*PY_out) = ((*v).x * (*CM)[4] + (*v).y * (*CM)[5] + (*v).z * (*CM)[6] + (*CM)[7])
         / ((*v).x * (*CM)[8] + (*v).y * (*CM)[9] + (*v).z * (*CM)[10] + (*CM)[11]);
@@ -60,10 +60,10 @@ void projectY(private double16* CM, private double4* v, private double* PY_out)
  * @param v Volume point
  * @param P_out Output
  */
-void project(private double16* CM, private double4* v, private double2* P_out)
+void project(private double16* CM, private double3* v, private double2* P_out)
 {
 
-    double4 coord;
+    double3 coord;
     coord.x = v->x * (*CM)[0] + v->y * (*CM)[1] + v->z * (*CM)[2] + (*CM)[3];
     coord.y = v->x * (*CM)[4] + v->y * (*CM)[5] + v->z * (*CM)[6] + (*CM)[7];
     coord.z = v->x * (*CM)[8] + v->y * (*CM)[9] + v->z * (*CM)[10] + (*CM)[11];
@@ -71,9 +71,9 @@ void project(private double16* CM, private double4* v, private double2* P_out)
     P_out->y = coord.y / coord.z;
 }
 
-int2 projectionIndices(private double16 P, private double4 vdim, int2 pdims)
+int2 projectionIndices(private double16 P, private double3 vdim, int2 pdims)
 {
-    double4 coord;
+    double3 coord;
     coord.x = vdim.x * P[0] + vdim.y * P[1] + vdim.z * P[2] + P[3];
     coord.y = vdim.x * P[4] + vdim.y * P[5] + vdim.z * P[6] + P[7];
     coord.z = vdim.x * P[8] + vdim.y * P[9] + vdim.z * P[10] + P[11];
@@ -91,9 +91,9 @@ int2 projectionIndices(private double16 P, private double4 vdim, int2 pdims)
     }
 }
 
-int projectionIndex(private double16* CM, private double4 v, int2 pdims)
+int projectionIndex(private double16* CM, private double3 v, int2 pdims)
 {
-    double4 coord;
+    double3 coord;
     coord.x = v.x * (*CM)[0] + v.y * (*CM)[1] + v.z * (*CM)[2] + (*CM)[3];
     coord.y = v.x * (*CM)[4] + v.y * (*CM)[5] + v.z * (*CM)[6] + (*CM)[7];
     coord.z = v.x * (*CM)[8] + v.y * (*CM)[9] + v.z * (*CM)[10] + (*CM)[11];
@@ -114,18 +114,18 @@ int projectionIndex(private double16* CM, private double4 v, int2 pdims)
 /// insertEdgeValues(factor, V, P, projection, pdims);
 void insertEdgeValues(int PX,
                       double value,
-                      double4 v,
+                      double3 v,
                       private double16 CM,
                       global float* projection,
-                      private double4 voxelSizes,
+                      private double3 voxelSizes,
                       private int2 pdims)
 {
 
-    double4 v_down, v_up;
+    double3 v_down, v_up;
     double PY_down, PY_up;
     int PJ_down, PJ_up;
-    v_down = v + voxelSizes * (double4)(0, 0, -0.5, 0);
-    v_up = v + voxelSizes * (double4)(0, 0, +0.5, 0);
+    v_down = v + voxelSizes * (double3)(0.0, 0.0, -0.5);
+    v_up = v + voxelSizes * (double3)(0.0, 0.0, +0.5);
     projectY(&CM, &v_down, &PY_down);
     projectY(&CM, &v_up, &PY_up);
     PJ_down = convert_int_rtn(PY_down + 0.5);
@@ -238,7 +238,7 @@ void insertEdgeValues(int PX,
  *
  * @return Parametrization of the line that maps to PX.
  */
-inline double intersectionXTime(private double16* CM, double* PX, double4* A, double4* B)
+inline double intersectionXTime(private double16* CM, double* PX, double3* A, double3* B)
 {
     double PX_A, PX_B;
     projectX(CM, A, &PX_A);
@@ -269,11 +269,11 @@ inline double intersectionXTime(private double16* CM, double* PX, double4* A, do
 double2 findIntersectionPoints(private double16* CM,
                                int PI,
                                double2 lastIntersections,
-                               double4* V_ccw0,
-                               double4* V_ccw1,
-                               double4* V_ccw2,
-                               double4* V_ccw3,
-                               double4* V_max)
+                               double3* V_ccw0,
+                               double3* V_ccw1,
+                               double3* V_ccw2,
+                               double3* V_ccw3,
+                               double3* V_max)
 {
     double PX = (double)PI - 0.5;
     double intersectionTime;
@@ -380,10 +380,10 @@ double2 findIntersectionPoints(private double16* CM,
  * @param V_ccw2
  * @param V_ccw3
  */
-double4
-intersectionPoint(double p, double4* V_ccw0, double4* V_ccw1, double4* V_ccw2, double4* V_ccw3)
+double3
+intersectionPoint(double p, double3* V_ccw0, double3* V_ccw1, double3* V_ccw2, double3* V_ccw3)
 {
-    double4 v;
+    double3 v;
     if(p <= 1.0)
     {
         v = (*V_ccw0) * (1.0 - p) + p * (*V_ccw1);
@@ -467,47 +467,47 @@ inline int volIndex(int* i, int* j, int* k, int4* vdims)
 void kernel FLOATcutting_voxel_project(global float* volume,
                                        global float* projection,
                                        private double16 CM,
-                                       private double4 sourcePosition,
-                                       private double4 normalToDetector,
+                                       private double3 sourcePosition,
+                                       private double3 normalToDetector,
                                        private int4 vdims,
-                                       private double4 voxelSizes,
+                                       private double3 voxelSizes,
                                        private int2 pdims,
                                        private float scalingFactor)
 {
     int i = get_global_id(2);
     int j = get_global_id(1);
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
-    const double4 IND_ijk = { (double)(i), (double)(j), (double)(k), 0.0 };
-    const double4 zerocorner_xyz = -convert_double4(vdims) / 2.0;
+    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k)};
+    const double3 zerocorner_xyz = {-0.5 * (double)vdims.x, -0.5 * (double)vdims.y, -0.5 * (double)vdims.z };// -convert_double3(vdims) / 2.0;
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
     int pdimMax = pdims.x * pdims.y;
     int8 cube_abi
         = { projectionIndex(&CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(1, 0, 0, 0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 0.0, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(0, 1, 0, 0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(1, 1, 0, 0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 1, 0.0)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(0, 0, 1, 0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 1)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(1, 0, 1, 0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 0.0, 1)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(0, 1, 1, 0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1, 1)),
                             pdims),
-            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(1, 1, 1, 0)),
+            projectionIndex(&CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1, 1, 1)),
                             pdims) };
     if(all(cube_abi
            == pdimMax)) // When all projections of the voxel corners points outside projector area
     {
         return;
     }
-    const double4 voxelcenter_xyz = zerocorner_xyz
+    const double3 voxelcenter_xyz = zerocorner_xyz
         + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
     float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
 
-    double4 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
+    double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
     double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
     double cosPowThree = cosine * cosine * cosine;
@@ -523,11 +523,11 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
     double2 px00, px01, px10, px11;
-    double4 vx00, vx01, vx10, vx11;
-    vx00 = zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(0, 0, 0.5, 0));
-    vx01 = zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(1, 0, 0.5, 0));
-    vx10 = zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(0, 1, 0.5, 0));
-    vx11 = zerocorner_xyz + voxelSizes * (IND_ijk + (double4)(1, 1, 0.5, 0));
+    double3 vx00, vx01, vx10, vx11;
+    vx00 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 0.5));
+    vx01 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.5));
+    vx10 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.5));
+    vx11 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.5));
     project(&CM, &vx00, &px00);
     project(&CM, &vx01, &px01);
     project(&CM, &vx10, &px10);
@@ -539,7 +539,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     pxx_max = max(max(max(px00.x, px01.x), px10.x), px11.x);
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
-    double4 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
+    double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
                                // from the minimum voxel
     if(px00.x == pxx_min)
     {
@@ -610,7 +610,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                 {
                     numberOfEdges += 2;
                 }
-                double4 V;
+                double3 V;
                 double factor = value * cutSize / numberOfEdges;
                 if(lastIntersections.x == 0 && lastIntersections.y == 0)
                 {

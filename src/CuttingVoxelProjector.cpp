@@ -84,12 +84,12 @@ int CuttingVoxelProjector::project(float* projection,
 
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
                      0.0, 0.0, 0.0 });
-    cl_double4 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2], 0.0 });
-    cl_double4 NORMALTODETECTOR(
-        { normalToDetector[0], normalToDetector[1], normalToDetector[2], 0.0 });
+    cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+    cl_double3 NORMALTODETECTOR(
+        { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
-    cl_double4 voxelSizes({ 1.0, 1.0, 1.0, 0.0 });
+    cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
     (*FLOATcutting_voxel_project)(eargs, *volumeBuffer, buffer_projection, PM, SOURCEPOSITION,
                                   NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingFactor)
