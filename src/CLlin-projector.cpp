@@ -3,12 +3,12 @@
 
 // External libraries
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <ctype.h>
 #include <iostream>
 #include <regex>
 #include <string>
-
 #include <unistd.h>
 
 // External libraries
@@ -179,6 +179,7 @@ int main(int argc, char* argv[])
     plogSetup.initLogging();
     LOGI << io::xprintf("Xpath is %s", xpath.c_str());
     LOGI << io::xprintf("argv[0] is %s", argv[0]);
+    auto start = std::chrono::steady_clock::now();
     LOGI << io::xprintf("START %s", argv[0]);
     // Argument parsing
     Args a;
@@ -275,6 +276,6 @@ int main(int argc, char* argv[])
     }
     delete[] volume;
     delete[] projection;
-
-    LOGI << io::xprintf("END %s", argv[0]);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+    LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
 }
