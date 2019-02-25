@@ -524,283 +524,297 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                             pdims),
             projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 1.0)),
                             pdims) };
-    if(all(cube_abi
-           == pdimMax)) // When all projections of the voxel corners points outside projector area
+    if(!all(cube_abi
+            == pdimMax)) // When all projections of the voxel corners points outside projector area
     {
-        return;
-    }
-    const double3 voxelcenter_xyz = zerocorner_xyz
-        + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
-    float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
+        const double3 voxelcenter_xyz = zerocorner_xyz
+            + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
+        float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
 
-    double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-    double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-    double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
-    double cosPowThree = cosine * cosine * cosine;
-    float value = voxelValue * scalingFactor
-        / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
-    if(all(cube_abi == cube_abi.x)) // When all projections are the same
-    {
-        AtomicAdd_g_f(&projection[cube_abi.x],
-                      value); // Atomic version of projection[ind] += value;
-        return;
-    }
-    // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
-    // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
-    // project the rectangle that lies on the z midline of the voxel on the projector
-    double px00, px01, px10, px11;
-    double3 vx00, vx01, vx10, vx11;
-    vx00 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 0.5));
-    vx01 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.5));
-    vx10 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.5));
-    vx11 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.5));
-    px00 = projectX(CM, vx00);
-    px01 = projectX(CM, vx01);
-    px10 = projectX(CM, vx10);
-    px11 = projectX(CM, vx11);
-    // We now figure out the vertex that projects to minimum and maximum px
-    double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
-    int max_PX,
-        min_PX; // Pixel to which are the voxels with minimum and maximum values are projected
-    pxx_min = min(min(min(px00, px01), px10), px11);
-    pxx_max = max(max(max(px00, px01), px10), px11);
-    max_PX = convert_int_rtn(pxx_max + 0.5);
-    min_PX = convert_int_rtn(pxx_min + 0.5);
+        double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
+        double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
+        double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
+        double cosPowThree = cosine * cosine * cosine;
+        float value = voxelValue * scalingFactor
+            / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+        if(all(cube_abi == cube_abi.x)) // When all projections are the same
+        {
+            AtomicAdd_g_f(&projection[cube_abi.x],
+                          value); // Atomic version of projection[ind] += value;
+        } else
+        {
+            // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any
+            // z_1, z_2  This assumption is restricted to the voxel edges, where it holds very
+            // accurately  We project the rectangle that lies on the z midline of the voxel on the
+            // projector
+            double px00, px01, px10, px11;
+            double3 vx00, vx01, vx10, vx11;
+            vx00 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 0.5));
+            vx01 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.5));
+            vx10 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.5));
+            vx11 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.5));
+            px00 = projectX(CM, vx00);
+            px01 = projectX(CM, vx01);
+            px10 = projectX(CM, vx10);
+            px11 = projectX(CM, vx11);
+            // We now figure out the vertex that projects to minimum and maximum px
+            double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
+            int max_PX,
+                min_PX; // Pixel to which are the voxels with minimum and maximum values are
+                        // projected
+            pxx_min = min(min(min(px00, px01), px10), px11);
+            pxx_max = max(max(max(px00, px01), px10), px11);
+            max_PX = convert_int_rtn(pxx_max + 0.5);
+            min_PX = convert_int_rtn(pxx_min + 0.5);
 
-    // COMPUTE WITHOUT CHECKS
-    if(all(cube_abi != pdimMax))
-    {
-        if(max_PX == min_PX)
-        {
-            double factor = value / 4.0;
-            insertEdgeValues(projection, CM, vx00, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx10, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx01, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx11, min_PX, factor, voxelSizes, pdims);
-            return;
-        }
-        double3 *V_max,
-            *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
-        // from the minimum voxel
-        double *PX_max,
-            *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise  points
-        // from the minimum voxel
-        if(px00 == pxx_min)
-        {
-            V_ccw[0] = &vx00;
-            V_ccw[1] = &vx01;
-            V_ccw[2] = &vx11;
-            V_ccw[3] = &vx10;
-            PX_ccw[0] = &px00;
-            PX_ccw[1] = &px01;
-            PX_ccw[2] = &px11;
-            PX_ccw[3] = &px10;
-        } else if(px01 == pxx_min)
-        {
-            V_ccw[0] = &vx01;
-            V_ccw[1] = &vx11;
-            V_ccw[2] = &vx10;
-            V_ccw[3] = &vx00;
-            PX_ccw[0] = &px01;
-            PX_ccw[1] = &px11;
-            PX_ccw[2] = &px10;
-            PX_ccw[3] = &px00;
-        } else if(px10 == pxx_min)
-        {
-            V_ccw[0] = &vx10;
-            V_ccw[1] = &vx00;
-            V_ccw[2] = &vx01;
-            V_ccw[3] = &vx11;
-            PX_ccw[0] = &px10;
-            PX_ccw[1] = &px00;
-            PX_ccw[2] = &px01;
-            PX_ccw[3] = &px11;
-        } else // its px11
-        {
-            V_ccw[0] = &vx11;
-            V_ccw[1] = &vx10;
-            V_ccw[2] = &vx00;
-            V_ccw[3] = &vx01;
-            PX_ccw[0] = &px11;
-            PX_ccw[1] = &px10;
-            PX_ccw[2] = &px00;
-            PX_ccw[3] = &px01;
-        }
-        if(px10 == pxx_max)
-        {
-            V_max = &vx10;
-            PX_max = &px10;
-        } else if(px11 == pxx_max)
-        {
-            V_max = &vx11;
-            PX_max = &px11;
-        } else if(px00 == pxx_max)
-        {
-            V_max = &vx00;
-            PX_max = &px00;
-        } else // its px01
-        {
-            V_max = &vx01;
-            PX_max = &px01;
-        }
-        double lastSectionSize, nextSectionSize, polygonSize;
-        double3 lastV1, lastV2, nextV1, nextV2;
-        int I = min_PX;
-        int I_STOP = max_PX;
-        int numberOfEdges;
-        double factor;
-        // Section of the square that corresponds to the indices < i
-        // CCW and CW coordinates of the last intersection on the lines specified by the points in
-        // V_ccw
-        lastSectionSize
+            // COMPUTE WITHOUT CHECKS
+            if(all(cube_abi != pdimMax))
+            {
+                if(max_PX == min_PX)
+                {
+                    double factor = value / 4.0;
+                    insertEdgeValues(projection, CM, vx00, min_PX, factor, voxelSizes, pdims);
+                    insertEdgeValues(projection, CM, vx10, min_PX, factor, voxelSizes, pdims);
+                    insertEdgeValues(projection, CM, vx01, min_PX, factor, voxelSizes, pdims);
+                    insertEdgeValues(projection, CM, vx11, min_PX, factor, voxelSizes, pdims);
+                } else
+                {
+                    double3 *V_max,
+                        *V_ccw[4]; // Point in which maximum is achieved and counter clock wise
+                                   // points
+                    // from the minimum voxel
+                    double *PX_max,
+                        *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise
+                                    // points
+                    // from the minimum voxel
+                    if(px00 == pxx_min)
+                    {
+                        V_ccw[0] = &vx00;
+                        V_ccw[1] = &vx01;
+                        V_ccw[2] = &vx11;
+                        V_ccw[3] = &vx10;
+                        PX_ccw[0] = &px00;
+                        PX_ccw[1] = &px01;
+                        PX_ccw[2] = &px11;
+                        PX_ccw[3] = &px10;
+                    } else if(px01 == pxx_min)
+                    {
+                        V_ccw[0] = &vx01;
+                        V_ccw[1] = &vx11;
+                        V_ccw[2] = &vx10;
+                        V_ccw[3] = &vx00;
+                        PX_ccw[0] = &px01;
+                        PX_ccw[1] = &px11;
+                        PX_ccw[2] = &px10;
+                        PX_ccw[3] = &px00;
+                    } else if(px10 == pxx_min)
+                    {
+                        V_ccw[0] = &vx10;
+                        V_ccw[1] = &vx00;
+                        V_ccw[2] = &vx01;
+                        V_ccw[3] = &vx11;
+                        PX_ccw[0] = &px10;
+                        PX_ccw[1] = &px00;
+                        PX_ccw[2] = &px01;
+                        PX_ccw[3] = &px11;
+                    } else // its px11
+                    {
+                        V_ccw[0] = &vx11;
+                        V_ccw[1] = &vx10;
+                        V_ccw[2] = &vx00;
+                        V_ccw[3] = &vx01;
+                        PX_ccw[0] = &px11;
+                        PX_ccw[1] = &px10;
+                        PX_ccw[2] = &px00;
+                        PX_ccw[3] = &px01;
+                    }
+                    if(px10 == pxx_max)
+                    {
+                        V_max = &vx10;
+                        PX_max = &px10;
+                    } else if(px11 == pxx_max)
+                    {
+                        V_max = &vx11;
+                        PX_max = &px11;
+                    } else if(px00 == pxx_max)
+                    {
+                        V_max = &vx00;
+                        PX_max = &px00;
+                    } else // its px01
+                    {
+                        V_max = &vx01;
+                        PX_max = &px01;
+                    }
+                    double lastSectionSize, nextSectionSize, polygonSize;
+                    double3 lastV1, lastV2, nextV1, nextV2;
+                    int I = min_PX;
+                    int I_STOP = max_PX;
+                    int numberOfEdges;
+                    double factor;
+                    // Section of the square that corresponds to the indices < i
+                    // CCW and CW coordinates of the last intersection on the lines specified by the
+                    // points in V_ccw
+                    lastSectionSize
 
-            = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                     PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastV1, &lastV2);
-        factor = value * lastSectionSize / 3.0;
-        insertEdgeValuesNOCHECK(projection, CM, *V_ccw[0], I, factor, voxelSizes, pdims);
-        insertEdgeValuesNOCHECK(projection, CM, lastV1, I, factor, voxelSizes, pdims);
-        insertEdgeValuesNOCHECK(projection, CM, lastV2, I, factor, voxelSizes, pdims);
-        for(I = I + 1; I < I_STOP; I++)
-        {
-            nextSectionSize = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1],
-                                                     V_ccw[2], V_ccw[3], PX_ccw[0], PX_ccw[1],
-                                                     PX_ccw[2], PX_ccw[3], &nextV1, &nextV2);
-            polygonSize = nextSectionSize - lastSectionSize;
-            double factor = value * polygonSize / 4.0;
-            insertEdgeValuesNOCHECK(projection, CM, lastV1, I, factor, voxelSizes, pdims);
-            insertEdgeValuesNOCHECK(projection, CM, lastV2, I, factor, voxelSizes, pdims);
-            insertEdgeValuesNOCHECK(projection, CM, nextV1, I, factor, voxelSizes, pdims);
-            insertEdgeValuesNOCHECK(projection, CM, nextV2, I, factor, voxelSizes, pdims);
-            lastSectionSize = nextSectionSize;
-            lastV1 = nextV1;
-            lastV2 = nextV2;
-        }
-        if(I_STOP < pdims.x)
-        {
-            factor = value * (1 - lastSectionSize) / 3.0;
-            insertEdgeValuesNOCHECK(projection, CM, *V_max, I, factor, voxelSizes, pdims);
-            insertEdgeValuesNOCHECK(projection, CM, lastV1, I, factor, voxelSizes, pdims);
-            insertEdgeValuesNOCHECK(projection, CM, lastV2, I, factor, voxelSizes, pdims);
-        }
+                        = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2],
+                                                 V_ccw[3], PX_ccw[0], PX_ccw[1], PX_ccw[2],
+                                                 PX_ccw[3], &lastV1, &lastV2);
+                    factor = value * lastSectionSize / 3.0;
+                    insertEdgeValuesNOCHECK(projection, CM, *V_ccw[0], I, factor, voxelSizes,
+                                            pdims);
+                    insertEdgeValuesNOCHECK(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+                    insertEdgeValuesNOCHECK(projection, CM, lastV2, I, factor, voxelSizes, pdims);
+                    I = I + 1;
+                    while(I < max_PX)
+                    {
+                        nextSectionSize = findIntersectionPoints(
+                            ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], PX_ccw[0],
+                            PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextV1, &nextV2);
+                        polygonSize = nextSectionSize - lastSectionSize;
+                        double factor = value * polygonSize / 4.0;
+                        insertEdgeValuesNOCHECK(projection, CM, lastV1, I, factor, voxelSizes,
+                                                pdims);
+                        insertEdgeValuesNOCHECK(projection, CM, lastV2, I, factor, voxelSizes,
+                                                pdims);
+                        insertEdgeValuesNOCHECK(projection, CM, nextV1, I, factor, voxelSizes,
+                                                pdims);
+                        insertEdgeValuesNOCHECK(projection, CM, nextV2, I, factor, voxelSizes,
+                                                pdims);
+                        lastSectionSize = nextSectionSize;
+                        lastV1 = nextV1;
+                        lastV2 = nextV2;
+                        I++;
+                    }
+                    factor = value * (1 - lastSectionSize) / 3.0;
+                    insertEdgeValuesNOCHECK(projection, CM, *V_max, I, factor, voxelSizes, pdims);
+                    insertEdgeValuesNOCHECK(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+                    insertEdgeValuesNOCHECK(projection, CM, lastV2, I, factor, voxelSizes, pdims);
+                }
+            } else
+            {
 
-        return;
-    }
+                if(max_PX == min_PX)
+                {
+                    if(min_PX >= 0 && min_PX < pdims.x)
+                    {
+                        double factor = value / 4.0;
+                        insertEdgeValues(projection, CM, vx00, min_PX, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, vx10, min_PX, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, vx01, min_PX, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, vx11, min_PX, factor, voxelSizes, pdims);
+                    }
+                } else
+                {
 
-    if(max_PX == min_PX)
-    {
-        if(min_PX >= 0 && min_PX < pdims.x)
-        {
-            double factor = value / 4.0;
-            insertEdgeValues(projection, CM, vx00, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx10, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx01, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx11, min_PX, factor, voxelSizes, pdims);
+                    double3 *V_max,
+                        *V_ccw[4]; // Point in which maximum is achieved and counter clock wise
+                                   // points
+                    // from the minimum voxel
+                    double *PX_max,
+                        *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise
+                                    // points
+                    // from the minimum voxel
+                    if(px00 == pxx_min)
+                    {
+                        V_ccw[0] = &vx00;
+                        V_ccw[1] = &vx01;
+                        V_ccw[2] = &vx11;
+                        V_ccw[3] = &vx10;
+                        PX_ccw[0] = &px00;
+                        PX_ccw[1] = &px01;
+                        PX_ccw[2] = &px11;
+                        PX_ccw[3] = &px10;
+                    } else if(px01 == pxx_min)
+                    {
+                        V_ccw[0] = &vx01;
+                        V_ccw[1] = &vx11;
+                        V_ccw[2] = &vx10;
+                        V_ccw[3] = &vx00;
+                        PX_ccw[0] = &px01;
+                        PX_ccw[1] = &px11;
+                        PX_ccw[2] = &px10;
+                        PX_ccw[3] = &px00;
+                    } else if(px10 == pxx_min)
+                    {
+                        V_ccw[0] = &vx10;
+                        V_ccw[1] = &vx00;
+                        V_ccw[2] = &vx01;
+                        V_ccw[3] = &vx11;
+                        PX_ccw[0] = &px10;
+                        PX_ccw[1] = &px00;
+                        PX_ccw[2] = &px01;
+                        PX_ccw[3] = &px11;
+                    } else // its px11
+                    {
+                        V_ccw[0] = &vx11;
+                        V_ccw[1] = &vx10;
+                        V_ccw[2] = &vx00;
+                        V_ccw[3] = &vx01;
+                        PX_ccw[0] = &px11;
+                        PX_ccw[1] = &px10;
+                        PX_ccw[2] = &px00;
+                        PX_ccw[3] = &px01;
+                    }
+                    if(px10 == pxx_max)
+                    {
+                        V_max = &vx10;
+                        PX_max = &px10;
+                    } else if(px11 == pxx_max)
+                    {
+                        V_max = &vx11;
+                        PX_max = &px11;
+                    } else if(px00 == pxx_max)
+                    {
+                        V_max = &vx00;
+                        PX_max = &px00;
+                    } else // its px01
+                    {
+                        V_max = &vx01;
+                        PX_max = &px01;
+                    }
+                    double lastSectionSize, nextSectionSize, polygonSize;
+                    double3 lastV1, lastV2, nextV1, nextV2;
+                    int I = max(-1, min_PX);
+                    int I_STOP = min(max_PX, pdims.x);
+                    int numberOfEdges;
+                    double factor;
+                    // Section of the square that corresponds to the indices < i
+                    // CCW and CW coordinates of the last intersection on the lines specified by the
+                    // points in V_ccw
+                    lastSectionSize = findIntersectionPoints(
+                        ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], PX_ccw[0],
+                        PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastV1, &lastV2);
+                    if(I >= 0)
+                    {
+                        factor = value * lastSectionSize / 3.0;
+                        insertEdgeValues(projection, CM, *V_ccw[0], I, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
+                    }
+                    for(I = I + 1; I < I_STOP; I++)
+                    {
+                        nextSectionSize = findIntersectionPoints(
+                            ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], PX_ccw[0],
+                            PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextV1, &nextV2);
+                        polygonSize = nextSectionSize - lastSectionSize;
+                        double factor = value * polygonSize / 4.0;
+                        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, nextV1, I, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, nextV2, I, factor, voxelSizes, pdims);
+                        lastSectionSize = nextSectionSize;
+                        lastV1 = nextV1;
+                        lastV2 = nextV2;
+                    }
+                    if(I_STOP < pdims.x)
+                    {
+                        factor = value * (1 - lastSectionSize) / 3.0;
+                        insertEdgeValues(projection, CM, *V_max, I, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
+                        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
+                    }
+                }
+            }
         }
-        return;
-    }
-
-    double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
-    // from the minimum voxel
-    double *PX_max,
-        *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise  points
-    // from the minimum voxel
-    if(px00 == pxx_min)
-    {
-        V_ccw[0] = &vx00;
-        V_ccw[1] = &vx01;
-        V_ccw[2] = &vx11;
-        V_ccw[3] = &vx10;
-        PX_ccw[0] = &px00;
-        PX_ccw[1] = &px01;
-        PX_ccw[2] = &px11;
-        PX_ccw[3] = &px10;
-    } else if(px01 == pxx_min)
-    {
-        V_ccw[0] = &vx01;
-        V_ccw[1] = &vx11;
-        V_ccw[2] = &vx10;
-        V_ccw[3] = &vx00;
-        PX_ccw[0] = &px01;
-        PX_ccw[1] = &px11;
-        PX_ccw[2] = &px10;
-        PX_ccw[3] = &px00;
-    } else if(px10 == pxx_min)
-    {
-        V_ccw[0] = &vx10;
-        V_ccw[1] = &vx00;
-        V_ccw[2] = &vx01;
-        V_ccw[3] = &vx11;
-        PX_ccw[0] = &px10;
-        PX_ccw[1] = &px00;
-        PX_ccw[2] = &px01;
-        PX_ccw[3] = &px11;
-    } else // its px11
-    {
-        V_ccw[0] = &vx11;
-        V_ccw[1] = &vx10;
-        V_ccw[2] = &vx00;
-        V_ccw[3] = &vx01;
-        PX_ccw[0] = &px11;
-        PX_ccw[1] = &px10;
-        PX_ccw[2] = &px00;
-        PX_ccw[3] = &px01;
-    }
-    if(px10 == pxx_max)
-    {
-        V_max = &vx10;
-        PX_max = &px10;
-    } else if(px11 == pxx_max)
-    {
-        V_max = &vx11;
-        PX_max = &px11;
-    } else if(px00 == pxx_max)
-    {
-        V_max = &vx00;
-        PX_max = &px00;
-    } else // its px01
-    {
-        V_max = &vx01;
-        PX_max = &px01;
-    }
-    double lastSectionSize, nextSectionSize, polygonSize;
-    double3 lastV1, lastV2, nextV1, nextV2;
-    int I = max(-1, min_PX);
-    int I_STOP = min(max_PX, pdims.x);
-    int numberOfEdges;
-    double factor;
-    // Section of the square that corresponds to the indices < i
-    // CCW and CW coordinates of the last intersection on the lines specified by the points in
-    // V_ccw
-    lastSectionSize
-        = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                 PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastV1, &lastV2);
-    if(I >= 0)
-    {
-        factor = value * lastSectionSize / 3.0;
-        insertEdgeValues(projection, CM, *V_ccw[0], I, factor, voxelSizes, pdims);
-        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
-        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
-    }
-    for(I = I + 1; I < I_STOP; I++)
-    {
-        nextSectionSize
-            = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                     PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextV1, &nextV2);
-        polygonSize = nextSectionSize - lastSectionSize;
-        double factor = value * polygonSize / 4.0;
-        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
-        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
-        insertEdgeValues(projection, CM, nextV1, I, factor, voxelSizes, pdims);
-        insertEdgeValues(projection, CM, nextV2, I, factor, voxelSizes, pdims);
-        lastSectionSize = nextSectionSize;
-        lastV1 = nextV1;
-        lastV2 = nextV2;
-    }
-    if(I_STOP < pdims.x)
-    {
-        factor = value * (1 - lastSectionSize) / 3.0;
-        insertEdgeValues(projection, CM, *V_max, I, factor, voxelSizes, pdims);
-        insertEdgeValues(projection, CM, lastV1, I, factor, voxelSizes, pdims);
-        insertEdgeValues(projection, CM, lastV2, I, factor, voxelSizes, pdims);
     }
 }
