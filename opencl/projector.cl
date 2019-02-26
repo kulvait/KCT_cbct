@@ -7,24 +7,20 @@
  * @param source Pointer to the memory to perform atomic operation on.
  * @param operand Float to add.
  */
-inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
+inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
 {
     union
     {
-        unsigned int intVal;
-        float floatVal;
-    } newVal;
-    union
-    {
-        unsigned int intVal;
-        float floatVal;
-    } prevVal;
+        unsigned int u32;
+        float f32;
+    } tmp, adrcatch;
+    tmp.f32 = *adr;
     do
     {
-        prevVal.floatVal = *source;
-        newVal.floatVal = prevVal.floatVal + operand;
-    } while(atomic_cmpxchg((volatile __global unsigned int*)source, prevVal.intVal, newVal.intVal)
-            != prevVal.intVal);
+        adrcatch.f32 = tmp.f32;
+        tmp.f32 += v;
+        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
+    } while(tmp.u32 != adrcatch.u32);
 }
 
 /** Projection of a volume point v onto X coordinate on projector.
@@ -621,16 +617,16 @@ void kernel FLOATcutting_voxel_project(global float* volume,
             = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
                                      PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
         polygonSize = nextSectionSize - lastSectionSize;
-	Int = (nextSectionSize*nextInt-lastSectionSize*lastInt)/polygonSize;
-        double factor = value * polygonSize ;
+        Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
+        double factor = value * polygonSize;
         insertEdgeValues(projection, CM, Int, I, factor, voxelSizes, pdims);
         lastSectionSize = nextSectionSize;
         lastInt = nextInt;
     }
     if(I_STOP < pdims.x)
     {
-	polygonSize = 1-lastSectionSize;
-	Int = ((*V_ccw[0]+*V_ccw[2])/2-lastSectionSize*lastInt)/polygonSize;
+        polygonSize = 1 - lastSectionSize;
+        Int = ((*V_ccw[0] + *V_ccw[2]) / 2 - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize;
         insertEdgeValues(projection, CM, Int, I, factor, voxelSizes, pdims);
     }
