@@ -24,6 +24,7 @@ int CGLSReconstructor::initializeOpenCL(uint32_t platformId)
     std::string clFile;
     // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
     clFile = io::xprintf("%s/opencl/projector.cl", this->xpath.c_str());
+    clFile = io::xprintf("%s/opencl/utils.cl", this->xpath.c_str());
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
@@ -46,10 +47,19 @@ int CGLSReconstructor::initializeOpenCL(uint32_t platformId)
     // OpenCL 1.2 got rid of KernelFunctor
     // https://forums.khronos.org/showthread.php/8317-cl-hpp-KernelFunctor-gone-replaced-with-KernelFunctorGlobal
     // https://stackoverflow.com/questions/23992369/what-should-i-use-instead-of-clkernelfunctor/54344990#54344990
-    FLOATcutting_voxel_project
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&,
-                                           cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATcutting_voxel_project"));
+    //    FLOATcutting_voxel_project
+    //        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&,
+    //        cl_double4&,
+    //                                           cl_double4&, cl_int4&, cl_double4&, cl_int2&,
+    //                                           float&>>(
+    //            cl::Kernel(program, "FLOATcutting_voxel_project"));
+    FLOAT_NormSquare = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, int&>>(
+        cl::Kernel(program, "FLOATvector_NormSquarePartial"));
+    FLOAT_SumPartial = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, int&>>(
+        cl::Kernel(program, "FLOATvector_SumPartial"));
+    FLOAT_NormSquare_barier
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, int&>>(
+            cl::Kernel(program, "FLOATvector_NormSquarePartial_barier"));
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
 }
@@ -59,22 +69,27 @@ int CGLSReconstructor::initializeVectors(float* projections, float* volume)
     this->b = projections;
     this->x = volume;
     cl_int err;
+
+    // Initialize buffers x_buf, v_buf and v_buf by zeros
     x_buf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                        sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
-    y_buf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
+    v_buf
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                        sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
-    z_buf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
+    w_buf
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                        sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
-    b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR | CL_MEM_HOST_READ_ONLY,
+
+    b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_HOST_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                          sizeof(float) * pdimx * pdimy * pdimz, (void*)projections,
                                          &err);
-    c_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
+    // Initialize buffer c by projections data
+    c_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                          sizeof(float) * pdimx * pdimy * pdimz, (void*)projections,
                                          &err);
-    d_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
+
+    d_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                          sizeof(float) * pdimx * pdimy * pdimz, (void*)projections,
                                          &err);
     if(err != CL_SUCCESS)
@@ -87,9 +102,37 @@ int CGLSReconstructor::initializeVectors(float* projections, float* volume)
 
 int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl_float FLOATZERO(0.0);
+    float bnorm = 0.0;
+    cl_int err;
+    cl::Buffer bnorm_buf_part(*context, CL_MEM_READ_WRITE, sizeof(float) * pdimz, nullptr, &err);
+    cl::Buffer bnorm_buf(*context, CL_MEM_READ_WRITE, sizeof(float), nullptr, &err);
 
-    Q->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * vdimx * vdimy * vdimz, x);
+    Q->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, vdimx * vdimy * vdimz);
+    Q->enqueueFillBuffer<cl_float>(*v_buf, FLOATZERO, 0, vdimx * vdimy * vdimz);
+    Q->enqueueFillBuffer<cl_float>(*w_buf, FLOATZERO, 0, vdimx * vdimy * vdimz);
+    Q->enqueueFillBuffer<cl_float>(*c_buf, FLOATZERO, 0, pdimx * pdimy * pdimz);
+    Q->enqueueFillBuffer<cl_float>(*d_buf, FLOATZERO, 0, pdimx * pdimy * pdimz);
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(pdimz));
+    int size = pdimx * pdimy;
+    (*FLOAT_NormSquare)(eargs, *b_buf, bnorm_buf_part, size);
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(1));
+    size = 1;
+    (*FLOAT_NormSquare)(eargs2, bnorm_buf_part, bnorm_buf, size);
+
+    int ptotal, dimcompute;
+    ptotal = pdimx * pdimy * pdimz;
+    dimcompute = ptotal + (256 - ptotal % 256) % 256;
+    cl::Buffer bnorm_reduced(*context, CL_MEM_READ_WRITE, sizeof(float) * dimcompute / 256, nullptr,
+                             &err);
+    cl::EnqueueArgs eargs_local(*Q, cl::NDRange(dimcompute), cl::NDRange(256));
+    cl::LocalSpaceArg localsize = cl::Local(256);
+    (*FLOAT_NormSquare_barier)(eargs_local, *b_buf, bnorm_reduced,localsize ,ptotal);
+	int frameC = dimcompute / 256;   
+ (*FLOAT_SumPartial)(eargs2, bnorm_reduced, bnorm_buf, frameC);
+
+    Q->enqueueReadBuffer(bnorm_buf, CL_TRUE, 0, sizeof(float), &bnorm);
+    LOGI << io::xprintf("Norm of b is %f", bnorm);
     return 0;
 }
 

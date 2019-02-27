@@ -145,9 +145,13 @@ int Args::parseArguments(int argc, char* argv[])
         io::DenSupportedType t = inf.getDataType();
         if(t != io::DenSupportedType::float_)
         {
-            io::throwerr("This program supports float projections only but the supplied volume is "
-                         "of type %s!",
-                         io::DenSupportedTypeToString(t).c_str());
+            std::string ERR
+                = io::xprintf("This program supports float projections only but the supplied "
+                              "projection file %s is "
+                              "of type %s",
+                              inputProjections.c_str(), io::DenSupportedTypeToString(t).c_str());
+            LOGE << ERR;
+            io::throwerr(ERR);
         }
     } catch(const CLI::CallForHelp e)
     {
@@ -214,7 +218,7 @@ int main(int argc, char* argv[])
     buf[0] = a.volumeSizeY;
     buf[1] = a.volumeSizeX;
     buf[2] = a.volumeSizeZ;
-    io::createEmptyFile(a.outputVolume, 0, true); // Try if this is faster
+    io::createEmptyFile(a.outputVolume, 0, true);
     io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
     cgls->reconstruct(dr);
     io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));

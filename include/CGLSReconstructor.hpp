@@ -77,18 +77,12 @@ private:
     std::shared_ptr<cl::Image3D> volumeImage = nullptr;
     std::shared_ptr<cl::CommandQueue> Q = nullptr;
     std::shared_ptr<cl::Buffer> b_buf = nullptr, c_buf = nullptr, d_buf = nullptr;
-    std::shared_ptr<cl::Buffer> x_buf = nullptr, y_buf = nullptr, z_buf = nullptr;
+    std::shared_ptr<cl::Buffer> x_buf = nullptr, v_buf = nullptr, w_buf = nullptr;
 
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int4&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&>>
-        FLOATcutting_voxel_project;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, int&>> FLOAT_NormSquare;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, int&>> FLOAT_SumPartial;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, int&>>
+        FLOAT_NormSquare_barier;
 };
 
 } // namespace CTL
