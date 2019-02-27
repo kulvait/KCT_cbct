@@ -89,13 +89,33 @@ target_link_libraries(CLlin-projector CTIOL_OPENCL)
 target_include_directories(CLlin-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-projector ${CMAKE_THREAD_LIBS_INIT})
-configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/programs.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
 install (TARGETS CLlin-projector RUNTIME DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 
+SET(CLLINCGLS_SOURCES src/CLlin-cgls.cpp src/CGLSReconstructor.cpp)
+add_executable(CLlin-cgls ${CLLINCGLS_SOURCES})
+set_target_properties(
+    CLlin-cgls
+    PROPERTIES 
+        OUTPUT_NAME "cllin-cgls"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-cgls ctiol)
+target_link_libraries(CLlin-cgls ctmal)
+target_link_libraries(CLlin-cgls OpenCL::OpenCL)
+target_link_libraries(CLlin-cgls CTIOL_OPENCL)
+target_include_directories(CLlin-cgls PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-cgls PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-cgls ${CMAKE_THREAD_LIBS_INIT})
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
+install (TARGETS CLlin-cgls RUNTIME DESTINATION .)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 SET(CTMATRIX_SOURCES src/CTMatrix.cpp)
 add_executable(ctmatrix ${CTMATRIX_SOURCES})

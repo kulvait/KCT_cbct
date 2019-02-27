@@ -30,7 +30,7 @@ inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
  * @param v Volume point
  * @param PX_out Output
  */
-inline double projectX(private double16 CM, private const double3 v)
+inline double projectX(private const double16 CM, private const double3 v)
 {
     return (dot(v, CM.s012) + CM.s3) / (dot(v, CM.s89a) + CM.sb);
 }
@@ -42,7 +42,7 @@ inline double projectX(private double16 CM, private const double3 v)
  * @param v Volume point
  * @param PY_out Output
  */
-inline double projectY(private double16 CM, private double3 v)
+inline double projectY(private const double16 CM, private const double3 v)
 {
     return (dot(v, CM.s456) + CM.s7) / (dot(v, CM.s89a) + CM.sb);
 }
@@ -91,7 +91,7 @@ int projectionIndex(private double16 CM, private double3 v, int2 pdims)
     coord.x = dot(v, CM.s012);
     coord.y = dot(v, CM.s456);
     coord.z = dot(v, CM.s89a);
-    coord = coord + CM.s37b;
+    coord += CM.s37b;
     coord.x /= coord.z;
     coord.y /= coord.z;
     int2 ind;
@@ -102,7 +102,7 @@ int projectionIndex(private double16 CM, private double3 v, int2 pdims)
         return ind.x + pdims.x * ind.y;
     } else
     {
-        return pdims.x * pdims.y;
+        return -1;
     }
 }
 
@@ -459,7 +459,6 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                                      -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
-    int pdimMax = pdims.x * pdims.y;
     int8 cube_abi
         = { projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims),
             projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.0)),
@@ -477,7 +476,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
             projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 1.0)),
                             pdims) };
     if(all(cube_abi
-           == pdimMax)) // When all projections of the voxel corners points outside projector area
+           == -1)) // When all projections of the voxel corners points outside projector area
     {
         return;
     }
@@ -626,7 +625,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     if(I_STOP < pdims.x)
     {
         polygonSize = 1 - lastSectionSize;
-        Int = ((*V_ccw[0] + *V_ccw[2]) / 2 - lastSectionSize * lastInt) / polygonSize;
+        Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize;
         insertEdgeValues(projection, CM, Int, I, factor, voxelSizes, pdims);
     }
