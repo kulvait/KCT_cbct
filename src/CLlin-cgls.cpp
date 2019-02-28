@@ -52,6 +52,7 @@ struct Args
     std::string inputProjectionMatrices;
     std::string inputProjections;
     bool force = false;
+    uint32_t itemsPerWorkgroup = 256;
 };
 
 /**Argument parsing
@@ -94,6 +95,10 @@ int Args::parseArguments(int argc, char* argv[])
         ->check(CLI::Range(0, 65535))
         ->group("Platform settings");
     app.add_flag("-d,--debug", debug, "OpenCL compilation including debugging information.")
+        ->group("Platform settings");
+    app.add_option("--items-per-workgroup", itemsPerWorkgroup,
+                   "Number of extra threads that application can use.")
+        ->check(CLI::Range(1, 65535))
         ->group("Platform settings");
     psx->needs(psy);
     psy->needs(psx);
@@ -203,8 +208,8 @@ int main(int argc, char* argv[])
     float* projection = new float[a.totalProjectionsSize];
     io::readBytesFrom(a.inputProjections, 6, (uint8_t*)projection, a.totalProjectionsSize * 4);
     std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-        a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.volumeSizeX, a.volumeSizeY,
-        a.volumeSizeZ, xpath, a.debug);
+        a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
+        a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug, a.itemsPerWorkgroup);
     int res = cgls->initializeOpenCL(a.platformId);
     if(res < 0)
     {

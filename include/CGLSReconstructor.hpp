@@ -32,6 +32,8 @@ public:
     CGLSReconstructor(uint32_t pdimx,
                       uint32_t pdimy,
                       uint32_t pdimz,
+                      double pixelSpacingX,
+                      double pixelSpacingY,
                       uint32_t vdimx,
                       uint32_t vdimy,
                       uint32_t vdimz,
@@ -41,6 +43,8 @@ public:
         : pdimx(pdimx)
         , pdimy(pdimy)
         , pdimz(pdimz)
+        , pixelSpacingX(pixelSpacingX)
+        , pixelSpacingY(pixelSpacingY)
         , vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
@@ -107,6 +111,17 @@ public:
     int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
+    // Constructor defined variables
+    const uint32_t pdimx, pdimy, pdimz;
+    const double pixelSpacingX, pixelSpacingY;
+    const uint32_t vdimx, vdimy, vdimz;
+    const std::string xpath; // Path where the program executes
+    const bool debug;
+    const uint32_t workGroupSize = 256;
+    uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
+        XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
+        XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
+
     float normBBuffer_barier(cl::Buffer& B);
     float normXBuffer_barier(cl::Buffer& X);
     float normBBuffer_frame(cl::Buffer& B);
@@ -124,12 +139,10 @@ private:
     int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
     std::vector<matrix::ProjectionMatrix>
     encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
+    std::vector<float> computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM);
 
-        float* x = nullptr; // Volume data
+    float* x = nullptr; // Volume data
     float* b = nullptr; // Projection data
-    uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
-    std::string xpath; // Path where the program executes
-    bool debug;
 
     std::shared_ptr<cl::Device> device = nullptr;
     std::shared_ptr<cl::Context> context = nullptr;
@@ -175,10 +188,6 @@ private:
                                     float&>>
         FLOATcutting_voxel_backproject;
 
-    const uint32_t workGroupSize = 256;
-    uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
-        XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
-        XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
 };
 
 } // namespace CTL

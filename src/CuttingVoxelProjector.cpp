@@ -22,8 +22,13 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
     // Debug info
     // https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
     std::string clFile;
-    // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
-    clFile = io::xprintf("%s/opencl/projector.cl", this->xpath.c_str());
+    if(centerVoxelProjector)
+    {
+        clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
+    } else
+    {
+        clFile = io::xprintf("%s/opencl/projector.cl", this->xpath.c_str());
+    }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
@@ -46,10 +51,20 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
     // OpenCL 1.2 got rid of KernelFunctor
     // https://forums.khronos.org/showthread.php/8317-cl-hpp-KernelFunctor-gone-replaced-with-KernelFunctorGlobal
     // https://stackoverflow.com/questions/23992369/what-should-i-use-instead-of-clkernelfunctor/54344990#54344990
-    FLOATcutting_voxel_project
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&,
-                                           cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
+    if(centerVoxelProjector)
+    {
+        projector = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&, cl_double4&,
+                            cl_int4&, cl_double4&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATcenter_voxel_project"));
+
+    } else
+    {
+        projector = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&, cl_double4&,
+                            cl_int4&, cl_double4&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcutting_voxel_project"));
+    }
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
 }
@@ -85,13 +100,12 @@ int CuttingVoxelProjector::project(float* projection,
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
                      0.0, 0.0, 0.0 });
     cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
-    cl_double3 NORMALTODETECTOR(
-        { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+    cl_double3 NORMALTODETECTOR({ normalToDetector[0], normalToDetector[1], normalToDetector[2] });
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
     cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
-    (*FLOATcutting_voxel_project)(eargs, *volumeBuffer, buffer_projection, PM, SOURCEPOSITION,
+    (*projector)(eargs, *volumeBuffer, buffer_projection, PM, SOURCEPOSITION,
                                   NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingFactor)
         .wait();
 

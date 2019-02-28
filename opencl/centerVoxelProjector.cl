@@ -1,5 +1,5 @@
 
-/** Atomic float addition.
+/** Atomic float addition. Less effective implementation to have it here.
  *
  * Function from
  * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
@@ -11,17 +11,17 @@
 inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
 {
     union
-    {
+    {   
         unsigned int intVal;
         float floatVal;
     } newVal;
     union
-    {
+    {   
         unsigned int intVal;
         float floatVal;
     } prevVal;
-    do
-    {
+    do  
+    {   
         prevVal.floatVal = *source;
         newVal.floatVal = prevVal.floatVal + operand;
     } while(atomic_cmpxchg((volatile __global unsigned int*)source, prevVal.intVal, newVal.intVal)
@@ -69,7 +69,7 @@ int volIndex(int* i, int* j, int* k, int4* vdims)
  *
  * @return
  */
-void kernel FLOATcutting_voxel_project(global float* volume,
+void kernel FLOATcenter_voxel_project(global float* volume,
                                        global float* projection,
                                        private double16 PM,
                                        private double4 sourcePosition,
@@ -89,8 +89,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     int2 p_ab = projectionIndex(PM, voxelcenter_xyz, pdims);
     if(p_ab.x != pdims.x && p_ab.y != pdims.y)
     {
-        float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
-
+	int VINDEX = volIndex(&i, &j, &k, &vdims);
+        float voxelValue = volume[VINDEX];
         double4 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
         double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
         double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;

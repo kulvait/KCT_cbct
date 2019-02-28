@@ -191,7 +191,8 @@ double CGLSReconstructor::normXBuffer_frame_double(cl::Buffer& X)
     cl::EnqueueArgs eargs1(*Q, cl::NDRange(vdimz));
     (*NormSquare)(eargs1, X, *tmp_x_red1, framesize).wait();
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
-    (*SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, vdimz).wait();
+    unsigned int arg = vdimz;
+    (*SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(double), &sum);
     LOGI << io::xprintf("Norm of x squared from frame approach is %f.", sum);
     return sum;
@@ -234,7 +235,8 @@ double CGLSReconstructor::normBBuffer_frame_double(cl::Buffer& B)
     cl::EnqueueArgs eargs1(*Q, cl::NDRange(pdimz));
     (*NormSquare)(eargs1, B, *tmp_b_red1, framesize).wait();
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
-    (*SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, pdimz).wait();
+    unsigned int arg = pdimz;
+    (*SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(double), &sum);
     LOGI << io::xprintf("Norm double of b squared from frame based approach is %f.", sum);
     return sum;
@@ -276,7 +278,8 @@ float CGLSReconstructor::normXBuffer_frame(cl::Buffer& X)
     cl::EnqueueArgs eargs1(*Q, cl::NDRange(vdimz));
     (*FLOAT_NormSquare)(eargs1, X, *tmp_x_red1, framesize).wait();
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
-    (*FLOAT_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, vdimz).wait();
+    unsigned int arg = vdimz;
+    (*FLOAT_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(float), &sum);
     LOGI << io::xprintf("Norm of x squared from frame approach is %f.", sum);
     return sum;
@@ -319,7 +322,8 @@ float CGLSReconstructor::normBBuffer_frame(cl::Buffer& B)
     cl::EnqueueArgs eargs1(*Q, cl::NDRange(pdimz));
     (*FLOAT_NormSquare)(eargs1, B, *tmp_b_red1, framesize).wait();
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
-    (*FLOAT_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, pdimz).wait();
+    unsigned int arg = pdimz;
+    (*FLOAT_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(float), &sum);
     LOGI << io::xprintf("Norm of b squared from frame based approach is %f.", sum);
     return sum;
@@ -411,11 +415,14 @@ CGLSReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> P
     for(std::size_t i = 0; i != pdimz; i++)
     {
         double x1, x2, y1, y2;
+        matrix::ProjectionMatrix pm = PM[i];
+        std::array<double, 3> sourcePosition = pm.sourcePosition();
+        std::array<double, 3> normalToDetector = pm.normalToDetector();
         pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
                    sourcePosition[2] + normalToDetector[2], &x1, &y1);
         pm.project(100.0, 100.0, 100.0, &x2, &y2);
-        double xspacing2 = a.pixelSpacingX * a.pixelSpacingX;
-        double yspacing2 = a.pixelSpacingY * a.pixelSpacingY;
+        double xspacing2 = pixelSpacingX * pixelSpacingX;
+        double yspacing2 = pixelSpacingY * pixelSpacingY;
         double distance
             = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
         double x = 100.0 - sourcePosition[0];
@@ -428,24 +435,26 @@ CGLSReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> P
         double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
         double theta = std::acos(cos);
         double distToDetector = std::abs(distance / std::tan(theta));
-        double scalingFactor = distToDetector * distToDetector / a.pixelSpacingX / a.pixelSpacingY;
-        salingFactors.push_back(scalingFactor);
+        double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;
+        scalingFactors.push_back(scalingFactor);
     }
     return scalingFactors;
 }
 
 int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices)
 {
-    std::vector<cl_double16> PM = encodeProjectionMatrices(matrices);
+    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
-    int iteration = 0;
+    uint32_t iteration = 0;
     cl_float FLOATZERO(0.0);
     // INITIALIZATION x_0
     Q->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     // c_0 is filled by b
     // v_0=w_0=BACKPROJECT(c_0)
-    backproject(c_buf, v_buf, PM);
-    copyFloatVector(v_buf, w_buf, XDIM);
+    backproject(*c_buf, *v_buf, PM, scalingFactors);
+    copyFloatVector(*v_buf, *w_buf, XDIM);
+
+	LOGI << iteration;
 
     Q->enqueueFillBuffer<cl_float>(*v_buf, FLOATZERO, 0, vdimx * vdimy * vdimz);
     Q->enqueueFillBuffer<cl_float>(*w_buf, FLOATZERO, 0, vdimx * vdimy * vdimz);

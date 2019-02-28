@@ -47,6 +47,7 @@ struct Args
     uint32_t volumeSizeZ = 199;
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
+	bool centerVoxelProjector = false;
     std::string inputVolume;
     std::string inputProjectionMatrices;
     std::string outputProjection;
@@ -92,6 +93,8 @@ int Args::parseArguments(int argc, char* argv[])
                  "framenum*projx*projy, where framenum is the zero based order of the projection "
                  "matrix in the source file, projx is the x dimension of projection area and y is "
                  "the y dimension of projection area.");
+    app.add_flag("--center-voxel-projector", centerVoxelProjector,
+                 "Use center voxel projector instead of cutting voxel projector.");
     CLI::Option* px
         = app.add_option("--projx", projectionSizeX, "Dimension of detector, defaults to 616.");
     CLI::Option* py
@@ -100,13 +103,6 @@ int Args::parseArguments(int argc, char* argv[])
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* psy = app.add_option("--pixel_spacing_y", pixelSpacingY,
                                       "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* vx
-        = app.add_option("--volumex", volumeSizeX, "Dimension of volume, defaults to 256.");
-    CLI::Option* vy
-        = app.add_option("--volumey", volumeSizeY, "Dimension of volume, defaults to 256.");
-    CLI::Option* vz
-        = app.add_option("--volumez", volumeSizeZ, "Dimension of volume, defaults to 199.");
-
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
         ->check(CLI::Range(0, 65535))
@@ -120,9 +116,6 @@ int Args::parseArguments(int argc, char* argv[])
     py->needs(px);
     psx->needs(psy);
     psy->needs(psx);
-    vx->needs(vy)->needs(vz);
-    vy->needs(vx)->needs(vz);
-    vz->needs(vx)->needs(vy);
     try
     {
         app.parse(argc, argv);
@@ -222,7 +215,7 @@ int main(int argc, char* argv[])
     float* volume = new float[totalVolumeSize];
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        volume, inf.dimx(), inf.dimy(), inf.dimz(), xpath, a.debug);
+        volume, inf.dimx(), inf.dimy(), inf.dimz(), xpath, a.debug, a.centerVoxelProjector);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {
@@ -276,6 +269,7 @@ int main(int argc, char* argv[])
     }
     delete[] volume;
     delete[] projection;
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start);
     LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
 }

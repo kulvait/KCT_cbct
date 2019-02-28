@@ -27,19 +27,22 @@ public:
      * @param vdimz Volume z dimension
      * @param xpath Path of cl kernel files
      * @param debug Should debugging be used by suppliing source and -g as options
+     * @param centerVoxelProjector Use center voxel projector istead of cutting voxels.
      */
     CuttingVoxelProjector(float* volume,
                           uint32_t vdimx,
                           uint32_t vdimy,
                           uint32_t vdimz,
                           std::string xpath,
-                          bool debug)
+                          bool debug,
+			bool centerVoxelProjector)
         : volume(volume)
         , vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
         , xpath(xpath)
         , debug(debug)
+	, centerVoxelProjector(centerVoxelProjector)
     {
     }
 
@@ -69,6 +72,7 @@ private:
     uint32_t vdimx, vdimy, vdimz;
     std::string xpath; // Path where the program executes
     bool debug;
+	bool centerVoxelProjector = false;
 
     std::shared_ptr<cl::Device> device = nullptr;
     std::shared_ptr<cl::Context> context = nullptr;
@@ -85,7 +89,7 @@ private:
                                     cl_double3&,
                                     cl_int2&,
                                     float&>>
-        FLOATcutting_voxel_project;
+        projector;
 };
 
 } // namespace CTL
