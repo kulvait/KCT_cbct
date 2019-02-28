@@ -53,6 +53,12 @@ int CGLSReconstructor::initializeOpenCL(uint32_t platformId)
     //                                           cl_double4&, cl_int4&, cl_double4&, cl_int2&,
     //                                           float&>>(
     //            cl::Kernel(program, "FLOATcutting_voxel_project"));
+    FLOAT_addIntoFirstVectorSecondVectorScaled
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
+            cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled"));
+    FLOAT_addIntoFirstVectorScaledSecondVector
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
+            cl::Kernel(program, "FLOAT_add_into_first_vector_scaled_second_vector"));
     FLOAT_NormSquare = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
         cl::Kernel(program, "FLOATvector_NormSquarePartial"));
     FLOAT_SumPartial = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
@@ -94,34 +100,30 @@ int CGLSReconstructor::initializeVectors(float* projections, float* volume)
     cl_int err;
 
     // Initialize buffers x_buf, v_buf and v_buf by zeros
-    x_buf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                       sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
+    x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                         sizeof(float) * XDIM, (void*)volume, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-    v_buf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                       sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
+    v_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM, nullptr,
+                                         &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-    w_buf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                       sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
+    w_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM, nullptr,
+                                         &err);
 
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-    b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                         sizeof(float) * pdimx * pdimy * pdimz, (void*)projections,
-                                         &err);
+    b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                         sizeof(float) * BDIM, (void*)projections, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
@@ -129,16 +131,14 @@ int CGLSReconstructor::initializeVectors(float* projections, float* volume)
     }
     // Initialize buffer c by projections data
     c_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                         sizeof(float) * pdimx * pdimy * pdimz, (void*)projections,
-                                         &err);
+                                         sizeof(float) * BDIM, (void*)projections, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
 
-    d_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                         sizeof(float) * pdimx * pdimy * pdimz, (void*)projections,
+    d_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM, nullptr,
                                          &err);
     if(err != CL_SUCCESS)
     {
@@ -160,6 +160,14 @@ int CGLSReconstructor::initializeVectors(float* projections, float* volume)
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
+    tmp_b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
+                                             nullptr, &err);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+        return -1;
+    }
+
     tmp_b_red1 = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
                                               sizeof(double) * BDIM_REDUCED1, nullptr, &err);
     if(err != CL_SUCCESS)
@@ -356,6 +364,7 @@ int CGLSReconstructor::backproject(cl::Buffer& B,
                                    std::vector<matrix::ProjectionMatrix>& V,
                                    std::vector<float>& scalingFactors)
 {
+    Q->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     cl_int err;
     for(std::size_t i = 0; i != pdimz; i++)
@@ -389,10 +398,69 @@ int CGLSReconstructor::backproject(cl::Buffer& B,
     return 0;
 }
 
+int CGLSReconstructor::project(cl::Buffer& X,
+                               cl::Buffer& B,
+                               std::vector<matrix::ProjectionMatrix>& V,
+                               std::vector<float>& scalingFactors)
+{
+    Q->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
+    unsigned int frameSize = pdimx * pdimy;
+    cl_int err;
+    for(std::size_t i = 0; i != pdimz; i++)
+    {
+        matrix::ProjectionMatrix mat = V[i];
+        float scalingFactor = scalingFactors[i];
+        std::array<double, 3> sourcePosition = mat.sourcePosition();
+        std::array<double, 3> normalToDetector = mat.normalToDetector();
+        double* P = mat.getPtr();
+        cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
+                         0.0, 0.0, 0.0, 0.0 });
+        cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+        cl_double3 NORMALTODETECTOR(
+            { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+        cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
+        cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
+        cl_int2 pdims({ int(pdimx), int(pdimy) });
+        cl_buffer_region reg = { i * frameSize * sizeof(float), frameSize * sizeof(float) };
+        cl::Buffer subbuf
+            = B.createSubBuffer(CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &reg, &err);
+        if(err != CL_SUCCESS)
+        {
+            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+            return -1;
+        }
+        cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+        (*FLOATcutting_voxel_project)(eargs, X, subbuf, PM, SOURCEPOSITION, NORMALTODETECTOR, vdims,
+                                      voxelSizes, pdims, scalingFactor)
+            .wait();
+    }
+    return 0;
+}
+
 int CGLSReconstructor::copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
     (*FLOAT_CopyVector)(eargs, from, to).wait();
+    return 0;
+}
+
+int CGLSReconstructor::addIntoFirstVectorSecondVectorScaled(cl::Buffer& a,
+                                                            cl::Buffer& b,
+                                                            float f,
+                                                            unsigned int size)
+{
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f).wait();
+    return 0;
+}
+
+int CGLSReconstructor::addIntoFirstVectorScaledSecondVector(cl::Buffer& a,
+                                                            cl::Buffer& b,
+                                                            float f,
+                                                            unsigned int size)
+{
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f).wait();
     return 0;
 }
 
@@ -446,36 +514,49 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
     uint32_t iteration = 0;
-    cl_float FLOATZERO(0.0);
-    // INITIALIZATION x_0
-    Q->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
+    double norm, vnorm2_old, vnorm2_now, dnorm2_old, alpha, beta;
+    // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
     // c_0 is filled by b
     // v_0=w_0=BACKPROJECT(c_0)
     backproject(*c_buf, *v_buf, PM, scalingFactors);
+    vnorm2_old = normXBuffer_barier_double(*v_buf);
     copyFloatVector(*v_buf, *w_buf, XDIM);
-
-	LOGI << iteration;
-
-    Q->enqueueFillBuffer<cl_float>(*v_buf, FLOATZERO, 0, vdimx * vdimy * vdimz);
-    Q->enqueueFillBuffer<cl_float>(*w_buf, FLOATZERO, 0, vdimx * vdimy * vdimz);
-    Q->enqueueFillBuffer<cl_float>(*c_buf, FLOATZERO, 0, pdimx * pdimy * pdimz);
-    Q->enqueueFillBuffer<cl_float>(*d_buf, FLOATZERO, 0, pdimx * pdimy * pdimz);
-
-    float n22 = normBBuffer_barier(*b_buf);
-    normBBuffer_frame(*b_buf);
-    Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 4);
-    Q->flush();
-    float n22_after = normBBuffer_barier(*b_buf);
-    float before = 71804928.0;
-    float next = before - 1.0;
-    LOGI << io::xprintf("Before=%f, next=%f", before, next);
-    LOGI << io::xprintf("Before=%f, after=%f difference=%f.", n22, n22_after, n22 - n22_after);
-    Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 8);
-    Q->flush();
-    normBBuffer_barier_double(*b_buf);
-    Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 12);
-    Q->flush();
-    normBBuffer_frame_double(*b_buf);
+    project(*w_buf, *d_buf, PM, scalingFactors);
+    while(iteration < 3)
+    {
+        dnorm2_old = normBBuffer_barier_double(*d_buf);
+        iteration = iteration + 1;
+        project(*x_buf, *tmp_b_buf, PM, scalingFactors);
+        addIntoFirstVectorSecondVectorScaled(*tmp_b_buf, *b_buf, -1.0, BDIM);
+        norm = std::sqrt(normBBuffer_barier_double(*tmp_b_buf));
+        LOGI << io::xprintf("Starting %d iteration, the norm of |Ax-b| is %f", iteration, norm);
+        alpha = vnorm2_old / dnorm2_old;
+        addIntoFirstVectorSecondVectorScaled(*x_buf, *w_buf, alpha, XDIM);
+        addIntoFirstVectorSecondVectorScaled(*c_buf, *d_buf, -alpha, BDIM);
+        backproject(*c_buf, *v_buf, PM, scalingFactors);
+        vnorm2_now = normXBuffer_barier_double(*v_buf);
+        beta = vnorm2_now / vnorm2_old;
+        vnorm2_old = vnorm2_now;
+        addIntoFirstVectorScaledSecondVector(*w_buf, *v_buf, beta, XDIM);
+        project(*w_buf, *d_buf, PM, scalingFactors);
+    }
+    /*
+        float n22 = normBBuffer_barier(*b_buf);
+        normBBuffer_frame(*b_buf);
+        Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 4);
+        Q->flush();
+        float n22_after = normBBuffer_barier(*b_buf);
+        float before = 71804928.0;
+        float next = before - 1.0;
+        LOGI << io::xprintf("Before=%f, next=%f", before, next);
+        LOGI << io::xprintf("Before=%f, after=%f difference=%f.", n22, n22_after, n22 - n22_after);
+        Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 8);
+        Q->flush();
+        normBBuffer_barier_double(*b_buf);
+        Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 12);
+        Q->flush();
+        normBBuffer_frame_double(*b_buf);
+     */
     return 0;
 }
 

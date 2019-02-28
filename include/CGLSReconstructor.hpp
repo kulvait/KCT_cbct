@@ -111,6 +111,8 @@ public:
     int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
+    const cl_float FLOATZERO = 0.0;
+    const cl_double DOUBLEZERO = 0.0;
     // Constructor defined variables
     const uint32_t pdimx, pdimy, pdimz;
     const double pixelSpacingX, pixelSpacingY;
@@ -136,7 +138,15 @@ private:
                     cl::Buffer& X,
                     std::vector<matrix::ProjectionMatrix>& V,
                     std::vector<float>& scalingFactors);
+    int project(cl::Buffer& B,
+                cl::Buffer& X,
+                std::vector<matrix::ProjectionMatrix>& V,
+                std::vector<float>& scalingFactors);
     int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
+    int
+    addIntoFirstVectorSecondVectorScaled(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
+    int
+    addIntoFirstVectorScaledSecondVector(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
     std::vector<matrix::ProjectionMatrix>
     encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
     std::vector<float> computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM);
@@ -149,11 +159,15 @@ private:
     std::shared_ptr<cl::Image3D> volumeImage = nullptr;
     std::shared_ptr<cl::CommandQueue> Q = nullptr;
     std::shared_ptr<cl::Buffer> b_buf = nullptr, c_buf = nullptr, d_buf = nullptr,
-                                tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
+                                tmp_b_red1 = nullptr, tmp_b_red2 = nullptr, tmp_b_buf = nullptr;
     std::shared_ptr<cl::Buffer> x_buf = nullptr, v_buf = nullptr, w_buf = nullptr,
                                 tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
 
     // Functions
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
+        FLOAT_addIntoFirstVectorSecondVectorScaled;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
+        FLOAT_addIntoFirstVectorScaledSecondVector;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_NormSquare;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_SumPartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
@@ -187,7 +201,6 @@ private:
                                     cl_int2&,
                                     float&>>
         FLOATcutting_voxel_backproject;
-
 };
 
 } // namespace CTL

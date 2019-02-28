@@ -254,6 +254,26 @@ void kernel vector_SumPartial_barier(global double* x,
         partialSum[gid] = loc[0] + loc[1];
     }
 }
+
+void kernel FLOAT_copy_vector(global float* from, global float* to)
+{
+	int gid = get_global_id(0);
+	to[gid] = from[gid];
+}
+
+void kernel FLOAT_add_into_first_vector_second_vector_scaled(global float* a, global float* b, private float f)
+{
+	int gid = get_global_id(0);
+	float val = a[gid] + f * b[gid];
+	a[gid] = val;
+}
+
+void kernel FLOAT_add_into_first_vector_scaled__second_vector(global float* a, global float* b, private float f)
+{
+	int gid = get_global_id(0);
+	float val = f*a[gid] + b[gid];
+	a[gid] = val;
+}
 /** Atomic float addition.
  *
  * Function from
