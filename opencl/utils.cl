@@ -1,53 +1,3 @@
-/** Atomic float addition.
- *
- * Function from
- * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
- *
- *
- * @param source Pointer to the memory to perform atomic operation on.
- * @param operand Float to add.
- */
-inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
-{
-    union
-    {
-        unsigned int u32;
-        float f32;
-    } tmp, adrcatch;
-    tmp.f32 = *adr;
-    do
-    {
-        adrcatch.f32 = tmp.f32;
-        tmp.f32 += v;
-        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
-    } while(tmp.u32 != adrcatch.u32);
-}
-
-/** Atomic float addition.
- *
- * Function from
- * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
- *
- *
- * @param source Pointer to the memory to perform atomic operation on.
- * @param operand Float to add.
- */
-inline void AtomicAdd_l_f(volatile __global float* adr, const float v)
-{
-    union
-    {
-        unsigned int u32;
-        float f32;
-    } tmp, adrcatch;
-    tmp.f32 = *adr;
-    do
-    {
-        adrcatch.f32 = tmp.f32;
-        tmp.f32 += v;
-        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
-    } while(tmp.u32 != adrcatch.u32);
-}
-
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -303,4 +253,10 @@ void kernel vector_SumPartial_barier(global double* x,
 	gid = get_group_id(0);
         partialSum[gid] = loc[0] + loc[1];
     }
+}
+
+void kernel FLOAT_copy_vector(global float* from, global float* to)
+{
+	int gid = get_global_id(0);
+	to[gid] = from[gid];
 }

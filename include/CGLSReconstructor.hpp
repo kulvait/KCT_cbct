@@ -115,7 +115,17 @@ private:
     double normXBuffer_barier_double(cl::Buffer& X);
     double normBBuffer_frame_double(cl::Buffer& B);
     double normXBuffer_frame_double(cl::Buffer& X);
-    float* x = nullptr; // Volume data
+
+    // Backprojecting from B to X
+    int backproject(cl::Buffer& B,
+                    cl::Buffer& X,
+                    std::vector<matrix::ProjectionMatrix>& V,
+                    std::vector<float>& scalingFactors);
+    int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
+    std::vector<matrix::ProjectionMatrix>
+    encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
+
+        float* x = nullptr; // Volume data
     float* b = nullptr; // Projection data
     uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
     std::string xpath; // Path where the program executes
@@ -130,7 +140,7 @@ private:
     std::shared_ptr<cl::Buffer> x_buf = nullptr, v_buf = nullptr, w_buf = nullptr,
                                 tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
 
-//Functions
+    // Functions
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_NormSquare;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_SumPartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
@@ -143,9 +153,29 @@ private:
         NormSquare_barier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         Sum_barier;
-    
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOAT_CopyVector;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int4&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOATcutting_voxel_project;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int4&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOATcutting_voxel_backproject;
 
-const uint32_t workGroupSize = 256;
+    const uint32_t workGroupSize = 256;
     uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
         XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
         XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
