@@ -36,7 +36,8 @@ public:
                       uint32_t vdimy,
                       uint32_t vdimz,
                       std::string xpath,
-                      bool debug)
+                      bool debug,
+                      uint32_t workGroupSize = 256)
         : pdimx(pdimx)
         , pdimy(pdimy)
         , pdimz(pdimz)
@@ -45,7 +46,47 @@ public:
         , vdimz(vdimz)
         , xpath(xpath)
         , debug(debug)
+        , workGroupSize(workGroupSize)
     {
+        uint32_t UINT32_MAXXX = ((uint32_t)-1);
+        uint64_t xdim = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
+        uint64_t bdim = uint64_t(pdimx) * uint64_t(pdimy) * uint64_t(pdimz);
+        uint64_t xdim_aligned = xdim + (workGroupSize - xdim % workGroupSize) % workGroupSize;
+        uint64_t bdim_aligned = bdim + (workGroupSize - bdim % workGroupSize) % workGroupSize;
+        XDIM = xdim;
+        XDIM_ALIGNED = xdim_aligned;
+        XDIM_REDUCED1 = xdim_aligned / workGroupSize;
+        XDIM_REDUCED1_ALIGNED
+            = XDIM_REDUCED1 + (workGroupSize - XDIM_REDUCED1 % workGroupSize) % workGroupSize;
+        XDIM_REDUCED2 = XDIM_REDUCED1_ALIGNED / workGroupSize;
+        XDIM_REDUCED2_ALIGNED
+            = XDIM_REDUCED2 + (workGroupSize - XDIM_REDUCED2 % workGroupSize) % workGroupSize;
+        BDIM = bdim;
+        BDIM_ALIGNED = bdim_aligned;
+        BDIM_REDUCED1 = bdim_aligned / workGroupSize;
+        BDIM_REDUCED1_ALIGNED
+            = BDIM_REDUCED1 + (workGroupSize - BDIM_REDUCED1 % workGroupSize) % workGroupSize;
+        BDIM_REDUCED2 = BDIM_REDUCED1_ALIGNED / workGroupSize;
+        BDIM_REDUCED2_ALIGNED
+            = BDIM_REDUCED2 + (workGroupSize - BDIM_REDUCED2 % workGroupSize) % workGroupSize;
+        if(xdim_aligned > UINT32_MAXXX)
+        {
+            std::string err = "Too big dimensions";
+            LOGE << err;
+            throw std::runtime_error(err);
+        } else if(xdim_aligned * 4 > UINT32_MAXXX)
+        {
+            LOGI << "Beware buffer overflows for x buffer.";
+        }
+        if(bdim_aligned > UINT32_MAXXX)
+        {
+            std::string err = "Too big dimensions";
+            LOGE << err;
+            throw std::runtime_error(err);
+        } else if(bdim_aligned * 4 > UINT32_MAXXX)
+        {
+            LOGI << "Beware buffer overflows for b buffer.";
+        }
     }
 
     /** Initializes OpenCL.
@@ -66,6 +107,14 @@ public:
     int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
+    float normBBuffer_barier(cl::Buffer& B);
+    float normXBuffer_barier(cl::Buffer& X);
+    float normBBuffer_frame(cl::Buffer& B);
+    float normXBuffer_frame(cl::Buffer& X);
+    double normBBuffer_barier_double(cl::Buffer& B);
+    double normXBuffer_barier_double(cl::Buffer& X);
+    double normBBuffer_frame_double(cl::Buffer& B);
+    double normXBuffer_frame_double(cl::Buffer& X);
     float* x = nullptr; // Volume data
     float* b = nullptr; // Projection data
     uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
@@ -76,13 +125,30 @@ private:
     std::shared_ptr<cl::Context> context = nullptr;
     std::shared_ptr<cl::Image3D> volumeImage = nullptr;
     std::shared_ptr<cl::CommandQueue> Q = nullptr;
-    std::shared_ptr<cl::Buffer> b_buf = nullptr, c_buf = nullptr, d_buf = nullptr;
-    std::shared_ptr<cl::Buffer> x_buf = nullptr, v_buf = nullptr, w_buf = nullptr;
+    std::shared_ptr<cl::Buffer> b_buf = nullptr, c_buf = nullptr, d_buf = nullptr,
+                                tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
+    std::shared_ptr<cl::Buffer> x_buf = nullptr, v_buf = nullptr, w_buf = nullptr,
+                                tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
 
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, int&>> FLOAT_NormSquare;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, int&>> FLOAT_SumPartial;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, int&>>
+//Functions
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_NormSquare;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_SumPartial;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         FLOAT_NormSquare_barier;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+        FLOAT_Sum_barier;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> NormSquare;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> SumPartial;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+        NormSquare_barier;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+        Sum_barier;
+    
+
+const uint32_t workGroupSize = 256;
+    uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
+        XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
+        XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
 };
 
 } // namespace CTL
