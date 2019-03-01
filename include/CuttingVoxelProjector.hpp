@@ -35,14 +35,14 @@ public:
                           uint32_t vdimz,
                           std::string xpath,
                           bool debug,
-			bool centerVoxelProjector)
+                          bool centerVoxelProjector)
         : volume(volume)
         , vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
         , xpath(xpath)
         , debug(debug)
-	, centerVoxelProjector(centerVoxelProjector)
+        , centerVoxelProjector(centerVoxelProjector)
     {
     }
 
@@ -72,7 +72,7 @@ private:
     uint32_t vdimx, vdimy, vdimz;
     std::string xpath; // Path where the program executes
     bool debug;
-	bool centerVoxelProjector = false;
+    bool centerVoxelProjector = false;
 
     std::shared_ptr<cl::Device> device = nullptr;
     std::shared_ptr<cl::Context> context = nullptr;
@@ -82,6 +82,7 @@ private:
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
+                                    unsigned int&,
                                     cl_double16&,
                                     cl_double3&,
                                     cl_double3&,

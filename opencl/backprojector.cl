@@ -1,15 +1,13 @@
-
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
-void inline backprojectEdgeValues(private int INDEX,
-                                  global float* volume,
-                                  global float* projection,
-                                  private double16 CM,
-                                  private double3 v,
-                                  private int PX,
-                                  private double value,
-                                  private double3 voxelSizes,
-                                  private int2 pdims)
+float inline backprojectEdgeValues(global float* projection,
+                                   private double16 CM,
+                                   private double3 v,
+                                   private int PX,
+                                   private double value,
+                                   private double3 voxelSizes,
+                                   private int2 pdims)
 {
+    float ADD = 0.0;
     double3 v_down, v_up;
     double PY_down, PY_up;
     int PJ_down, PJ_up;
@@ -24,9 +22,12 @@ void inline backprojectEdgeValues(private int INDEX,
     {
         if(PJ_down >= 0 && PJ_down < pdims.y)
         {
-            volume[INDEX] += projection[PX + pdims.x * PJ_down] * value * voxelSizes.z;
+            ADD = projection[PX + pdims.x * PJ_down] * value * voxelSizes.z;
+            return ADD;
+        } else
+        {
+            return 0.0;
         }
-        return;
     }
     if(PJ_down > PJ_up)
     {
@@ -40,7 +41,7 @@ void inline backprojectEdgeValues(private int INDEX,
 
         for(int j = PJ_down + increment; j != PJ_up; j += increment)
         {
-            volume[INDEX] += projection[PX + pdims.x * j] * value * stepSize * increment;
+            ADD += projection[PX + pdims.x * j] * value * stepSize * increment;
         }
 
         // Add part that maps to PJ_down
@@ -53,7 +54,7 @@ void inline backprojectEdgeValues(private int INDEX,
             nextGridY = (double)PJ_down - 0.5;
         }
         factor = (nextGridY - PY_down) * stepSize;
-        volume[INDEX] += projection[PX + pdims.x * PJ_down] * value * factor;
+        ADD += projection[PX + pdims.x * PJ_down] * value * factor;
         // Add part that maps to PJ_up
         double prevGridY;
         if(increment > 0)
@@ -64,7 +65,7 @@ void inline backprojectEdgeValues(private int INDEX,
             prevGridY = (double)PJ_up + 0.5;
         }
         factor = (PY_up - prevGridY) * stepSize;
-        volume[INDEX] += projection[PX + pdims.x * PJ_up] * value * factor;
+        ADD += projection[PX + pdims.x * PJ_up] * value * factor;
     } else
     {
 
@@ -73,7 +74,7 @@ void inline backprojectEdgeValues(private int INDEX,
 
             if(j >= 0 && j < pdims.y)
             {
-                volume[INDEX] += projection[PX + pdims.x * j] * value * stepSize * increment;
+                ADD += projection[PX + pdims.x * j] * value * stepSize * increment;
             }
         }
 
@@ -89,7 +90,7 @@ void inline backprojectEdgeValues(private int INDEX,
                 nextGridY = (double)PJ_down - 0.5;
             }
             factor = (nextGridY - PY_down) * stepSize;
-            volume[INDEX] += projection[PX + pdims.x * PJ_down] * value * factor;
+            ADD += projection[PX + pdims.x * PJ_down] * value * factor;
         } // Add part that maps to PJ_up
         if(PJ_up >= 0 && PJ_up < pdims.y)
         {
@@ -102,11 +103,11 @@ void inline backprojectEdgeValues(private int INDEX,
                 prevGridY = (double)PJ_up + 0.5;
             }
             factor = (PY_up - prevGridY) * stepSize;
-            volume[INDEX] += projection[PX + pdims.x * PJ_up] * value * factor;
+            ADD += projection[PX + pdims.x * PJ_up] * value * factor;
         }
     }
+    return ADD;
 }
-
 
 /** Project given volume using cutting voxel projector.
  *
@@ -126,6 +127,7 @@ void inline backprojectEdgeValues(private int INDEX,
  */
 void kernel FLOATcutting_voxel_backproject(global float* volume,
                                            global float* projection,
+                                           private uint projectionOffset,
                                            private double16 CM,
                                            private double3 sourcePosition,
                                            private double3 normalToDetector,
@@ -137,6 +139,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     int i = get_global_id(2);
     int j = get_global_id(1);
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
+    float ADD = 0.0;
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
     const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
                                      -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
@@ -163,7 +166,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     {
         return;
     }
-    const uint INDEX = voxelIndex(i, j, k, vdims);
+    const uint IND = voxelIndex(i, j, k, vdims);
     const double3 voxelcenter_xyz = zerocorner_xyz
         + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
     double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
@@ -173,7 +176,8 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     float value = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
     if(all(cube_abi == cube_abi.x)) // When all projections are the same
     {
-        volume[INDEX] += projection[cube_abi.x] * value;
+        ADD = projection[projectionOffset + cube_abi.x] * value;
+        volume[IND] += ADD;
         return;
     }
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
@@ -201,8 +205,9 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     {
         if(min_PX >= 0 && min_PX < pdims.x)
         {
-            backprojectEdgeValues(INDEX, volume, projection, CM, (vx00 + vx11) / 2.0, min_PX, value,
-                                  voxelSizes, pdims);
+            ADD = backprojectEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0,
+                                        min_PX, value, voxelSizes, pdims);
+            volume[IND] += ADD;
         }
         return;
     }
@@ -285,7 +290,8 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     if(I >= 0)
     {
         factor = value * lastSectionSize;
-        backprojectEdgeValues(INDEX, volume, projection, CM, lastInt, I, factor, voxelSizes, pdims);
+        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
+                                     voxelSizes, pdims);
     }
     for(I = I + 1; I < I_STOP; I++)
     {
@@ -295,7 +301,8 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
         double factor = value * polygonSize;
-        backprojectEdgeValues(INDEX, volume, projection, CM, Int, I, factor, voxelSizes, pdims);
+        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
+                                     pdims);
         lastSectionSize = nextSectionSize;
         lastInt = nextInt;
     }
@@ -304,6 +311,8 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize;
-        backprojectEdgeValues(INDEX, volume, projection, CM, Int, I, factor, voxelSizes, pdims);
+        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
+                                     pdims);
     }
+    volume[IND] += ADD;
 }

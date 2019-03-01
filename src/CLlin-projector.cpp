@@ -261,7 +261,6 @@ int main(int argc, char* argv[])
         //        LOGI << io::xprintf("Distance to the detector is %fmm therefore scaling factor is
         //        %f.",
         //                            distToDetector, scalingFactor);
-
         cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
         io::appendBytes(a.outputProjection, (uint8_t*)projection,
                         projectionElementsCount * sizeof(float));

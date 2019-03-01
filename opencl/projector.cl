@@ -443,6 +443,7 @@ inline uint voxelIndex(uint i, uint j, uint k, int4 vdims)
  */
 void kernel FLOATcutting_voxel_project(global float* volume,
                                        global float* projection,
+                                       private uint projectionOffset,
                                        private double16 CM,
                                        private double3 sourcePosition,
                                        private double3 normalToDetector,
@@ -493,7 +494,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
         / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
     if(all(cube_abi == cube_abi.x)) // When all projections are the same
     {
-        AtomicAdd_g_f(&projection[cube_abi.x],
+        AtomicAdd_g_f(&projection[projectionOffset + cube_abi.x],
                       value); // Atomic version of projection[ind] += value;
         return;
     }
@@ -522,7 +523,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     {
         if(min_PX >= 0 && min_PX < pdims.x)
         {
-            insertEdgeValues(projection, CM, (vx00 + vx11) / 2, min_PX, value, voxelSizes, pdims);
+            insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX, value,
+                             voxelSizes, pdims);
         }
         return;
     }
@@ -605,7 +607,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     if(I >= 0)
     {
         factor = value * lastSectionSize;
-        insertEdgeValues(projection, CM, lastInt, I, factor, voxelSizes, pdims);
+        insertEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor, voxelSizes, pdims);
     }
     for(I = I + 1; I < I_STOP; I++)
     {
@@ -615,7 +617,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
         double factor = value * polygonSize;
-        insertEdgeValues(projection, CM, Int, I, factor, voxelSizes, pdims);
+        insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
         lastSectionSize = nextSectionSize;
         lastInt = nextInt;
     }
@@ -624,6 +626,6 @@ void kernel FLOATcutting_voxel_project(global float* volume,
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize;
-        insertEdgeValues(projection, CM, Int, I, factor, voxelSizes, pdims);
+        insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
     }
 }

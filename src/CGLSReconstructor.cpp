@@ -81,14 +81,14 @@ int CGLSReconstructor::initializeOpenCL(uint32_t platformId)
         cl::Kernel(program, "vector_SumPartial_barier"));
     FLOAT_CopyVector = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
         cl::Kernel(program, "FLOAT_copy_vector"));
-    FLOATcutting_voxel_project
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&,
-                                           cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATcutting_voxel_project"));
-    FLOATcutting_voxel_backproject
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&,
-                                           cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATcutting_voxel_backproject"));
+    FLOATcutting_voxel_project = std::make_shared<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&,
+                        cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
+        cl::Kernel(program, "FLOATcutting_voxel_project"));
+    FLOATcutting_voxel_backproject = std::make_shared<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&,
+                        cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
+        cl::Kernel(program, "FLOATcutting_voxel_backproject"));
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
 }
@@ -358,7 +358,6 @@ int CGLSReconstructor::backproject(cl::Buffer& B,
 {
     Q->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
-    cl_int err;
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
@@ -374,16 +373,9 @@ int CGLSReconstructor::backproject(cl::Buffer& B,
         cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
         cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
         cl_int2 pdims({ int(pdimx), int(pdimy) });
-        cl_buffer_region reg = { i * frameSize * sizeof(float), frameSize * sizeof(float) };
-        cl::Buffer subbuf
-            = B.createSubBuffer(CL_MEM_READ_ONLY, CL_BUFFER_CREATE_TYPE_REGION, &reg, &err);
-        if(err != CL_SUCCESS)
-        {
-            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-            return -1;
-        }
         cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-        (*FLOATcutting_voxel_backproject)(eargs, X, subbuf, PM, SOURCEPOSITION, NORMALTODETECTOR,
+        unsigned int offset = i * frameSize;
+        (*FLOATcutting_voxel_backproject)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
                                           vdims, voxelSizes, pdims, scalingFactor)
             .wait();
     }
@@ -397,7 +389,6 @@ int CGLSReconstructor::project(cl::Buffer& X,
 {
     Q->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
-    cl_int err;
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
@@ -413,17 +404,10 @@ int CGLSReconstructor::project(cl::Buffer& X,
         cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
         cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
         cl_int2 pdims({ int(pdimx), int(pdimy) });
-        cl_buffer_region reg = { i * frameSize * sizeof(float), frameSize * sizeof(float) };
-        cl::Buffer subbuf
-            = B.createSubBuffer(CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &reg, &err);
-        if(err != CL_SUCCESS)
-        {
-            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-            return -1;
-        }
+        unsigned int offset = i * frameSize;
         cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-        (*FLOATcutting_voxel_project)(eargs, X, subbuf, PM, SOURCEPOSITION, NORMALTODETECTOR, vdims,
-                                      voxelSizes, pdims, scalingFactor)
+        (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
+                                      vdims, voxelSizes, pdims, scalingFactor)
             .wait();
     }
     return 0;
@@ -529,7 +513,8 @@ void CGLSReconstructor::setTimepoint() { timepoint = std::chrono::steady_clock::
 
 void CGLSReconstructor::reportTime(std::string msg)
 {
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timepoint);
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - timepoint);
     LOGW << io::xprintf("%s: %ds", msg.c_str(), duration.count());
     setTimepoint();
 }
@@ -554,13 +539,13 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
     // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
     // c_0 is filled by b
     // v_0=w_0=BACKPROJECT(c_0)
-    writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_0.den"));
+    // writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_0.den"));
     backproject(*c_buf, *v_buf, PM, scalingFactors);
     reportTime("v_0 backprojection");
     writeVolume(*v_buf, io::xprintf("/tmp/cgls/v_0.den"));
     vnorm2_old = normXBuffer_barier_double(*v_buf);
     copyFloatVector(*v_buf, *w_buf, XDIM);
-    writeVolume(*v_buf, io::xprintf("/tmp/cgls/w_0.den"));
+    // writeVolume(*w_buf, io::xprintf("/tmp/cgls/w_0.den"));
     project(*w_buf, *d_buf, PM, scalingFactors);
     reportTime("d_0 projection");
     writeProjections(*d_buf, "/tmp/cgls/d_0.den");
@@ -574,23 +559,23 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
                             vnorm2_old, dnorm2_old, float(alpha));
         addIntoFirstVectorSecondVectorScaled(*x_buf, *w_buf, alpha, XDIM);
         reportTime(io::xprintf("x=x+alpha w %d iteration", iteration));
-        writeVolume(*x_buf, io::xprintf("/tmp/cgls/x_%d.den", iteration));
+        // writeVolume(*x_buf, io::xprintf("/tmp/cgls/x_%d.den", iteration));
         addIntoFirstVectorSecondVectorScaled(*c_buf, *d_buf, -alpha, BDIM);
         reportTime(io::xprintf("c=c-alpha d %d iteration", iteration));
-        writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_%d.den", iteration));
+        // writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_%d.den", iteration));
         backproject(*c_buf, *v_buf, PM, scalingFactors);
         reportTime(io::xprintf("v_%d backprojection", iteration));
-        writeVolume(*v_buf, io::xprintf("/tmp/cgls/v_%d.den", iteration));
+        // writeVolume(*v_buf, io::xprintf("/tmp/cgls/v_%d.den", iteration));
         vnorm2_now = normXBuffer_barier_double(*v_buf);
         beta = vnorm2_now / vnorm2_old;
         LOGI << io::xprintf("In %d iteration |v_now|^2=%E, |v_old|^2=%E, beta=%0.2f", iteration,
                             vnorm2_now, vnorm2_old, beta);
         vnorm2_old = vnorm2_now;
         addIntoFirstVectorScaledSecondVector(*w_buf, *v_buf, beta, XDIM);
-        writeVolume(*w_buf, io::xprintf("/tmp/cgls/w_%d.den", iteration));
+        // writeVolume(*w_buf, io::xprintf("/tmp/cgls/w_%d.den", iteration));
         project(*w_buf, *d_buf, PM, scalingFactors);
-        reportTime(io::xprintf("d_%d backprojection", iteration));
-        writeProjections(*d_buf, io::xprintf("/tmp/cgls/d_%d.den", iteration));
+        reportTime(io::xprintf("d_%d projection", iteration));
+        // writeProjections(*d_buf, io::xprintf("/tmp/cgls/d_%d.den", iteration));
         dnorm2_old = normBBuffer_barier_double(*d_buf);
 
         project(*x_buf, *tmp_b_buf, PM, scalingFactors);
@@ -600,22 +585,12 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
         LOGE << io::xprintf("After %d iteration, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
                             iteration, norm, 100.0 * norm / NB0);
     }
-    /*
-        normBBuffer_frame(*b_buf);
-        Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 4);
-        Q->flush();
-        float n22_after = normBBuffer_barier(*b_buf);
-        float before = 71804928.0;
-        float next = before - 1.0;
-        LOGI << io::xprintf("Before=%f, next=%f", before, next);
-        LOGI << io::xprintf("Before=%f, after=%f difference=%f.", n22, n22_after, n22 - n22_after);
-        Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 8);
-        Q->flush();
-        normBBuffer_barier_double(*b_buf);
-        Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 12);
-        Q->flush();
-        normBBuffer_frame_double(*b_buf);
-     */
+    // Optionally write even more converged solution
+    alpha = vnorm2_old / dnorm2_old;
+    LOGI << io::xprintf("Finally |v|^2=%E, |d|^2=%E, alpha=%E", iteration - 1, vnorm2_old,
+                        dnorm2_old, float(alpha));
+    addIntoFirstVectorSecondVectorScaled(*x_buf, *w_buf, alpha, XDIM);
+    Q->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 

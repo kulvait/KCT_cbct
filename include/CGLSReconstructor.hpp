@@ -190,6 +190,7 @@ private:
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOAT_CopyVector;
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
+                                    unsigned int&,
                                     cl_double16&,
                                     cl_double3&,
                                     cl_double3&,
@@ -200,6 +201,7 @@ private:
         FLOATcutting_voxel_project;
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
+                                    unsigned int&,
                                     cl_double16&,
                                     cl_double3&,
                                     cl_double3&,

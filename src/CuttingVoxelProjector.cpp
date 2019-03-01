@@ -54,14 +54,14 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
     if(centerVoxelProjector)
     {
         projector = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&, cl_double4&,
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&, cl_double4&,
                             cl_int4&, cl_double4&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcenter_voxel_project"));
 
     } else
     {
         projector = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&, cl_double4&, cl_double4&,
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&, cl_double4&,
                             cl_int4&, cl_double4&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcutting_voxel_project"));
     }
@@ -105,8 +105,9 @@ int CuttingVoxelProjector::project(float* projection,
     cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
     cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
-    (*projector)(eargs, *volumeBuffer, buffer_projection, PM, SOURCEPOSITION,
-                                  NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingFactor)
+    unsigned int offset = 0;
+    (*projector)(eargs, *volumeBuffer, buffer_projection, offset, PM, SOURCEPOSITION,
+                 NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingFactor)
         .wait();
 
     Q->enqueueReadBuffer(buffer_projection, CL_TRUE, 0, sizeof(float) * pdimx * pdimy, projection);

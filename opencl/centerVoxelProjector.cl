@@ -1,4 +1,3 @@
-
 /** Atomic float addition. Less effective implementation to have it here.
  *
  * Function from
@@ -11,17 +10,17 @@
 inline void AtomicAdd_g_f(volatile __global float* source, const float operand)
 {
     union
-    {   
+    {
         unsigned int intVal;
         float floatVal;
     } newVal;
     union
-    {   
+    {
         unsigned int intVal;
         float floatVal;
     } prevVal;
-    do  
-    {   
+    do
+    {
         prevVal.floatVal = *source;
         newVal.floatVal = prevVal.floatVal + operand;
     } while(atomic_cmpxchg((volatile __global unsigned int*)source, prevVal.intVal, newVal.intVal)
@@ -70,14 +69,15 @@ int volIndex(int* i, int* j, int* k, int4* vdims)
  * @return
  */
 void kernel FLOATcenter_voxel_project(global float* volume,
-                                       global float* projection,
-                                       private double16 PM,
-                                       private double4 sourcePosition,
-                                       private double4 normalToDetector,
-                                       private int4 vdims,
-                                       private double4 voxelSizes,
-                                       private int2 pdims,
-                                       private float scalingFactor)
+                                      global float* projection,
+                                      private uint projectionOffset,
+                                      private double16 PM,
+                                      private double4 sourcePosition,
+                                      private double4 normalToDetector,
+                                      private int4 vdims,
+                                      private double4 voxelSizes,
+                                      private int2 pdims,
+                                      private float scalingFactor)
 {
     int i = get_global_id(2);
     int j = get_global_id(1);
@@ -89,7 +89,7 @@ void kernel FLOATcenter_voxel_project(global float* volume,
     int2 p_ab = projectionIndex(PM, voxelcenter_xyz, pdims);
     if(p_ab.x != pdims.x && p_ab.y != pdims.y)
     {
-	int VINDEX = volIndex(&i, &j, &k, &vdims);
+        int VINDEX = volIndex(&i, &j, &k, &vdims);
         float voxelValue = volume[VINDEX];
         double4 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
         double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
@@ -98,6 +98,7 @@ void kernel FLOATcenter_voxel_project(global float* volume,
         float value = voxelValue * scalingFactor
             / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
         int ind = p_ab.y * pdims.x + p_ab.x;
-        AtomicAdd_g_f(&projection[ind], value); // Atomic version of projection[ind] += value;
+        AtomicAdd_g_f(&projection[projectionOffset + ind],
+                      value); // Atomic version of projection[ind] += value;
     }
 }
