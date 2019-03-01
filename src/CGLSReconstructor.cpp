@@ -558,10 +558,8 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
         LOGI << io::xprintf("After %d iteration |v|^2=%E, |d|^2=%E, alpha=%E", iteration - 1,
                             vnorm2_old, dnorm2_old, float(alpha));
         addIntoFirstVectorSecondVectorScaled(*x_buf, *w_buf, alpha, XDIM);
-        reportTime(io::xprintf("x=x+alpha w %d iteration", iteration));
         // writeVolume(*x_buf, io::xprintf("/tmp/cgls/x_%d.den", iteration));
         addIntoFirstVectorSecondVectorScaled(*c_buf, *d_buf, -alpha, BDIM);
-        reportTime(io::xprintf("c=c-alpha d %d iteration", iteration));
         // writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_%d.den", iteration));
         backproject(*c_buf, *v_buf, PM, scalingFactors);
         reportTime(io::xprintf("v_%d backprojection", iteration));
