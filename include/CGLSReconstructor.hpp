@@ -5,6 +5,8 @@
 
 // External libraries
 #include <CL/cl.hpp>
+#include <chrono>
+#include <ctime>
 #include <iostream>
 
 // Internal libraries
@@ -91,6 +93,7 @@ public:
         {
             LOGI << "Beware buffer overflows for b buffer.";
         }
+        timepoint = std::chrono::steady_clock::now();
     }
 
     /** Initializes OpenCL.
@@ -133,6 +136,10 @@ private:
     double normBBuffer_frame_double(cl::Buffer& B);
     double normXBuffer_frame_double(cl::Buffer& X);
 
+    void setTimepoint();
+    void reportTime(std::string msg);
+    void writeVolume(cl::Buffer& X, std::string path);
+    void writeProjections(cl::Buffer& B, std::string path);
     // Backprojecting from B to X
     int backproject(cl::Buffer& B,
                     cl::Buffer& X,
@@ -201,6 +208,8 @@ private:
                                     cl_int2&,
                                     float&>>
         FLOATcutting_voxel_backproject;
+
+    std::chrono::time_point<std::chrono::steady_clock> timepoint;
 };
 
 } // namespace CTL

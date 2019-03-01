@@ -202,7 +202,6 @@ double CGLSReconstructor::normXBuffer_frame_double(cl::Buffer& X)
     unsigned int arg = vdimz;
     (*SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(double), &sum);
-    LOGI << io::xprintf("Norm of x squared from frame approach is %f.", sum);
     return sum;
 }
 
@@ -225,7 +224,6 @@ double CGLSReconstructor::normXBuffer_barier_double(cl::Buffer& X)
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
     (*SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
     Q->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
-    LOGI << io::xprintf("Norm of x squared from two stage double barier approach is %f.", sum);
     return sum;
 }
 
@@ -246,7 +244,6 @@ double CGLSReconstructor::normBBuffer_frame_double(cl::Buffer& B)
     unsigned int arg = pdimz;
     (*SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(double), &sum);
-    LOGI << io::xprintf("Norm double of b squared from frame based approach is %f.", sum);
     return sum;
 }
 
@@ -268,7 +265,6 @@ double CGLSReconstructor::normBBuffer_barier_double(cl::Buffer& B)
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
     (*SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
     Q->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
-    LOGI << io::xprintf("Norm double of b squared from two stage barier approach is %f.", sum);
     return sum;
 }
 
@@ -289,7 +285,6 @@ float CGLSReconstructor::normXBuffer_frame(cl::Buffer& X)
     unsigned int arg = vdimz;
     (*FLOAT_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(float), &sum);
-    LOGI << io::xprintf("Norm of x squared from frame approach is %f.", sum);
     return sum;
 }
 
@@ -312,7 +307,6 @@ float CGLSReconstructor::normXBuffer_barier(cl::Buffer& X)
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
     (*FLOAT_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
     Q->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
-    LOGI << io::xprintf("Norm of x squared from two stage barier approach is %f.", sum);
     return sum;
 }
 
@@ -333,7 +327,6 @@ float CGLSReconstructor::normBBuffer_frame(cl::Buffer& B)
     unsigned int arg = pdimz;
     (*FLOAT_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
     Q->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(float), &sum);
-    LOGI << io::xprintf("Norm of b squared from frame based approach is %f.", sum);
     return sum;
 }
 
@@ -355,7 +348,6 @@ float CGLSReconstructor::normBBuffer_barier(cl::Buffer& B)
     cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
     (*FLOAT_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
     Q->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
-    LOGI << io::xprintf("Norm of b squared from two stage barier approach is %f.", sum);
     return sum;
 }
 
@@ -460,7 +452,7 @@ int CGLSReconstructor::addIntoFirstVectorScaledSecondVector(cl::Buffer& a,
                                                             unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
-    (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f).wait();
+    (*FLOAT_addIntoFirstVectorScaledSecondVector)(eargs, a, b, f).wait();
     return 0;
 }
 
@@ -509,39 +501,106 @@ CGLSReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> P
     return scalingFactors;
 }
 
+void CGLSReconstructor::writeVolume(cl::Buffer& X, std::string path)
+{
+    uint16_t buf[3];
+    buf[0] = vdimy;
+    buf[1] = vdimx;
+    buf[2] = vdimz;
+    io::createEmptyFile(path, 0, true); // Try if this is faster
+    io::appendBytes(path, (uint8_t*)buf, 6);
+    Q->enqueueReadBuffer(X, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    io::appendBytes(path, (uint8_t*)x, XDIM * sizeof(float));
+}
+
+void CGLSReconstructor::writeProjections(cl::Buffer& B, std::string path)
+{
+    uint16_t buf[3];
+    buf[0] = pdimy;
+    buf[1] = pdimx;
+    buf[2] = pdimz;
+    io::createEmptyFile(path, 0, true); // Try if this is faster
+    io::appendBytes(path, (uint8_t*)buf, 6);
+    Q->enqueueReadBuffer(B, CL_TRUE, 0, sizeof(float) * BDIM, b);
+    io::appendBytes(path, (uint8_t*)b, BDIM * sizeof(float));
+}
+
+void CGLSReconstructor::setTimepoint() { timepoint = std::chrono::steady_clock::now(); }
+
+void CGLSReconstructor::reportTime(std::string msg)
+{
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - timepoint);
+    LOGW << io::xprintf("%s: %ds", msg.c_str(), duration.count());
+    setTimepoint();
+}
+
 int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices)
 {
+    LOGI << io::xprintf("WELCOME TO CGLS");
+    reportTime("CGLS INIT");
+    writeProjections(*b_buf, io::xprintf("/tmp/cgls/b.den"));
+    writeVolume(*x_buf, io::xprintf("/tmp/cgls/x_0.den"));
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
     uint32_t iteration = 0;
     double norm, vnorm2_old, vnorm2_now, dnorm2_old, alpha, beta;
+    double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
+    norm = NB0;
+    project(*x_buf, *tmp_b_buf, PM, scalingFactors);
+    reportTime("X_0 projection");
+    addIntoFirstVectorSecondVectorScaled(*tmp_b_buf, *b_buf, -1.0, BDIM);
+    norm = std::sqrt(normBBuffer_barier_double(*tmp_b_buf));
+    LOGI << io::xprintf("Initial norm of b is %f and initial |Ax-b| is %f.", NB0, norm);
     // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
     // c_0 is filled by b
     // v_0=w_0=BACKPROJECT(c_0)
+    writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_0.den"));
     backproject(*c_buf, *v_buf, PM, scalingFactors);
+    reportTime("v_0 backprojection");
+    writeVolume(*v_buf, io::xprintf("/tmp/cgls/v_0.den"));
     vnorm2_old = normXBuffer_barier_double(*v_buf);
     copyFloatVector(*v_buf, *w_buf, XDIM);
+    writeVolume(*v_buf, io::xprintf("/tmp/cgls/w_0.den"));
     project(*w_buf, *d_buf, PM, scalingFactors);
-    while(iteration < 3)
+    reportTime("d_0 projection");
+    writeProjections(*d_buf, "/tmp/cgls/d_0.den");
+    dnorm2_old = normBBuffer_barier_double(*d_buf);
+    while(norm / NB0 > 0.01)
     {
-        dnorm2_old = normBBuffer_barier_double(*d_buf);
+        // Iteration
         iteration = iteration + 1;
-        project(*x_buf, *tmp_b_buf, PM, scalingFactors);
-        addIntoFirstVectorSecondVectorScaled(*tmp_b_buf, *b_buf, -1.0, BDIM);
-        norm = std::sqrt(normBBuffer_barier_double(*tmp_b_buf));
-        LOGI << io::xprintf("Starting %d iteration, the norm of |Ax-b| is %f", iteration, norm);
         alpha = vnorm2_old / dnorm2_old;
+        LOGI << io::xprintf("After %d iteration |v|^2=%E, |d|^2=%E, alpha=%E", iteration - 1,
+                            vnorm2_old, dnorm2_old, float(alpha));
         addIntoFirstVectorSecondVectorScaled(*x_buf, *w_buf, alpha, XDIM);
+        reportTime(io::xprintf("x=x+alpha w %d iteration", iteration));
+        writeVolume(*x_buf, io::xprintf("/tmp/cgls/x_%d.den", iteration));
         addIntoFirstVectorSecondVectorScaled(*c_buf, *d_buf, -alpha, BDIM);
+        reportTime(io::xprintf("c=c-alpha d %d iteration", iteration));
+        writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_%d.den", iteration));
         backproject(*c_buf, *v_buf, PM, scalingFactors);
+        reportTime(io::xprintf("v_%d backprojection", iteration));
+        writeVolume(*v_buf, io::xprintf("/tmp/cgls/v_%d.den", iteration));
         vnorm2_now = normXBuffer_barier_double(*v_buf);
         beta = vnorm2_now / vnorm2_old;
+        LOGI << io::xprintf("In %d iteration |v_now|^2=%E, |v_old|^2=%E, beta=%0.2f", iteration,
+                            vnorm2_now, vnorm2_old, beta);
         vnorm2_old = vnorm2_now;
         addIntoFirstVectorScaledSecondVector(*w_buf, *v_buf, beta, XDIM);
+        writeVolume(*w_buf, io::xprintf("/tmp/cgls/w_%d.den", iteration));
         project(*w_buf, *d_buf, PM, scalingFactors);
+        reportTime(io::xprintf("d_%d backprojection", iteration));
+        writeProjections(*d_buf, io::xprintf("/tmp/cgls/d_%d.den", iteration));
+        dnorm2_old = normBBuffer_barier_double(*d_buf);
+
+        project(*x_buf, *tmp_b_buf, PM, scalingFactors);
+        reportTime(io::xprintf("x_%d projection", iteration));
+        addIntoFirstVectorSecondVectorScaled(*tmp_b_buf, *b_buf, -1.0, BDIM);
+        norm = std::sqrt(normBBuffer_barier_double(*tmp_b_buf));
+        LOGE << io::xprintf("After %d iteration, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
+                            iteration, norm, 100.0 * norm / NB0);
     }
     /*
-        float n22 = normBBuffer_barier(*b_buf);
         normBBuffer_frame(*b_buf);
         Q->enqueueFillBuffer<cl_float>(*b_buf, FLOATZERO, 0, 4);
         Q->flush();

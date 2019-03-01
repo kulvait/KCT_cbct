@@ -165,7 +165,7 @@ int main(int argc, char* argv[])
     readlink("/proc/self/exe", exepath, sizeof(exepath));
     std::string argv0(exepath);
     std::string csvLogFile
-        = io::xprintf("/tmp/%s.csv", io::getBasename(argv0.c_str())); // Set NULL to disable
+        = io::xprintf("/tmp/%s.csv", io::getBasename(argv0.c_str()).c_str()); // Set NULL to disable
     std::string xpath = io::getParent(argv0);
     bool logToConsole = true;
     plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);

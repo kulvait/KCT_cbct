@@ -102,7 +102,7 @@ void inline backprojectEdgeValues(private int INDEX,
                 prevGridY = (double)PJ_up + 0.5;
             }
             factor = (PY_up - prevGridY) * stepSize;
-            volume[INDEX] = projection[PX + pdims.x * PJ_up] * value * factor;
+            volume[INDEX] += projection[PX + pdims.x * PJ_up] * value * factor;
         }
     }
 }
@@ -163,10 +163,9 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     {
         return;
     }
+    const uint INDEX = voxelIndex(i, j, k, vdims);
     const double3 voxelcenter_xyz = zerocorner_xyz
         + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
-    float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
-    int INDEX = volIndex(&i, &j, &k, &vdims);
     double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
     double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;

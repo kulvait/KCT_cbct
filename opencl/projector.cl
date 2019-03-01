@@ -420,9 +420,9 @@ double computeSquareSize(double2 abc)
     return 0; // This is not gonna happen
 }
 
-inline int volIndex(int* i, int* j, int* k, int4* vdims)
+inline uint voxelIndex(uint i, uint j, uint k, int4 vdims)
 {
-    return (*i) + (*j) * vdims->x + (*k) * (vdims->x * vdims->y);
+    return i + j * vdims.x + k * vdims.x * vdims.y;
 }
 
 /** Project given volume using cutting voxel projector.
@@ -451,9 +451,9 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                                        private int2 pdims,
                                        private float scalingFactor)
 {
-    int i = get_global_id(2);
-    int j = get_global_id(1);
-    int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
+    uint i = get_global_id(2);
+    uint j = get_global_id(1);
+    uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
     const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
                                      -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
@@ -480,9 +480,10 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     {
         return;
     }
+    const uint IND = voxelIndex(i, j, k, vdims);
+    float voxelValue = volume[IND];
     const double3 voxelcenter_xyz = zerocorner_xyz
         + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
-    float voxelValue = volume[volIndex(&i, &j, &k, &vdims)];
 
     double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
@@ -521,11 +522,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     {
         if(min_PX >= 0 && min_PX < pdims.x)
         {
-            double factor = value / 4.0;
-            insertEdgeValues(projection, CM, vx00, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx10, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx01, min_PX, factor, voxelSizes, pdims);
-            insertEdgeValues(projection, CM, vx11, min_PX, factor, voxelSizes, pdims);
+            insertEdgeValues(projection, CM, (vx00 + vx11) / 2, min_PX, value, voxelSizes, pdims);
         }
         return;
     }

@@ -268,7 +268,7 @@ void kernel FLOAT_add_into_first_vector_second_vector_scaled(global float* a, gl
 	a[gid] = val;
 }
 
-void kernel FLOAT_add_into_first_vector_scaled__second_vector(global float* a, global float* b, private float f)
+void kernel FLOAT_add_into_first_vector_scaled_second_vector(global float* a, global float* b, private float f)
 {
 	int gid = get_global_id(0);
 	float val = f*a[gid] + b[gid];
@@ -1010,7 +1010,7 @@ void inline backprojectEdgeValues(private int INDEX,
                 prevGridY = (double)PJ_up + 0.5;
             }
             factor = (PY_up - prevGridY) * stepSize;
-            volume[INDEX] = projection[PX + pdims.x * PJ_up] * value * factor;
+            volume[INDEX] += projection[PX + pdims.x * PJ_up] * value * factor;
         }
     }
 }
