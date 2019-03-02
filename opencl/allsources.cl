@@ -795,13 +795,15 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     pxx_max = max(max(max(px00, px01), px10), px11);
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
-    if(max_PX == min_PX)
+    if(max_PX < 0 || min_PX >= pdims.x)
     {
-        if(min_PX >= 0 && min_PX < pdims.x)
-        {
-            insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX, value,
-                             voxelSizes, pdims);
-        }
+        return;
+    }
+    if(max_PX == min_PX) // Due to the previous statement I know that these indices are inside the
+                         // admissible range
+    {
+        insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX, value,
+                         voxelSizes, pdims);
         return;
     }
 
@@ -1108,14 +1110,16 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     pxx_max = max(max(max(px00, px01), px10), px11);
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
-    if(max_PX == min_PX)
+    if(max_PX < 0 || min_PX >= pdims.x)
     {
-        if(min_PX >= 0 && min_PX < pdims.x)
-        {
-            ADD = backprojectEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0,
-                                        min_PX, value, voxelSizes, pdims);
-            volume[IND] += ADD;
-        }
+        return;
+    }
+    if(max_PX == min_PX) // Due to the previous statement I know that these indices are inside the
+                         // admissible range
+    {
+        ADD = backprojectEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0, min_PX,
+                                    value, voxelSizes, pdims);
+        volume[IND] += ADD;
         return;
     }
 
