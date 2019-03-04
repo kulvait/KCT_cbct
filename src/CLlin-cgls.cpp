@@ -31,6 +31,7 @@ struct Args
     int parseArguments(int argc, char* argv[]);
     uint32_t platformId = 0;
     bool debug = false;
+    bool reportIntermediate = false;
     int threads = 1;
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint32_t projectionSizeX = 616;
@@ -47,6 +48,7 @@ struct Args
     uint32_t projectionsSizeZ;
     uint64_t totalProjectionsSize;
     uint32_t baseOffset = 0;
+    uint32_t maxIterations = 10;
     bool noFrameOffset = false;
     std::string outputVolume;
     std::string inputProjectionMatrices;
@@ -66,15 +68,15 @@ int Args::parseArguments(int argc, char* argv[])
 {
 
     CLI::App app{ "OpenCL implementation of CGLS." };
-    app.add_option("output_volume", outputVolume, "Volume to project")->required();
+    app.add_option("input_projections", inputProjections, "Input projections")
+        ->required()
+        ->check(CLI::ExistingFile);
     app.add_option("input_projection_matrices", inputProjectionMatrices,
                    "Projection matrices to be input of the computation."
                    "Files in a DEN format that contains projection matricess to process.")
         ->required()
         ->check(CLI::ExistingFile);
-    app.add_option("input_projections", inputProjections, "Input projections")
-        ->required()
-        ->check(CLI::ExistingFile);
+    app.add_option("output_volume", outputVolume, "Volume to project")->required();
     app.add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
     CLI::Option* psx = app.add_option("--pixel_spacing_x", pixelSpacingX,
                                       "Spacing of detector cells, defaults to 0.616.");
@@ -97,7 +99,14 @@ int Args::parseArguments(int argc, char* argv[])
     app.add_flag("-d,--debug", debug, "OpenCL compilation including debugging information.")
         ->group("Platform settings");
     app.add_option("--items-per-workgroup", itemsPerWorkgroup,
-                   "Number of extra threads that application can use.")
+                   "OpenCL parameter that is important for norm computation, defaults to 256.")
+        ->check(CLI::Range(1, 65535))
+        ->group("Platform settings");
+    app.add_flag("--report-intermediate", reportIntermediate,
+                 "Report intermediate values of x, defaults to false.")
+        ->group("Platform settings");
+    app.add_option("-i,--max_iterations", maxIterations,
+                   "Maximum number of CGLS iterations, defaults to 10.")
         ->check(CLI::Range(1, 65535))
         ->group("Platform settings");
     psx->needs(psy);
@@ -207,9 +216,15 @@ int main(int argc, char* argv[])
         = std::make_shared<io::DenProjectionMatrixReader>(a.inputProjectionMatrices);
     float* projection = new float[a.totalProjectionsSize];
     io::readBytesFrom(a.inputProjections, 6, (uint8_t*)projection, a.totalProjectionsSize * 4);
+    std::string startPath = io::getParent(a.outputVolume);
+    std::string bname = io::getBasename(a.outputVolume);
+    bname = bname.substr(0, bname.find_last_of("."));
+    startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
+    LOGI << io::xprintf("startpath=%s", startPath.c_str());
     std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
         a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
-        a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug, a.itemsPerWorkgroup);
+        a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug,
+        a.itemsPerWorkgroup, a.reportIntermediate, startPath);
     int res = cgls->initializeOpenCL(a.platformId);
     if(res < 0)
     {
@@ -218,8 +233,8 @@ int main(int argc, char* argv[])
         io::throwerr(ERR);
     }
     float* volume = new float[a.totalVolumeSize]();
-//testing
-//    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
+    // testing
+    //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
 
     cgls->initializeVectors(projection, volume);
     uint16_t buf[3];
@@ -228,7 +243,7 @@ int main(int argc, char* argv[])
     buf[2] = a.volumeSizeZ;
     io::createEmptyFile(a.outputVolume, 0, true);
     io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-    cgls->reconstruct(dr);
+    cgls->reconstruct(dr, a.maxIterations);
     io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
     delete[] volume;
     delete[] projection;
