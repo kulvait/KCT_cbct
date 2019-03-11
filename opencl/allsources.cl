@@ -400,101 +400,54 @@ void inline insertEdgeValues(global float* projection,
     PY_up = projectY(CM, v_up);
     PJ_down = convert_int_rtn(PY_down + 0.5);
     PJ_up = convert_int_rtn(PY_up + 0.5);
-    int increment = 1;
-    if(PJ_down == PJ_up)
-    {
-        if(PJ_down >= 0 && PJ_down < pdims.y)
-        {
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
-                          value * voxelSizes.z); // Atomic version of projection[ind] += value;
-        }
-        return;
-    }
     if(PJ_down > PJ_up)
     {
-        increment = -1;
+        int tmp_i;
+        double tmp_d;
+        tmp_i = PJ_down;
+        PJ_down = PJ_up;
+        PJ_up = tmp_i;
+        tmp_d = PY_down;
+        PY_down = PY_up;
+        PY_up = tmp_d;
+    }
+    if(PJ_up < 0 || PJ_down >= pdims.y)
+    {
+        return;
+    }
+    if(PJ_down == PJ_up)
+    {
+        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+                      value * voxelSizes.z); // Atomic version of projection[ind] += value;
+        return;
     }
     double stepSize = voxelSizes.z
         / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
+    int j = max(-1, PJ_down);
+    int j_STOP = min(PJ_up, pdims.y);
+    for(j = j + 1; j < j_STOP; j++)
+    {
+        AtomicAdd_g_f(&projection[PX + pdims.x * j],
+                      value * stepSize); // Atomic version of projection[ind] += value;
+    }
+
     double factor;
-    if(PJ_up >= 0 && PJ_up < pdims.y && PJ_down >= 0 && PJ_down < pdims.y)
-    { // Do not check for every insert
-
-        for(int j = PJ_down + increment; j != PJ_up; j += increment)
-        {
-            AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                          value * stepSize
-                              * increment); // Atomic version of projection[ind] += value;
-        }
-
-        // Add part that maps to PJ_down
+    // Add part that maps to PJ_down
+    if(PJ_down >= 0)
+    {
         double nextGridY;
-        if(increment > 0)
-        {
-            nextGridY = (double)PJ_down + 0.5;
-        } else
-        {
-            nextGridY = (double)PJ_down - 0.5;
-        }
+        nextGridY = (double)PJ_down + 0.5;
         factor = (nextGridY - PY_down) * stepSize;
         AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
                       value * factor); // Atomic version of projection[ind] += value;
-        // Add part that maps to PJ_up
+    } // Add part that maps to PJ_up
+    if(PJ_up < pdims.y)
+    {
         double prevGridY;
-        if(increment > 0)
-        {
-            prevGridY = (double)PJ_up - 0.5;
-        } else
-        {
-            prevGridY = (double)PJ_up + 0.5;
-        }
+        prevGridY = (double)PJ_up - 0.5;
         factor = (PY_up - prevGridY) * stepSize;
         AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
                       value * factor); // Atomic version of projection[ind] += value;
-
-    } else
-    {
-
-        for(int j = PJ_down + increment; j != PJ_up; j += increment)
-        {
-
-            if(j >= 0 && j < pdims.y)
-            {
-                AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                              value * stepSize
-                                  * increment); // Atomic version of projection[ind] += value;
-            }
-        }
-
-        // Add part that maps to PJ_down
-        if(PJ_down >= 0 && PJ_down < pdims.y)
-        {
-            double nextGridY;
-            if(increment > 0)
-            {
-                nextGridY = (double)PJ_down + 0.5;
-            } else
-            {
-                nextGridY = (double)PJ_down - 0.5;
-            }
-            factor = (nextGridY - PY_down) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
-                          value * factor); // Atomic version of projection[ind] += value;
-        } // Add part that maps to PJ_up
-        if(PJ_up >= 0 && PJ_up < pdims.y)
-        {
-            double prevGridY;
-            if(increment > 0)
-            {
-                prevGridY = (double)PJ_up - 0.5;
-            } else
-            {
-                prevGridY = (double)PJ_up + 0.5;
-            }
-            factor = (PY_up - prevGridY) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
-                          value * factor); // Atomic version of projection[ind] += value;
-        }
     }
 }
 
@@ -791,8 +744,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
     int max_PX,
         min_PX; // Pixel to which are the voxels with minimum and maximum values are projected
-    pxx_min = min(min(min(px00, px01), px10), px11);
-    pxx_max = max(max(max(px00, px01), px10), px11);
+    pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
+    pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
     if(max_PX < 0 || min_PX >= pdims.x)
@@ -806,7 +759,6 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                          voxelSizes, pdims);
         return;
     }
-
     double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
     // from the minimum voxel
     double *PX_max,
@@ -926,94 +878,50 @@ float inline backprojectEdgeValues(global float* projection,
     PY_up = projectY(CM, v_up);
     PJ_down = convert_int_rtn(PY_down + 0.5);
     PJ_up = convert_int_rtn(PY_up + 0.5);
-    int increment = 1;
-    if(PJ_down == PJ_up)
-    {
-        if(PJ_down >= 0 && PJ_down < pdims.y)
-        {
-            ADD = projection[PX + pdims.x * PJ_down] * value * voxelSizes.z;
-            return ADD;
-        } else
-        {
-            return 0.0;
-        }
-    }
     if(PJ_down > PJ_up)
     {
-        increment = -1;
+        int tmp_i;
+        double tmp_d;
+        tmp_i = PJ_down;
+        PJ_down = PJ_up;
+        PJ_up = tmp_i;
+        tmp_d = PY_down;
+        PY_down = PY_up;
+        PY_up = tmp_d;
+    }
+    if(PJ_up < 0 || PJ_down >= pdims.y)
+    {
+        return 0.0;
+    }
+    if(PJ_down == PJ_up)
+    {
+        ADD = projection[PX + pdims.x * PJ_down] * value * voxelSizes.z;
+        return ADD;
     }
     double stepSize = voxelSizes.z
         / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
+    int j = max(-1, PJ_down);
+    int j_STOP = min(PJ_up, pdims.y);
+    for(j = j + 1; j < j_STOP; j++)
+    {
+        ADD += projection[PX + pdims.x * j] * value * stepSize;
+    }
+
     double factor;
-    if(PJ_up >= 0 && PJ_up < pdims.y && PJ_down >= 0 && PJ_down < pdims.y)
-    { // Do not check for every insert
-
-        for(int j = PJ_down + increment; j != PJ_up; j += increment)
-        {
-            ADD += projection[PX + pdims.x * j] * value * stepSize * increment;
-        }
-
-        // Add part that maps to PJ_down
+    // Add part that maps to PJ_down
+    if(PJ_down >= 0)
+    {
         double nextGridY;
-        if(increment > 0)
-        {
-            nextGridY = (double)PJ_down + 0.5;
-        } else
-        {
-            nextGridY = (double)PJ_down - 0.5;
-        }
+        nextGridY = (double)PJ_down + 0.5;
         factor = (nextGridY - PY_down) * stepSize;
         ADD += projection[PX + pdims.x * PJ_down] * value * factor;
-        // Add part that maps to PJ_up
+    } // Add part that maps to PJ_up
+    if(PJ_up < pdims.y)
+    {
         double prevGridY;
-        if(increment > 0)
-        {
-            prevGridY = (double)PJ_up - 0.5;
-        } else
-        {
-            prevGridY = (double)PJ_up + 0.5;
-        }
+        prevGridY = (double)PJ_up - 0.5;
         factor = (PY_up - prevGridY) * stepSize;
         ADD += projection[PX + pdims.x * PJ_up] * value * factor;
-    } else
-    {
-
-        for(int j = PJ_down + increment; j != PJ_up; j += increment)
-        {
-
-            if(j >= 0 && j < pdims.y)
-            {
-                ADD += projection[PX + pdims.x * j] * value * stepSize * increment;
-            }
-        }
-
-        // Add part that maps to PJ_down
-        if(PJ_down >= 0 && PJ_down < pdims.y)
-        {
-            double nextGridY;
-            if(increment > 0)
-            {
-                nextGridY = (double)PJ_down + 0.5;
-            } else
-            {
-                nextGridY = (double)PJ_down - 0.5;
-            }
-            factor = (nextGridY - PY_down) * stepSize;
-            ADD += projection[PX + pdims.x * PJ_down] * value * factor;
-        } // Add part that maps to PJ_up
-        if(PJ_up >= 0 && PJ_up < pdims.y)
-        {
-            double prevGridY;
-            if(increment > 0)
-            {
-                prevGridY = (double)PJ_up - 0.5;
-            } else
-            {
-                prevGridY = (double)PJ_up + 0.5;
-            }
-            factor = (PY_up - prevGridY) * stepSize;
-            ADD += projection[PX + pdims.x * PJ_up] * value * factor;
-        }
     }
     return ADD;
 }
