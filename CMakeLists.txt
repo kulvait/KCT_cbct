@@ -7,7 +7,9 @@ set(CMAKE_CXX_STANDARD 14)#Supported values are 98, 11 and 14.
 message("Current value of flags is ${CMAKE_CXX_FLAGS} and debug is ${CMAKE_CXX_FLAGS_DEBUG} and release is ${CMAKE_CXX_FLAGS_RELEASE}")
 #Default CMAKE_CXX_FLAGS are empty, default for CMAKE_CXX_FLAGS_DEBUG is -g and CMAKE_CXX_FLAGS_RELEASE are not empty
 set(CMAKE_CXX_FLAGS "-Wall")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
+message("New value of flags is ${CMAKE_CXX_FLAGS} and debug is ${CMAKE_CXX_FLAGS_DEBUG} and release is ${CMAKE_CXX_FLAGS_RELEASE}")
+#add_definitions(-DDEBUG)
 set(CMAKE_BUILD_TYPE Debug)
 set(BUILD_SHARED_LIBS False)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
@@ -35,6 +37,13 @@ find_package (Threads)#include pthreads
 #Intel MKL
 find_package(MKL)
 include_directories(${MKL_INCLUDE_DIRS})
+
+#Matplotlibcpp
+include_directories(${CMAKE_SOURCE_DIR}/submodules/matplotlib-cpp)
+
+#Python for matplotlib
+find_package(PythonLibs 2.7)
+include_directories(${PYTHON_INCLUDE_DIRS})
 
 #CT input output library
 FILE( GLOB CTIOL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/*.cpp ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/ARGPARSE/*.cpp)
@@ -135,6 +144,7 @@ target_link_libraries(CLlin-perfusion CTIOL_OPENCL)
 target_include_directories(CLlin-perfusion PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-perfusion PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-perfusion ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(CLlin-perfusion ${PYTHON_LIBRARIES})
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/allsources.cl opencl/allsources.cl COPYONLY)

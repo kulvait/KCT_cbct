@@ -16,3 +16,6 @@
 [submodule "submodules/CTMAL"]
 	path = submodules/CTMAL
 	url = ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTMAL.git
+[submodule "submodules/matplotlib-cpp"]
+	path = submodules/matplotlib-cpp
+	url = https://github.com/lava/matplotlib-cpp

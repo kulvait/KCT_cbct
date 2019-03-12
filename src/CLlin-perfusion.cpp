@@ -285,13 +285,56 @@ int main(int argc, char* argv[])
         projections.push_back(projection);
         for(std::size_t j = 0; j != a.projectionsSizeZ; j++)
         {
-            baseFunctionsEvaluator->valuesAt(i * mean_sweep_time + j * a.frame_time, vals);
+            if(i % 2 == 0)
+            {
+                baseFunctionsEvaluator->valuesAt(i * mean_sweep_time + j * a.frame_time, vals);
+            } else
+            {
+                baseFunctionsEvaluator->valuesAt(
+                    i * mean_sweep_time + (a.projectionsSizeZ - 1 - j) * a.frame_time, vals);
+            }
             for(std::size_t k = 0; k != a.degree; k++)
             {
                 basisFunctionsValues[k][i * a.projectionsSizeZ + j] = vals[k];
             }
         }
     }
+#ifdef DEBUG
+    std::vector<double> taxis;
+    std::vector<std::vector<double>> values;
+    for(uint32_t j = 0; j != a.degree; j++)
+    {
+        values.push_back(std::vector<double>());
+    }
+
+    for(std::size_t i = 0; i != a.inputProjections.size(); i++)
+    {
+        for(std::size_t j = 0; j != a.projectionsSizeZ; j++)
+        {
+            double time = i * mean_sweep_time + j * a.frame_time;
+            taxis.push_back(time);
+            for(std::size_t k = 0; k != a.degree; k++)
+            {
+                values[k].push_back(basisFunctionsValues[k][i * a.projectionsSizeZ + j]);
+            }
+        }
+    }
+    for(uint32_t j = 0; j != a.degree; j++)
+    {
+        plt::named_plot(io::xprintf("Function %d", j), taxis, values[j]);
+    }
+    plt::legend();
+    plt::show();
+    for(std::size_t i = 0; i != a.degree; i++)
+    {
+        delete[] basisFunctionsValues[i];
+    }
+    for(std::size_t i = 0; i < a.inputProjections.size(); i++)
+    {
+        delete[] projections[i];
+    }
+#endif
+    return 0;
 
     std::string startPath = io::getParent(a.outputVolume);
     std::string bname = io::getBasename(a.outputVolume);
@@ -333,6 +376,7 @@ int main(int argc, char* argv[])
         io::appendBytes(f, (uint8_t*)buf, 6);
         io::appendBytes(f, (uint8_t*)volumes[i], a.totalVolumeSize * sizeof(float));
         delete[] volumes[i];
+        delete[] basisFunctionsValues[i];
     }
     for(std::size_t i = 0; i < a.inputProjections.size(); i++)
     {
