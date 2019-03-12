@@ -47,7 +47,7 @@ struct Args
     uint32_t volumeSizeZ = 199;
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
-	bool centerVoxelProjector = false;
+    bool centerVoxelProjector = false;
     std::string inputVolume;
     std::string inputProjectionMatrices;
     std::string outputProjection;

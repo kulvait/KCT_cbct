@@ -18,10 +18,10 @@
 // Internal libraries
 #include "ARGPARSE/parseArgs.h"
 #include "CGLSPerfusionReconstructor.hpp"
-#include "FUN/FourierSeries.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
+#include "FUN/FourierSeries.hpp"
 
 using namespace CTL;
 
@@ -47,7 +47,7 @@ struct Args
     uint32_t volumeSizeZ = 199;
     uint64_t totalVolumeSize;
     uint32_t baseOffset = 0;
-    uint32_t maxIterations = 10;
+    uint32_t maxIterations = 100;
     bool noFrameOffset = false;
     std::string outputVolume;
     std::string inputProjectionMatrices;
@@ -152,7 +152,7 @@ int Args::parseArguments(int argc, char* argv[])
                  "Report intermediate values of x, defaults to false.")
         ->group("Platform settings");
     app.add_option("--max_iterations", maxIterations,
-                   "Maximum number of CGLS iterations, defaults to 10.")
+                   "Maximum number of CGLS iterations, defaults to 100.")
         ->check(CLI::Range(1, 65535))
         ->group("Platform settings");
     psx->needs(psy);
@@ -320,16 +320,24 @@ int main(int argc, char* argv[])
     //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
 
     cgls->initializeData(projections, basisFunctionsValues, volumes);
+    cgls->reconstruct(dr, a.maxIterations);
+
     uint16_t buf[3];
     buf[0] = a.volumeSizeY;
     buf[1] = a.volumeSizeX;
     buf[2] = a.volumeSizeZ;
-    io::createEmptyFile(a.outputVolume, 0, true);
-    io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-    cgls->reconstruct(dr, a.maxIterations);
-    io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
-    delete[] volume;
-    delete[] projection;
+    for(std::size_t i = 0; i != a.degree; i++)
+    {
+        std::string f = io::xprintf("%s_reconstructed%d", a.outputVolume.c_str(), i);
+        io::createEmptyFile(f, 0, true);
+        io::appendBytes(f, (uint8_t*)buf, 6);
+        io::appendBytes(f, (uint8_t*)volumes[i], a.totalVolumeSize * sizeof(float));
+        delete[] volumes[i];
+    }
+    for(std::size_t i = 0; i < a.inputProjections.size(); i++)
+    {
+        delete[] projections[i];
+    }
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start);
     LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());

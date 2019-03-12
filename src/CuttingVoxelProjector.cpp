@@ -54,15 +54,15 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
     if(centerVoxelProjector)
     {
         projector = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&, cl_double4&,
-                            cl_int4&, cl_double4&, cl_int2&, float&>>(
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&,
+                            cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcenter_voxel_project"));
 
     } else
     {
         projector = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&, cl_double4&,
-                            cl_int4&, cl_double4&, cl_int2&, float&>>(
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&,
+                            cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcutting_voxel_project"));
     }
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
