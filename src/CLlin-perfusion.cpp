@@ -325,14 +325,6 @@ int main(int argc, char* argv[])
     }
     plt::legend();
     plt::show();
-    for(std::size_t i = 0; i != a.degree; i++)
-    {
-        delete[] basisFunctionsValues[i];
-    }
-    for(std::size_t i = 0; i < a.inputProjections.size(); i++)
-    {
-        delete[] projections[i];
-    }
 #endif
     std::string startPath = io::getParent(a.outputVolume);
     std::string bname = io::getBasename(a.outputVolume);
