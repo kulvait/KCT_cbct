@@ -334,8 +334,6 @@ int main(int argc, char* argv[])
         delete[] projections[i];
     }
 #endif
-    return 0;
-
     std::string startPath = io::getParent(a.outputVolume);
     std::string bname = io::getBasename(a.outputVolume);
     bname = bname.substr(0, bname.find_last_of("."));
