@@ -120,6 +120,30 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/allsources.cl DESTINATION opencl)
 
+SET(CLLINPERFUSION_SOURCES src/CLlin-perfusion.cpp src/CGLSPerfusionReconstructor.cpp)
+add_executable(CLlin-perfusion ${CLLINPERFUSION_SOURCES})
+set_target_properties(
+    CLlin-perfusion
+    PROPERTIES 
+        OUTPUT_NAME "cllin-perfusion"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-perfusion ctiol)
+target_link_libraries(CLlin-perfusion ctmal)
+target_link_libraries(CLlin-perfusion OpenCL::OpenCL)
+target_link_libraries(CLlin-perfusion CTIOL_OPENCL)
+target_include_directories(CLlin-perfusion PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-perfusion PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-perfusion ${CMAKE_THREAD_LIBS_INIT})
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/allsources.cl opencl/allsources.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
+install (TARGETS CLlin-perfusion RUNTIME DESTINATION .)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/allsources.cl DESTINATION opencl)
+
 SET(CTMATRIX_SOURCES src/CTMatrix.cpp)
 add_executable(ctmatrix ${CTMATRIX_SOURCES})
 set_target_properties(
