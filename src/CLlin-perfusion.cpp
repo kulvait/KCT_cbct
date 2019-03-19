@@ -311,7 +311,15 @@ int main(int argc, char* argv[])
     {
         for(std::size_t j = 0; j != a.projectionsSizeZ; j++)
         {
-            double time = i * mean_sweep_time + j * a.frame_time;
+            double time;
+
+            if(i % 2 == 0)
+            {
+                time = i * mean_sweep_time + j * a.frame_time;
+            } else
+            {
+                time = i * mean_sweep_time + (a.projectionsSizeZ - 1 - j) * a.frame_time;
+            }
             taxis.push_back(time);
             for(std::size_t k = 0; k != a.degree; k++)
             {
@@ -326,6 +334,8 @@ int main(int argc, char* argv[])
     plt::legend();
     plt::show();
 #endif
+
+return 1;
     std::string startPath = io::getParent(a.outputVolume);
     std::string bname = io::getBasename(a.outputVolume);
     bname = bname.substr(0, bname.find_last_of("."));

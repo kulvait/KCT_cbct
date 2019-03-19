@@ -527,8 +527,8 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
     reportTime("CGLS INIT");
     if(reportProgress)
     {
-        writeProjections(*b_buf, io::xprintf("%sb.den", progressBeginPath.c_str()));
-        writeVolume(*x_buf, io::xprintf("%sx_0.den", progressBeginPath.c_str()));
+        //writeProjections(*b_buf, io::xprintf("%sb.den", progressBeginPath.c_str()));
+        //writeVolume(*x_buf, io::xprintf("%sx_0.den", progressBeginPath.c_str()));
     }
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
@@ -549,19 +549,19 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
     reportTime("v_0 backprojection");
     if(reportProgress)
     {
-        writeVolume(*v_buf, io::xprintf("%sv_0.den", progressBeginPath.c_str()));
+       // writeVolume(*v_buf, io::xprintf("%sv_0.den", progressBeginPath.c_str()));
     }
     vnorm2_old = normXBuffer_barier_double(*v_buf);
     copyFloatVector(*v_buf, *w_buf, XDIM);
     if(reportProgress)
     {
-        writeVolume(*w_buf, io::xprintf("%sw_0.den", progressBeginPath.c_str()));
+       // writeVolume(*w_buf, io::xprintf("%sw_0.den", progressBeginPath.c_str()));
     }
     project(*w_buf, *d_buf, PM, scalingFactors);
     reportTime("d_0 projection");
     if(reportProgress)
     {
-        writeProjections(*d_buf, io::xprintf("%sd_0.den", progressBeginPath.c_str()));
+       // writeProjections(*d_buf, io::xprintf("%sd_0.den", progressBeginPath.c_str()));
     }
     dnorm2_old = normBBuffer_barier_double(*d_buf);
     while(norm / NB0 > errCondition && iteration < maxIterations)
@@ -579,15 +579,15 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
         addIntoFirstVectorSecondVectorScaled(*c_buf, *d_buf, -alpha, BDIM);
         if(reportProgress)
         {
-            writeProjections(*c_buf,
-                             io::xprintf("%sc_%d.den", progressBeginPath.c_str(), iteration));
+        //    writeProjections(*c_buf,
+        //                     io::xprintf("%sc_%d.den", progressBeginPath.c_str(), iteration));
         }
         backproject(*c_buf, *v_buf, PM, scalingFactors);
         reportTime(io::xprintf("v_%d backprojection", iteration));
 
         if(reportProgress)
         {
-            writeVolume(*v_buf, io::xprintf("%sv_%d.den", progressBeginPath.c_str(), iteration));
+        //    writeVolume(*v_buf, io::xprintf("%sv_%d.den", progressBeginPath.c_str(), iteration));
         }
         vnorm2_now = normXBuffer_barier_double(*v_buf);
         beta = vnorm2_now / vnorm2_old;
@@ -597,15 +597,15 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
         addIntoFirstVectorScaledSecondVector(*w_buf, *v_buf, beta, XDIM);
         if(reportProgress)
         {
-            writeVolume(*w_buf, io::xprintf("%sw_%d.den", progressBeginPath.c_str(), iteration));
+        //    writeVolume(*w_buf, io::xprintf("%sw_%d.den", progressBeginPath.c_str(), iteration));
         }
         addIntoFirstVectorSecondVectorScaled(*tmp_b_buf, *d_buf, alpha, BDIM);
         project(*w_buf, *d_buf, PM, scalingFactors);
         reportTime(io::xprintf("d_%d projection", iteration));
         if(reportProgress)
         {
-            writeProjections(*d_buf,
-                             io::xprintf("%sd_%d.den", progressBeginPath.c_str(), iteration));
+        //    writeProjections(*d_buf,
+        //                     io::xprintf("%sd_%d.den", progressBeginPath.c_str(), iteration));
         }
         dnorm2_old = normBBuffer_barier_double(*d_buf);
 
