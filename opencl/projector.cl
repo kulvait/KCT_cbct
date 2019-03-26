@@ -373,9 +373,34 @@ double computeSquareSize(double2 abc)
     return 0; // This is not gonna happen
 }
 
-inline uint voxelIndex(uint i, uint j, uint k, int4 vdims)
+inline uint voxelIndex(uint i, uint j, uint k, int3 vdims)
 {
     return i + j * vdims.x + k * vdims.x * vdims.y;
+}
+
+/** Kernel to precompute projection indices to spare some redundancy.
+ *
+ * @param vertexProjectionIndices
+ * @param CM
+ * @param voxelSizes
+ * @param vdims
+ *
+ * @return
+ */
+void kernel computeProjectionIndices(global int* vertexProjectionIndices,
+                                     private double16 CM,
+                                     double3 voxelSizes,
+                                     int3 vdims,
+                                     int2 pdims)
+{
+    uint i = get_global_id(2);
+    uint j = get_global_id(1);
+    uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
+    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
+    const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
+                                     -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
+    vertexProjectionIndices[i + j * (vdims.x + 1) + k * (vdims.x + 1) * (vdims.y + 1)]
+        = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
 }
 
 /** Project given volume using cutting voxel projector.
@@ -400,7 +425,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                                        private double16 CM,
                                        private double3 sourcePosition,
                                        private double3 normalToDetector,
-                                       private int4 vdims,
+                                       private int3 vdims,
                                        private double3 voxelSizes,
                                        private int2 pdims,
                                        private float scalingFactor)

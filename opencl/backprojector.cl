@@ -87,7 +87,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                                            private double16 CM,
                                            private double3 sourcePosition,
                                            private double3 normalToDetector,
-                                           private int4 vdims,
+                                           private int3 vdims,
                                            private double3 voxelSizes,
                                            private int2 pdims,
                                            private float scalingFactor)

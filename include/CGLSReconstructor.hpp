@@ -205,7 +205,7 @@ private:
                                     cl_double16&,
                                     cl_double3&,
                                     cl_double3&,
-                                    cl_int4&,
+                                    cl_int3&,
                                     cl_double3&,
                                     cl_int2&,
                                     float&>>
@@ -216,7 +216,7 @@ private:
                                     cl_double16&,
                                     cl_double3&,
                                     cl_double3&,
-                                    cl_int4&,
+                                    cl_int3&,
                                     cl_double3&,
                                     cl_int2&,
                                     float&>>

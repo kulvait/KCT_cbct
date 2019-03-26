@@ -82,12 +82,12 @@ int CGLSPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
     FLOAT_CopyVector = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
         cl::Kernel(program, "FLOAT_copy_vector"));
     FLOATcutting_voxel_project = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&,
-                        cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                        cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
         cl::Kernel(program, "FLOATcutting_voxel_project"));
     FLOATcutting_voxel_backproject = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&,
-                        cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                        cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
         cl::Kernel(program, "FLOATcutting_voxel_backproject"));
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
@@ -427,7 +427,7 @@ int CGLSPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buff
                     { sourcePosition[0], sourcePosition[1], sourcePosition[2] });
                 cl_double3 NORMALTODETECTOR(
                     { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-                cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
+                cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
                 cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
                 cl_int2 pdims({ int(pdimx), int(pdimy) });
                 cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
@@ -469,7 +469,7 @@ int CGLSPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>>
                     { sourcePosition[0], sourcePosition[1], sourcePosition[2] });
                 cl_double3 NORMALTODETECTOR(
                     { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-                cl_int4 vdims({ int(vdimx), int(vdimy), int(vdimz), 0 });
+                cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz)});
                 cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
                 cl_int2 pdims({ int(pdimx), int(pdimy) });
                 unsigned int offset = i * frameSize;
