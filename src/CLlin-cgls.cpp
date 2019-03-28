@@ -21,6 +21,7 @@
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
+#include "GLSQRReconstructor.hpp"
 
 using namespace CTL;
 
@@ -55,6 +56,7 @@ struct Args
     std::string inputProjections;
     bool force = false;
     uint32_t itemsPerWorkgroup = 256;
+    bool glsqr = false;
 };
 
 /**Argument parsing
@@ -78,6 +80,7 @@ int Args::parseArguments(int argc, char* argv[])
         ->check(CLI::ExistingFile);
     app.add_option("output_volume", outputVolume, "Volume to project")->required();
     app.add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
+    app.add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
     CLI::Option* psx = app.add_option("--pixel_spacing_x", pixelSpacingX,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* psy = app.add_option("--pixel_spacing_y", pixelSpacingY,
@@ -221,33 +224,67 @@ int main(int argc, char* argv[])
     bname = bname.substr(0, bname.find_last_of("."));
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
-    std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-        a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
-        a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug,
-        a.itemsPerWorkgroup, a.reportIntermediate, startPath);
-    int res = cgls->initializeOpenCL(a.platformId);
-    if(res < 0)
+    if(!a.glsqr)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", a.platformId);
-        LOGE << ERR;
-        io::throwerr(ERR);
-    }
-    float* volume = new float[a.totalVolumeSize]();
-    // testing
-    //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
+        std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
+            a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
+            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug,
+            a.itemsPerWorkgroup, a.reportIntermediate, startPath);
+        int res = cgls->initializeOpenCL(a.platformId);
+        if(res < 0)
+        {
+            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", a.platformId);
+            LOGE << ERR;
+            io::throwerr(ERR);
+        }
+        float* volume = new float[a.totalVolumeSize]();
+        // testing
+        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
 
-    cgls->initializeVectors(projection, volume);
-    uint16_t buf[3];
-    buf[0] = a.volumeSizeY;
-    buf[1] = a.volumeSizeX;
-    buf[2] = a.volumeSizeZ;
-    io::createEmptyFile(a.outputVolume, 0, true);
-    io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-    cgls->reconstruct(dr, a.maxIterations);
-    io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
-    delete[] volume;
-    delete[] projection;
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-    LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
+        cgls->initializeVectors(projection, volume);
+        uint16_t buf[3];
+        buf[0] = a.volumeSizeY;
+        buf[1] = a.volumeSizeX;
+        buf[2] = a.volumeSizeZ;
+        io::createEmptyFile(a.outputVolume, 0, true);
+        io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
+        cgls->reconstruct(dr, a.maxIterations);
+        io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
+        delete[] volume;
+        delete[] projection;
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start);
+        LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
+    } else
+    {
+        std::shared_ptr<GLSQRReconstructor> cgls = std::make_shared<GLSQRReconstructor>(
+            a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
+            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug,
+            a.itemsPerWorkgroup, a.reportIntermediate, startPath);
+        int res = cgls->initializeOpenCL(a.platformId);
+        if(res < 0)
+        {
+            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", a.platformId);
+            LOGE << ERR;
+            io::throwerr(ERR);
+        }
+        float* volume = new float[a.totalVolumeSize]();
+        // testing
+        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
+
+        cgls->initializeVectors(projection, volume);
+        uint16_t buf[3];
+        buf[0] = a.volumeSizeY;
+        buf[1] = a.volumeSizeX;
+        buf[2] = a.volumeSizeZ;
+        io::createEmptyFile(a.outputVolume, 0, true);
+        io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
+        cgls->reconstruct(dr, a.maxIterations);
+        io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
+        delete[] volume;
+        delete[] projection;
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start);
+        LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
+    }
 }

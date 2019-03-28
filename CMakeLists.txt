@@ -105,7 +105,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 
-SET(CLLINCGLS_SOURCES src/CLlin-cgls.cpp src/CGLSReconstructor.cpp)
+SET(CLLINCGLS_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-cgls.cpp)
 add_executable(CLlin-cgls ${CLLINCGLS_SOURCES})
 set_target_properties(
     CLlin-cgls
