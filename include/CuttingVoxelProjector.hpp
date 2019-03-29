@@ -67,6 +67,9 @@ public:
                 matrix::ProjectionMatrix P,
                 float scalingFactor);
 
+    double normSquare(float* projection, uint32_t pdimx, uint32_t pdimy);
+    double normSquareDifference(float* projection, uint32_t pdimx, uint32_t pdimy);
+
 private:
     float* volume = nullptr;
     uint32_t vdimx, vdimy, vdimz;
@@ -79,6 +82,10 @@ private:
     std::shared_ptr<cl::Image3D> volumeImage = nullptr;
     std::shared_ptr<cl::CommandQueue> Q = nullptr;
     std::shared_ptr<cl::Buffer> volumeBuffer = nullptr;
+    std::shared_ptr<cl::Buffer> projectionBuffer = nullptr;
+    size_t projectionBuffer_size = 0;
+    std::shared_ptr<cl::Buffer> tmpBuffer = nullptr;
+    size_t tmpBuffer_size = 0;
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
@@ -86,11 +93,16 @@ private:
                                     cl_double16&,
                                     cl_double3&,
                                     cl_double3&,
-                                    cl_int4&,
+                                    cl_int3&,
                                     cl_double3&,
                                     cl_int2&,
                                     float&>>
         projector;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
+        FLOAT_addIntoFirstVectorSecondVectorScaled;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> NormSquare;
 };
+const cl_float FLOATZERO = 0.0;
+const cl_double DOUBLEZERO = 0.0;
 
 } // namespace CTL

@@ -27,7 +27,7 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
         clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
     } else
     {
-        clFile = io::xprintf("%s/opencl/projector.cl", this->xpath.c_str());
+        clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
     }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
@@ -48,6 +48,7 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
             return -3;
         }
     }
+    LOGI << "Build sucesfull";
     // OpenCL 1.2 got rid of KernelFunctor
     // https://forums.khronos.org/showthread.php/8317-cl-hpp-KernelFunctor-gone-replaced-with-KernelFunctorGlobal
     // https://stackoverflow.com/questions/23992369/what-should-i-use-instead-of-clkernelfunctor/54344990#54344990
@@ -61,9 +62,14 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
     } else
     {
         projector = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double4&,
-                            cl_double4&, cl_int4&, cl_double4&, cl_int2&, float&>>(
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcutting_voxel_project"));
+        FLOAT_addIntoFirstVectorSecondVectorScaled
+            = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
+                cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled"));
+        NormSquare = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
+            cl::Kernel(program, "vector_NormSquarePartial"));
     }
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
@@ -83,6 +89,63 @@ int CuttingVoxelProjector::initializeVolumeImage()
     }
     return 0;
 }
+double CuttingVoxelProjector::normSquare(float* v, uint32_t pdimx, uint32_t pdimy)
+{
+    size_t vecsize = sizeof(float) * pdimx * pdimy;
+    if(tmpBuffer == nullptr || vecsize != tmpBuffer_size)
+    {
+        tmpBuffer_size = vecsize;
+        tmpBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                                 projectionBuffer_size, (void*)v);
+    } else
+    {
+        Q->enqueueWriteBuffer(*tmpBuffer, CL_TRUE, 0, tmpBuffer_size, (void*)v);
+    }
+    cl::Buffer onedouble(*context, CL_MEM_READ_WRITE, sizeof(double), nullptr);
+    double sum;
+    uint32_t framesize = pdimx * pdimy;
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    (*NormSquare)(eargs, *tmpBuffer, onedouble, framesize).wait();
+    Q->enqueueReadBuffer(onedouble, CL_TRUE, 0, sizeof(double), &sum);
+    return sum;
+}
+
+double CuttingVoxelProjector::normSquareDifference(float* v, uint32_t pdimx, uint32_t pdimy)
+{
+    size_t vecsize = sizeof(float) * pdimx * pdimy;
+    if(projectionBuffer == nullptr)
+    {
+        std::string msg = "Comparing to empty buffer is not possible.";
+        LOGE << msg;
+        throw new std::runtime_error(msg);
+    }
+    if(vecsize != projectionBuffer_size)
+    {
+        std::string msg = "Ca not compare buffers of incompatible dimensions.";
+        throw new std::runtime_error(msg);
+    }
+
+    if(tmpBuffer == nullptr || vecsize != tmpBuffer_size)
+    {
+        tmpBuffer_size = vecsize;
+        tmpBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                                 projectionBuffer_size, (void*)v);
+    } else
+    {
+        Q->enqueueWriteBuffer(*tmpBuffer, CL_TRUE, 0, tmpBuffer_size, (void*)v);
+    }
+    uint32_t framesize = pdimx * pdimy;
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(framesize));
+    float factor = -1.0;
+    (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, *tmpBuffer, *projectionBuffer, factor)
+        .wait();
+    cl::Buffer onedouble(*context, CL_MEM_READ_WRITE, sizeof(double), nullptr);
+    double sum;
+    cl::EnqueueArgs ear(*Q, cl::NDRange(1));
+    (*NormSquare)(ear, *tmpBuffer, onedouble, framesize).wait();
+    Q->enqueueReadBuffer(onedouble, CL_TRUE, 0, sizeof(double), &sum);
+    return sum;
+}
 
 int CuttingVoxelProjector::project(float* projection,
                                    uint32_t pdimx,
@@ -94,8 +157,16 @@ int CuttingVoxelProjector::project(float* projection,
     std::array<double, 3> sourcePosition = matrix.sourcePosition();
     std::array<double, 3> normalToDetector = matrix.normalToDetector();
     //    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
-    cl::Buffer buffer_projection(*context, CL_MEM_COPY_HOST_PTR, sizeof(float) * pdimx * pdimy,
-                                 (void*)projection);
+    size_t projectionSize = sizeof(float) * pdimx * pdimy;
+    if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
+    {
+        projectionBuffer_size = projectionSize;
+        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
+                                                        projectionBuffer_size, (void*)projection);
+    } else
+    {
+        Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
+    }
 
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
                      0.0, 0.0, 0.0 });
@@ -106,11 +177,11 @@ int CuttingVoxelProjector::project(float* projection,
     cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
     unsigned int offset = 0;
-    (*projector)(eargs, *volumeBuffer, buffer_projection, offset, PM, SOURCEPOSITION,
+    (*projector)(eargs, *volumeBuffer, *projectionBuffer, offset, PM, SOURCEPOSITION,
                  NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingFactor)
         .wait();
 
-    Q->enqueueReadBuffer(buffer_projection, CL_TRUE, 0, sizeof(float) * pdimx * pdimy, projection);
+    Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy, projection);
     return 0;
 }
 

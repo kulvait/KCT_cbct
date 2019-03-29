@@ -20,6 +20,7 @@
 #include "CuttingVoxelProjector.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
+#include "DEN/DenProjectionReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
@@ -46,11 +47,11 @@ struct Args
     uint32_t volumeSizeY = 256;
     uint32_t volumeSizeZ = 199;
     uint32_t baseOffset = 0;
-    bool noFrameOffset = false;
     bool centerVoxelProjector = false;
     std::string inputVolume;
     std::string inputProjectionMatrices;
     std::string outputProjection;
+    std::string rightHandSide = "";
     bool force = false;
 };
 
@@ -87,12 +88,9 @@ int Args::parseArguments(int argc, char* argv[])
                    "must be positive integer.")
         ->check(CLI::Range(1, 65535));
     app.add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
-    app.add_flag("-n,--no_frame_offset", noFrameOffset,
-                 "When this flag is specified no offset of the projections will be used when "
-                 "writing voxel pixel relationship. Normally the offset will be "
-                 "framenum*projx*projy, where framenum is the zero based order of the projection "
-                 "matrix in the source file, projx is the x dimension of projection area and y is "
-                 "the y dimension of projection area.");
+    app.add_option("--right-hand-side", rightHandSide,
+                 "If the parameter is specified, then we also compute the norm of the right hand "
+                 "side from the projected vector.");
     app.add_flag("--center-voxel-projector", centerVoxelProjector,
                  "Use center voxel projector instead of cutting voxel projector.");
     CLI::Option* px
@@ -232,6 +230,13 @@ int main(int argc, char* argv[])
     buf[2] = a.frames.size();
     io::createEmptyFile(a.outputProjection, 0, true); // Try if this is faster
     io::appendBytes(a.outputProjection, (uint8_t*)buf, 6);
+    double normSquare = 0;
+    double normSquareDifference = 0;
+    std::shared_ptr<io::DenFrame2DReader<float>> dpr = nullptr;
+    if(!a.rightHandSide.empty())
+    {
+        dpr = std::make_shared<io::DenFrame2DReader<float>>(a.rightHandSide);
+    }
     for(int f : a.frames)
     {
         matrix::ProjectionMatrix pm = dr->readMatrix(f);
@@ -262,6 +267,14 @@ int main(int argc, char* argv[])
         //        %f.",
         //                            distToDetector, scalingFactor);
         cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+        if(dpr != nullptr)
+        {
+            std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(f);
+            normSquare
+                += cvp->normSquare((float*)fr->getDataPointer(), a.projectionSizeX, a.projectionSizeY);
+            normSquareDifference += cvp->normSquareDifference((float*)fr->getDataPointer(),
+                                                              a.projectionSizeX, a.projectionSizeY);
+        }
         io::appendBytes(a.outputProjection, (uint8_t*)projection,
                         projectionElementsCount * sizeof(float));
         std::fill_n(projection, projectionElementsCount, float(0.0));
@@ -271,4 +284,10 @@ int main(int argc, char* argv[])
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start);
     LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
+    if(dpr != nullptr)
+    {
+        LOGI << io::xprintf(
+            "Initial norm is %f, norm of the difference  is %f that is %f%% of the initial norm.",
+            std::sqrt(normSquare), std::sqrt(normSquareDifference), std::sqrt(normSquareDifference / normSquare) * 100);
+    }
 }
