@@ -39,6 +39,9 @@ struct Args
     uint32_t projectionSizeY = 480;
     double pixelSpacingX = 0.616;
     double pixelSpacingY = 0.616;
+    double voxelSpacingX = 1.0;
+    double voxelSpacingY = 1.0;
+    double voxelSpacingZ = 1.0;
     // Here (0,0,0) is in the center of the volume
     uint32_t volumeSizeX = 256;
     uint32_t volumeSizeY = 256;
@@ -91,6 +94,9 @@ int Args::parseArguments(int argc, char* argv[])
         = app.add_option("--volumey", volumeSizeY, "Dimension of volume, defaults to 256.");
     CLI::Option* vz
         = app.add_option("--volumez", volumeSizeZ, "Dimension of volume, defaults to 199.");
+    app.add_option("--voxel_spacing_x", voxelSpacingX, "Spacing of voxels, defaults to 1.0.");
+    app.add_option("--voxel_spacing_y", voxelSpacingY, "Spacing of voxels, defaults to 1.0.");
+    app.add_option("--voxel_spacing_z", voxelSpacingZ, "Spacing of voxels, defaults to 1.0.");
 
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
@@ -228,8 +234,9 @@ int main(int argc, char* argv[])
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
             a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
-            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug,
-            a.itemsPerWorkgroup, a.reportIntermediate, startPath);
+            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSpacingX,
+            a.voxelSpacingY, a.voxelSpacingZ, xpath, a.debug, a.itemsPerWorkgroup,
+            a.reportIntermediate, startPath);
         int res = cgls->initializeOpenCL(a.platformId);
         if(res < 0)
         {
@@ -259,8 +266,9 @@ int main(int argc, char* argv[])
     {
         std::shared_ptr<GLSQRReconstructor> cgls = std::make_shared<GLSQRReconstructor>(
             a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
-            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, xpath, a.debug,
-            a.itemsPerWorkgroup, a.reportIntermediate, startPath);
+            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSpacingX,
+            a.voxelSpacingY, a.voxelSpacingZ, xpath, a.debug, a.itemsPerWorkgroup,
+            a.reportIntermediate, startPath);
         int res = cgls->initializeOpenCL(a.platformId);
         if(res < 0)
         {

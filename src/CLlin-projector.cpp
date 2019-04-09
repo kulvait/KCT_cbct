@@ -229,7 +229,7 @@ int main(int argc, char* argv[])
     buf[1] = a.projectionSizeX;
     buf[2] = a.frames.size();
     io::createEmptyFile(a.outputProjection, 0, true); // Try if this is faster
-    io::appendBytes(a.outputProjection, (uint8_t*)buf, 6);
+    io::appendBytes(a.outputProjection, (uint8_t*)buf, (uint64_t)6);
     double normSquare = 0;
     double normSquareDifference = 0;
     std::shared_ptr<io::DenFrame2DReader<float>> dpr = nullptr;

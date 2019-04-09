@@ -279,6 +279,15 @@ void kernel FLOAT_copy_vector(global float* from, global float* to)
     to[gid] = from[gid];
 }
 
+void kernel FLOAT_copy_vector_offset(global float* from,
+                                     uint offset_from,
+                                     global float* to,
+                                     uint offset_to)
+{
+    int gid = get_global_id(0);
+    to[gid + offset_to] += from[gid + offset_from];
+}
+
 void kernel FLOAT_scale_vector(global float* v, private float f)
 {
     int gid = get_global_id(0);
@@ -738,8 +747,16 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     uint j = get_global_id(1);
     uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
-                                     -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz
+        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
+            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    // EXPERIMENTAL ... reconstruct inner circle
+ /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5, 0.5));
+    if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
+    {
+        return;
+    }*/
+    // EXPERIMENTAL ... reconstruct inner circle
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
     int8 cube_abi
@@ -777,7 +794,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     if(all(cube_abi == cube_abi.x)) // When all projections are the same
     {
         AtomicAdd_g_f(&projection[projectionOffset + cube_abi.x],
-                      value); // Atomic version of projection[ind] += value;
+                      value * voxelSizes.x * voxelSizes.y
+                          * voxelSizes.z); // Atomic version of projection[ind] += value;
         return;
     }
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
@@ -808,8 +826,8 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     if(max_PX == min_PX) // Due to the previous statement I know that these indices are inside the
                          // admissible range
     {
-        insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX, value,
-                         voxelSizes, pdims);
+        insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX,
+                         value * voxelSizes.x * voxelSizes.y, voxelSizes, pdims);
         return;
     }
     double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
@@ -889,7 +907,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                                  PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
     if(I >= 0)
     {
-        factor = value * lastSectionSize;
+        factor = value * lastSectionSize * voxelSizes.x * voxelSizes.y;
         insertEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor, voxelSizes, pdims);
     }
     for(I = I + 1; I < I_STOP; I++)
@@ -899,7 +917,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                                      PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
-        double factor = value * polygonSize;
+        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
         insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
         lastSectionSize = nextSectionSize;
         lastInt = nextInt;
@@ -908,7 +926,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     {
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize;
+        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
         insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
     }
 }
@@ -1011,8 +1029,16 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     float ADD = 0.0;
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
-                                     -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz
+        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
+            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    // EXPERIMENTAL ... reconstruct inner circle
+ /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5, 0.5));
+    if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
+    {
+        return;
+    }*/
+    // EXPERIMENTAL ... reconstruct inner circle
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
     int8 cube_abi
@@ -1046,7 +1072,8 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     float value = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
     if(all(cube_abi == cube_abi.x)) // When all projections are the same
     {
-        ADD = projection[projectionOffset + cube_abi.x] * value;
+        ADD = projection[projectionOffset + cube_abi.x] * value * voxelSizes.x * voxelSizes.y
+            * voxelSizes.z;
         volume[IND] += ADD;
         return;
     }
@@ -1079,7 +1106,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                          // admissible range
     {
         ADD = backprojectEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0, min_PX,
-                                    value, voxelSizes, pdims);
+                                    value * voxelSizes.x * voxelSizes.y, voxelSizes, pdims);
         volume[IND] += ADD;
         return;
     }
@@ -1161,7 +1188,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                                  PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
     if(I >= 0)
     {
-        factor = value * lastSectionSize;
+        factor = value * lastSectionSize * voxelSizes.x * voxelSizes.y;
         ADD += backprojectEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
                                      voxelSizes, pdims);
     }
@@ -1172,7 +1199,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                                      PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
-        double factor = value * polygonSize;
+        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
         ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
                                      pdims);
         lastSectionSize = nextSectionSize;
@@ -1182,7 +1209,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     {
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize;
+        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
         ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
                                      pdims);
     }

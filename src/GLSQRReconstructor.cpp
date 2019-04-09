@@ -498,7 +498,7 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
         cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-        cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
+        cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
         cl_int2 pdims({ int(pdimx), int(pdimy) });
         cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
         unsigned int offset = i * frameSize;
@@ -529,7 +529,7 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
         cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-        cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
+        cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
         cl_int2 pdims({ int(pdimx), int(pdimy) });
         unsigned int offset = i * frameSize;
         cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
@@ -860,14 +860,6 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
         if(reportProgress)
         {
-            // Now test if the data are correct
-            project(*x_cur, *BZ, PM, scalingFactors);
-            addIntoFirstVectorSecondVectorScaled(*BZ, *b_buf, float(-1.0), BDIM);
-            double curnorm = std::sqrt(normBBuffer_barier_double(*BZ));
-            LOGE << io::xprintf(
-                "After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.", iteration,
-                std::abs(curnorm), 100.0 * std::abs(curnorm) / NB0);
-
             writeVolume(*x_cur, io::xprintf("%sx_%d.den", progressBeginPath.c_str(), iteration));
         }
     }

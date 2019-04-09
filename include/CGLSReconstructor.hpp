@@ -39,6 +39,9 @@ public:
                       uint32_t vdimx,
                       uint32_t vdimy,
                       uint32_t vdimz,
+                      double voxelSpacingX,
+                      double voxelSpacingY,
+                      double voxelSpacingZ,
                       std::string xpath,
                       bool debug,
                       uint32_t workGroupSize = 256,
@@ -52,6 +55,9 @@ public:
         , vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
+        , voxelSpacingX(voxelSpacingX)
+        , voxelSpacingY(voxelSpacingY)
+        , voxelSpacingZ(voxelSpacingZ)
         , xpath(xpath)
         , debug(debug)
         , workGroupSize(workGroupSize)
@@ -129,6 +135,7 @@ private:
     const uint32_t pdimx, pdimy, pdimz;
     const double pixelSpacingX, pixelSpacingY;
     const uint32_t vdimx, vdimy, vdimz;
+    const double voxelSpacingX, voxelSpacingY, voxelSpacingZ;
     const std::string xpath; // Path where the program executes
     const bool debug;
     const uint32_t workGroupSize = 256;
@@ -161,6 +168,11 @@ private:
                 std::vector<matrix::ProjectionMatrix>& V,
                 std::vector<float>& scalingFactors);
     int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
+    int copyFloatVectorOffset(cl::Buffer& from,
+                              unsigned int from_offset,
+                              cl::Buffer& to,
+                              unsigned int to_offset,
+                              unsigned int size);
     int
     addIntoFirstVectorSecondVectorScaled(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
     int
@@ -199,6 +211,8 @@ private:
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         Sum_barier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOAT_CopyVector;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned int&, cl::Buffer&, unsigned int&>>
+        FLOAT_CopyVector_offset;
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,

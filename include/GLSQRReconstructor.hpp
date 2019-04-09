@@ -39,6 +39,9 @@ public:
                        uint32_t vdimx,
                        uint32_t vdimy,
                        uint32_t vdimz,
+                       double voxelSpacingX,
+                       double voxelSpacingY,
+                       double voxelSpacingZ,
                        std::string xpath,
                        bool debug,
                        uint32_t workGroupSize = 256,
@@ -52,6 +55,9 @@ public:
         , vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
+        , voxelSpacingX(voxelSpacingX)
+        , voxelSpacingY(voxelSpacingY)
+        , voxelSpacingZ(voxelSpacingZ)
         , xpath(xpath)
         , debug(debug)
         , workGroupSize(workGroupSize)
@@ -129,6 +135,7 @@ private:
     const uint32_t pdimx, pdimy, pdimz;
     const double pixelSpacingX, pixelSpacingY;
     const uint32_t vdimx, vdimy, vdimz;
+    const double voxelSpacingX, voxelSpacingY, voxelSpacingZ;
     const std::string xpath; // Path where the program executes
     const bool debug;
     const uint32_t workGroupSize = 256;
