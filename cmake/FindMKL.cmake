@@ -41,7 +41,7 @@ else()
   set(COR_LIB "libmkl_rt.so")
 endif()
 
-find_path(MKL_INCLUDE_DIR NAMES mkl_lapacke.h HINTS /opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/include /opt/intel/compilers_and_libraries_2018.2.199/linux/mkl/include)
+find_path(MKL_INCLUDE_DIR NAMES mkl_lapacke.h HINTS /opt/intel/compilers_and_libraries_2019.4.243/linux/mkl/include /opt/intel/compilers_and_libraries_2019.0.117/linux/mkl/include)
 set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIR})
 message("Found MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIR}")
 get_filename_component(MKL_BASE_DIR ${MKL_INCLUDE_DIR} DIRECTORY)

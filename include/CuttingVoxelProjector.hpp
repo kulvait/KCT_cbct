@@ -33,6 +33,9 @@ public:
                           uint32_t vdimx,
                           uint32_t vdimy,
                           uint32_t vdimz,
+                          double vxs,
+                          double vys,
+                          double vzs,
                           std::string xpath,
                           bool debug,
                           bool centerVoxelProjector)
@@ -40,6 +43,9 @@ public:
         , vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
+        , vxs(vxs)
+        , vys(vys)
+        , vzs(vzs)
         , xpath(xpath)
         , debug(debug)
         , centerVoxelProjector(centerVoxelProjector)
@@ -73,6 +79,7 @@ public:
 private:
     float* volume = nullptr;
     uint32_t vdimx, vdimy, vdimz;
+    double vxs, vys, vzs;
     std::string xpath; // Path where the program executes
     bool debug;
     bool centerVoxelProjector = false;

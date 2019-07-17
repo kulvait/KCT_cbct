@@ -174,7 +174,7 @@ int CuttingVoxelProjector::project(float* projection,
     cl_double3 NORMALTODETECTOR({ normalToDetector[0], normalToDetector[1], normalToDetector[2] });
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-    cl_double3 voxelSizes({ 1.0, 1.0, 1.0 });
+    cl_double3 voxelSizes({ vxs, vys, vzs });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
     unsigned int offset = 0;
     (*projector)(eargs, *volumeBuffer, *projectionBuffer, offset, PM, SOURCEPOSITION,

@@ -42,11 +42,15 @@ struct Args
     uint32_t projectionSizeY = 480;
     double pixelSpacingX = 0.616;
     double pixelSpacingY = 0.616;
+    double voxelSizeX = 1.0;
+    double voxelSizeY = 1.0;
+    double voxelSizeZ = 1.0;
     // Here (0,0,0) is in the center of the volume
     uint32_t volumeSizeX = 256;
     uint32_t volumeSizeY = 256;
     uint32_t volumeSizeZ = 199;
     uint32_t baseOffset = 0;
+    bool noFrameOffset = false;
     bool centerVoxelProjector = false;
     std::string inputVolume;
     std::string inputProjectionMatrices;
@@ -101,6 +105,12 @@ int Args::parseArguments(int argc, char* argv[])
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* psy = app.add_option("--pixel_spacing_y", pixelSpacingY,
                                       "Spacing of detector cells, defaults to 0.616.");
+    CLI::Option* vsx
+        = app.add_option("--voxel_spacing_x", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
+    CLI::Option* vsy
+        = app.add_option("--voxel_spacing_y", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
+    CLI::Option* vsz
+        = app.add_option("--voxel_spacing_z", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
         ->check(CLI::Range(0, 65535))
@@ -114,6 +124,9 @@ int Args::parseArguments(int argc, char* argv[])
     py->needs(px);
     psx->needs(psy);
     psy->needs(psx);
+    vsx->needs(vsy)->needs(vsz);
+    vsy->needs(vsx)->needs(vsz);
+    vsz->needs(vsx)->needs(vsy);
     try
     {
         app.parse(argc, argv);
@@ -213,7 +226,8 @@ int main(int argc, char* argv[])
     float* volume = new float[totalVolumeSize];
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        volume, inf.dimx(), inf.dimy(), inf.dimz(), xpath, a.debug, a.centerVoxelProjector);
+        volume, inf.dimx(), inf.dimy(), inf.dimz(), a.voxelSizeX, a.voxelSizeY,
+        a.voxelSizeZ, xpath, a.debug, a.centerVoxelProjector);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {
