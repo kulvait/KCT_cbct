@@ -37,22 +37,21 @@ struct Args
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint32_t projectionSizeX = 616;
     uint32_t projectionSizeY = 480;
-    double pixelSpacingX = 0.616;
-    double pixelSpacingY = 0.616;
-    double voxelSpacingX = 1.0;
-    double voxelSpacingY = 1.0;
-    double voxelSpacingZ = 1.0;
+    uint32_t projectionSizeZ;
+    uint64_t totalProjectionsSize;
+    double pixelSizeX = 0.616;
+    double pixelSizeY = 0.616;
+    double voxelSizeX = 1.0;
+    double voxelSizeY = 1.0;
+    double voxelSizeZ = 1.0;
     // Here (0,0,0) is in the center of the volume
     uint32_t volumeSizeX = 256;
     uint32_t volumeSizeY = 256;
     uint32_t volumeSizeZ = 199;
     uint64_t totalVolumeSize;
-    uint32_t projectionsSizeX;
-    uint32_t projectionsSizeY;
-    uint32_t projectionsSizeZ;
-    uint64_t totalProjectionsSize;
     uint32_t baseOffset = 0;
     uint32_t maxIterations = 10;
+	double stoppingError = 0.01;
     bool noFrameOffset = false;
     std::string outputVolume;
     std::string inputProjectionMatrices;
@@ -84,9 +83,9 @@ int Args::parseArguments(int argc, char* argv[])
     app.add_option("output_volume", outputVolume, "Volume to project")->required();
     app.add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
     app.add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
-    CLI::Option* psx = app.add_option("--pixel_spacing_x", pixelSpacingX,
+    CLI::Option* psx = app.add_option("--pixel_spacing_x", pixelSizeX,
                                       "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* psy = app.add_option("--pixel_spacing_y", pixelSpacingY,
+    CLI::Option* psy = app.add_option("--pixel_spacing_y", pixelSizeY,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* vx
         = app.add_option("--volumex", volumeSizeX, "Dimension of volume, defaults to 256.");
@@ -94,9 +93,9 @@ int Args::parseArguments(int argc, char* argv[])
         = app.add_option("--volumey", volumeSizeY, "Dimension of volume, defaults to 256.");
     CLI::Option* vz
         = app.add_option("--volumez", volumeSizeZ, "Dimension of volume, defaults to 199.");
-    app.add_option("--voxel_spacing_x", voxelSpacingX, "Spacing of voxels, defaults to 1.0.");
-    app.add_option("--voxel_spacing_y", voxelSpacingY, "Spacing of voxels, defaults to 1.0.");
-    app.add_option("--voxel_spacing_z", voxelSpacingZ, "Spacing of voxels, defaults to 1.0.");
+    app.add_option("--voxel_spacing_x", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
+    app.add_option("--voxel_spacing_y", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
+    app.add_option("--voxel_spacing_z", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
 
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
@@ -117,6 +116,10 @@ int Args::parseArguments(int argc, char* argv[])
     app.add_option("-i,--max_iterations", maxIterations,
                    "Maximum number of CGLS iterations, defaults to 10.")
         ->check(CLI::Range(1, 65535))
+        ->group("Platform settings");
+    app.add_option("-e", stoppingError,
+                   "Stopping error, defaults to 0.01.")
+        ->check(CLI::Range(0.0, 1.00))
         ->group("Platform settings");
     psx->needs(psy);
     psy->needs(psx);
@@ -140,12 +143,12 @@ int Args::parseArguments(int argc, char* argv[])
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
         io::DenFileInfo inf(inputProjections);
-        projectionsSizeX = inf.dimx();
-        projectionsSizeY = inf.dimy();
-        projectionsSizeZ = inf.dimz();
+        projectionSizeX = inf.dimx();
+        projectionSizeY = inf.dimy();
+        projectionSizeZ = inf.dimz();
         totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
         totalProjectionsSize
-            = uint64_t(projectionsSizeX) * uint64_t(projectionsSizeY) * uint64_t(projectionsSizeZ);
+            = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
         if(inf.dimz() != pmi.dimz())
         {
             std::string ERR = io::xprintf(
@@ -233,9 +236,9 @@ int main(int argc, char* argv[])
     if(!a.glsqr)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-            a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
-            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSpacingX,
-            a.voxelSpacingY, a.voxelSpacingZ, xpath, a.debug, a.itemsPerWorkgroup,
+            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX,
+            a.pixelSizeY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX,
+            a.voxelSizeY, a.voxelSizeZ, xpath, a.debug, a.itemsPerWorkgroup,
             a.reportIntermediate, startPath);
         int res = cgls->initializeOpenCL(a.platformId);
         if(res < 0)
@@ -255,7 +258,7 @@ int main(int argc, char* argv[])
         buf[2] = a.volumeSizeZ;
         io::createEmptyFile(a.outputVolume, 0, true);
         io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-        cgls->reconstruct(dr, a.maxIterations);
+        cgls->reconstruct(dr, a.maxIterations, a.stoppingError);
         io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;
@@ -264,12 +267,12 @@ int main(int argc, char* argv[])
         LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
     } else
     {
-        std::shared_ptr<GLSQRReconstructor> cgls = std::make_shared<GLSQRReconstructor>(
-            a.projectionsSizeX, a.projectionsSizeY, a.projectionsSizeZ, a.pixelSpacingX,
-            a.pixelSpacingY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSpacingX,
-            a.voxelSpacingY, a.voxelSpacingZ, xpath, a.debug, a.itemsPerWorkgroup,
+        std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
+            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX,
+            a.pixelSizeY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX,
+            a.voxelSizeY, a.voxelSizeZ, xpath, a.debug, a.itemsPerWorkgroup,
             a.reportIntermediate, startPath);
-        int res = cgls->initializeOpenCL(a.platformId);
+        int res = glsqr->initializeOpenCL(a.platformId);
         if(res < 0)
         {
             std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", a.platformId);
@@ -280,14 +283,14 @@ int main(int argc, char* argv[])
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
 
-        cgls->initializeVectors(projection, volume);
+        glsqr->initializeVectors(projection, volume);
         uint16_t buf[3];
         buf[0] = a.volumeSizeY;
         buf[1] = a.volumeSizeX;
         buf[2] = a.volumeSizeZ;
         io::createEmptyFile(a.outputVolume, 0, true);
         io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-        cgls->reconstruct(dr, a.maxIterations);
+        glsqr->reconstruct(dr, a.maxIterations, a.stoppingError);
         io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;

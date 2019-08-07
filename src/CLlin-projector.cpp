@@ -40,8 +40,8 @@ struct Args
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint32_t projectionSizeX = 616;
     uint32_t projectionSizeY = 480;
-    double pixelSpacingX = 0.616;
-    double pixelSpacingY = 0.616;
+    double pixelSizeX = 0.616;
+    double pixelSizeY = 0.616;
     double voxelSizeX = 1.0;
     double voxelSizeY = 1.0;
     double voxelSizeZ = 1.0;
@@ -98,19 +98,19 @@ int Args::parseArguments(int argc, char* argv[])
     app.add_flag("--center-voxel-projector", centerVoxelProjector,
                  "Use center voxel projector instead of cutting voxel projector.");
     CLI::Option* px
-        = app.add_option("--projx", projectionSizeX, "Dimension of detector, defaults to 616.");
+        = app.add_option("--projection-sizex", projectionSizeX, "Dimension of detector, defaults to 616.");
     CLI::Option* py
-        = app.add_option("--projy", projectionSizeY, "Dimension of detector, defaults to 480.");
-    CLI::Option* psx = app.add_option("--pixel_spacing_x", pixelSpacingX,
+        = app.add_option("--projection-sizey", projectionSizeY, "Dimension of detector, defaults to 480.");
+    CLI::Option* psx = app.add_option("--pixel-sizex", pixelSizeX,
                                       "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* psy = app.add_option("--pixel_spacing_y", pixelSpacingY,
+    CLI::Option* psy = app.add_option("--pixel-sizey", pixelSizeY,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* vsx
-        = app.add_option("--voxel_spacing_x", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
+        = app.add_option("--voxel-size-x", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
     CLI::Option* vsy
-        = app.add_option("--voxel_spacing_y", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
+        = app.add_option("--voxel-size-y", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
     CLI::Option* vsz
-        = app.add_option("--voxel_spacing_z", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
+        = app.add_option("--voxel-size-z", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
         ->check(CLI::Range(0, 65535))
@@ -262,8 +262,8 @@ int main(int argc, char* argv[])
         pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
                    sourcePosition[2] + normalToDetector[2], &x1, &y1);
         pm.project(100.0, 100.0, 100.0, &x2, &y2);
-        double xspacing2 = a.pixelSpacingX * a.pixelSpacingX;
-        double yspacing2 = a.pixelSpacingY * a.pixelSpacingY;
+        double xspacing2 = a.pixelSizeX * a.pixelSizeX;
+        double yspacing2 = a.pixelSizeY * a.pixelSizeY;
         double distance
             = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
         double x = 100.0 - sourcePosition[0];
@@ -276,7 +276,7 @@ int main(int argc, char* argv[])
         double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
         double theta = std::acos(cos);
         double distToDetector = std::abs(distance / std::tan(theta));
-        double scalingFactor = distToDetector * distToDetector / a.pixelSpacingX / a.pixelSpacingY;
+        double scalingFactor = distToDetector * distToDetector / a.pixelSizeX / a.pixelSizeY;
         //        LOGI << io::xprintf("Distance to the detector is %fmm therefore scaling factor is
         //        %f.",
         //                            distToDetector, scalingFactor);
