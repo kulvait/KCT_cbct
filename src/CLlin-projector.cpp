@@ -106,11 +106,11 @@ int Args::parseArguments(int argc, char* argv[])
     CLI::Option* psy = app.add_option("--pixel-sizey", pixelSizeY,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* vsx
-        = app.add_option("--voxel-size-x", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
+        = app.add_option("--voxel-sizex", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
     CLI::Option* vsy
-        = app.add_option("--voxel-size-y", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
+        = app.add_option("--voxel-sizey", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
     CLI::Option* vsz
-        = app.add_option("--voxel-size-z", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
+        = app.add_option("--voxel-sizez", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
         ->check(CLI::Range(0, 65535))
