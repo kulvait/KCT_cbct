@@ -51,7 +51,7 @@ struct Args
     uint64_t totalVolumeSize;
     uint32_t baseOffset = 0;
     uint32_t maxIterations = 10;
-	double stoppingError = 0.01;
+    double stoppingError = 0.01;
     bool noFrameOffset = false;
     std::string outputVolume;
     std::string inputProjectionMatrices;
@@ -83,19 +83,19 @@ int Args::parseArguments(int argc, char* argv[])
     app.add_option("output_volume", outputVolume, "Volume to project")->required();
     app.add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
     app.add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
-    CLI::Option* psx = app.add_option("--pixel_spacing_x", pixelSizeX,
+    CLI::Option* psx = app.add_option("--pixel-sizex", pixelSizeX,
                                       "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* psy = app.add_option("--pixel_spacing_y", pixelSizeY,
+    CLI::Option* psy = app.add_option("--pixel-sizey", pixelSizeY,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* vx
-        = app.add_option("--volumex", volumeSizeX, "Dimension of volume, defaults to 256.");
+        = app.add_option("--volume-sizex", volumeSizeX, "Dimension of volume, defaults to 256.");
     CLI::Option* vy
-        = app.add_option("--volumey", volumeSizeY, "Dimension of volume, defaults to 256.");
+        = app.add_option("--volume-sizey", volumeSizeY, "Dimension of volume, defaults to 256.");
     CLI::Option* vz
-        = app.add_option("--volumez", volumeSizeZ, "Dimension of volume, defaults to 199.");
-    app.add_option("--voxel_spacing_x", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
-    app.add_option("--voxel_spacing_y", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
-    app.add_option("--voxel_spacing_z", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
+        = app.add_option("--volume-sizez", volumeSizeZ, "Dimension of volume, defaults to 199.");
+    app.add_option("--voxel-sizex", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
+    app.add_option("--voxel-sizey", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
+    app.add_option("--voxel-sizez", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
 
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
@@ -117,8 +117,7 @@ int Args::parseArguments(int argc, char* argv[])
                    "Maximum number of CGLS iterations, defaults to 10.")
         ->check(CLI::Range(1, 65535))
         ->group("Platform settings");
-    app.add_option("-e", stoppingError,
-                   "Stopping error, defaults to 0.01.")
+    app.add_option("-e", stoppingError, "Stopping error, defaults to 0.01.")
         ->check(CLI::Range(0.0, 1.00))
         ->group("Platform settings");
     psx->needs(psy);
@@ -236,10 +235,9 @@ int main(int argc, char* argv[])
     if(!a.glsqr)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX,
-            a.pixelSizeY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX,
-            a.voxelSizeY, a.voxelSizeZ, xpath, a.debug, a.itemsPerWorkgroup,
-            a.reportIntermediate, startPath);
+            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX, a.pixelSizeY,
+            a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ,
+            xpath, a.debug, a.itemsPerWorkgroup, a.reportIntermediate, startPath);
         int res = cgls->initializeOpenCL(a.platformId);
         if(res < 0)
         {
@@ -268,10 +266,9 @@ int main(int argc, char* argv[])
     } else
     {
         std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
-            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX,
-            a.pixelSizeY, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX,
-            a.voxelSizeY, a.voxelSizeZ, xpath, a.debug, a.itemsPerWorkgroup,
-            a.reportIntermediate, startPath);
+            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX, a.pixelSizeY,
+            a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ,
+            xpath, a.debug, a.itemsPerWorkgroup, a.reportIntermediate, startPath);
         int res = glsqr->initializeOpenCL(a.platformId);
         if(res < 0)
         {
