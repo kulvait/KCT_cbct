@@ -302,3 +302,12 @@ void kernel FLOAT_add_into_first_vector_scaled_second_vector(global float* a,
     float val = f * a[gid] + b[gid];
     a[gid] = val;
 }
+
+void kernel FLOAT_copy_vector_offset(global float* from,
+                                     uint offset_from,
+                                     global float* to,
+                                     uint offset_to)
+{
+    int gid = get_global_id(0);
+    to[gid + offset_to] += from[gid + offset_from];
+}

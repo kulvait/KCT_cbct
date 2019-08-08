@@ -25,6 +25,10 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
     std::string sourceText;
     // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
     clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
+    io::concatenateTextFiles(clFile, true,
+                             { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+                               io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
+                               io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) }); 
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
@@ -860,6 +864,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
         if(reportProgress)
         {
+		LOGD << io::xprintf("Writing file %sx_%d.den", progressBeginPath.c_str(), iteration);
             writeVolume(*x_cur, io::xprintf("%sx_%d.den", progressBeginPath.c_str(), iteration));
         }
     }

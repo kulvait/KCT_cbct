@@ -25,6 +25,10 @@ int CGLSReconstructor::initializeOpenCL(uint32_t platformId)
     std::string sourceText;
     // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
     clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
+    io::concatenateTextFiles(clFile, true,
+                             { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+                               io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
+                               io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) });
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
@@ -588,7 +592,7 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
     // writeProjections(*c_buf, io::xprintf("/tmp/cgls/c_0.den"));
     backproject(*c_buf, *v_buf, PM, scalingFactors);
     // Experimental
-	LOGI << "Backprojection correction vector";
+    LOGI << "Backprojection correction vector";
     Q->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, pdimx * pdimy * sizeof(float));
     for(unsigned int i = 0; i != pdimz; i++)
     {
@@ -611,7 +615,7 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
     // EXPERIMENTAL
     copyFloatVector(*v_buf, *w_buf, XDIM);
     // EXPERIMENTAL
-    copyFloatVector(*v_proj, *w_proj, pdimx*pdimy);
+    copyFloatVector(*v_proj, *w_proj, pdimx * pdimy);
     // EXPERIMENTAL
     if(reportProgress)
     {

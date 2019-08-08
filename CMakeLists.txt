@@ -49,6 +49,8 @@ include_directories(${PYTHON_INCLUDE_DIRS})
 FILE( GLOB CTIOL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/*.cpp ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/ARGPARSE/*.cpp)
 add_library(ctiol ${CTIOL_SRC})
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTIOL/include)
+target_link_libraries(ctiol stdc++fs)
+
 
 #CTIOL_OPENCL
 IF(OpenCL_FOUND)
@@ -121,13 +123,37 @@ target_include_directories(CLlin-cgls PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-cgls PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-cgls ${CMAKE_THREAD_LIBS_INIT})
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/allsources.cl opencl/allsources.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
 install (TARGETS CLlin-cgls RUNTIME DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/allsources.cl DESTINATION opencl)
+
+
+SET(CLLINJACOBIGLSQR_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-jacobiglsqr.cpp)
+add_executable(CLlin-jacobiglsqr ${CLLINJACOBIGLSQR_SOURCES})
+set_target_properties(
+    CLlin-jacobiglsqr
+    PROPERTIES 
+        OUTPUT_NAME "cllin-jacobiglsqr"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-jacobiglsqr ctiol)
+target_link_libraries(CLlin-jacobiglsqr ctmal)
+target_link_libraries(CLlin-jacobiglsqr OpenCL::OpenCL)
+target_link_libraries(CLlin-jacobiglsqr CTIOL_OPENCL)
+target_include_directories(CLlin-jacobiglsqr PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-jacobiglsqr PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-jacobiglsqr ${CMAKE_THREAD_LIBS_INIT})
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+install (TARGETS CLlin-jacobiglsqr RUNTIME DESTINATION .)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 
 SET(CLLINPERFUSION_SOURCES src/CLlin-perfusion.cpp src/CGLSPerfusionReconstructor.cpp)
 add_executable(CLlin-perfusion ${CLLINPERFUSION_SOURCES})
@@ -146,13 +172,13 @@ target_compile_definitions(CLlin-perfusion PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_A
 target_link_libraries (CLlin-perfusion ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(CLlin-perfusion ${PYTHON_LIBRARIES})
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/allsources.cl opencl/allsources.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
 install (TARGETS CLlin-perfusion RUNTIME DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/allsources.cl DESTINATION opencl)
 
 SET(CTMATRIX_SOURCES src/CTMatrix.cpp)
 add_executable(ctmatrix ${CTMATRIX_SOURCES})
