@@ -35,35 +35,42 @@ float inline backprojectEdgeValues(global float* projection,
     float factor;
     if(PJ_down == PJ_up)
     {
-	factor = value * voxelSizes.z;
+        factor = value * voxelSizes.z;
         ADD = projection[PX + pdims.x * PJ_down] * factor;
         return ADD;
     }
-    double stepSize = voxelSizes.z
+    float stepSize = voxelSizes.z * value
         / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
-    int j = max(-1, PJ_down);
-    int j_STOP = min(PJ_up, pdims.y);
-    for(j = j + 1; j < j_STOP; j++)
-    {
-	factor = value * stepSize;
-        ADD += projection[PX + pdims.x * j] * factor;
-    }
-
     // Add part that maps to PJ_down
+    int j, j_STOP;
     if(PJ_down >= 0)
     {
         double nextGridY;
         nextGridY = (double)PJ_down + 0.5;
-        factor = (nextGridY - PY_down) * stepSize * value;
-        ADD += projection[PX + pdims.x * PJ_down] * factor;
-    } // Add part that maps to PJ_up
+        factor = (nextGridY - PY_down) * stepSize;
+        ADD = projection[PX + pdims.x * PJ_down] * factor;
+        j = PJ_down + 1;
+    } else
+    {
+        j = 0;
+    }
+
     if(PJ_up < pdims.y)
     {
         double prevGridY;
         prevGridY = (double)PJ_up - 0.5;
-        factor = (PY_up - prevGridY) * stepSize * value;
+        factor = (PY_up - prevGridY) * stepSize;
         ADD += projection[PX + pdims.x * PJ_up] * factor;
+        j_STOP = PJ_up;
+    } else
+    {
+        j_STOP = pdims.y;
     }
+    for(; j < j_STOP; j++)
+    {
+        ADD += projection[PX + pdims.x * j] * stepSize;
+    }
+    // Add part that maps to PJ_up
     return ADD;
 }
 
