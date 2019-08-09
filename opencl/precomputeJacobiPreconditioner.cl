@@ -12,7 +12,7 @@ float inline backprojectEdgeValues(global float* projection,
     double PY_down, PY_up;
     int PJ_down, PJ_up;
     v_down = v + voxelSizes * (double3)(0.0, 0.0, -0.5);
-    v_up = v + voxelSizes * (double3)(0.0, 0.0, 0.5);
+    v_up = v + voxelSizes * (double3)(0.0, 0.0, +0.5);
     PY_down = projectY(CM, v_down);
     PY_up = projectY(CM, v_up);
     PJ_down = convert_int_rtn(PY_down + 0.5);
@@ -32,11 +32,9 @@ float inline backprojectEdgeValues(global float* projection,
     {
         return 0.0;
     }
-    float factor;
     if(PJ_down == PJ_up)
     {
-	factor = value * voxelSizes.z;
-        ADD = projection[PX + pdims.x * PJ_down] * factor;
+        ADD = projection[PX + pdims.x * PJ_down] * value * voxelSizes.z;
         return ADD;
     }
     double stepSize = voxelSizes.z
@@ -45,27 +43,28 @@ float inline backprojectEdgeValues(global float* projection,
     int j_STOP = min(PJ_up, pdims.y);
     for(j = j + 1; j < j_STOP; j++)
     {
-	factor = value * stepSize;
-        ADD += projection[PX + pdims.x * j] * factor;
+        ADD += projection[PX + pdims.x * j] * value * stepSize;
     }
 
+    double factor;
     // Add part that maps to PJ_down
     if(PJ_down >= 0)
     {
         double nextGridY;
         nextGridY = (double)PJ_down + 0.5;
-        factor = (nextGridY - PY_down) * stepSize * value;
-        ADD += projection[PX + pdims.x * PJ_down] * factor;
+        factor = (nextGridY - PY_down) * stepSize;
+        ADD += projection[PX + pdims.x * PJ_down] * value * factor;
     } // Add part that maps to PJ_up
     if(PJ_up < pdims.y)
     {
         double prevGridY;
         prevGridY = (double)PJ_up - 0.5;
-        factor = (PY_up - prevGridY) * stepSize * value;
-        ADD += projection[PX + pdims.x * PJ_up] * factor;
+        factor = (PY_up - prevGridY) * stepSize;
+        ADD += projection[PX + pdims.x * PJ_up] * value * factor;
     }
     return ADD;
 }
+
 
 /** Project given volume using cutting voxel projector.
  *
@@ -83,9 +82,7 @@ float inline backprojectEdgeValues(global float* projection,
  *
  * @return
  */
-void kernel FLOATcutting_voxel_backproject(global float* volume,
-                                           global float* projection,
-                                           private uint projectionOffset,
+void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePreconditionerVector,
                                            private double16 CM,
                                            private double3 sourcePosition,
                                            private double3 normalToDetector,
@@ -102,77 +99,60 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     const double3 zerocorner_xyz
         = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
             -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
-    const double3 voxelcorner_xyz = zerocorner_xyz
-        + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
     // EXPERIMENTAL ... reconstruct inner circle
-    /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5,
-       0.5)); if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
-       {
-           return;
-       }*/
+ /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5, 0.5));
+    if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
+    {
+        return;
+    }*/
     // EXPERIMENTAL ... reconstruct inner circle
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
-    int cornerProjectionIndex = projectionIndex(CM, voxelcorner_xyz, pdims);
-    if(cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0), pdims)
-       && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.0), pdims)
-       && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 1.0), pdims)
-       && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 1.0), pdims)
-       && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.0), pdims)
-       && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.0), pdims)
-       && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 1.0),
-                              pdims)) // When all projections are the same
+    int8 cube_abi
+        = { projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.0)),
+                            pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.0)),
+                            pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.0)),
+                            pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 1.0)),
+                            pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 1.0)),
+                            pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 1.0)),
+                            pdims),
+            projectionIndex(CM, zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 1.0)),
+                            pdims) };
+    if(all(cube_abi
+           == -1)) // When all projections of the voxel corners points outside projector area
     {
-        if(cornerProjectionIndex != -1)
-        {
-            const uint IND = voxelIndex(i, j, k, vdims);
-            const double3 voxelcenter_xyz = voxelcorner_xyz
-                + voxelSizes * 0.5; // Using widening and vector multiplication operations
-            double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-            double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-            double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
-            double cosPowThree = cosine * cosine * cosine;
-            float value
-                = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
-            ADD = projection[projectionOffset + cornerProjectionIndex] * value * voxelSizes.x
-                * voxelSizes.y * voxelSizes.z;
-            volume[IND] += ADD;
-        }
         return;
     }
-    // EXPERIMENTAL ... reconstruct inner circle
-    /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5,
-       0.5)); if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
-       {
-           return;
-       }*/
-    // EXPERIMENTAL ... reconstruct inner circle
-    // If all the corners of given voxel points to a common coordinate, then compute the value based
-    // on the center
     const uint IND = voxelIndex(i, j, k, vdims);
-    const double3 voxelcenter_xyz
-        = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
+    const double3 voxelcenter_xyz = zerocorner_xyz
+        + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
     double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
     double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
     double cosPowThree = cosine * cosine * cosine;
     float value = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+    if(all(cube_abi == cube_abi.x)) // When all projections are the same
+    {
+        ADD = projection[projectionOffset + cube_abi.x] * value * voxelSizes.x * voxelSizes.y
+            * voxelSizes.z;
+        volume[IND] += ADD;
+        return;
+    }
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
     double px00, px01, px10, px11;
     double3 vx00, vx01, vx10, vx11;
-    vx00 = voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 0.5);
-    vx01 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.5);
-    vx10 = voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.5);
-    vx11 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.5);
+    vx00 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 0.0, 0.5));
+    vx01 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 0.0, 0.5));
+    vx10 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.0, 1.0, 0.5));
+    vx11 = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(1.0, 1.0, 0.5));
     px00 = projectX(CM, vx00);
     px01 = projectX(CM, vx01);
     px10 = projectX(CM, vx10);
@@ -181,8 +161,8 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
     int max_PX,
         min_PX; // Pixel to which are the voxels with minimum and maximum values are projected
-    pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
-    pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
+    pxx_min = min(min(min(px00, px01), px10), px11);
+    pxx_max = max(max(max(px00, px01), px10), px11);
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
     if(max_PX < 0 || min_PX >= pdims.x)
