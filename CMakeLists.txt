@@ -132,7 +132,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 
 
-SET(CLLINJACOBIGLSQR_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-jacobiglsqr.cpp)
+SET(CLLINJACOBIGLSQR_SOURCES src/JacobiGLSQRReconstructor.cpp src/CLlin-jacobiglsqr.cpp)
 add_executable(CLlin-jacobiglsqr ${CLLINJACOBIGLSQR_SOURCES})
 set_target_properties(
     CLlin-jacobiglsqr
@@ -147,13 +147,15 @@ target_link_libraries(CLlin-jacobiglsqr CTIOL_OPENCL)
 target_include_directories(CLlin-jacobiglsqr PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-jacobiglsqr PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-jacobiglsqr ${CMAKE_THREAD_LIBS_INIT})
-configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl opencl/precomputeJacobiPreconditioner.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl opencl/jacobiPreconditionedProjector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl opencl/jacobiPreconditionedBackprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 install (TARGETS CLlin-jacobiglsqr RUNTIME DESTINATION .)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl DESTINATION opencl)
 
 SET(CLLINPERFUSION_SOURCES src/CLlin-perfusion.cpp src/CGLSPerfusionReconstructor.cpp)
 add_executable(CLlin-perfusion ${CLLINPERFUSION_SOURCES})

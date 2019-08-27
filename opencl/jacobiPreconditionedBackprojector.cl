@@ -1,10 +1,11 @@
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
-float inline jacobiEdgeValues(private double16 CM,
-                              private double3 v,
-                              private int PX,
-                              private double value,
-                              private double3 voxelSizes,
-                              private int2 pdims)
+float inline backprojectEdgeValues(global float* projection,
+                                   private double16 CM,
+                                   private double3 v,
+                                   private int PX,
+                                   private double value,
+                                   private double3 voxelSizes,
+                                   private int2 pdims)
 {
     float ADD = 0.0;
     double3 v_down, v_up;
@@ -35,7 +36,7 @@ float inline jacobiEdgeValues(private double16 CM,
     if(PJ_down == PJ_up)
     {
         factor = value * voxelSizes.z;
-        ADD = factor * factor;
+        ADD = projection[PX + pdims.x * PJ_down] * factor;
         return ADD;
     }
     float stepSize = voxelSizes.z * value
@@ -47,7 +48,7 @@ float inline jacobiEdgeValues(private double16 CM,
         double nextGridY;
         nextGridY = (double)PJ_down + 0.5;
         factor = (nextGridY - PY_down) * stepSize;
-        ADD = factor * factor;
+        ADD = projection[PX + pdims.x * PJ_down] * factor;
         j = PJ_down + 1;
     } else
     {
@@ -59,7 +60,7 @@ float inline jacobiEdgeValues(private double16 CM,
         double prevGridY;
         prevGridY = (double)PJ_up - 0.5;
         factor = (PY_up - prevGridY) * stepSize;
-        ADD += factor * factor;
+        ADD += projection[PX + pdims.x * PJ_up] * factor;
         j_STOP = PJ_up;
     } else
     {
@@ -67,13 +68,13 @@ float inline jacobiEdgeValues(private double16 CM,
     }
     for(; j < j_STOP; j++)
     {
-        ADD += stepSize * stepSize;
+        ADD += projection[PX + pdims.x * j] * stepSize;
     }
     // Add part that maps to PJ_up
     return ADD;
 }
 
-/** This functions precomputes diag(A^T A) to use as Jacobi preconditioner.
+/** Project given volume using cutting voxel projector.
  *
  *
  * @param volume Volume to project.
@@ -89,14 +90,17 @@ float inline jacobiEdgeValues(private double16 CM,
  *
  * @return
  */
-void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePreconditionerVector,
-                                                          private double16 CM,
-                                                          private double3 sourcePosition,
-                                                          private double3 normalToDetector,
-                                                          private int3 vdims,
-                                                          private double3 voxelSizes,
-                                                          private int2 pdims,
-                                                          private float scalingFactor)
+void kernel FLOATjacobiPreconditionedCutting_voxel_backproject(global float* volume,
+                                           global float* preconditioner,
+                                           global float* projection,
+                                           private uint projectionOffset,
+                                           private double16 CM,
+                                           private double3 sourcePosition,
+                                           private double3 normalToDetector,
+                                           private int3 vdims,
+                                           private double3 voxelSizes,
+                                           private int2 pdims,
+                                           private float scalingFactor)
 {
     int i = get_global_id(2);
     int j = get_global_id(1);
@@ -144,13 +148,22 @@ void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePr
             double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
             double cosPowThree = cosine * cosine * cosine;
             float value
-                = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
-            ADD = value * voxelSizes.x * voxelSizes.y * voxelSizes.z;
-            ADD = ADD * ADD;
-            volumePreconditionerVector[IND] += ADD;
+                = preconditioner[IND] * scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+            ADD = projection[projectionOffset + cornerProjectionIndex] * value * voxelSizes.x
+                * voxelSizes.y * voxelSizes.z;
+            volume[IND] += ADD;
         }
         return;
     }
+    // EXPERIMENTAL ... reconstruct inner circle
+    /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5,
+       0.5)); if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
+       {
+           return;
+       }*/
+    // EXPERIMENTAL ... reconstruct inner circle
+    // If all the corners of given voxel points to a common coordinate, then compute the value based
+    // on the center
     const uint IND = voxelIndex(i, j, k, vdims);
     const double3 voxelcenter_xyz
         = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
@@ -158,7 +171,7 @@ void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePr
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
     double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
     double cosPowThree = cosine * cosine * cosine;
-    float value = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+    float value = preconditioner[IND] * scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
@@ -187,9 +200,9 @@ void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePr
     if(max_PX == min_PX) // Due to the previous statement I know that these indices are inside the
                          // admissible range
     {
-        ADD = jacobiEdgeValues(CM, (vx10 + vx01) / 2.0, min_PX, value * voxelSizes.x * voxelSizes.y,
-                               voxelSizes, pdims);
-        volumePreconditionerVector[IND] += ADD;
+        ADD = backprojectEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0, min_PX,
+                                    value * voxelSizes.x * voxelSizes.y, voxelSizes, pdims);
+        volume[IND] += ADD;
         return;
     }
 
@@ -271,7 +284,8 @@ void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePr
     if(I >= 0)
     {
         factor = value * lastSectionSize * voxelSizes.x * voxelSizes.y;
-        ADD += jacobiEdgeValues(CM, lastInt, I, factor, voxelSizes, pdims);
+        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
+                                     voxelSizes, pdims);
     }
     for(I = I + 1; I < I_STOP; I++)
     {
@@ -281,7 +295,8 @@ void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePr
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
-        ADD += jacobiEdgeValues(CM, Int, I, factor, voxelSizes, pdims);
+        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
+                                     pdims);
         lastSectionSize = nextSectionSize;
         lastInt = nextInt;
     }
@@ -290,7 +305,8 @@ void kernel FLOATcutting_voxel_jacobiPreconditionerVector(global float* volumePr
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
-        ADD += jacobiEdgeValues(CM, Int, I, factor, voxelSizes, pdims);
+        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
+                                     pdims);
     }
-    volumePreconditionerVector[IND] += ADD;
+    volume[IND] += ADD;
 }

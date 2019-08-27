@@ -22,12 +22,20 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
     // Debug info
     // https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
     std::string clFile;
+    clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
     if(centerVoxelProjector)
     {
-        clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str()) });
+
     } else
     {
-        clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()) });
     }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);

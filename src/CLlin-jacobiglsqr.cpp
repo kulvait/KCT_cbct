@@ -21,7 +21,7 @@
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
-#include "GLSQRReconstructor.hpp"
+#include "JacobiGLSQRReconstructor.hpp"
 
 using namespace CTL;
 

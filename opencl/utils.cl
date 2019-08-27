@@ -311,3 +311,21 @@ void kernel FLOAT_copy_vector_offset(global float* from,
     int gid = get_global_id(0);
     to[gid + offset_to] += from[gid + offset_from];
 }
+
+void kernel FLOAT_compute_sqrt(global float* v)
+{
+    int gid = get_global_id(0);
+    v[gid] = sqrt(v[gid]);
+}
+
+void kernel FLOAT_compute_inverse(global float* v)
+{
+    int gid = get_global_id(0);
+    v[gid] = 1.0 / v[gid];
+}
+
+void kernel FLOAT_multiply_vectors_into_first_vector(global float* a, global float* b)
+{
+    int gid = get_global_id(0);
+    a[gid] = a[gid] * b[gid];
+}
