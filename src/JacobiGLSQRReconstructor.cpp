@@ -746,7 +746,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
     writeVolume(*x_jacobi_preconditioner,
                 io::xprintf("%sPreconditioner.den", progressBeginPath.c_str()));
     // Try to use identity
-    // cl_float fillones = 1.0;
+    // cl_float fillones = 2.0;
     // Q->enqueueFillBuffer<cl_float>(*x_jacobi_preconditioner, fillones, 0, XDIM * sizeof(float));
     // END
     // Anything might be supplied here, but we will do standard initialization first
