@@ -106,6 +106,27 @@ install (TARGETS CLlin-projector RUNTIME DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
+SET(CLLINPROJECTORVOLUMES_SOURCES src/CLlin-projector-volumes.cpp src/alg/CuttingVoxelProjector.cpp)
+add_executable(CLlin-projector-volumes ${CLLINPROJECTORVOLUMES_SOURCES})
+set_target_properties(
+    CLlin-projector-volumes
+    PROPERTIES 
+        OUTPUT_NAME "cllin-projector-volumes"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-projector-volumes ctiol)
+target_link_libraries(CLlin-projector-volumes ctmal)
+target_link_libraries(CLlin-projector-volumes OpenCL::OpenCL)
+target_link_libraries(CLlin-projector-volumes CTIOL_OPENCL)
+target_include_directories(CLlin-projector-volumes PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-projector-volumes PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-projector-volumes ${CMAKE_THREAD_LIBS_INIT})
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
+install (TARGETS CLlin-projector-volumes RUNTIME DESTINATION .)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
+
 
 SET(CLLINCGLS_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-cgls.cpp)
 add_executable(CLlin-cgls ${CLLINCGLS_SOURCES})

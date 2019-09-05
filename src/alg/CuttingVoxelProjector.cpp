@@ -32,10 +32,9 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
 
     } else
     {
-        io::concatenateTextFiles(
-            clFile, true,
-            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
-              io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()) });
+        io::concatenateTextFiles(clFile, true,
+                                 { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+                                   io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()) });
     }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
@@ -88,7 +87,7 @@ int CuttingVoxelProjector::initializeVolumeImage()
     cl::ImageFormat f(CL_INTENSITY, CL_FLOAT);
     cl_int err;
     volumeBuffer
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR | CL_MEM_HOST_READ_ONLY,
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE,
                                        sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
     if(err != CL_SUCCESS)
     {
@@ -97,6 +96,14 @@ int CuttingVoxelProjector::initializeVolumeImage()
     }
     return 0;
 }
+
+int CuttingVoxelProjector::updateVolumeImage()
+{
+    Q->enqueueWriteBuffer(*volumeBuffer, CL_TRUE, 0, sizeof(float) * vdimx * vdimy * vdimz,
+                          (void*)volume);
+    return 0;
+}
+
 double CuttingVoxelProjector::normSquare(float* v, uint32_t pdimx, uint32_t pdimy)
 {
     size_t vecsize = sizeof(float) * pdimx * pdimy;

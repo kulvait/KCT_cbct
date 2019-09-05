@@ -28,7 +28,7 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
     io::concatenateTextFiles(clFile, true,
                              { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
                                io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
-                               io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) }); 
+                               io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) });
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
@@ -594,30 +594,31 @@ std::vector<float>
 GLSQRReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM)
 {
     std::vector<float> scalingFactors;
+    double xoveryspacing = pixelSpacingX / pixelSpacingY;
+    double yoverxspacing = pixelSpacingY / pixelSpacingX;
     for(std::size_t i = 0; i != pdimz; i++)
     {
         double x1, x2, y1, y2;
         matrix::ProjectionMatrix pm = PM[i];
         std::array<double, 3> sourcePosition = pm.sourcePosition();
         std::array<double, 3> normalToDetector = pm.normalToDetector();
-        pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
-                   sourcePosition[2] + normalToDetector[2], &x1, &y1);
-        pm.project(100.0, 100.0, 100.0, &x2, &y2);
-        double xspacing2 = pixelSpacingX * pixelSpacingX;
-        double yspacing2 = pixelSpacingY * pixelSpacingY;
-        double distance
-            = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
-        double x = 100.0 - sourcePosition[0];
-        double y = 100.0 - sourcePosition[1];
-        double z = 100.0 - sourcePosition[2];
-        double norma = std::sqrt(x * x + y * y + z * z);
-        x /= norma;
-        y /= norma;
-        z /= norma;
-        double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
-        double theta = std::acos(cos);
-        double distToDetector = std::abs(distance / std::tan(theta));
-        double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;
+        std::array<double, 3> tangentToDetector = pm.tangentToDetectorYDirection();
+        pm.project(sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+                   sourcePosition[2] - normalToDetector[2], &x1, &y1);
+        pm.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                   sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                   sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
+        /*
+        double distToDetector
+            = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2
+                        + (y1 - y2) * (y1 - y2) * yspacing2); // Here I am using the fact that I
+                                                              // have projected two vectors with the
+                                                              // angle 45deg and so the distance on
+                                                              // the detector is the same as the
+                                                              // distance from source to detector
+        double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;*/
+        double scalingFactor
+            = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
         scalingFactors.push_back(scalingFactor);
     }
     return scalingFactors;
@@ -864,7 +865,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
         if(reportProgress)
         {
-		LOGD << io::xprintf("Writing file %sx_%d.den", progressBeginPath.c_str(), iteration);
+            LOGD << io::xprintf("Writing file %sx_%d.den", progressBeginPath.c_str(), iteration);
             writeVolume(*x_cur, io::xprintf("%sx_%d.den", progressBeginPath.c_str(), iteration));
         }
     }

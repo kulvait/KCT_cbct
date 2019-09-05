@@ -654,21 +654,23 @@ std::vector<float>
 GLSQRReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM)
 {
     std::vector<float> scalingFactors;
-    double xspacing2 = pixelSpacingX * pixelSpacingX;
-    double yspacing2 = pixelSpacingY * pixelSpacingY;
+    double xoveryspacing = pixelSpacingX / pixelSpacingY;
+    double yoverxspacing = pixelSpacingY / pixelSpacingX;
     for(std::size_t i = 0; i != pdimz; i++)
     {
         double x1, x2, y1, y2;
         matrix::ProjectionMatrix pm = PM[i];
         std::array<double, 3> sourcePosition = pm.sourcePosition();
         std::array<double, 3> normalToDetector = pm.normalToDetector();
-        std::array<double, 3> tangentToDetector
-            = { normalToDetector[1], -normalToDetector[0], 0.0 };
-        pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
-                   sourcePosition[2] + normalToDetector[2], &x1, &y1);
-        pm.project(sourcePosition[0] + normalToDetector[0] + tangentToDetector[0],
-                   sourcePosition[1] + normalToDetector[1] + tangentToDetector[1],
-                   sourcePosition[2] + normalToDetector[2] + tangentToDetector[2], &x2, &y2);
+        std::array<double, 3> tangentToDetector = pm.tangentToDetectorYDirection();
+        pm.project(sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+                   sourcePosition[2] - normalToDetector[2], &x1, &y1);
+        pm.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                   sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                   sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
+        /*
+    double xspacing2 = pixelSpacingX * pixelSpacingX;
+    double yspacing2 = pixelSpacingY * pixelSpacingY;
         double distToDetector
             = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2
                         + (y1 - y2) * (y1 - y2) * yspacing2); // Here I am using the fact that I
@@ -676,7 +678,9 @@ GLSQRReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> 
                                                               // angle 45deg and so the distance on
                                                               // the detector is the same as the
                                                               // distance from source to detector
-        double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;
+        double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;*/
+        double scalingFactor
+            = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
         scalingFactors.push_back(scalingFactor);
     }
     return scalingFactors;

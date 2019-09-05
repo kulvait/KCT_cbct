@@ -144,7 +144,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                 + voxelSizes * 0.5; // Using widening and vector multiplication operations
             double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
             double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-            double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
+            double cosine = -dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
             double cosPowThree = cosine * cosine * cosine;
             float value
                 = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
@@ -168,7 +168,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
         = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
     double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-    double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
+    double cosine = -dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
     double cosPowThree = cosine * cosine * cosine;
     float value = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,

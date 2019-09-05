@@ -66,6 +66,7 @@ public:
     int initializeOpenCL(uint32_t platformId = 0);
 
     int initializeVolumeImage();
+    int updateVolumeImage();
 
     int project(float* projection,
                 uint32_t pdimx,
@@ -93,7 +94,6 @@ private:
     size_t projectionBuffer_size = 0;
     std::shared_ptr<cl::Buffer> tmpBuffer = nullptr;
     size_t tmpBuffer_size = 0;
-
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
