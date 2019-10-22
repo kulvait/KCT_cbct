@@ -35,12 +35,12 @@ float inline backprojectEdgeValues(global float* projection,
     float factor;
     if(PJ_down == PJ_up)
     {
-        factor = value * voxelSizes.z;
+        factor = value;
         ADD = projection[PX + pdims.x * PJ_down] * factor;
         return ADD;
     }
-    float stepSize = voxelSizes.z * value
-        / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
+    float stepSize
+        = value / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
     // Add part that maps to PJ_down
     int j, j_STOP;
     if(PJ_down >= 0)
@@ -111,6 +111,10 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
             -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
     const double3 voxelcorner_xyz = zerocorner_xyz
         + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
+    const uint IND = voxelIndex(i, j, k, vdims);
+    const double3 voxelcenter_xyz
+        = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
+    const float voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
     // EXPERIMENTAL ... reconstruct inner circle
     /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5,
        0.5)); if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
@@ -139,17 +143,10 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     {
         if(cornerProjectionIndex != -1)
         {
-            const uint IND = voxelIndex(i, j, k, vdims);
-            const double3 voxelcenter_xyz = voxelcorner_xyz
-                + voxelSizes * 0.5; // Using widening and vector multiplication operations
             double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-            double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-            double cosine = -dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
-            double cosPowThree = cosine * cosine * cosine;
-            float value
-                = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
-            ADD = projection[projectionOffset + cornerProjectionIndex] * value * voxelSizes.x
-                * voxelSizes.y * voxelSizes.z;
+            double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
+            ADD = projection[projectionOffset + cornerProjectionIndex] * scalingFactor * voxelVolume
+                / sourceToVoxel_xyz_norm2;
             volume[IND] += ADD;
         }
         return;
@@ -163,14 +160,9 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     // EXPERIMENTAL ... reconstruct inner circle
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
-    const uint IND = voxelIndex(i, j, k, vdims);
-    const double3 voxelcenter_xyz
-        = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
     double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-    double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-    double cosine = -dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
-    double cosPowThree = cosine * cosine * cosine;
-    float value = scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+    double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
+    float value = scalingFactor * voxelVolume / sourceToVoxel_xyz_norm2;
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
@@ -200,7 +192,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                          // admissible range
     {
         ADD = backprojectEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0, min_PX,
-                                    value * voxelSizes.x * voxelSizes.y, voxelSizes, pdims);
+                                    value, voxelSizes, pdims);
         volume[IND] += ADD;
         return;
     }
@@ -282,7 +274,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                                  PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
     if(I >= 0)
     {
-        factor = value * lastSectionSize * voxelSizes.x * voxelSizes.y;
+        factor = value * lastSectionSize;
         ADD += backprojectEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
                                      voxelSizes, pdims);
     }
@@ -293,7 +285,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
                                      PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
+        factor = value * polygonSize;
         ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
                                      pdims);
         lastSectionSize = nextSectionSize;
@@ -303,7 +295,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     {
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
+        factor = value * polygonSize;
         ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
                                      pdims);
     }

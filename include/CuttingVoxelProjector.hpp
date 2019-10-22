@@ -8,7 +8,9 @@
 #include <iostream>
 
 // Internal libraries
+#include "MATRIX/LUDoolittleForm.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
+#include "MATRIX/SquareMatrix.hpp"
 #include "OPENCL/OpenCLManager.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
@@ -74,6 +76,12 @@ public:
                 matrix::ProjectionMatrix P,
                 float scalingFactor);
 
+    int projectSiddon(float* projection,
+                      uint32_t pdimx,
+                      uint32_t pdimy,
+                      matrix::ProjectionMatrix matrix,
+                      float scalingFactor);
+
     double normSquare(float* projection, uint32_t pdimx, uint32_t pdimy);
     double normSquareDifference(float* projection, uint32_t pdimx, uint32_t pdimy);
 
@@ -105,6 +113,26 @@ private:
                                     cl_int2&,
                                     float&>>
         projector;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&,
+                                    cl_uint2&>>
+        projector_siddon;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        scalingProjections;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOAT_addIntoFirstVectorSecondVectorScaled;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> NormSquare;

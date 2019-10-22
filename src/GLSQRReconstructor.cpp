@@ -98,6 +98,10 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
     ScalarProductPartial_barier = std::make_shared<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
         cl::Kernel(program, "vector_ScalarProductPartial_barier"));
+    scalingProjections
+        = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                                           cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATrescale_projections"));
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
 }
@@ -485,10 +489,12 @@ float GLSQRReconstructor::normBBuffer_barier(cl::Buffer& B)
 int GLSQRReconstructor::backproject(cl::Buffer& B,
                                     cl::Buffer& X,
                                     std::vector<matrix::ProjectionMatrix>& V,
+                                    std::vector<cl_double16>& invertedProjectionMatrices,
                                     std::vector<float>& scalingFactors)
 {
     Q->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
+    copyFloatVector(B, *tmp_b_buf, BDIM);
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
@@ -498,16 +504,22 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
         double* P = mat.getPtr();
         cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
                          0.0, 0.0, 0.0, 0.0 });
+        cl_double16 ICM = invertedProjectionMatrices[i];
         cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
         cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
         cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
         cl_int2 pdims({ int(pdimx), int(pdimy) });
-        cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
         unsigned int offset = i * frameSize;
-        (*FLOATcutting_voxel_backproject)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
-                                          vdims, voxelSizes, pdims, scalingFactor)
+        cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+        (*scalingProjections)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                              pdims, scalingFactor)
+            .wait();
+        cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+        float FLOATONE = 1.0;
+        (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
+                                          NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE)
             .wait();
     }
     return 0;
@@ -516,6 +528,7 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
 int GLSQRReconstructor::project(cl::Buffer& X,
                                 cl::Buffer& B,
                                 std::vector<matrix::ProjectionMatrix>& V,
+                                std::vector<cl_double16>& invertedProjectionMatrices,
                                 std::vector<float>& scalingFactors)
 {
     Q->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
@@ -529,6 +542,7 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         double* P = mat.getPtr();
         cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
                          0.0, 0.0, 0.0, 0.0 });
+        cl_double16 ICM = invertedProjectionMatrices[i];
         cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
@@ -536,9 +550,14 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
         cl_int2 pdims({ int(pdimx), int(pdimy) });
         unsigned int offset = i * frameSize;
+        float FLOATONE = 1.0;
         cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
         (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
-                                      vdims, voxelSizes, pdims, scalingFactor)
+                                      vdims, voxelSizes, pdims, FLOATONE)
+            .wait();
+        cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+        (*scalingProjections)(eargs2, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR, pdims,
+                              scalingFactor)
             .wait();
     }
     return 0;
@@ -590,6 +609,31 @@ GLSQRReconstructor::encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMa
     return v;
 }
 
+std::vector<cl_double16>
+GLSQRReconstructor::inverseProjectionMatrices(std::vector<matrix::ProjectionMatrix> CM)
+{
+    std::vector<cl_double16> inverseProjectionMatrices;
+    for(std::size_t i = 0; i != pdimz; i++)
+    {
+        matrix::ProjectionMatrix matrix = CM[i];
+
+        double* P = matrix.getPtr();
+        std::array<double, 3> sourcePosition = matrix.sourcePosition();
+        CTL::matrix::SquareMatrix CME(4,
+                                      { P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9],
+                                        P[10], P[11], sourcePosition[0], sourcePosition[1],
+                                        sourcePosition[2], 1.0 });
+        matrix::LUDoolittleForm lu = matrix::LUDoolittleForm::LUDecomposeDoolittle(CME, 0.001);
+        matrix::SquareMatrix invertedCameraMatrix = lu.inverseMatrix();
+        double* icm = invertedCameraMatrix.getPtr();
+        //    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
+        cl_double16 ICM({ icm[0], icm[1], icm[2], icm[3], icm[4], icm[5], icm[6], icm[7], icm[8],
+                          icm[9], icm[10], icm[11], icm[12], icm[13], icm[14], icm[15] });
+        inverseProjectionMatrices.push_back(ICM);
+    }
+    return inverseProjectionMatrices;
+}
+
 std::vector<float>
 GLSQRReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM)
 {
@@ -608,15 +652,6 @@ GLSQRReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> 
         pm.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
                    sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
-        /*
-        double distToDetector
-            = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2
-                        + (y1 - y2) * (y1 - y2) * yspacing2); // Here I am using the fact that I
-                                                              // have projected two vectors with the
-                                                              // angle 45deg and so the distance on
-                                                              // the detector is the same as the
-                                                              // distance from source to detector
-        double scalingFactor = distToDetector * distToDetector / pixelSpacingX / pixelSpacingY;*/
         double scalingFactor
             = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
         scalingFactors.push_back(scalingFactor);
@@ -670,6 +705,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
         // writeVolume(*x_buf, io::xprintf("%sx_0.den", progressBeginPath.c_str()));
     }
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
+    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
     uint32_t iteration = 0;
 
@@ -685,7 +721,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
     // Anything might be supplied here, but we will do standard initialization first
     v_next = xa_buf;
     Q->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
-    backproject(*b_buf, *v_next, PM, scalingFactors);
+    backproject(*b_buf, *v_next, PM, ICM, scalingFactors);
     double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
     scaleFloatVector(*v_next, float(1.0 / vnextnorm), XDIM);
@@ -775,7 +811,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
         rho_prev_prev = rho_prev;
         rho_prev = rho_cur;
 
-        backproject(*u_cur, *XZ, PM, scalingFactors);
+        backproject(*u_cur, *XZ, PM, ICM, scalingFactors);
         sigma_prev = scalarProductXBuffer_barier_double(*XZ, *v_prev);
         addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
         LOGI << io::xprintf("sigma_prev=%f", sigma_prev);
@@ -820,7 +856,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
             }
         }
 
-        project(*v_cur, *BZ, PM, scalingFactors);
+        project(*v_cur, *BZ, PM, ICM, scalingFactors);
         tau_prev = scalarProductBBuffer_barier_double(*BZ, *u_prev);
         addIntoFirstVectorSecondVectorScaled(*BZ, *u_prev, float(-tau_prev), BDIM);
 

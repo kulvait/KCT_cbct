@@ -164,10 +164,12 @@ private:
     int backproject(cl::Buffer& B,
                     cl::Buffer& X,
                     std::vector<matrix::ProjectionMatrix>& V,
+                    std::vector<cl_double16>& invertedProjectionMatrices,
                     std::vector<float>& scalingFactors);
     int project(cl::Buffer& B,
                 cl::Buffer& X,
                 std::vector<matrix::ProjectionMatrix>& V,
+                std::vector<cl_double16>& invertedProjectionMatrices,
                 std::vector<float>& scalingFactors);
     int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
     int scaleFloatVector(cl::Buffer& v, float f, unsigned int size);
@@ -177,6 +179,7 @@ private:
     addIntoFirstVectorScaledSecondVector(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
     std::vector<matrix::ProjectionMatrix>
     encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
+    std::vector<cl_double16> inverseProjectionMatrices(std::vector<matrix::ProjectionMatrix>);
     std::vector<float> computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM);
 
     float* x = nullptr; // Volume data
@@ -239,6 +242,14 @@ private:
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         ScalarProductPartial_barier;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        scalingProjections;
     std::chrono::time_point<std::chrono::steady_clock> timepoint;
 };
 

@@ -57,6 +57,7 @@ struct Args
     std::string outputProjection;
     std::string rightHandSide = "";
     bool force = false;
+    bool siddon = false;
 };
 
 /**Argument parsing
@@ -86,6 +87,7 @@ int Args::parseArguments(int argc, char* argv[])
                    "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "
                    "does matter. Accepts end literal that means total number of slices of the "
                    "input.");
+    app.add_flag("-s,--siddon", siddon, "Use Siddon's projector");
     app.add_option("-k,--each-kth", eachkth,
                    "Process only each k-th frame intended for output. The frames to output "
                    "are then 1st specified, 1+kN, N=1...\\infty if such frame exists. Parameter k "
@@ -93,14 +95,14 @@ int Args::parseArguments(int argc, char* argv[])
         ->check(CLI::Range(1, 65535));
     app.add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
     app.add_option("--right-hand-side", rightHandSide,
-                 "If the parameter is specified, then we also compute the norm of the right hand "
-                 "side from the projected vector.");
+                   "If the parameter is specified, then we also compute the norm of the right hand "
+                   "side from the projected vector.");
     app.add_flag("--center-voxel-projector", centerVoxelProjector,
                  "Use center voxel projector instead of cutting voxel projector.");
-    CLI::Option* px
-        = app.add_option("--projection-sizex", projectionSizeX, "Dimension of detector, defaults to 616.");
-    CLI::Option* py
-        = app.add_option("--projection-sizey", projectionSizeY, "Dimension of detector, defaults to 480.");
+    CLI::Option* px = app.add_option("--projection-sizex", projectionSizeX,
+                                     "Dimension of detector, defaults to 616.");
+    CLI::Option* py = app.add_option("--projection-sizey", projectionSizeY,
+                                     "Dimension of detector, defaults to 480.");
     CLI::Option* psx = app.add_option("--pixel-sizex", pixelSizeX,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* psy = app.add_option("--pixel-sizey", pixelSizeY,
@@ -226,8 +228,8 @@ int main(int argc, char* argv[])
     float* volume = new float[totalVolumeSize];
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        volume, inf.dimx(), inf.dimy(), inf.dimz(), a.voxelSizeX, a.voxelSizeY,
-        a.voxelSizeZ, xpath, a.debug, a.centerVoxelProjector);
+        volume, inf.dimx(), inf.dimy(), inf.dimz(), a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ, xpath,
+        a.debug, a.centerVoxelProjector);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {
@@ -251,41 +253,35 @@ int main(int argc, char* argv[])
     {
         dpr = std::make_shared<io::DenFrame2DReader<float>>(a.rightHandSide);
     }
+    double xoveryspacing = a.pixelSizeX / a.pixelSizeY;
+    double yoverxspacing = a.pixelSizeY / a.pixelSizeX;
     for(int f : a.frames)
     {
         matrix::ProjectionMatrix pm = dr->readMatrix(f);
 
+        double x1, x2, y1, y2;
         std::array<double, 3> sourcePosition = pm.sourcePosition();
         std::array<double, 3> normalToDetector = pm.normalToDetector();
-
-        double x1, x2, y1, y2;
-        pm.project(sourcePosition[0] + normalToDetector[0], sourcePosition[1] + normalToDetector[1],
-                   sourcePosition[2] + normalToDetector[2], &x1, &y1);
-        pm.project(100.0, 100.0, 100.0, &x2, &y2);
-        double xspacing2 = a.pixelSizeX * a.pixelSizeX;
-        double yspacing2 = a.pixelSizeY * a.pixelSizeY;
-        double distance
-            = std::sqrt((x1 - x2) * (x1 - x2) * xspacing2 + (y1 - y2) * (y1 - y2) * yspacing2);
-        double x = 100.0 - sourcePosition[0];
-        double y = 100.0 - sourcePosition[1];
-        double z = 100.0 - sourcePosition[2];
-        double norma = std::sqrt(x * x + y * y + z * z);
-        x /= norma;
-        y /= norma;
-        z /= norma;
-        double cos = normalToDetector[0] * x + normalToDetector[1] * y + normalToDetector[2] * z;
-        double theta = std::acos(cos);
-        double distToDetector = std::abs(distance / std::tan(theta));
-        double scalingFactor = distToDetector * distToDetector / a.pixelSizeX / a.pixelSizeY;
-        //        LOGI << io::xprintf("Distance to the detector is %fmm therefore scaling factor is
-        //        %f.",
-        //                            distToDetector, scalingFactor);
-        cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+        std::array<double, 3> tangentToDetector = pm.tangentToDetectorYDirection();
+        pm.project(sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+                   sourcePosition[2] - normalToDetector[2], &x1, &y1);
+        pm.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                   sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                   sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
+        double scalingFactor
+            = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
+	if(a.siddon)
+	{
+        	cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+	}else
+	{
+        	cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+	}
         if(dpr != nullptr)
         {
             std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(f);
-            normSquare
-                += cvp->normSquare((float*)fr->getDataPointer(), a.projectionSizeX, a.projectionSizeY);
+            normSquare += cvp->normSquare((float*)fr->getDataPointer(), a.projectionSizeX,
+                                          a.projectionSizeY);
             normSquareDifference += cvp->normSquareDifference((float*)fr->getDataPointer(),
                                                               a.projectionSizeX, a.projectionSizeY);
         }
@@ -302,6 +298,7 @@ int main(int argc, char* argv[])
     {
         LOGI << io::xprintf(
             "Initial norm is %f, norm of the difference  is %f that is %f%% of the initial norm.",
-            std::sqrt(normSquare), std::sqrt(normSquareDifference), std::sqrt(normSquareDifference / normSquare) * 100);
+            std::sqrt(normSquare), std::sqrt(normSquareDifference),
+            std::sqrt(normSquareDifference / normSquare) * 100);
     }
 }

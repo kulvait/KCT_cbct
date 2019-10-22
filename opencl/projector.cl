@@ -1,27 +1,3 @@
-/** Atomic float addition.
- *
- * Function from
- * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
- *
- *
- * @param source Pointer to the memory to perform atomic operation on.
- * @param operand Float to add.
- */
-inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
-{
-    union
-    {
-        unsigned int u32;
-        float f32;
-    } tmp, adrcatch;
-    tmp.f32 = *adr;
-    do
-    {
-        adrcatch.f32 = tmp.f32;
-        tmp.f32 += v;
-        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
-    } while(tmp.u32 != adrcatch.u32);
-}
 
 /** Projection of a volume point v onto X coordinate on projector.
  * No checks for boundaries.
@@ -143,10 +119,10 @@ void inline insertEdgeValues(global float* projection,
     if(PJ_down == PJ_up)
     {
         AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
-                      value * voxelSizes.z); // Atomic version of projection[ind] += value;
+                      value); // Atomic version of projection[ind] += value;
         return;
     }
-    double stepSize = voxelSizes.z * value
+    double stepSize = value
         / (PY_up
            - PY_down); // Length of z in volume to increase y in projection by 1 multiplied by value
     // int j = max(-1, PJ_down);
@@ -415,6 +391,40 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
         = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
 }
 
+void kernel FLOATrescale_projections(global float* projection,
+                                     private uint projectionOffset,
+                                     private double16 ICM,
+                                     private double3 sourcePosition,
+                                     private double3 normalToDetector,
+                                     private int2 pdims,
+                                     private float scalingFactor)
+{
+    uint px = get_global_id(0);
+    uint py = get_global_id(1);
+    const double4 P = { (double)px, (double)py, 1.0, 0.0 };
+    double4 V; // Point that will be projected to P by CM
+
+    V.s0 = dot(ICM.s0123, P);
+    V.s1 = dot(ICM.s4567, P);
+    V.s2 = dot(ICM.s89ab, P);
+    V.s3 = dot(ICM.scdef, P);
+    if(fabs(V.s3) < 0.001) // This is legal operation since source is projected to (0,0,0)
+    {
+        V.s012 = V.s012 + sourcePosition;
+        V.s3 = V.s3 + 1.0;
+    }
+    V.s0 = V.s0 / V.s3;
+    V.s1 = V.s1 / V.s3;
+    V.s2 = V.s2 / V.s3;
+    double3 n = normalize(V.s012 - sourcePosition);
+    double cosine = fabs(-dot(normalToDetector, n));
+    double cosPowThree = cosine * cosine * cosine;
+    uint ind = px + pdims.x * py;
+    float pixelValue = projection[projectionOffset + ind];
+    float value = pixelValue * scalingFactor / cosPowThree;
+    projection[projectionOffset + ind] = value;
+}
+
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -451,6 +461,11 @@ void kernel FLOATcutting_voxel_project(global float* volume,
             -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
     const double3 voxelcorner_xyz = zerocorner_xyz
         + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
+    const uint IND = voxelIndex(i, j, k, vdims);
+    const float voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
+    const float voxelValue = volume[IND];
+    const double3 voxelcenter_xyz
+        = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
     // EXPERIMENTAL ... reconstruct inner circle
     /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5,
        0.5)); if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
@@ -479,32 +494,17 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     {
         if(cornerProjectionIndex != -1)
         {
-            const uint IND = voxelIndex(i, j, k, vdims);
-            float voxelValue = volume[IND];
-            const double3 voxelcenter_xyz = voxelcorner_xyz
-                + voxelSizes * 0.5; // Using widening and vector multiplication operations
             double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-            double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-            double cosine = -dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
-            double cosPowThree = cosine * cosine * cosine;
-            float value = voxelValue * scalingFactor
-                / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+            double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
+            float value = voxelValue * voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2;
             AtomicAdd_g_f(&projection[projectionOffset + cornerProjectionIndex],
-                          value * voxelSizes.x * voxelSizes.y
-                              * voxelSizes.z); // Atomic version of projection[ind] += value;
+                          value); // Atomic version of projection[ind] += value;
         }
         return;
     }
-    const uint IND = voxelIndex(i, j, k, vdims);
-    float voxelValue = volume[IND];
-    const double3 voxelcenter_xyz
-        = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
     double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-    double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
-    double cosine = -dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
-    double cosPowThree = cosine * cosine * cosine;
-    float value = voxelValue * scalingFactor
-        / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+    double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
+    float value = voxelValue * scalingFactor * voxelVolume / sourceToVoxel_xyz_norm2;
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
@@ -522,8 +522,133 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
     int max_PX,
         min_PX; // Pixel to which are the voxels with minimum and maximum values are projected
-    pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
-    pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
+    // pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
+    // pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
+    double3* V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
+    // from the minimum voxel
+    double* PX_ccw[4]; // Point in which maximum is achieved and counter clock wise  points
+    // from the minimum voxel
+    if(px00 < px01)
+    {
+        if(px00 < px10)
+        {
+            pxx_min = px00;
+            V_ccw[0] = &vx00;
+            V_ccw[1] = &vx01;
+            V_ccw[2] = &vx11;
+            V_ccw[3] = &vx10;
+            PX_ccw[0] = &px00;
+            PX_ccw[1] = &px01;
+            PX_ccw[2] = &px11;
+            PX_ccw[3] = &px10;
+            if(px11 >= px01)
+            {
+                if(px11 >= px10)
+                {
+                    pxx_max = px11;
+                } else
+                {
+                    pxx_max = px10;
+                }
+            } else
+            {
+                pxx_max = px01;
+            }
+        } else
+        {
+            if(px10 < px11)
+            {
+                pxx_min = px10;
+                V_ccw[0] = &vx10;
+                V_ccw[1] = &vx00;
+                V_ccw[2] = &vx01;
+                V_ccw[3] = &vx11;
+                PX_ccw[0] = &px10;
+                PX_ccw[1] = &px00;
+                PX_ccw[2] = &px01;
+                PX_ccw[3] = &px11;
+                if(px01 < px11)
+                {
+                    pxx_max = px11;
+                } else
+                {
+                    pxx_max = px01;
+                }
+            } else
+            {
+                pxx_min = px11;
+                pxx_max = px01;
+                V_ccw[0] = &vx11;
+                V_ccw[1] = &vx10;
+                V_ccw[2] = &vx00;
+                V_ccw[3] = &vx01;
+                PX_ccw[0] = &px11;
+                PX_ccw[1] = &px10;
+                PX_ccw[2] = &px00;
+                PX_ccw[3] = &px01;
+            }
+        }
+    } else
+    {
+        if(px01 < px11)
+        {
+            pxx_min = px01;
+            V_ccw[0] = &vx01;
+            V_ccw[1] = &vx11;
+            V_ccw[2] = &vx10;
+            V_ccw[3] = &vx00;
+            PX_ccw[0] = &px01;
+            PX_ccw[1] = &px11;
+            PX_ccw[2] = &px10;
+            PX_ccw[3] = &px00;
+            if(px10 >= px11)
+            {
+                if(px10 >= px00)
+                {
+                    pxx_max = px10;
+                } else
+                {
+                    pxx_max = px00;
+                }
+            } else
+            {
+                pxx_max = px11;
+            }
+        } else
+        {
+            if(px11 < px10)
+            {
+                pxx_min = px11;
+                V_ccw[0] = &vx11;
+                V_ccw[1] = &vx10;
+                V_ccw[2] = &vx00;
+                V_ccw[3] = &vx01;
+                PX_ccw[0] = &px11;
+                PX_ccw[1] = &px10;
+                PX_ccw[2] = &px00;
+                PX_ccw[3] = &px01;
+                if(px00 >= px10)
+                {
+                    pxx_max = px00;
+                } else
+                {
+                    pxx_max = px10;
+                }
+            } else
+            {
+                pxx_min = px10;
+                pxx_max = px00;
+                V_ccw[0] = &vx10;
+                V_ccw[1] = &vx00;
+                V_ccw[2] = &vx01;
+                V_ccw[3] = &vx11;
+                PX_ccw[0] = &px10;
+                PX_ccw[1] = &px00;
+                PX_ccw[2] = &px01;
+                PX_ccw[3] = &px11;
+            }
+        }
+    }
     max_PX = convert_int_rtn(pxx_max + 0.5);
     min_PX = convert_int_rtn(pxx_min + 0.5);
     if(max_PX < 0 || min_PX >= pdims.x)
@@ -533,73 +658,11 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     if(max_PX == min_PX) // Due to the previous statement I know that these indices are inside the
                          // admissible range
     {
-        insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX,
-                         value * voxelSizes.x * voxelSizes.y, voxelSizes, pdims);
+        insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX, value,
+                         voxelSizes, pdims);
         return;
     }
-    double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
-    // from the minimum voxel
-    double *PX_max,
-        *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise  points
-    // from the minimum voxel
-    if(px00 == pxx_min)
-    {
-        V_ccw[0] = &vx00;
-        V_ccw[1] = &vx01;
-        V_ccw[2] = &vx11;
-        V_ccw[3] = &vx10;
-        PX_ccw[0] = &px00;
-        PX_ccw[1] = &px01;
-        PX_ccw[2] = &px11;
-        PX_ccw[3] = &px10;
-    } else if(px01 == pxx_min)
-    {
-        V_ccw[0] = &vx01;
-        V_ccw[1] = &vx11;
-        V_ccw[2] = &vx10;
-        V_ccw[3] = &vx00;
-        PX_ccw[0] = &px01;
-        PX_ccw[1] = &px11;
-        PX_ccw[2] = &px10;
-        PX_ccw[3] = &px00;
-    } else if(px10 == pxx_min)
-    {
-        V_ccw[0] = &vx10;
-        V_ccw[1] = &vx00;
-        V_ccw[2] = &vx01;
-        V_ccw[3] = &vx11;
-        PX_ccw[0] = &px10;
-        PX_ccw[1] = &px00;
-        PX_ccw[2] = &px01;
-        PX_ccw[3] = &px11;
-    } else // its px11
-    {
-        V_ccw[0] = &vx11;
-        V_ccw[1] = &vx10;
-        V_ccw[2] = &vx00;
-        V_ccw[3] = &vx01;
-        PX_ccw[0] = &px11;
-        PX_ccw[1] = &px10;
-        PX_ccw[2] = &px00;
-        PX_ccw[3] = &px01;
-    }
-    if(px10 == pxx_max)
-    {
-        V_max = &vx10;
-        PX_max = &px10;
-    } else if(px11 == pxx_max)
-    {
-        V_max = &vx11;
-        PX_max = &px11;
-    } else if(px00 == pxx_max)
-    {
-        V_max = &vx00;
-        PX_max = &px00;
-    } else // its px01
-    {
-        V_max = &vx01;
-        PX_max = &px01;
-    }
+
     double lastSectionSize, nextSectionSize, polygonSize;
     double3 lastInt, nextInt, Int;
     int I = max(-1, min_PX);
@@ -614,7 +677,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                                  PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
     if(I >= 0)
     {
-        factor = value * lastSectionSize * voxelSizes.x * voxelSizes.y;
+        factor = value * lastSectionSize;
         insertEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor, voxelSizes, pdims);
     }
     for(I = I + 1; I < I_STOP; I++)
@@ -624,7 +687,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
                                      PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
+        factor = value * polygonSize;
         insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
         lastSectionSize = nextSectionSize;
         lastInt = nextInt;
@@ -633,7 +696,7 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     {
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize * voxelSizes.x * voxelSizes.y;
+        factor = value * polygonSize;
         insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
     }
 }
