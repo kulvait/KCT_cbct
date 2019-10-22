@@ -174,7 +174,7 @@ void kernel FLOATsidon_backproject(global float* volume,
                     alphasNext.z += sidonIncrement.z;
                 }
                 LEN = alphanext - alphaprev;
-                pos = alphaprev + 0.5(alphanext - alphaprev);
+                pos = alphaprev + 0.5*(alphanext - alphaprev);
                 ind = convert_int3_rtn(sourcePosition + pos * a
                                        - (zerocorner_xyz + (0.5, 0.5, 0.5)));
                 IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
