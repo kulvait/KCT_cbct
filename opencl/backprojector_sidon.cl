@@ -57,7 +57,7 @@ void kernel FLOATsidon_backproject(global float* volume,
             double3 alphasPrev; // Previous intersection with the plane in given direction
             if(a.x != 0.0)
             {
-                sidonIncrement.x = voxelSizes.x / a.x;
+                sidonIncrement.x = abs(voxelSizes.x / a.x);
                 minSidonIncrement = sidonIncrement.x;
                 minalphai = cornera_minus_s.x / a.x;
                 maxalphai = cornerb_minus_s.x / a.x;
@@ -73,7 +73,7 @@ void kernel FLOATsidon_backproject(global float* volume,
             }
             if(a.y != 0.0)
             {
-                sidonIncrement.y = voxelSizes.y / a.y;
+                sidonIncrement.y = abs(voxelSizes.y / a.y);
                 minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.x);
                 minalphai = cornera_minus_s.y / a.y;
                 maxalphai = cornerb_minus_s.y / a.y;
@@ -106,7 +106,7 @@ void kernel FLOATsidon_backproject(global float* volume,
             }
             if(a.z != 0.0)
             {
-                sidonIncrement.z = voxelSizes.z / a.z;
+                sidonIncrement.z = abs(voxelSizes.z / a.z);
                 minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.z);
                 minalphai = cornera_minus_s.z / a.z;
                 maxalphai = cornerb_minus_s.z / a.z;
