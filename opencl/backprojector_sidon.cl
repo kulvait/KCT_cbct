@@ -17,8 +17,7 @@ void kernel FLOATsidon_backproject(global float* volume,
     float VAL = projection[projectionOffset + pin];
     float2 pixelCorner = (float2)((float)px, (float)py) - (float2)0.5f;
     float2 pixelSamplingGap = (float2)(1.0f) / convert_float2(raysPerPixel);
-    float2 pixelPosition;
-    double4 P, V; // V is the point that will be projected to P by CM
+    double4 P = { 0.0, 0.0, 1.0, 0.0 }, V;// V is the point that will be projected to P by extended CM
     const double3 zerocorner_xyz
         = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
             -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
@@ -27,8 +26,8 @@ void kernel FLOATsidon_backproject(global float* volume,
     {
         for(uint pj = 0; pj < raysPerPixel.y; pj++)
         {
-            pixelPosition = pixelCorner + (pi + 0.5f, pj + 0.5f) * pixelSamplingGap;
-            P = { (double)pixelPosition.x, (double)pixelPosition.y, 1.0, 0.0 };
+            P.x = pixelCorner + (pi + 0.5f) * pixelSamplingGap.x;
+            P.y = pixelCorner + (pj + 0.5f) * pixelSamplingGap.y;
             V.s0 = dot(ICM.s0123, P);
             V.s1 = dot(ICM.s4567, P);
             V.s2 = dot(ICM.s89ab, P);
@@ -146,7 +145,7 @@ void kernel FLOATsidon_backproject(global float* volume,
                 maxalpha = fmin(maxalpha, maxalphai);
             }
             double halfMinIncrement = minSidonIncrement * 0.5;
-            double alphasNext = alphasPrev + sidonIncrement;
+            double3 alphasNext = alphasPrev + sidonIncrement;
 
             double alphaprev = minalpha;
             while(alphaprev + halfMinIncrement < maxalpha)
@@ -176,7 +175,7 @@ void kernel FLOATsidon_backproject(global float* volume,
                 ind = convert_int3_rtn(sourcePosition + pos * a
                                        - (zerocorner_xyz + (0.5, 0.5, 0.5)));
                 IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
-		AtomicAdd_g_f(&volume[IND], VAL*LEN/totalProbes);
+                AtomicAdd_g_f(&volume[IND], VAL * LEN / totalProbes);
                 assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
                 alphaprev = alphanext;
             }
