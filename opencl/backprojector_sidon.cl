@@ -176,11 +176,12 @@ void kernel FLOATsidon_backproject(global float* volume,
                 }
                 LEN = alphanext - alphaprev;
                 pos = alphaprev + 0.5 * (alphanext - alphaprev);
-                ind = convert_int3_rtn(sourcePosition + pos * a
-                                       - zerocorner_xyz );//Not rounding but finds integer that is closest smaller
+                ind = convert_int3_rtn(
+                    (sourcePosition + pos * a - zerocorner_xyz)
+                    / voxelSizes); // Not rounding but finds integer that is closest smaller
                 IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
                 AtomicAdd_g_f(&volume[IND], VAL * LEN / totalProbes);
-                //assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+                // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
                 alphaprev = alphanext;
             }
         }
