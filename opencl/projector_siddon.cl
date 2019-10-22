@@ -176,7 +176,7 @@ void kernel FLOATsidon_project(global float* volume,
                 LEN = alphanext - alphaprev;
                 pos = alphaprev + 0.5 * (alphanext - alphaprev);
                 ind = convert_int3_rtn(sourcePosition + pos * a
-                                       - (zerocorner_xyz + (double3)(0.5, 0.5, 0.5)));
+                                       - zerocorner_xyz );//Not rounding but finds integer that is closest smaller
                 IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
                 VAL += volume[IND] * LEN;
                 assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
