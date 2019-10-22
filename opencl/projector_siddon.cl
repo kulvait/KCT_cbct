@@ -26,7 +26,8 @@ void kernel FLOATsidon_project(global float* volume,
     {
         for(uint pj = 0; pj < raysPerPixel.y; pj++)
         {
-            P.xy = pixelCorner + (pi + 0.5, pj + 0.5) * pixelSamplingGap;
+            P.x = pixelCorner.x + (pi + 0.5) * pixelSamplingGap.x;
+            P.y = pixelCorner.y + (pj + 0.5) * pixelSamplingGap.y;
             V.s0 = dot(ICM.s0123, P);
             V.s1 = dot(ICM.s4567, P);
             V.s2 = dot(ICM.s89ab, P);
@@ -173,12 +174,12 @@ void kernel FLOATsidon_project(global float* volume,
                     alphasNext.z += sidonIncrement.z;
                 }
                 LEN = alphanext - alphaprev;
-                pos = alphaprev + 0.5*(alphanext - alphaprev);
+                pos = alphaprev + 0.5 * (alphanext - alphaprev);
                 ind = convert_int3_rtn(sourcePosition + pos * a
-                                       - (zerocorner_xyz + (0.5, 0.5, 0.5)));
+                                       - (zerocorner_xyz + (double3)(0.5, 0.5, 0.5)));
                 IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
                 VAL += volume[IND] * LEN;
-                // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+                assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
                 alphaprev = alphanext;
             }
         }
