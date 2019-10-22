@@ -180,7 +180,7 @@ void kernel FLOATsidon_project(global float* volume,
                     / voxelSizes); // Not rounding but finds integer that is closest smaller
                 IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
                 VAL += volume[IND] * LEN;
-                assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+//                assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
                 alphaprev = alphanext;
             }
         }
