@@ -15,8 +15,8 @@ void kernel FLOATsidon_backproject(global float* volume,
     double totalProbes = (double)raysPerPixel.x * raysPerPixel.y;
     uint pin = px + pdims.x * py;
     float VAL = projection[projectionOffset + pin];
-    float2 pixelCorner = (float2)((float)px, (float)py) - (float2)0.5f;
-    float2 pixelSamplingGap = (float2)(1.0f) / convert_float2(raysPerPixel);
+    double2 pixelCorner = (double2)((double)px, (double)py) - (double2)0.5;
+    double2 pixelSamplingGap = (double2)(1.0) / convert_double2(raysPerPixel);
     double4 P = { 0.0, 0.0, 1.0, 0.0 }, V;// V is the point that will be projected to P by extended CM
     const double3 zerocorner_xyz
         = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
@@ -26,8 +26,7 @@ void kernel FLOATsidon_backproject(global float* volume,
     {
         for(uint pj = 0; pj < raysPerPixel.y; pj++)
         {
-            P.x = pixelCorner + (pi + 0.5f) * pixelSamplingGap.x;
-            P.y = pixelCorner + (pj + 0.5f) * pixelSamplingGap.y;
+            P.xy = pixelCorner + (pi + 0.5, pj+0.5) * pixelSamplingGap;
             V.s0 = dot(ICM.s0123, P);
             V.s1 = dot(ICM.s4567, P);
             V.s2 = dot(ICM.s89ab, P);
