@@ -17,7 +17,8 @@ void kernel FLOATsidon_backproject(global float* volume,
     float VAL = projection[projectionOffset + pin];
     double2 pixelCorner = (double2)((double)px, (double)py) - (double2)0.5;
     double2 pixelSamplingGap = (double2)(1.0) / convert_double2(raysPerPixel);
-    double4 P = { 0.0, 0.0, 1.0, 0.0 }, V;// V is the point that will be projected to P by extended CM
+    double4 P = { 0.0, 0.0, 1.0, 0.0 },
+            V; // V is the point that will be projected to P by extended CM
     const double3 zerocorner_xyz
         = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
             -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
@@ -26,7 +27,7 @@ void kernel FLOATsidon_backproject(global float* volume,
     {
         for(uint pj = 0; pj < raysPerPixel.y; pj++)
         {
-            P.xy = pixelCorner + (pi + 0.5, pj+0.5) * pixelSamplingGap;
+            P.xy = pixelCorner + (pi + 0.5, pj + 0.5) * pixelSamplingGap;
             V.s0 = dot(ICM.s0123, P);
             V.s1 = dot(ICM.s4567, P);
             V.s2 = dot(ICM.s89ab, P);
@@ -147,6 +148,9 @@ void kernel FLOATsidon_backproject(global float* volume,
             double3 alphasNext = alphasPrev + sidonIncrement;
 
             double alphaprev = minalpha;
+            double alphanext, LEN, pos;
+            int3 ind;
+            int IND;
             while(alphaprev + halfMinIncrement < maxalpha)
             {
                 if(alphasNext.x < alphasNext.y)

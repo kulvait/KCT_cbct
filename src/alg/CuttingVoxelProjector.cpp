@@ -42,7 +42,7 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
     if(debug)
     {
-        std::string options = io::xprintf("-g -s \"%s\"", clFile.c_str());
+        std::string options = io::xprintf("-Werror -g -s \"%s\"", clFile.c_str());
         if(program.build({ *device }, options.c_str()) != CL_SUCCESS)
         {
             LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
