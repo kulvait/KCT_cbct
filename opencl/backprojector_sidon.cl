@@ -57,7 +57,7 @@ void kernel FLOATsidon_backproject(global float* volume,
             double3 alphasPrev; // Previous intersection with the plane in given direction
             if(a.x != 0.0)
             {
-                sidonIncrement.x = abs(voxelSizes.x / a.x);
+                sidonIncrement.x = fabs(voxelSizes.x / a.x);
                 minSidonIncrement = sidonIncrement.x;
                 minalphai = cornera_minus_s.x / a.x;
                 maxalphai = cornerb_minus_s.x / a.x;
@@ -73,7 +73,7 @@ void kernel FLOATsidon_backproject(global float* volume,
             }
             if(a.y != 0.0)
             {
-                sidonIncrement.y = abs(voxelSizes.y / a.y);
+                sidonIncrement.y = fabs(voxelSizes.y / a.y);
                 minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.x);
                 minalphai = cornera_minus_s.y / a.y;
                 maxalphai = cornerb_minus_s.y / a.y;
@@ -106,7 +106,7 @@ void kernel FLOATsidon_backproject(global float* volume,
             }
             if(a.z != 0.0)
             {
-                sidonIncrement.z = abs(voxelSizes.z / a.z);
+                sidonIncrement.z = fabs(voxelSizes.z / a.z);
                 minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.z);
                 minalphai = cornera_minus_s.z / a.z;
                 maxalphai = cornerb_minus_s.z / a.z;
@@ -180,7 +180,7 @@ void kernel FLOATsidon_backproject(global float* volume,
                                        - (zerocorner_xyz + (double3)(0.5, 0.5, 0.5)));
                 IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
                 AtomicAdd_g_f(&volume[IND], VAL * LEN / totalProbes);
-                assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+                //assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
                 alphaprev = alphanext;
             }
         }
