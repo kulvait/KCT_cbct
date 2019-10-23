@@ -42,11 +42,11 @@ void kernel FLOATsidon_backproject(global float* volume,
             V.s1 = V.s1 / V.s3;
             V.s2 = V.s2 / V.s3;
             double3 a = normalize(V.s012 - sourcePosition);
-            double cosine = -dot(normalToDetector, a);
-            if(cosine < 0.0)
-            {
-                a = -a;
-            } // Direction from the source to a given detector position sourcePosition + alpha * a
+//            double cosine = -dot(normalToDetector, a);
+//            if(cosine < 0.0)
+//            {
+//                a = -a;
+//            } // Direction from the source to a given detector position sourcePosition + alpha * a
             double minalpha = 0.0;
             double maxalpha = DBL_MAX;
             double minalphai, maxalphai, tmp;
@@ -74,7 +74,7 @@ void kernel FLOATsidon_backproject(global float* volume,
             if(a.y != 0.0)
             {
                 sidonIncrement.y = fabs(voxelSizes.y / a.y);
-                minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.x);
+                minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.y);
                 minalphai = cornera_minus_s.y / a.y;
                 maxalphai = cornerb_minus_s.y / a.y;
                 if(minalphai > maxalphai)
