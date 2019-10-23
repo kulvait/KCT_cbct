@@ -80,7 +80,8 @@ public:
                       uint32_t pdimx,
                       uint32_t pdimy,
                       matrix::ProjectionMatrix matrix,
-                      float scalingFactor);
+                      float scalingFactor,
+                      uint32_t probesPerEdge);
 
     double normSquare(float* projection, uint32_t pdimx, uint32_t pdimy);
     double normSquareDifference(float* projection, uint32_t pdimx, uint32_t pdimy);

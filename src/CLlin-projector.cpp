@@ -58,6 +58,7 @@ struct Args
     std::string rightHandSide = "";
     bool force = false;
     bool siddon = false;
+    uint32_t probesPerEdge = 1;
 };
 
 /**Argument parsing
@@ -87,7 +88,13 @@ int Args::parseArguments(int argc, char* argv[])
                    "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "
                    "does matter. Accepts end literal that means total number of slices of the "
                    "input.");
-    app.add_flag("-s,--siddon", siddon, "Use Siddon's projector");
+    CLI::Option* sid = app.add_flag("-s,--siddon", siddon, "Use Siddon's projector");
+    CLI::Option* ppe
+        = app.add_option("--probes-per-edge", probesPerEdge,
+                         "Number of probes in each pixel edge, complexity scales with the "
+                         "square of this number. Defaults to 1")
+              ->check(CLI::Range(1, 1000));
+    ppe->needs(sid);
     app.add_option("-k,--each-kth", eachkth,
                    "Process only each k-th frame intended for output. The frames to output "
                    "are then 1st specified, 1+kN, N=1...\\infty if such frame exists. Parameter k "
@@ -270,13 +277,14 @@ int main(int argc, char* argv[])
                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
         double scalingFactor
             = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
-	if(a.siddon)
-	{
-        	cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
-	}else
-	{
-        	cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
-	}
+        if(a.siddon)
+        {
+            cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor,
+                               a.probesPerEdge);
+        } else
+        {
+            cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+        }
         if(dpr != nullptr)
         {
             std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(f);

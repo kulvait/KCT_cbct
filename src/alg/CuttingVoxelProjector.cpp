@@ -32,10 +32,11 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
 
     } else
     {
-        io::concatenateTextFiles(clFile, true,
-                                 { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector_siddon.cl", this->xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()) });
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector_siddon.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()) });
     }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
@@ -228,7 +229,8 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
                                          uint32_t pdimx,
                                          uint32_t pdimy,
                                          matrix::ProjectionMatrix matrix,
-                                         float scalingFactor)
+                                         float scalingFactor,
+                                         uint32_t probesPerEdge)
 {
     double* P = matrix.getPtr();
     std::array<double, 3> sourcePosition = matrix.sourcePosition();
@@ -261,12 +263,12 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
     cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
     cl_double3 voxelSizes({ vxs, vys, vzs });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
-    cl_uint2 pixelGranularity({ 1, 1 });
+    cl_uint2 pixelGranularity({ probesPerEdge, probesPerEdge });
     unsigned int offset = 0;
     float scalingOne = 1.0;
     cl::EnqueueArgs eargs(*Q, cl::NDRange(pdimx, pdimy));
     (*projector_siddon)(eargs, *volumeBuffer, *projectionBuffer, offset, ICM, SOURCEPOSITION,
-                       NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingOne, pixelGranularity)
+                        NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingOne, pixelGranularity)
         .wait();
 
     Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy, projection);
