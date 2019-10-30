@@ -50,8 +50,8 @@ struct Args
     uint32_t volumeSizeZ = 199;
     uint64_t totalVolumeSize;
     uint32_t baseOffset = 0;
-    uint32_t maxIterations = 10;
-    double stoppingError = 0.01;
+    uint32_t maxIterations = 40;
+    double stoppingError = 0.0025;
     bool noFrameOffset = false;
     std::string outputVolume;
     std::string inputProjectionMatrices;
@@ -114,10 +114,10 @@ int Args::parseArguments(int argc, char* argv[])
                  "Report intermediate values of x, defaults to false.")
         ->group("Platform settings");
     app.add_option("-i,--max_iterations", maxIterations,
-                   "Maximum number of CGLS iterations, defaults to 10.")
+                   "Maximum number of CGLS iterations, defaults to 40.")
         ->check(CLI::Range(1, 65535))
         ->group("Platform settings");
-    app.add_option("-e", stoppingError, "Stopping error, defaults to 0.01.")
+    app.add_option("-e", stoppingError, "Stopping error, defaults to 0.0025.")
         ->check(CLI::Range(0.0, 1.00))
         ->group("Platform settings");
     psx->needs(psy);
