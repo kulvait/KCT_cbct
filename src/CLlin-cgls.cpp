@@ -51,7 +51,8 @@ struct Args
     uint64_t totalVolumeSize;
     uint32_t baseOffset = 0;
     uint32_t maxIterations = 40;
-    double stoppingError = 0.0025;
+    double stoppingError = 0.00025;
+    double tikhonovLambda = -1.0;
     bool noFrameOffset = false;
     std::string outputVolume;
     std::string inputProjectionMatrices;
@@ -82,7 +83,12 @@ int Args::parseArguments(int argc, char* argv[])
         ->check(CLI::ExistingFile);
     app.add_option("output_volume", outputVolume, "Volume to project")->required();
     app.add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
-    app.add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
+    CLI::Option* glsqr_cli = app.add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
+
+    CLI::Option* tl_cli
+        = app.add_option("--tikhonov-lambda", tikhonovLambda, "Tikhonov regularization parameter.")
+              ->check(CLI::Range(0.0, 100.0));
+    tl_cli->needs(glsqr_cli);
     CLI::Option* psx = app.add_option("--pixel-sizex", pixelSizeX,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* psy = app.add_option("--pixel-sizey", pixelSizeY,
@@ -117,7 +123,7 @@ int Args::parseArguments(int argc, char* argv[])
                    "Maximum number of CGLS iterations, defaults to 40.")
         ->check(CLI::Range(1, 65535))
         ->group("Platform settings");
-    app.add_option("-e", stoppingError, "Stopping error, defaults to 0.0025.")
+    app.add_option("-e", stoppingError, "Stopping error, defaults to 0.00025.")
         ->check(CLI::Range(0.0, 1.00))
         ->group("Platform settings");
     psx->needs(psy);
@@ -288,7 +294,13 @@ int main(int argc, char* argv[])
         buf[2] = a.volumeSizeZ;
         io::createEmptyFile(a.outputVolume, 0, true);
         io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-        glsqr->reconstruct(dr, a.maxIterations, a.stoppingError);
+        if(a.tikhonovLambda <= 0.0)
+        {
+            glsqr->reconstruct(dr, a.maxIterations, a.stoppingError);
+        } else
+        {
+            glsqr->reconstructTikhonov(dr, a.tikhonovLambda, a.maxIterations, a.stoppingError);
+        }
         io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;

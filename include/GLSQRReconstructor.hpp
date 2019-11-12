@@ -127,6 +127,10 @@ public:
     int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
                     uint32_t maxIterations = 100,
                     float errCondition = 0.01);
+    int reconstructTikhonov(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
+                            double lambda,
+                            uint32_t maxIterations = 100,
+                            float errCondition = 0.01);
 
 private:
     const cl_float FLOATZERO = 0.0;
@@ -196,7 +200,8 @@ private:
                                 xc_buf = nullptr, xd_buf = nullptr, xe_buf = nullptr,
                                 xf_buf = nullptr, xg_buf = nullptr, xh_buf = nullptr,
                                 xi_buf = nullptr, xj_buf = nullptr, tmp_x_red1 = nullptr,
-                                tmp_x_red2 = nullptr;
+                                tmp_x_red2 = nullptr, xk_buf = nullptr, xl_buf = nullptr,
+                                xm_buf = nullptr, xn_buf = nullptr;
 
     // Functions
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>

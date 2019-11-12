@@ -311,8 +311,10 @@ int main(int argc, char* argv[])
         */
         double scalingFactor = (x1 - x2) * (x1 - x2) * (a.pixelSizeX / a.pixelSizeY)
             + (y1 - y2) * (y1 - y2) * (a.pixelSizeY / a.pixelSizeX);
-        LOGI << io::xprintf("Scaling factor for i=%d is %f.", i, scalingFactor);
-
+        if(i == 5)
+        {
+            LOGI << io::xprintf("Scaling factor for i=%d is %f.", i, scalingFactor);
+        }
         cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
         if(dpr != nullptr)
         {
