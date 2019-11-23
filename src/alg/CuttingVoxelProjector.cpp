@@ -95,14 +95,14 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
 
 int CuttingVoxelProjector::initializeVolumeImage()
 {
-    cl::ImageFormat f(CL_INTENSITY, CL_FLOAT);
+    //    cl::ImageFormat f(CL_INTENSITY, CL_FLOAT);
     cl_int err;
     volumeBuffer
         = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE,
                                        sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
     if(err != CL_SUCCESS)
     {
-        LOGE << io::xprintf("Unsucessful initialization of Image3D with error code %d!", err);
+        LOGE << io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
         return -1;
     }
     return 0;
@@ -110,8 +110,14 @@ int CuttingVoxelProjector::initializeVolumeImage()
 
 int CuttingVoxelProjector::updateVolumeImage()
 {
-    Q->enqueueWriteBuffer(*volumeBuffer, CL_TRUE, 0, sizeof(float) * vdimx * vdimy * vdimz,
-                          (void*)volume);
+    cl_int err;
+    err = Q->enqueueWriteBuffer(*volumeBuffer, CL_TRUE, 0, sizeof(float) * vdimx * vdimy * vdimz,
+                                (void*)volume);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
+        return -1;
+    }
     return 0;
 }
 
@@ -180,6 +186,7 @@ int CuttingVoxelProjector::project(float* projection,
                                    float scalingFactor)
 {
     double* P = matrix.getPtr();
+    cl_int err;
     std::array<double, 3> sourcePosition = matrix.sourcePosition();
     std::array<double, 3> normalToDetector = matrix.normalToDetector();
     CTL::matrix::SquareMatrix CME(4,
@@ -194,11 +201,19 @@ int CuttingVoxelProjector::project(float* projection,
     if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
     {
         projectionBuffer_size = projectionSize;
-        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
-                                                        projectionBuffer_size, (void*)projection);
-    } else
+        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                        projectionBuffer_size, nullptr, &err);
+        if(err != CL_SUCCESS)
+        {
+            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+            return -1;
+        }
+    }
+    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
+    if(err != CL_SUCCESS)
     {
-        Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
+        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+        return -1;
     }
 
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
@@ -221,7 +236,13 @@ int CuttingVoxelProjector::project(float* projection,
                           pdims, scalingFactor)
         .wait();
 
-    Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy, projection);
+    err = Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy,
+                               projection);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
+        return -1;
+    }
     return 0;
 }
 
@@ -233,6 +254,7 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
                                          uint32_t probesPerEdge)
 {
     double* P = matrix.getPtr();
+    cl_int err;
     std::array<double, 3> sourcePosition = matrix.sourcePosition();
     std::array<double, 3> normalToDetector = matrix.normalToDetector();
     CTL::matrix::SquareMatrix CME(4,
@@ -247,11 +269,19 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
     if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
     {
         projectionBuffer_size = projectionSize;
-        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR,
-                                                        projectionBuffer_size, (void*)projection);
-    } else
+        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                        projectionBuffer_size, nullptr, &err);
+        if(err != CL_SUCCESS)
+        {
+            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+            return -1;
+        }
+    }
+    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
+    if(err != CL_SUCCESS)
     {
-        Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
+        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+        return -1;
     }
 
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
@@ -271,7 +301,13 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
                         NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingOne, pixelGranularity)
         .wait();
 
-    Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy, projection);
+    err = Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy,
+                               projection);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
+        return -1;
+    }
     return 0;
 }
 

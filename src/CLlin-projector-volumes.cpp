@@ -58,6 +58,8 @@ struct Args
     std::string outputProjection;
     std::string rightHandSide = "";
     bool force = false;
+    bool siddon = false;
+    uint32_t probesPerEdge = 1;
 };
 
 /**Argument parsing
@@ -98,6 +100,13 @@ int Args::parseArguments(int argc, char* argv[])
                    "side from the projected vector.");
     app.add_flag("--center-voxel-projector", centerVoxelProjector,
                  "Use center voxel projector instead of cutting voxel projector.");
+    CLI::Option* sid = app.add_flag("-s,--siddon", siddon, "Use Siddon's projector");
+    CLI::Option* ppe
+        = app.add_option("--probes-per-edge", probesPerEdge,
+                         "Number of probes in each pixel edge, complexity scales with the "
+                         "square of this number. Defaults to 1")
+              ->check(CLI::Range(1, 1000));
+    ppe->needs(sid);
     CLI::Option* px = app.add_option("--projection-sizex", projectionSizeX,
                                      "Dimension of detector, defaults to 616.");
     CLI::Option* py = app.add_option("--projection-sizey", projectionSizeY,
@@ -271,7 +280,7 @@ int main(int argc, char* argv[])
     }
     cvp->initializeVolumeImage();
     uint32_t projectionElementsCount = a.projectionSizeX * a.projectionSizeY;
-    float* projection = new float[projectionElementsCount]();
+    float* projection = new float[projectionElementsCount]; //();
     uint16_t buf[3];
     buf[0] = a.projectionSizeY;
     buf[1] = a.projectionSizeX;
@@ -290,6 +299,7 @@ int main(int argc, char* argv[])
         io::readBytesFrom(a.inputVolumes[i], 6, (uint8_t*)volume, a.totalVolumeSize * 4);
         cvp->updateVolumeImage();
         matrix::ProjectionMatrix pm = dr->readMatrix(a.frames[i]);
+        assert((i == (uint32_t)a.frames[i]));
         double x1, x2, y1, y2;
         std::array<double, 3> sourcePosition = pm.sourcePosition();
         std::array<double, 3> normalToDetector = pm.normalToDetector();
@@ -315,7 +325,24 @@ int main(int argc, char* argv[])
         {
             LOGI << io::xprintf("Scaling factor for i=%d is %f.", i, scalingFactor);
         }
-        cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+        int success = 0;
+        if(a.siddon)
+        {
+            success = cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm,
+                                         scalingFactor, a.probesPerEdge);
+        } else
+        {
+            success
+                = cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+        }
+        if(success != 0)
+        {
+            std::string msg
+                = io::xprintf("Some problem occurred during the projection of %s th volume",
+                              a.inputVolumes[i].c_str());
+            LOGE << msg;
+            throw std::runtime_error(msg);
+        }
         if(dpr != nullptr)
         {
             std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(a.frames[i]);
@@ -326,7 +353,7 @@ int main(int argc, char* argv[])
         }
         io::appendBytes(a.outputProjection, (uint8_t*)projection,
                         projectionElementsCount * sizeof(float));
-        std::fill_n(projection, projectionElementsCount, float(0.0));
+        //        std::fill_n(projection, projectionElementsCount, float(0.0));
     }
     delete[] volume;
     delete[] projection;
