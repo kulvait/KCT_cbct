@@ -89,19 +89,23 @@ int Args::parseArguments(int argc, char* argv[])
         = app.add_option("--tikhonov-lambda", tikhonovLambda, "Tikhonov regularization parameter.")
               ->check(CLI::Range(0.0, 100.0));
     tl_cli->needs(glsqr_cli);
-    CLI::Option* psx = app.add_option("--pixel-sizex", pixelSizeX,
+    
+	//Reconstruction geometry
+	CLI::Option_group* og_rec
+        = app.add_option_group("Reconstruction geometry", "Parameters that define reconstruction geometry.");
+    CLI::Option* psx = og_rec->add_option("--pixel-sizex", pixelSizeX,
                                       "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* psy = app.add_option("--pixel-sizey", pixelSizeY,
+    CLI::Option* psy = og_rec->add_option("--pixel-sizey", pixelSizeY,
                                       "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* vx
-        = app.add_option("--volume-sizex", volumeSizeX, "Dimension of volume, defaults to 256.");
+        = og_rec->add_option("--volume-sizex", volumeSizeX, "Dimension of volume, defaults to 256.");
     CLI::Option* vy
-        = app.add_option("--volume-sizey", volumeSizeY, "Dimension of volume, defaults to 256.");
+        = og_rec->add_option("--volume-sizey", volumeSizeY, "Dimension of volume, defaults to 256.");
     CLI::Option* vz
-        = app.add_option("--volume-sizez", volumeSizeZ, "Dimension of volume, defaults to 199.");
-    app.add_option("--voxel-sizex", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
-    app.add_option("--voxel-sizey", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
-    app.add_option("--voxel-sizez", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
+        = og_rec->add_option("--volume-sizez", volumeSizeZ, "Dimension of volume, defaults to 199.");
+    og_rec->add_option("--voxel-sizex", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
+    og_rec->add_option("--voxel-sizey", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
+    og_rec->add_option("--voxel-sizez", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
 
     // Program flow parameters
     app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
@@ -137,7 +141,7 @@ int Args::parseArguments(int argc, char* argv[])
         // If force is not set, then check if output file does not exist
         if(!force)
         {
-            if(io::fileExists(outputVolume))
+            if(io::pathExists(outputVolume))
             {
                 std::string msg
                     = "Error: output file already exists, use --force to force overwrite.";

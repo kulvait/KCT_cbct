@@ -142,7 +142,7 @@ int Args::parseArguments(int argc, char* argv[])
         // If force is not set, then check if output file does not exist
         if(!force)
         {
-            if(io::fileExists(outputProjection))
+            if(io::pathExists(outputProjection))
             {
                 std::string msg
                     = "Error: output file already exists, use --force to force overwrite.";
