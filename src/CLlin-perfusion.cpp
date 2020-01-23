@@ -21,6 +21,7 @@
 #include "DEN/DenSupportedType.hpp"
 #include "FUN/FourierSeries.hpp"
 #include "FUN/LegendrePolynomialsExplicit.hpp"
+#include "FUN/ChebyshevPolynomialsExplicit.hpp"
 #include "FUN/StepFunction.hpp"
 #include "GLSQRPerfusionReconstructor.hpp"
 #include "RunTimeInfo.hpp"
@@ -52,6 +53,7 @@ struct Args
     uint64_t totalVolumeSize;
     // Basis and timings
     bool useLegendrePolynomials = false;
+    bool useChebyshevPolynomials = false;
     bool useFourierBasis = false;
     std::string engineerBasis = "";
     uint32_t degree = 7;
@@ -153,21 +155,14 @@ int Args::parseArguments(int argc, char* argv[])
         "Basis type.",
         "Specification of the basis type.");
 	
-    CLI::Option* opt_legendre
-        = og_basis_type->add_flag("--legendre", useLegendrePolynomials, "Use Legendre polynomials.");
-    CLI::Option* opt_fourier
-        = og_basis_type->add_flag("--fourier", useFourierBasis, "Use Fourier basis.");
-    CLI::Option* opt_engineer = og_basis_type->add_option("--engineer", engineerBasis,
+    og_basis_type->add_flag("--legendre", useLegendrePolynomials, "Use Legendre polynomials.");
+    og_basis_type->add_flag("--chebyshev", useChebyshevPolynomials, "Use Fourier basis.");
+    og_basis_type->add_flag("--fourier", useFourierBasis, "Use Fourier basis.");
+    og_basis_type->add_option("--engineer", engineerBasis,
                                                      "Use basis that is stored in a DEN file.");
 	og_basis_type->require_option(1);
     og_basis->add_option("--degree", degree, "Size of the basis. Defaults to 7.")
         ->check(CLI::Range(1, 65535));
-    opt_legendre->excludes(opt_fourier);
-    opt_legendre->excludes(opt_engineer);
-    opt_fourier->excludes(opt_legendre);
-    opt_fourier->excludes(opt_engineer);
-    opt_engineer->excludes(opt_legendre);
-    opt_engineer->excludes(opt_fourier);
     og_basis
         ->add_option("--frame-time", frame_time,
                      "Frame Time. (0018, 1063) Nominal time (in msec) per individual frame (slice) "
@@ -342,7 +337,12 @@ int main(int argc, char* argv[])
     {
         baseFunctionsEvaluator
             = std::make_shared<util::LegendrePolynomialsExplicit>(a.degree - 1, startTime, endTime);
-    } else
+    }else if(a.useChebyshevPolynomials)
+	{
+        baseFunctionsEvaluator
+            = std::make_shared<util::ChebyshevPolynomialsExplicit>(a.degree - 1, startTime, endTime);
+	}
+	 else
     {
         int numberOfFunctions = io::DenFileInfo(a.engineerBasis).dimz();
         baseFunctionsEvaluator = std::make_shared<util::StepFunction>(
