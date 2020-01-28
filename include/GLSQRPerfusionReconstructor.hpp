@@ -129,6 +129,10 @@ public:
     int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
                     uint32_t maxIterations = 1000,
                     float errCondition = 0.001);
+    int updateB(std::vector<float*> projections);
+    int updateX(std::vector<float*> volumes);
+    int projectXtoB(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
+    int backprojectBtoX(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
     const cl_float FLOATZERO = 0.0;
@@ -191,6 +195,8 @@ private:
                                              std::vector<std::shared_ptr<cl::Buffer>>& B,
                                              float f,
                                              unsigned int size);
+    int addIntoFirstVectorSecondVectorScaledOffset(
+        cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, unsigned int offset);
     int addIntoFirstVectorScaledSecondVector(std::vector<std::shared_ptr<cl::Buffer>>& A,
                                              std::vector<std::shared_ptr<cl::Buffer>>& B,
                                              float f,
@@ -224,6 +230,8 @@ private:
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOAT_scaleVector;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOAT_addIntoFirstVectorSecondVectorScaled;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned int&>>
+        FLOAT_addIntoFirstVectorSecondVectorScaledOffset;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOAT_addIntoFirstVectorScaledSecondVector;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_NormSquare;

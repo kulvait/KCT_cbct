@@ -16,7 +16,6 @@
 #include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
-#include "ARGPARSE/parseArgs.h"
 #include "CGLSReconstructor.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
@@ -89,20 +88,20 @@ int Args::parseArguments(int argc, char* argv[])
         = app.add_option("--tikhonov-lambda", tikhonovLambda, "Tikhonov regularization parameter.")
               ->check(CLI::Range(0.0, 100.0));
     tl_cli->needs(glsqr_cli);
-    
-	//Reconstruction geometry
-	CLI::Option_group* og_rec
-        = app.add_option_group("Reconstruction geometry", "Parameters that define reconstruction geometry.");
+
+    // Reconstruction geometry
+    CLI::Option_group* og_rec = app.add_option_group(
+        "Reconstruction geometry", "Parameters that define reconstruction geometry.");
     CLI::Option* psx = og_rec->add_option("--pixel-sizex", pixelSizeX,
-                                      "Spacing of detector cells, defaults to 0.616.");
+                                          "Spacing of detector cells, defaults to 0.616.");
     CLI::Option* psy = og_rec->add_option("--pixel-sizey", pixelSizeY,
-                                      "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* vx
-        = og_rec->add_option("--volume-sizex", volumeSizeX, "Dimension of volume, defaults to 256.");
-    CLI::Option* vy
-        = og_rec->add_option("--volume-sizey", volumeSizeY, "Dimension of volume, defaults to 256.");
-    CLI::Option* vz
-        = og_rec->add_option("--volume-sizez", volumeSizeZ, "Dimension of volume, defaults to 199.");
+                                          "Spacing of detector cells, defaults to 0.616.");
+    CLI::Option* vx = og_rec->add_option("--volume-sizex", volumeSizeX,
+                                         "Dimension of volume, defaults to 256.");
+    CLI::Option* vy = og_rec->add_option("--volume-sizey", volumeSizeY,
+                                         "Dimension of volume, defaults to 256.");
+    CLI::Option* vz = og_rec->add_option("--volume-sizez", volumeSizeZ,
+                                         "Dimension of volume, defaults to 199.");
     og_rec->add_option("--voxel-sizex", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
     og_rec->add_option("--voxel-sizey", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
     og_rec->add_option("--voxel-sizez", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");

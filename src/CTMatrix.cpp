@@ -10,11 +10,11 @@
 #include <string>
 
 // External libraries
+#include "PROG/parseArgs.h"
 #include "CLI/CLI.hpp" //Command line parser
 #include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
-#include "ARGPARSE/parseArgs.h"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 

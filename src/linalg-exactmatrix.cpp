@@ -14,7 +14,7 @@
 #include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
-#include "ARGPARSE/parseArgs.h"
+#include "PROG/parseArgs.h"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 

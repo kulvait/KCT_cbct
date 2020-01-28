@@ -62,6 +62,9 @@ int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
     FLOAT_addIntoFirstVectorSecondVectorScaled
         = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
             cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled"));
+    FLOAT_addIntoFirstVectorSecondVectorScaledOffset
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned int&>>(
+            cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled_offset"));
     FLOAT_addIntoFirstVectorScaledSecondVector
         = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
             cl::Kernel(program, "FLOAT_add_into_first_vector_scaled_second_vector"));
@@ -706,43 +709,49 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
                                          std::vector<cl_double16>& invertedProjectionMatrices,
                                          std::vector<float>& scalingFactors)
 {
-	zeroBBuffers(B);
+    zeroBBuffers(B);
+    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
+    cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
+    cl_int2 pdims({ int(pdimx), int(pdimy) });
     unsigned int frameSize = pdimx * pdimy;
-    for(std::size_t angleID = 0; angleID != pdimz; angleID++)
+    float FLOATONE = 1.0;
+    for(uint32_t basisIND = 0; basisIND != X.size(); ++basisIND)
     {
-        matrix::ProjectionMatrix mat = V[angleID];
-        float scalingFactor = scalingFactors[angleID];
-        std::array<double, 3> sourcePosition = mat.sourcePosition();
-        std::array<double, 3> normalToDetector = mat.normalToDetector();
-        double* P = mat.getPtr();
-        cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
-                         0.0, 0.0, 0.0, 0.0 });
-        cl_double16 ICM = invertedProjectionMatrices[angleID];
-        cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
-        cl_double3 NORMALTODETECTOR(
-            { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-        cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
-        cl_int2 pdims({ int(pdimx), int(pdimy) });
-        unsigned int offset = angleID * frameSize;
-        float FLOATONE = 1.0;
-        for(uint32_t basisIND = 0; basisIND != X.size(); ++basisIND)
+        Q->enqueueFillBuffer<cl_float>(*tmp_b, FLOATZERO, 0, BDIM * sizeof(float));
+        for(std::size_t angleID = 0; angleID != pdimz; angleID++)
         {
-            Q->enqueueFillBuffer<cl_float>(*tmp_b, FLOATZERO, 0, BDIM * sizeof(float));
+            matrix::ProjectionMatrix mat = V[angleID];
+            float scalingFactor = scalingFactors[angleID];
+            std::array<double, 3> sourcePosition = mat.sourcePosition();
+            std::array<double, 3> normalToDetector = mat.normalToDetector();
+            double* P = mat.getPtr();
+            cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10],
+                             P[11], 0.0, 0.0, 0.0, 0.0 });
+            cl_double16 ICM = invertedProjectionMatrices[angleID];
+            cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+            cl_double3 NORMALTODETECTOR(
+                { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+            unsigned int offset = angleID * frameSize;
             cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
             (*FLOATcutting_voxel_project)(eargs, *X[basisIND], *tmp_b, offset, PM, SOURCEPOSITION,
                                           NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE)
-                .wait();
+        ;//        .wait();
             cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
             (*scalingProjections)(eargs2, *tmp_b, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
                                   pdims, scalingFactor)
-                .wait();
-            for(uint32_t sweepID = 0; sweepID != B.size(); sweepID++)
+           ;//     .wait();
+        }
+        for(uint32_t sweepID = 0; sweepID != B.size(); sweepID++)
+        {
+            for(std::size_t angleID = 0; angleID != pdimz; angleID++)
             {
+                unsigned int offset = frameSize * angleID;
                 float scaleBy = basisFunctionsValues[basisIND][sweepID * pdimz + angleID];
-                addIntoFirstVectorSecondVectorScaled(*B[sweepID], *tmp_b, scaleBy, BDIM);
+                addIntoFirstVectorSecondVectorScaledOffset(*B[sweepID], *tmp_b, scaleBy, frameSize,
+                                                           offset);
             }
         }
+        LOGD << io::xprintf("%d. basis element", basisIND);
     }
     return 0;
 }
@@ -799,6 +808,14 @@ int GLSQRPerfusionReconstructor::addIntoFirstVectorSecondVectorScaled(cl::Buffer
 {
     cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
     (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f).wait();
+    return 0;
+}
+
+int GLSQRPerfusionReconstructor::addIntoFirstVectorSecondVectorScaledOffset(
+    cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, unsigned int offset)
+{
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    (*FLOAT_addIntoFirstVectorSecondVectorScaledOffset)(eargs, a, b, f, offset);
     return 0;
 }
 

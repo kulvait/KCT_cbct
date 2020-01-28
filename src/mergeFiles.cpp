@@ -14,7 +14,6 @@
 #include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
-#include "ARGPARSE/parseArgs.h"
 #include "SMA/BufferedSparseMatrixFloatReader.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 

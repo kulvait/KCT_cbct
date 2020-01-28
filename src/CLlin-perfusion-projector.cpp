@@ -1,160 +1,70 @@
 // Logging
 #include "PLOG/PlogSetup.h"
 
-// External libraries
-#include <algorithm>
-#include <chrono>
-#include <cstdlib>
-#include <ctype.h>
-#include <iostream>
-#include <regex>
-#include <string>
-#include <unistd.h>
-
-// External libraries
-#include "CLI/CLI.hpp" //Command line parser
-
 // Internal libraries
 #include "CArmArguments.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
-#include "DEN/DenSupportedType.hpp"
 #include "FUN/ChebyshevPolynomialsExplicit.hpp"
 #include "FUN/FourierSeries.hpp"
 #include "FUN/LegendrePolynomialsExplicit.hpp"
 #include "FUN/StepFunction.hpp"
 #include "GLSQRPerfusionReconstructor.hpp"
 #include "PROG/Program.hpp"
-#include "PROG/RunTimeInfo.hpp"
 
 using namespace CTL;
 using namespace CTL::util;
+using namespace CTL::io;
 
-/**Arguments parsed by the main function.
- */
 class Args : public CArmArguments
 {
-public:
-    Args(int argc, char** argv, std::string programName)
-        : CArmArguments(argc, argv, programName){};
-    void defineArguments();
-    int preParse() { return 0; };
-    int postParse()
+    virtual void defineArguments();
+    virtual int preParse() { return 0; };
+    virtual int postParse()
     {
-        if(!force)
-        {
-            std::string f;
-            for(uint32_t i = 0; i != basisSize; i++)
-            {
-                f = getVolumeName(i);
-                if(io::pathExists(f))
-                {
-                    std::string msg = io::xprintf(
-                        "Error: output file %f already exists, use --force to force overwrite it.",
-                        f.c_str());
-                    LOGE << msg;
-                    return 1;
-                }
-            }
-        }
-        // How many projection matrices is there in total
-        io::DenFileInfo pmi(inputProjectionMatrices);
-        io::DenFileInfo inf(inputProjections[0]);
-        projectionSizeX = inf.dimx();
-        projectionSizeY = inf.dimy();
-        projectionSizeZ = inf.dimz();
+        DenFileInfo vi(inputVolumes[0]);
+        volumeSizeX = vi.dimx();
+        volumeSizeY = vi.dimy();
+        volumeSizeZ = vi.dimz();
+        DenFileInfo mi(inputProjectionMatrices);
+        projectionSizeZ = mi.dimz();
         totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
         totalProjectionsSize
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
-        if(inf.dimz() != pmi.dimz())
-        {
-            std::string ERR = io::xprintf(
-                "Projection matrices z dimension %d is different from projections z dimension %d.",
-                pmi.dimz(), inf.dimz());
-            LOGE << ERR;
-            io::throwerr(ERR);
-        }
-        if(totalVolumeSize > INT_MAX)
-        {
-            io::throwerr(
-                "Implement indexing by uint64_t matrix dimension overflow of voxels count.");
-        }
-        // End parsing arguments
-        if(totalProjectionsSize > INT_MAX)
-        {
-            io::throwerr("Implement indexing by uint64_t matrix dimension overflow of projection "
-                         "pixels count.");
-        }
-        io::DenSupportedType t = inf.getDataType();
-        if(t != io::DenSupportedType::float_)
-        {
-            std::string ERR
-                = io::xprintf("This program supports float projections only but the supplied "
-                              "projection file %s is "
-                              "of type %s",
-                              inputProjections[0].c_str(), io::DenSupportedTypeToString(t).c_str());
-            LOGE << ERR;
-            io::throwerr(ERR);
-        }
+        basisSize = inputVolumes.size();
         return 0;
-    }
-    // Output files
-    std::string outputVolumePrefix;
+    };
+
+public:
+    Args(int argc, char** argv, std::string prgName)
+        : CArmArguments(argc, argv, prgName){};
+
+    std::string projectionFilePath(uint32_t sweepID)
+    {
+        return io::xprintf("%s%02d.den", outputProjectionPrefix.c_str(), sweepID + 1);
+    };
+
+    std::string outputProjectionPrefix;
     // Input files
     std::string inputProjectionMatrices;
-    std::vector<std::string> inputProjections;
-    // Geometry
+    std::vector<std::string> inputVolumes;
+    uint32_t sweepCount = 10;
+    uint32_t basisSize;
     uint64_t totalVolumeSize;
     uint64_t totalProjectionsSize;
-    uint32_t platformId = 0;
     bool debug = false;
-    bool reportIntermediate = false;
-    // It is evaluated from -0.5, pixels are centerred at integer coordinates
-    uint32_t baseOffset = 0;
-    uint32_t maxIterations = 100;
-    double stoppingError = 0.00025;
-    bool noFrameOffset = false;
-    bool force = false;
     uint32_t itemsPerWorkgroup = 256;
-
-    /** Frame Time. (0018, 1063) Nominal time (in msec) per individual frame.
-     *
-     *The model assumes that there is delay between two consecutive frames of the frame_time.
-     *First frame is aquired directly after pause. From DICOM it is 16.6666667ms. From
-     *experiment 16.8ms.
-     */
-    /**Fourier functions basisSize*/
-
-    int parseArguments(int argc, char* argv[]);
-    std::string getVolumeName(uint32_t baseIND);
+    bool reportIntermediate = false;
+    uint32_t platformId = 1;
 };
 
-std::string Args::getVolumeName(uint32_t baseIND)
-{
-    if(baseIND >= basisSize)
-    {
-        LOGW << io::xprintf("Constructing %d-th volume name that probably won't be used due to "
-                            "the size of the basis of %d elements.",
-                            baseIND, basisSize);
-    }
-    std::string f = io::xprintf("%s_reconstructed%d", outputVolumePrefix.c_str(), baseIND);
-    return f;
-}
-
-/**Argument parsing
- *
- * @param argc
- * @param argv[]
- *
- * @return Returns 0 on success and nonzero for some error.
- */
 void Args::defineArguments()
 {
     cliApp
-        ->add_option(
-            "output_volume_pattern", outputVolumePrefix,
-            "Output: pattern of volumes to reconstruct, PATTERN_reconstructed${i} will be used for "
-            "output files, where i is a index of the basis element.")
+        ->add_option("output_projection_pattern", outputProjectionPrefix,
+                     "Output: pattern of projections to reconstruct, PATTERN_perfproj${02i}.den "
+                     "will be used for "
+                     "output files, where i is a sweep ID.")
         ->required();
     cliApp
         ->add_option("input_projection_matrices", inputProjectionMatrices,
@@ -162,50 +72,24 @@ void Args::defineArguments()
         ->required()
         ->check(CLI::ExistingFile);
     cliApp
-        ->add_option("projection_files", inputProjections,
-                     "Input: projection files in a DEN format. All of them must be orderred "
-                     "according to the projection_matrices file. Therefore they need to "
-                     "be reversed for backward sweep.")
+        ->add_option("volume_coefficients", inputVolumes,
+                     "Input: projection files in a DEN format generated by the n sweep protocol. ")
         ->required()
         ->check(CLI::ExistingFile);
-    cliApp->add_flag("--force", force,
-                     "Overwrite output files given by output_volume_pattern if they exist.");
-
-    // Reconstruction geometry
-    addVolumeSizeArgs();
     addVoxelSizeArgs();
+    addProjectionSizeArgs();
     addPixelSizeArgs();
-    addBasisSpecificationArgs();
-
-    // Specification of the basis of the volume data, each voxel is approximated as v_i(t) =  sum
-    // v_i^j b_j(t).
-    // Program flow parameters
-    cliApp
-        ->add_option("--max-iterations", maxIterations,
-                     "Maximum number of LSQR iterations, defaults to 100.")
-        ->check(CLI::Range(1, 65535))
-        ->group("Platform settings");
-    cliApp->add_option("-p,--platform_id", platformId, "OpenCL platform ID to use.")
-        ->check(CLI::Range(0, 65535))
-        ->group("Platform settings");
-    cliApp->add_flag("-d,--debug", debug, "OpenCL compilation including debugging information.")
-        ->group("Platform settings");
-    cliApp
-        ->add_option("--items-per-workgroup", itemsPerWorkgroup,
-                     "OpenCL parameter that is important for norm computation, defaults to 256.")
-        ->check(CLI::Range(1, 65535))
-        ->group("Platform settings");
-    cliApp
-        ->add_flag("--report-intermediate", reportIntermediate,
-                   "Report intermediate values of x, defaults to false.")
-        ->group("Platform settings");
+    addBasisSpecificationArgs(false);
 }
 
 int main(int argc, char* argv[])
 {
     Program PRG(argc, argv);
-    Args ARG(argc, argv, "OpenCL implementation of GLSQR applied on the perfusion operator.");
-    // Argument parsing
+    // Program initialization
+    // Parsing arguments
+    Args ARG(argc, argv,
+             "Projection of the volumes defined by the basis functions and coefficient values by "
+             "the perfusion operator.");
     int parseResult = ARG.parse();
     if(parseResult > 0)
     {
@@ -215,6 +99,7 @@ int main(int argc, char* argv[])
         return -1; // Exited somehow wrong
     }
     PRG.startLog();
+    // STARTBODY
     std::shared_ptr<io::DenProjectionMatrixReader> dr
         = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
     float* projection;
@@ -225,7 +110,7 @@ int main(int argc, char* argv[])
     std::vector<float*> basisFunctionsValues;
     double mean_sweep_time = (ARG.projectionSizeZ - 1) * ARG.frame_time + ARG.pause_size;
     double startTime = ARG.start_offset;
-    double endTime = (ARG.inputProjections.size() - 1) * mean_sweep_time
+    double endTime = (ARG.sweepCount - 1) * mean_sweep_time
         + (ARG.projectionSizeZ - 1) * ARG.frame_time - ARG.end_offset;
 
     // Basis set initialization
@@ -250,14 +135,14 @@ int main(int argc, char* argv[])
     }
     for(std::size_t j = 0; j != ARG.basisSize; j++)
     {
-        basisVals = new float[ARG.projectionSizeZ * ARG.inputProjections.size()];
+        basisVals = new float[ARG.projectionSizeZ * ARG.sweepCount];
         basisFunctionsValues.push_back(basisVals);
     }
-    for(std::size_t sweepID = 0; sweepID != ARG.inputProjections.size(); sweepID++)
+    for(std::size_t sweepID = 0; sweepID != ARG.sweepCount; sweepID++)
     {
         projection = new float[ARG.totalProjectionsSize];
-        io::readBytesFrom(ARG.inputProjections[sweepID], 6, (uint8_t*)projection,
-                          ARG.totalProjectionsSize * 4);
+        //        io::readBytesFrom(ARG.inputVolumes[sweepID], 6, (uint8_t*)volume,
+        //                          ARG.totalVolumeSize * 4);
         projections.push_back(projection);
         // Values of basis function in the time that corresponds to i-th sweep and j-th angle
         for(std::size_t angleID = 0; angleID != ARG.projectionSizeZ; angleID++)
@@ -288,7 +173,7 @@ int main(int argc, char* argv[])
         values.push_back(std::vector<double>());
     }
 
-    for(std::size_t i = 0; i != ARG.inputProjections.size(); i++)
+    for(std::size_t i = 0; i != ARG.sweepCount; i++)
     {
         for(std::size_t j = 0; j != ARG.projectionSizeZ; j++)
         {
@@ -321,8 +206,8 @@ int main(int argc, char* argv[])
     plt::legend();
     plt::show();
 #endif
-    std::string startPath = io::getParent(ARG.outputVolumePrefix);
-    std::string bname = io::getBasename(ARG.outputVolumePrefix);
+    std::string startPath = io::getParent(ARG.outputProjectionPrefix);
+    std::string bname = io::getBasename(ARG.outputProjectionPrefix);
     bname = bname.substr(0, bname.find_last_of("."));
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
@@ -347,34 +232,38 @@ int main(int argc, char* argv[])
     for(std::size_t basisIND = 0; basisIND != ARG.basisSize; basisIND++)
     {
         volume = new float[ARG.totalVolumeSize]();
+        io::readBytesFrom(ARG.inputVolumes[basisIND], 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
         volumes.push_back(volume);
     }
     // testing
     //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
     LSQR->initializeData(projections, basisFunctionsValues, volumes);
-    LSQR->reconstruct(dr, ARG.maxIterations);
-
+    LSQR->projectXtoB(dr);
     uint16_t buf[3];
-    buf[0] = ARG.volumeSizeY;
-    buf[1] = ARG.volumeSizeX;
-    buf[2] = ARG.volumeSizeZ;
+    buf[0] = ARG.projectionSizeY;
+    buf[1] = ARG.projectionSizeX;
+    buf[2] = ARG.projectionSizeZ;
     std::string f;
-    for(std::size_t i = 0; i != ARG.basisSize; i++)
+    for(std::size_t sweepID = 0; sweepID != ARG.sweepCount; sweepID++)
     {
-        f = ARG.getVolumeName(i);
+        f = ARG.projectionFilePath(sweepID);
         LOGI << io::xprintf("Writing out file %s of the size [%d %d %d].", f.c_str(),
-                            ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
+                            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ);
         io::createEmptyFile(f, 0, true);
         io::appendBytes(f, (uint8_t*)buf, 6);
-        io::appendBytes(f, (uint8_t*)volumes[i], ARG.totalVolumeSize * sizeof(float));
-        delete[] volumes[i];
-        delete[] basisFunctionsValues[i];
+        io::appendBytes(f, (uint8_t*)projections[sweepID],
+                        ARG.totalProjectionsSize * sizeof(float));
+        delete[] projections[sweepID];
     }
-    for(std::size_t i = 0; i < ARG.inputProjections.size(); i++)
+    for(std::size_t basisIND = 0; basisIND < ARG.basisSize; basisIND++)
     {
-        delete[] projections[i];
+        delete[] volumes[basisIND];
+        delete[] basisFunctionsValues[basisIND];
     }
     delete[] vals;
+
+    // ENDBODY
     PRG.endLog(true);
+    return 0;
 }

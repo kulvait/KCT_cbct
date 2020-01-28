@@ -13,14 +13,14 @@
 
 // External libraries
 #include "CLI/CLI.hpp" //Command line parser
-#include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
-#include "ARGPARSE/parseArgs.h"
+#include "CArmArguments.hpp"
+#include "PROG/Program.hpp"
 #include "CuttingVoxelProjector.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
-#include "DEN/DenProjectionReader.hpp"
+#include "DEN/DenFrame2DReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
@@ -30,7 +30,6 @@ using namespace CTL;
  */
 struct Args
 {
-    int parseArguments(int argc, char* argv[]);
     uint32_t platformId = 0;
     bool debug = false;
     std::string frameSpecs = "";
@@ -59,6 +58,8 @@ struct Args
     bool force = false;
     bool siddon = false;
     uint32_t probesPerEdge = 1;
+	
+    int parseArguments(int argc, char* argv[]);
 };
 
 /**Argument parsing

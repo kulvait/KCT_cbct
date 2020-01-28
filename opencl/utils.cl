@@ -23,7 +23,6 @@ inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
     } while(tmp.u32 != adrcatch.u32);
 }
 
-
 void kernel FLOATvector_NormSquarePartial(global float* x,
                                           global float* normSquare,
                                           private uint frameLen)
@@ -318,6 +317,16 @@ void kernel FLOAT_add_into_first_vector_second_vector_scaled(global float* a,
     int gid = get_global_id(0);
     float val = a[gid] + f * b[gid];
     a[gid] = val;
+}
+
+void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset(global float* a,
+                                                                    global float* b,
+                                                                    private float f,
+                                                                    private uint offset)
+{
+    uint index = get_global_id(0) + offset;
+    float val = a[index] + f * b[index];
+    a[index] = val;
 }
 
 void kernel FLOAT_add_into_first_vector_scaled_second_vector(global float* a,

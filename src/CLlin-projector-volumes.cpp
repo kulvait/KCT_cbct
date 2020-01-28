@@ -16,11 +16,11 @@
 #include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
-#include "ARGPARSE/parseArgs.h"
+#include "PROG/parseArgs.h"
 #include "CuttingVoxelProjector.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
-#include "DEN/DenProjectionReader.hpp"
+#include "DEN/DenFrame2DReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 

@@ -46,7 +46,7 @@ find_package(PythonLibs 2.7)
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 #CT input output library
-FILE( GLOB CTIOL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/*.cpp ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/ARGPARSE/*.cpp)
+FILE( GLOB CTIOL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/*.cpp ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/PROG/*.cpp)
 add_library(ctiol ${CTIOL_SRC})
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTIOL/include)
 target_link_libraries(ctiol stdc++fs)
@@ -182,7 +182,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl DESTIN
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl DESTINATION opencl)
 
-SET(CLLINPERFUSION_SOURCES src/CLlin-perfusion.cpp src/CGLSPerfusionReconstructor.cpp src/GLSQRPerfusionReconstructor.cpp)
+SET(CLLINPERFUSION_SOURCES src/CLlin-perfusion.cpp src/CGLSPerfusionReconstructor.cpp src/GLSQRPerfusionReconstructor.cpp src/CArmArguments.cpp)
 add_executable(CLlin-perfusion ${CLLINPERFUSION_SOURCES})
 set_target_properties(
     CLlin-perfusion
@@ -203,6 +203,31 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
 install (TARGETS CLlin-perfusion RUNTIME DESTINATION .)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+
+SET(CLLINPERFUSIONPROJECTOR_SOURCES src/CLlin-perfusion-projector.cpp src/CGLSPerfusionReconstructor.cpp src/GLSQRPerfusionReconstructor.cpp src/CArmArguments.cpp)
+add_executable(CLlin-perfusion-projector ${CLLINPERFUSIONPROJECTOR_SOURCES})
+set_target_properties(
+    CLlin-perfusion-projector
+    PROPERTIES 
+        OUTPUT_NAME "cllin-perfusion-projector"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-perfusion-projector ctiol)
+target_link_libraries(CLlin-perfusion-projector ctmal)
+target_link_libraries(CLlin-perfusion-projector OpenCL::OpenCL)
+target_link_libraries(CLlin-perfusion-projector CTIOL_OPENCL)
+target_include_directories(CLlin-perfusion-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-perfusion-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-perfusion-projector ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(CLlin-perfusion-projector ${PYTHON_LIBRARIES})
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
+install (TARGETS CLlin-perfusion-projector RUNTIME DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
