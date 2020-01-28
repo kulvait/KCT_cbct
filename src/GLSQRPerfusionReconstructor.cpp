@@ -106,10 +106,53 @@ int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
     return 0;
 }
 
+int GLSQRPerfusionReconstructor::updateX(std::vector<float*> volumes)
+{
+    std::string ERR;
+    if(this->x.size() != volumes.size())
+    {
+        ERR = "Dimension mismatch";
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    this->x = volumes;
+    for(std::size_t i = 0; i != x.size(); i++)
+    {
+        Q->enqueueWriteBuffer(*x_buf[i], CL_BLOCKING, 0, sizeof(float) * XDIM, (void*)x[i], NULL,
+                              NULL);
+    }
+    return 0;
+}
+
+int GLSQRPerfusionReconstructor::updateB(std::vector<float*> projections)
+{
+    std::string ERR;
+    if(this->b.size() != projections.size())
+    {
+        ERR = "Dimension mismatch";
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    this->b = projections;
+    for(std::size_t i = 0; i != b.size(); i++)
+    {
+        Q->enqueueWriteBuffer(*b_buf[i], CL_BLOCKING, 0, sizeof(float) * BDIM, (void*)b[i], NULL,
+                              NULL);
+    }
+    return 0;
+}
+
 int GLSQRPerfusionReconstructor::initializeData(std::vector<float*> projections,
                                                 std::vector<float*> basisVectorValues,
                                                 std::vector<float*> volumes)
 {
+    std::string ERR;
+    if(basisVectorValues.size() != volumes.size())
+    {
+        ERR = "Dimension mismatch";
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
     this->b = projections;
     this->basisFunctionsValues = basisVectorValues;
     this->x = volumes;
@@ -605,7 +648,7 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
                                              std::vector<cl_double16>& invertedProjectionMatrices,
                                              std::vector<float>& scalingFactors)
 {
-	zeroXBuffers(X);
+    zeroXBuffers(X);
     unsigned int frameSize = pdimx * pdimy;
     for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
     {
@@ -1161,8 +1204,58 @@ int GLSQRPerfusionReconstructor::reconstruct(
     }
     for(uint32_t basisIND = 0; basisIND != x_cur->size(); basisIND++)
     {
-        Q->enqueueReadBuffer(*(*x_cur)[basisIND], CL_TRUE, 0, sizeof(float) * XDIM, x[basisIND]);
+        Q->enqueueReadBuffer(*(*x_cur)[basisIND], CL_TRUE, 0, sizeof(float) * XDIM,
+                             (void*)x[basisIND]);
     }
+    return 0;
+}
+
+int GLSQRPerfusionReconstructor::projectXtoB(
+    std::shared_ptr<io::DenProjectionMatrixReader> matrices)
+{
+    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
+    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
+    std::vector<float> scalingFactors = computeScalingFactors(PM);
+    double NB0 = std::sqrt(normBBuffer_barier_double(b_buf));
+    LOGI << io::xprintf("Current ||b||=%f", NB0);
+    double NX0 = std::sqrt(normXBuffer_barier_double(x_buf));
+    LOGI << io::xprintf("Current ||x||=%f", NX0);
+    zeroBBuffers(ba_buf);
+    project(x_buf, ba_buf, PM, ICM, scalingFactors);
+    double NB1 = std::sqrt(normBBuffer_barier_double(ba_buf));
+    LOGI << io::xprintf("Projected ||Ax||=%f", NB1);
+    for(uint32_t sweepID = 0; sweepID != b_buf.size(); sweepID++)
+    {
+        Q->enqueueReadBuffer(*ba_buf[sweepID], CL_TRUE, 0, sizeof(float) * BDIM, (void*)b[sweepID]);
+    }
+    addIntoFirstVectorSecondVectorScaled(ba_buf, b_buf, -1.0f, BDIM);
+    double NB2 = std::sqrt(normBBuffer_barier_double(ba_buf));
+    LOGI << io::xprintf(" ||Ax-b||=%f", NB2);
+    return 0;
+}
+
+int GLSQRPerfusionReconstructor::backprojectBtoX(
+    std::shared_ptr<io::DenProjectionMatrixReader> matrices)
+{
+    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
+    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
+    std::vector<float> scalingFactors = computeScalingFactors(PM);
+    double NB0 = std::sqrt(normBBuffer_barier_double(b_buf));
+    LOGI << io::xprintf("Current ||b||=%f", NB0);
+    double NX0 = std::sqrt(normXBuffer_barier_double(x_buf));
+    LOGI << io::xprintf("Current ||x||=%f", NX0);
+    zeroXBuffers(xa_buf);
+    backproject(b_buf, xa_buf, PM, ICM, scalingFactors);
+    double NX1 = std::sqrt(normXBuffer_barier_double(xa_buf));
+    LOGI << io::xprintf("Backprojected ||A^Tb||=%f", NX1);
+    for(uint32_t basisIND = 0; basisIND != x_buf.size(); basisIND++)
+    {
+        Q->enqueueReadBuffer(*xa_buf[basisIND], CL_TRUE, 0, sizeof(float) * XDIM,
+                             (void*)x[basisIND]);
+    }
+    addIntoFirstVectorSecondVectorScaled(xa_buf, x_buf, -1.0f, XDIM);
+    double NX2 = std::sqrt(normXBuffer_barier_double(xa_buf));
+    LOGI << io::xprintf("Backprojected ||A^Tb-x||=%f", NX2);
     return 0;
 }
 /*
