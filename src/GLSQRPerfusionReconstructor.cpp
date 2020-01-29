@@ -658,6 +658,9 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
         copyFloatVector(*B[sweepID], *tmp_b_buf[sweepID], BDIM);
     }
     unsigned int frameID;
+    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
+    cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
+    cl_int2 pdims({ int(pdimx), int(pdimy) });
     for(std::size_t angleID = 0; angleID != pdimz; angleID++)
     {
         matrix::ProjectionMatrix mat = V[angleID];
@@ -671,12 +674,8 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
         cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-        cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
-        cl_int2 pdims({ int(pdimx), int(pdimy) });
         unsigned int offset = angleID * frameSize;
         cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
-
         for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
         {
             (*scalingProjections)(eargs2, *tmp_b_buf[sweepID], offset, ICM, SOURCEPOSITION,
@@ -734,12 +733,11 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
             unsigned int offset = angleID * frameSize;
             cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
             (*FLOATcutting_voxel_project)(eargs, *X[basisIND], *tmp_b, offset, PM, SOURCEPOSITION,
-                                          NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE)
-        ;//        .wait();
+                                          NORMALTODETECTOR, vdims, voxelSizes, pdims,
+                                          FLOATONE); //        .wait();
             cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
             (*scalingProjections)(eargs2, *tmp_b, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                  pdims, scalingFactor)
-           ;//     .wait();
+                                  pdims, scalingFactor); //     .wait();
         }
         for(uint32_t sweepID = 0; sweepID != B.size(); sweepID++)
         {
