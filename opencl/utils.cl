@@ -311,12 +311,11 @@ void kernel FLOAT_scale_vector(global float* v, private float f)
 }
 
 void kernel FLOAT_add_into_first_vector_second_vector_scaled(global float* a,
-                                                             global float* b,
+                                                             global const float* b,
                                                              private float f)
 {
     int gid = get_global_id(0);
-    float val = a[gid] + f * b[gid];
-    a[gid] = val;
+    a[gid] = a[gid] + f * b[gid];
 }
 
 void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset(global float* a,
