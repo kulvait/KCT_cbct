@@ -2,6 +2,46 @@
 
 namespace CTL {
 
+struct Watches
+{
+    bool pressed = false;
+    std::chrono::time_point<std::chrono::high_resolution_clock> lastTime;
+    std::chrono::time_point<std::chrono::high_resolution_clock> now;
+    void press(std::string txt = "")
+    {
+        using namespace std::chrono;
+        if(!pressed)
+        {
+            pressed = true;
+            LOGI << io::xprintf("%s", txt.c_str());
+            lastTime = high_resolution_clock::now();
+        } else
+        {
+            now = high_resolution_clock::now();
+            duration<double> xxx = duration_cast<duration<double>>(now - lastTime);
+            LOGI << io::xprintf("%s %0.3fs", txt.c_str(), xxx.count());
+            lastTime = now;
+        }
+    };
+
+    void pressE(std::string txt = "")
+    {
+        using namespace std::chrono;
+        if(!pressed)
+        {
+            pressed = true;
+            LOGE << io::xprintf("%s", txt.c_str());
+            lastTime = high_resolution_clock::now();
+        } else
+        {
+            now = high_resolution_clock::now();
+            duration<double> xxx = duration_cast<duration<double>>(now - lastTime);
+            LOGE << io::xprintf("%s %0.3fs", txt.c_str(), xxx.count());
+            lastTime = now;
+        }
+    };
+};
+
 int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
 {
     // Select the first available platform.
@@ -25,10 +65,21 @@ int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
     std::string sourceText;
     // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
     clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
-    io::concatenateTextFiles(clFile, true,
-                             { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
-                               io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
-                               io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) });
+    if(sidon)
+    {
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector_sidon.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/backprojector_sidon.cl", this->xpath.c_str()) });
+    } else
+    {
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) });
+    }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
@@ -90,6 +141,8 @@ int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
         cl::Kernel(program, "vector_SumPartial_barier"));
     FLOAT_CopyVector = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
         cl::Kernel(program, "FLOAT_copy_vector"));
+    FLOAT_ZeroVector
+        = std::make_shared<cl::make_kernel<cl::Buffer&>>(cl::Kernel(program, "FLOAT_zero_vector"));
     FLOATcutting_voxel_project = std::make_shared<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                         cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
@@ -273,6 +326,15 @@ int GLSQRPerfusionReconstructor::initializeData(std::vector<float*> projections,
     }
     for(std::size_t i = 0; i != b.size(); i++)
     {
+        // Special buffer to optimize backprojection time not to erase it every time
+        xB_tmp_buf.push_back(std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                          sizeof(float) * XDIM, nullptr, &err));
+        if(err != CL_SUCCESS)
+        {
+            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+            return -1;
+        }
+
         b_buf.push_back(
             std::make_shared<cl::Buffer>(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                          sizeof(float) * BDIM, (void*)projections[i], &err));
@@ -651,6 +713,9 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
                                              std::vector<cl_double16>& invertedProjectionMatrices,
                                              std::vector<float>& scalingFactors)
 {
+    Watches w;
+    Q->finish();
+    w.press("START Backrojection");
     zeroXBuffers(X);
     unsigned int frameSize = pdimx * pdimy;
     for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
@@ -661,44 +726,111 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
     cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
     cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
-    for(std::size_t angleID = 0; angleID != pdimz; angleID++)
+    // float FLOATONE = 1.0;
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    float FLOATONE = 1.0;
+    if(!sidon)
     {
-        matrix::ProjectionMatrix mat = V[angleID];
-        float scalingFactor = scalingFactors[angleID];
-        std::array<double, 3> sourcePosition = mat.sourcePosition();
-        std::array<double, 3> normalToDetector = mat.normalToDetector();
-        double* P = mat.getPtr();
-        cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
-                         0.0, 0.0, 0.0, 0.0 });
-        cl_double16 ICM = invertedProjectionMatrices[angleID];
-        cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
-        cl_double3 NORMALTODETECTOR(
-            { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        unsigned int offset = angleID * frameSize;
-        cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
-        for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
+        for(std::size_t angleID = 0; angleID != pdimz; angleID++)
         {
-            (*scalingProjections)(eargs2, *tmp_b_buf[sweepID], offset, ICM, SOURCEPOSITION,
-                                  NORMALTODETECTOR, pdims, scalingFactor)
-                .wait();
-        }
-        cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-        for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
-        {
-            frameID = sweepID * pdimz + angleID;
-            float FLOATONE = 1.0;
-            Q->enqueueFillBuffer<cl_float>(*tmp_x, FLOATZERO, 0, XDIM * sizeof(float));
-            (*FLOATcutting_voxel_backproject)(eargs, *tmp_x, *tmp_b_buf[sweepID], offset, PM,
-                                              SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
-                                              pdims, FLOATONE)
-                .wait();
-            for(std::size_t basisIND = 0; basisIND != X.size(); basisIND++)
+            unsigned int offset = angleID * frameSize;
+            matrix::ProjectionMatrix mat = V[angleID];
+            float scalingFactor = scalingFactors[angleID];
+            std::array<double, 3> sourcePosition = mat.sourcePosition();
+            std::array<double, 3> normalToDetector = mat.normalToDetector();
+            double* P = mat.getPtr();
+            cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10],
+                             P[11], 0.0, 0.0, 0.0, 0.0 });
+            cl_double16 ICM = invertedProjectionMatrices[angleID];
+            cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+            cl_double3 NORMALTODETECTOR(
+                { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+            // Somehow better from the optimalization point of view
+            // zeroFloatVector(*xB_tmp_buf[sweepID], XDIM);
+            //        zeroFloatVector(*tmp_x, XDIM);
+            //   Q->finish();
+            //    w.press(io::xprintf("A angle %03d sweepID %02d", angleID, sweepID));
+            // frameID = sweepID * pdimz + angleID;
+            // Q->enqueueFillBuffer<cl_float>(*tmp_x, FLOATZERO, 0, XDIM * sizeof(float));
+            // zeroFloatVector(*tmp_x, XDIM);
+            for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
             {
-                float scaleBy = basisFunctionsValues[basisIND][frameID];
-                addIntoFirstVectorSecondVectorScaled(*X[basisIND], *tmp_x, scaleBy, XDIM);
+                (*scalingProjections)(eargs2, *tmp_b_buf[sweepID], offset, ICM, SOURCEPOSITION,
+                                      NORMALTODETECTOR, pdims, scalingFactor);
             }
         }
     }
+    Q->finish();
+    w.press("Prepared for Backrojection");
+    for(std::size_t basisIND = 0; basisIND != X.size(); basisIND++)
+    {
+        for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
+        {
+            for(std::size_t angleID = 0; angleID != pdimz; angleID++)
+            {
+                unsigned int offset = angleID * frameSize;
+                matrix::ProjectionMatrix mat = V[angleID];
+                std::array<double, 3> sourcePosition = mat.sourcePosition();
+                std::array<double, 3> normalToDetector = mat.normalToDetector();
+                double* P = mat.getPtr();
+                cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10],
+                                 P[11], 0.0, 0.0, 0.0, 0.0 });
+                cl_double3 SOURCEPOSITION(
+                    { sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+                cl_double3 NORMALTODETECTOR(
+                    { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+                // Somehow better from the optimalization point of view
+                // zeroFloatVector(*xB_tmp_buf[sweepID], XDIM);
+                //        zeroFloatVector(*tmp_x, XDIM);
+                //   Q->finish();
+                //    w.press(io::xprintf("A angle %03d sweepID %02d", angleID, sweepID));
+                // frameID = sweepID * pdimz + angleID;
+                // Q->enqueueFillBuffer<cl_float>(*tmp_x, FLOATZERO, 0, XDIM * sizeof(float));
+                // zeroFloatVector(*tmp_x, XDIM);
+                //            .wait();
+
+                //            (*FLOATcutting_voxel_backproject)(eargs, *tmp_x, *tmp_b_buf[sweepID],
+                //            offset, PM,
+                //                                              SOURCEPOSITION, NORMALTODETECTOR,
+                //                                              vdims, voxelSizes, pdims, FLOATONE);
+
+                // (*FLOATcutting_voxel_backproject)(eargs, *xB_tmp_buf[sweepID],
+                // *tmp_b_buf[sweepID],
+                //                                   offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
+                //                                   vdims, voxelSizes, pdims, FLOATONE);
+                // Q->finish();
+                //     w.press(io::xprintf("B angle %03d sweepID %02d", angleID, sweepID));
+                // sleep(100);
+                // w.press(io::xprintf("W angle %03d", angleID));
+
+                // sleep(10);
+                frameID = sweepID * pdimz + angleID;
+                float scaleBy = basisFunctionsValues[basisIND][frameID];
+                //       addIntoFirstVectorSecondVectorScaled(*X[basisIND], *tmp_x, scaleBy, XDIM);
+                if(sidon)
+                {
+                    cl_uint2 pixelGranularity({ 1, 1 });
+                    (*FLOATbackprojector_sidon)(eargs2, *tmp_x, *tmp_b_buf[sweepID], offset, PM,
+                                                SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                                pdims, FLOATONE, pixelGranularity);
+                    addIntoFirstVectorSecondVectorScaled(*X[basisIND], *tmp_x, scaleBy, XDIM);
+                } else
+                {
+                    (*FLOATcutting_voxel_backproject)(eargs, *X[basisIND], *tmp_b_buf[sweepID],
+                                                      offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
+                                                      vdims, voxelSizes, pdims, scaleBy);
+                }
+
+                // addIntoFirstVectorSecondVectorScaled(*X[basisIND], *xB_tmp_buf[sweepID], scaleBy,
+                //                                      XDIM);
+            }
+            // Q->finish();
+            // w.press(io::xprintf("X angle %03d sweepID %02d", angleID, sweepID));
+        }
+    }
+    Q->finish();
+    w.press("END Backrojection");
     return 0;
 }
 
@@ -708,12 +840,17 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
                                          std::vector<cl_double16>& invertedProjectionMatrices,
                                          std::vector<float>& scalingFactors)
 {
+    Watches w;
+    Q->finish();
+    w.press("START Projection");
     zeroBBuffers(B);
     cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
     cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
     cl_int2 pdims({ int(pdimx), int(pdimy) });
     unsigned int frameSize = pdimx * pdimy;
     float FLOATONE = 1.0;
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
     for(uint32_t basisIND = 0; basisIND != X.size(); ++basisIND)
     {
         Q->enqueueFillBuffer<cl_float>(*tmp_b, FLOATZERO, 0, BDIM * sizeof(float));
@@ -731,13 +868,21 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
             cl_double3 NORMALTODETECTOR(
                 { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
             unsigned int offset = angleID * frameSize;
-            cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-            (*FLOATcutting_voxel_project)(eargs, *X[basisIND], *tmp_b, offset, PM, SOURCEPOSITION,
-                                          NORMALTODETECTOR, vdims, voxelSizes, pdims,
-                                          FLOATONE); //        .wait();
-            cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
-            (*scalingProjections)(eargs2, *tmp_b, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                  pdims, scalingFactor); //     .wait();
+            if(sidon)
+            {
+                cl_uint2 pixelGranularity({ 1, 1 });
+                (*FLOATprojector_sidon)(eargs2, *X[basisIND], *tmp_b, offset, PM, SOURCEPOSITION,
+                                        NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE,
+                                        pixelGranularity); //        .wait();
+            } else
+            {
+                (*FLOATcutting_voxel_project)(eargs, *X[basisIND], *tmp_b, offset, PM,
+                                              SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                              pdims,
+                                              FLOATONE); //        .wait();
+                (*scalingProjections)(eargs2, *tmp_b, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                                      pdims, scalingFactor); //     .wait();
+            }
         }
         for(uint32_t sweepID = 0; sweepID != B.size(); sweepID++)
         {
@@ -749,8 +894,16 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
                                                            offset);
             }
         }
-        LOGD << io::xprintf("%d. basis element", basisIND);
     }
+    Q->finish();
+    w.press("END Projection");
+    return 0;
+}
+
+int GLSQRPerfusionReconstructor::zeroFloatVector(cl::Buffer& b, unsigned int size)
+{
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    (*FLOAT_ZeroVector)(eargs, b);
     return 0;
 }
 
@@ -805,7 +958,7 @@ int GLSQRPerfusionReconstructor::addIntoFirstVectorSecondVectorScaled(cl::Buffer
                                                                       unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
-    (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f).wait();
+    (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f);
     return 0;
 }
 
@@ -952,7 +1105,7 @@ void GLSQRPerfusionReconstructor::writeVolume(std::vector<std::shared_ptr<cl::Bu
     buf[2] = vdimz;
     for(std::size_t i = 0; i != X.size(); i++)
     {
-        std::string newpath = io::xprintf("%s_elm%d", path.c_str(), i);
+        std::string newpath = io::xprintf("%s_elm%02d", path.c_str(), i);
         io::createEmptyFile(newpath, 0, true); // Try if this is faster
         io::appendBytes(newpath, (uint8_t*)buf, 6);
         Q->enqueueReadBuffer(*X[i], CL_TRUE, 0, sizeof(float) * XDIM, x[i]);
@@ -995,11 +1148,6 @@ int GLSQRPerfusionReconstructor::reconstruct(
     LOGI << io::xprintf("GLSQR WITH PERFUSION");
     reportTime("GLSQR INIT");
     bool x0_iszero = true;
-    if(reportProgress)
-    {
-        // writeProjections(*b_buf, io::xprintf("%sb.den", progressBeginPath.c_str()));
-        // writeVolume(*x_buf, io::xprintf("%sx_0.den", progressBeginPath.c_str()));
-    }
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
@@ -1014,6 +1162,7 @@ int GLSQRPerfusionReconstructor::reconstruct(
     std::vector<std::shared_ptr<cl::Buffer>>*x_prev, *x_cur;
     std::vector<std::shared_ptr<cl::Buffer>>*XZ, *BZ;
 
+    LOGE << io::xprintf("Reconstruction01");
     // Inicializace vektoru v_1, ktery predstavuje normalizovany vektor, ktery je v klasickem
     // algoritmu normalizovany A^T b
     v_next = &xa_buf;
@@ -1039,6 +1188,7 @@ int GLSQRPerfusionReconstructor::reconstruct(
         zeroXBuffers(*v_next);
         addIntoFirstVectorSecondVectorScaled(*v_next, x_buf, float(1.0 / vnextnorm), XDIM);
     }
+    LOGE << io::xprintf("Reconstruction02");
     double d = 0.0;
 
     u_cur = &ba_buf;
@@ -1052,6 +1202,7 @@ int GLSQRPerfusionReconstructor::reconstruct(
     u_next = &bb_buf;
     zeroBBuffers(*u_next);
     addIntoFirstVectorSecondVectorScaled(*u_next, b_buf, float(1.0 / varphi_hat), BDIM);
+    LOGE << io::xprintf("Reconstruction03");
 
     x_cur = &x_buf;
     zeroXBuffers(*x_cur);
@@ -1123,10 +1274,12 @@ int GLSQRPerfusionReconstructor::reconstruct(
         rho_prev_prev = rho_prev;
         rho_prev = rho_cur;
 
+        LOGE << io::xprintf("Reconstruction05");
         backproject(*u_cur, *XZ, PM, ICM, scalingFactors);
         sigma_prev = scalarProductXBuffer_barier_double(*XZ, *v_prev);
         addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
         LOGI << io::xprintf("sigma_prev=%f", sigma_prev);
+        LOGE << io::xprintf("Reconstruction06");
 
         if(d == 0.0)
         {
@@ -1153,6 +1306,7 @@ int GLSQRPerfusionReconstructor::reconstruct(
             }
         } else
         {
+            LOGE << io::xprintf("Reconstruction07");
             LOGI << "d=1.0";
             sigma_cur = std::sqrt(normXBuffer_barier_double(*XZ));
             LOGI << io::xprintf("sigma_cur=%f", sigma_cur);
@@ -1167,6 +1321,7 @@ int GLSQRPerfusionReconstructor::reconstruct(
                 break;
             }
         }
+        LOGE << io::xprintf("Reconstruction08");
 
         project(*v_cur, *BZ, PM, ICM, scalingFactors);
         tau_prev = scalarProductBBuffer_barier_double(*BZ, *u_prev);
@@ -1211,10 +1366,12 @@ int GLSQRPerfusionReconstructor::reconstruct(
 
         LOGW << io::xprintf("After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
-        if(reportProgress)
+        if(reportEachK > 0 && iteration % reportEachK == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_%d.den", progressBeginPath.c_str(), iteration);
-            writeVolume(*x_cur, io::xprintf("%sx_%d.den", progressBeginPath.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_iteration%02d.den", progressBeginPath.c_str(),
+                                iteration);
+            writeVolume(*x_cur,
+                        io::xprintf("%sx_iteration%02d.den", progressBeginPath.c_str(), iteration));
         }
     }
     for(uint32_t basisIND = 0; basisIND != x_cur->size(); basisIND++)
@@ -1519,5 +1676,18 @@ int GLSQRPerfusionReconstructor::reconstructTikhonov(
     return 0;
 }
 */
+
+double GLSQRPerfusionReconstructor::adjointProductTest(
+    std::shared_ptr<io::DenProjectionMatrixReader> matrices)
+{
+    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
+    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
+    std::vector<float> scalingFactors = computeScalingFactors(PM);
+    backproject(b_buf, xa_buf, PM, ICM, scalingFactors);
+    project(x_buf, ba_buf, PM, ICM, scalingFactors);
+    double bdotAx = scalarProductBBuffer_barier_double(b_buf, ba_buf);
+    double ATbdotx = scalarProductXBuffer_barier_double(x_buf, xa_buf);
+    return (bdotAx / ATbdotx);
+}
 
 } // namespace CTL

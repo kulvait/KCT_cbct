@@ -46,7 +46,8 @@ public:
                        bool debug,
                        uint32_t workGroupSize = 256,
                        uint32_t reportKthIteration = 0,
-                       std::string progressBeginPath = "")
+                       std::string progressBeginPath = "",
+                       bool sidon = false)
         : pdimx(pdimx)
         , pdimy(pdimy)
         , pdimz(pdimz)
@@ -62,6 +63,7 @@ public:
         , debug(debug)
         , workGroupSize(workGroupSize)
         , reportKthIteration(reportKthIteration)
+        , sidon(sidon)
     {
         uint32_t UINT32_MAXXX = ((uint32_t)-1);
         uint64_t xdim = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
@@ -131,7 +133,7 @@ public:
                             double lambda,
                             uint32_t maxIterations = 100,
                             float errCondition = 0.01);
-	double adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
+    double adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
     const cl_float FLOATZERO = 0.0;
@@ -257,6 +259,31 @@ private:
                                     float&>>
         scalingProjections;
     std::chrono::time_point<std::chrono::steady_clock> timepoint;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&,
+                                    cl_uint2&>>
+        FLOATprojector_sidon;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&,
+                                    cl_uint2&>>
+        FLOATbackprojector_sidon;
+    bool sidon = false;
 };
 
 } // namespace CTL

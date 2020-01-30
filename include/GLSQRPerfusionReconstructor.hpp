@@ -45,8 +45,9 @@ public:
                                 std::string xpath,
                                 bool debug,
                                 uint32_t workGroupSize = 256,
-                                bool reportProgress = false,
-                                std::string progressBeginPath = "")
+                                uint32_t reportEachK = 0,
+                                std::string progressBeginPath = "",
+                                bool sidon = false)
         : pdimx(pdimx)
         , pdimy(pdimy)
         , pdimz(pdimz)
@@ -61,7 +62,8 @@ public:
         , xpath(xpath)
         , debug(debug)
         , workGroupSize(workGroupSize)
-        , reportProgress(reportProgress)
+        , reportEachK(reportEachK)
+        , sidon(sidon)
     {
         uint32_t UINT32_MAXXX = ((uint32_t)-1);
         uint64_t xdim = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
@@ -102,7 +104,7 @@ public:
         {
             LOGI << "Beware buffer overflows for b buffer.";
         }
-        if(reportProgress)
+        if(reportEachK > 0)
         {
             this->progressBeginPath = progressBeginPath;
         }
@@ -133,6 +135,7 @@ public:
     int updateX(std::vector<float*> volumes);
     int projectXtoB(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
     int backprojectBtoX(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
+    double adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
     const cl_float FLOATZERO = 0.0;
@@ -148,7 +151,7 @@ private:
     uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
         XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
         XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
-    bool reportProgress = false;
+    uint32_t reportEachK = 0;
     std::string progressBeginPath = "";
 
     float normBBuffer_barier(cl::Buffer& B);
@@ -183,6 +186,7 @@ private:
                 std::vector<matrix::ProjectionMatrix>& V,
                 std::vector<cl_double16>& invertedProjectionMatrices,
                 std::vector<float>& scalingFactors);
+    int zeroFloatVector(cl::Buffer& b, unsigned int size);
     int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
     int copyFloatVector(std::vector<std::shared_ptr<cl::Buffer>>& from,
                         std::vector<std::shared_ptr<cl::Buffer>>& to,
@@ -222,12 +226,13 @@ private:
     std::vector<std::shared_ptr<cl::Buffer>> b_buf, ba_buf, bb_buf, bc_buf, bd_buf, be_buf,
         tmp_b_buf;
     std::vector<std::shared_ptr<cl::Buffer>> x_buf, xa_buf, xb_buf, xc_buf, xd_buf, xe_buf, xf_buf,
-        xg_buf, xh_buf, xi_buf, xj_buf, xk_buf, xl_buf, xm_buf, xn_buf;
+        xg_buf, xh_buf, xi_buf, xj_buf, xk_buf, xl_buf, xm_buf, xn_buf, xB_tmp_buf;
     std::shared_ptr<cl::Buffer> tmp_b = nullptr, tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
     std::shared_ptr<cl::Buffer> tmp_x = nullptr, tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
 
     // Functions
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOAT_scaleVector;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOAT_ZeroVector;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOAT_addIntoFirstVectorSecondVectorScaled;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned int&>>
@@ -283,6 +288,31 @@ private:
         scalingProjections;
 
     std::chrono::time_point<std::chrono::steady_clock> timepoint;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&,
+                                    cl_uint2&>>
+        FLOATprojector_sidon;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&,
+                                    cl_uint2&>>
+        FLOATbackprojector_sidon;
+    bool sidon = false;
 };
 
 } // namespace CTL

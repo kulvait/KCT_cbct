@@ -25,10 +25,21 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
     std::string sourceText;
     // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
     clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
-    io::concatenateTextFiles(clFile, true,
-                             { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
-                               io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
-                               io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) });
+    if(sidon)
+    {
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector_sidon.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/backprojector_sidon.cl", this->xpath.c_str()) });
+    } else
+    {
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()) });
+    }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
@@ -87,14 +98,6 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
         cl::Kernel(program, "vector_SumPartial_barier"));
     FLOAT_CopyVector = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
         cl::Kernel(program, "FLOAT_copy_vector"));
-    FLOATcutting_voxel_project = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                        cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-        cl::Kernel(program, "FLOATcutting_voxel_project"));
-    FLOATcutting_voxel_backproject = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                        cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-        cl::Kernel(program, "FLOATcutting_voxel_backproject"));
     ScalarProductPartial_barier = std::make_shared<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
         cl::Kernel(program, "vector_ScalarProductPartial_barier"));
@@ -102,6 +105,27 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
         = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                                            cl_double3&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATrescale_projections"));
+    if(sidon)
+    {
+        FLOATprojector_sidon = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
+            cl::Kernel(program, "FLOATsidon_project"));
+        FLOATbackprojector_sidon = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
+            cl::Kernel(program, "FLOATsidon_backproject"));
+    } else
+    {
+        FLOATcutting_voxel_project = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATcutting_voxel_project"));
+        FLOATcutting_voxel_backproject = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATcutting_voxel_backproject"));
+    }
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
 }
@@ -522,7 +546,13 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
 {
     Q->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
+    float FLOATONE = 1.0;
+    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
+    cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
     copyFloatVector(B, *tmp_b_buf, BDIM);
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    cl_int2 pdims({ int(pdimx), int(pdimy) });
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
@@ -536,19 +566,25 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
         cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-        cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
-        cl_int2 pdims({ int(pdimx), int(pdimy) });
         unsigned int offset = i * frameSize;
-        cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
-        (*scalingProjections)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                              pdims, scalingFactor)
-            .wait();
-        cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-        float FLOATONE = 1.0;
-        (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
-                                          NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE)
-            .wait();
+        if(sidon)
+        {
+            LOGE << io::xprintf("Sidon backprojection start angle=%d", i);
+            cl_uint2 pixelGranularity({ 1, 1 });
+            (*FLOATbackprojector_sidon)(eargs2, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
+                                        NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE,
+                                        pixelGranularity)
+                .wait();
+            LOGE << "Sidon backprojection end";
+        } else
+        {
+            (*scalingProjections)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                                  pdims, scalingFactor)
+                .wait();
+            (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
+                                              NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE)
+                .wait();
+        }
     }
     return 0;
 }
@@ -561,6 +597,11 @@ int GLSQRReconstructor::project(cl::Buffer& X,
 {
     Q->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
+    float FLOATONE = 1.0;
+    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
+    cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
@@ -574,19 +615,23 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-        cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
         cl_int2 pdims({ int(pdimx), int(pdimy) });
         unsigned int offset = i * frameSize;
-        float FLOATONE = 1.0;
-        cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-        (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
-                                      vdims, voxelSizes, pdims, FLOATONE)
-            .wait();
-        cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
-        (*scalingProjections)(eargs2, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR, pdims,
-                              scalingFactor)
-            .wait();
+        if(sidon)
+        {
+            cl_uint2 pixelGranularity({ 1, 1 });
+            (*FLOATprojector_sidon)(eargs2, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
+                                    vdims, voxelSizes, pdims, FLOATONE, pixelGranularity)
+                .wait();
+        } else
+        {
+            (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
+                                          vdims, voxelSizes, pdims, FLOATONE)
+                .wait();
+            (*scalingProjections)(eargs2, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR, pdims,
+                                  scalingFactor)
+                .wait();
+        }
     }
     return 0;
 }
@@ -924,8 +969,10 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressBeginPath.c_str(), iteration);
-            writeVolume(*x_cur, io::xprintf("%sx_it%02d.den", progressBeginPath.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressBeginPath.c_str(),
+                                iteration);
+            writeVolume(*x_cur,
+                        io::xprintf("%sx_it%02d.den", progressBeginPath.c_str(), iteration));
         }
     }
     Q->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
@@ -1161,24 +1208,27 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%03d.den", progressBeginPath.c_str(), iteration);
-            writeVolume(*x_cur, io::xprintf("%sx_it%03d.den", progressBeginPath.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_it%03d.den", progressBeginPath.c_str(),
+                                iteration);
+            writeVolume(*x_cur,
+                        io::xprintf("%sx_it%03d.den", progressBeginPath.c_str(), iteration));
         }
     }
     Q->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
-	
-double GLSQRReconstructor::adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices)
+
+double
+GLSQRReconstructor::adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices)
 {
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
     backproject(*b_buf, *xa_buf, PM, ICM, scalingFactors);
     project(*x_buf, *ba_buf, PM, ICM, scalingFactors);
-	double bdotAx = scalarProductBBuffer_barier_double(*b_buf, *ba_buf);
-	double ATbdotx = scalarProductXBuffer_barier_double(*x_buf, *xa_buf);
-	return (bdotAx/ATbdotx);
+    double bdotAx = scalarProductBBuffer_barier_double(*b_buf, *ba_buf);
+    double ATbdotx = scalarProductXBuffer_barier_double(*x_buf, *xa_buf);
+    return (bdotAx / ATbdotx);
 }
 
 } // namespace CTL
