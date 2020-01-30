@@ -37,6 +37,7 @@ public:
 	
 	//Settings
     CLI::Option_group* og_settings = nullptr;
+	bool useSidonProjector = false;
 	uint32_t maxIterationCount = 40;
     double stoppingRelativeError = 0.00025;
     uint32_t reportKthIteration = 0;
@@ -61,5 +62,6 @@ protected:
 	void addSettingsGroup();
 	void addCLSettingsGroup();
 	void addSettingsArgs();
+	void addSidonArgs();
 };
 } // namespace CTL::util

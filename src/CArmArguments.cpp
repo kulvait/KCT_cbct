@@ -209,4 +209,14 @@ void CArmArguments::addSettingsArgs()
         ->check(CLI::Range(1, 65535));
 }
 
+void CArmArguments::addSidonArgs()
+{
+    addSettingsGroup();
+    std::string sidonValue = (useSidonProjector ? "true" : "false");
+    og_settings->add_flag("--sidon", useSidonProjector,
+                          io::xprintf("Use sidon projector and backprojector pair instead of "
+                                      "cuting voxel projector, defaults to %s.",
+                                      sidonValue.c_str()));
+}
+
 } // namespace CTL::util

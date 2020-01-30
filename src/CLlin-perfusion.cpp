@@ -176,6 +176,7 @@ void Args::defineArguments()
     addPixelSizeArgs();
     addBasisSpecificationArgs();
     addSettingsArgs();
+    addSidonArgs();
 
     // Specification of the basis of the volume data, each voxel is approximated as v_i(t) =  sum
     // v_i^j b_j(t).
@@ -315,7 +316,7 @@ int main(int argc, char* argv[])
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
             ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
             ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup,
-            ARG.reportKthIteration, startPath);
+            ARG.reportKthIteration, startPath, ARG.useSidonProjector);
     int res = LSQR->initializeOpenCL(ARG.CLplatformID);
     if(res < 0)
     {

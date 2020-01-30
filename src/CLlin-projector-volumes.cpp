@@ -59,7 +59,7 @@ struct Args
     std::string outputProjection;
     std::string rightHandSide = "";
     bool force = false;
-    bool siddon = false;
+    bool sidon = false;
     uint32_t probesPerEdge = 1;
 };
 
@@ -101,7 +101,7 @@ int Args::parseArguments(int argc, char* argv[])
                    "side from the projected vector.");
     app.add_flag("--center-voxel-projector", centerVoxelProjector,
                  "Use center voxel projector instead of cutting voxel projector.");
-    CLI::Option* sid = app.add_flag("-s,--siddon", siddon, "Use Siddon's projector");
+    CLI::Option* sid = app.add_flag("-s,--sidon", sidon, "Use Siddon's projector");
     CLI::Option* ppe
         = app.add_option("--probes-per-edge", probesPerEdge,
                          "Number of probes in each pixel edge, complexity scales with the "
@@ -314,7 +314,7 @@ int main(int argc, char* argv[])
             LOGI << io::xprintf("Scaling factor for i=%d is %f.", i, scalingFactor);
         }
         int success = 0;
-        if(a.siddon)
+        if(a.sidon)
         {
             success = cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm,
                                          scalingFactor, a.probesPerEdge);

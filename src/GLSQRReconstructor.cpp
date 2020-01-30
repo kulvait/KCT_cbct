@@ -553,6 +553,7 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
     cl_int2 pdims({ int(pdimx), int(pdimy) });
+    cl_uint2 pixelGranularity({ 1, 1 });
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
@@ -569,21 +570,15 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
         unsigned int offset = i * frameSize;
         if(sidon)
         {
-            LOGE << io::xprintf("Sidon backprojection start angle=%d", i);
-            cl_uint2 pixelGranularity({ 1, 1 });
-            (*FLOATbackprojector_sidon)(eargs2, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
+            (*FLOATbackprojector_sidon)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
                                         NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE,
-                                        pixelGranularity)
-                .wait();
-            LOGE << "Sidon backprojection end";
+                                        pixelGranularity);
         } else
         {
             (*scalingProjections)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                  pdims, scalingFactor)
-                .wait();
+                                  pdims, scalingFactor);
             (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
-                                              NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE)
-                .wait();
+                                              NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE);
         }
     }
     return 0;
@@ -620,17 +615,14 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         if(sidon)
         {
             cl_uint2 pixelGranularity({ 1, 1 });
-            (*FLOATprojector_sidon)(eargs2, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
-                                    vdims, voxelSizes, pdims, FLOATONE, pixelGranularity)
-                .wait();
+            (*FLOATprojector_sidon)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                                    vdims, voxelSizes, pdims, FLOATONE, pixelGranularity);
         } else
         {
             (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
-                                          vdims, voxelSizes, pdims, FLOATONE)
-                .wait();
+                                          vdims, voxelSizes, pdims, FLOATONE);
             (*scalingProjections)(eargs2, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR, pdims,
-                                  scalingFactor)
-                .wait();
+                                  scalingFactor);
         }
     }
     return 0;
@@ -1224,8 +1216,8 @@ GLSQRReconstructor::adjointProductTest(std::shared_ptr<io::DenProjectionMatrixRe
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
-    backproject(*b_buf, *xa_buf, PM, ICM, scalingFactors);
     project(*x_buf, *ba_buf, PM, ICM, scalingFactors);
+    backproject(*b_buf, *xa_buf, PM, ICM, scalingFactors);
     double bdotAx = scalarProductBBuffer_barier_double(*b_buf, *ba_buf);
     double ATbdotx = scalarProductXBuffer_barier_double(*x_buf, *xa_buf);
     return (bdotAx / ATbdotx);

@@ -780,6 +780,7 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
                     { sourcePosition[0], sourcePosition[1], sourcePosition[2] });
                 cl_double3 NORMALTODETECTOR(
                     { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+                cl_double16 ICM = invertedProjectionMatrices[angleID];
                 // Somehow better from the optimalization point of view
                 // zeroFloatVector(*xB_tmp_buf[sweepID], XDIM);
                 //        zeroFloatVector(*tmp_x, XDIM);
@@ -811,7 +812,7 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
                 if(sidon)
                 {
                     cl_uint2 pixelGranularity({ 1, 1 });
-                    (*FLOATbackprojector_sidon)(eargs2, *tmp_x, *tmp_b_buf[sweepID], offset, PM,
+                    (*FLOATbackprojector_sidon)(eargs2, *tmp_x, *tmp_b_buf[sweepID], offset, ICM,
                                                 SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
                                                 pdims, FLOATONE, pixelGranularity);
                     addIntoFirstVectorSecondVectorScaled(*X[basisIND], *tmp_x, scaleBy, XDIM);
@@ -871,7 +872,7 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
             if(sidon)
             {
                 cl_uint2 pixelGranularity({ 1, 1 });
-                (*FLOATprojector_sidon)(eargs2, *X[basisIND], *tmp_b, offset, PM, SOURCEPOSITION,
+                (*FLOATprojector_sidon)(eargs2, *X[basisIND], *tmp_b, offset, ICM, SOURCEPOSITION,
                                         NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE,
                                         pixelGranularity); //        .wait();
             } else
