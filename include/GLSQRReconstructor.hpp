@@ -45,7 +45,7 @@ public:
                        std::string xpath,
                        bool debug,
                        uint32_t workGroupSize = 256,
-                       bool reportProgress = false,
+                       uint32_t reportKthIteration = 0,
                        std::string progressBeginPath = "")
         : pdimx(pdimx)
         , pdimy(pdimy)
@@ -61,7 +61,7 @@ public:
         , xpath(xpath)
         , debug(debug)
         , workGroupSize(workGroupSize)
-        , reportProgress(reportProgress)
+        , reportKthIteration(reportKthIteration)
     {
         uint32_t UINT32_MAXXX = ((uint32_t)-1);
         uint64_t xdim = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
@@ -102,7 +102,7 @@ public:
         {
             LOGI << "Beware buffer overflows for b buffer.";
         }
-        if(reportProgress)
+        if(reportKthIteration > 0)
         {
             this->progressBeginPath = progressBeginPath;
         }
@@ -131,6 +131,7 @@ public:
                             double lambda,
                             uint32_t maxIterations = 100,
                             float errCondition = 0.01);
+	double adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
     const cl_float FLOATZERO = 0.0;
@@ -146,7 +147,7 @@ private:
     uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
         XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
         XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
-    bool reportProgress = false;
+    uint32_t reportKthIteration = 0;
     std::string progressBeginPath = "";
 
     float normBBuffer_barier(cl::Buffer& B);

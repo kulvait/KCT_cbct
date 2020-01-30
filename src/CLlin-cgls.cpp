@@ -16,128 +16,27 @@
 #include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
+#include "CArmArguments.hpp"
 #include "CGLSReconstructor.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "GLSQRReconstructor.hpp"
+#include "PROG/Program.hpp"
 
 using namespace CTL;
+using namespace CTL::util;
 
 /**Arguments parsed by the main function.
  */
-struct Args
+class Args : public CArmArguments
 {
-    int parseArguments(int argc, char* argv[]);
-    uint32_t platformId = 0;
-    bool debug = false;
-    bool reportIntermediate = false;
-    int threads = 1;
-    // It is evaluated from -0.5, pixels are centerred at integer coordinates
-    uint32_t projectionSizeX = 616;
-    uint32_t projectionSizeY = 480;
-    uint32_t projectionSizeZ;
-    uint64_t totalProjectionsSize;
-    double pixelSizeX = 0.616;
-    double pixelSizeY = 0.616;
-    double voxelSizeX = 1.0;
-    double voxelSizeY = 1.0;
-    double voxelSizeZ = 1.0;
-    // Here (0,0,0) is in the center of the volume
-    uint32_t volumeSizeX = 256;
-    uint32_t volumeSizeY = 256;
-    uint32_t volumeSizeZ = 199;
-    uint64_t totalVolumeSize;
-    uint32_t baseOffset = 0;
-    uint32_t maxIterations = 40;
-    double stoppingError = 0.00025;
-    double tikhonovLambda = -1.0;
-    bool noFrameOffset = false;
-    std::string outputVolume;
-    std::string inputProjectionMatrices;
-    std::string inputProjections;
-    bool force = false;
-    uint32_t itemsPerWorkgroup = 256;
-    bool glsqr = false;
-};
-
-/**Argument parsing
- *
- * @param argc
- * @param argv[]
- *
- * @return Returns 0 on success and nonzero for some error.
- */
-int Args::parseArguments(int argc, char* argv[])
-{
-
-    CLI::App app{ "OpenCL implementation of CGLS." };
-    app.add_option("input_projections", inputProjections, "Input projections")
-        ->required()
-        ->check(CLI::ExistingFile);
-    app.add_option("input_projection_matrices", inputProjectionMatrices,
-                   "Projection matrices to be input of the computation."
-                   "Files in a DEN format that contains projection matricess to process.")
-        ->required()
-        ->check(CLI::ExistingFile);
-    app.add_option("output_volume", outputVolume, "Volume to project")->required();
-    app.add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
-    CLI::Option* glsqr_cli = app.add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
-
-    CLI::Option* tl_cli
-        = app.add_option("--tikhonov-lambda", tikhonovLambda, "Tikhonov regularization parameter.")
-              ->check(CLI::Range(0.0, 100.0));
-    tl_cli->needs(glsqr_cli);
-
-    // Reconstruction geometry
-    CLI::Option_group* og_rec = app.add_option_group(
-        "Reconstruction geometry", "Parameters that define reconstruction geometry.");
-    CLI::Option* psx = og_rec->add_option("--pixel-sizex", pixelSizeX,
-                                          "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* psy = og_rec->add_option("--pixel-sizey", pixelSizeY,
-                                          "Spacing of detector cells, defaults to 0.616.");
-    CLI::Option* vx = og_rec->add_option("--volume-sizex", volumeSizeX,
-                                         "Dimension of volume, defaults to 256.");
-    CLI::Option* vy = og_rec->add_option("--volume-sizey", volumeSizeY,
-                                         "Dimension of volume, defaults to 256.");
-    CLI::Option* vz = og_rec->add_option("--volume-sizez", volumeSizeZ,
-                                         "Dimension of volume, defaults to 199.");
-    og_rec->add_option("--voxel-sizex", voxelSizeX, "Spacing of voxels, defaults to 1.0.");
-    og_rec->add_option("--voxel-sizey", voxelSizeY, "Spacing of voxels, defaults to 1.0.");
-    og_rec->add_option("--voxel-sizez", voxelSizeZ, "Spacing of voxels, defaults to 1.0.");
-
-    // Program flow parameters
-    app.add_option("-j,--threads", threads, "Number of extra threads that application can use.")
-        ->check(CLI::Range(0, 65535))
-        ->group("Platform settings");
-    app.add_option("-p,--platform_id", platformId, "OpenCL platform ID to use.")
-        ->check(CLI::Range(0, 65535))
-        ->group("Platform settings");
-    app.add_flag("-d,--debug", debug, "OpenCL compilation including debugging information.")
-        ->group("Platform settings");
-    app.add_option("--items-per-workgroup", itemsPerWorkgroup,
-                   "OpenCL parameter that is important for norm computation, defaults to 256.")
-        ->check(CLI::Range(1, 65535))
-        ->group("Platform settings");
-    app.add_flag("--report-intermediate", reportIntermediate,
-                 "Report intermediate values of x, defaults to false.")
-        ->group("Platform settings");
-    app.add_option("-i,--max_iterations", maxIterations,
-                   "Maximum number of CGLS iterations, defaults to 40.")
-        ->check(CLI::Range(1, 65535))
-        ->group("Platform settings");
-    app.add_option("-e", stoppingError, "Stopping error, defaults to 0.00025.")
-        ->check(CLI::Range(0.0, 1.00))
-        ->group("Platform settings");
-    psx->needs(psy);
-    psy->needs(psx);
-    vx->needs(vy)->needs(vz);
-    vy->needs(vx)->needs(vz);
-    vz->needs(vx)->needs(vy);
-    try
+public:
+    Args(int argc, char** argv, std::string programName)
+        : CArmArguments(argc, argv, programName){};
+    int preParse() { return 0; };
+    int postParse()
     {
-        app.parse(argc, argv);
-        // If force is not set, then check if output file does not exist
         if(!force)
         {
             if(io::pathExists(outputVolume))
@@ -187,128 +86,148 @@ int Args::parseArguments(int argc, char* argv[])
             LOGE << ERR;
             io::throwerr(ERR);
         }
-    } catch(const CLI::CallForHelp e)
-    {
-        app.exit(e); // Prints help message
-        return 1;
-    } catch(const CLI::ParseError& e)
-    {
-        int exitcode = app.exit(e);
-        LOGE << io::xprintf("There was perse error with exit code %d catched.\n %s", exitcode,
-                            app.help().c_str());
-        return -1;
-    } catch(...)
-    {
-        LOGE << "Unknown exception catched";
-        return -1;
-    }
-    return 0;
+        return 0;
+    };
+    void defineArguments();
+    int threads = 1;
+    // It is evaluated from -0.5, pixels are centerred at integer coordinates
+    uint64_t totalProjectionsSize;
+    uint64_t totalVolumeSize;
+    uint32_t baseOffset = 0;
+    double tikhonovLambda = -1.0;
+    bool noFrameOffset = false;
+    std::string outputVolume;
+    std::string inputProjectionMatrices;
+    std::string inputProjections;
+    bool force = false;
+    bool glsqr = false;
+};
+
+/**Argument parsing
+ *
+ * @param argc
+ * @param argv[]
+ *
+ * @return Returns 0 on success and nonzero for some error.
+ */
+void Args::defineArguments()
+{
+
+    cliApp->add_option("input_projections", inputProjections, "Input projections")
+        ->required()
+        ->check(CLI::ExistingFile);
+    cliApp
+        ->add_option("input_projection_matrices", inputProjectionMatrices,
+                     "Projection matrices to be input of the computation."
+                     "Files in a DEN format that contains projection matricess to process.")
+        ->required()
+        ->check(CLI::ExistingFile);
+    cliApp->add_option("output_volume", outputVolume, "Volume to project")->required();
+    cliApp->add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
+    CLI::Option* glsqr_cli = cliApp->add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
+
+    CLI::Option* tl_cli
+        = cliApp->add_option("--tikhonov-lambda", tikhonovLambda, "Tikhonov regularization parameter.")
+              ->check(CLI::Range(0.0, 100.0));
+    tl_cli->needs(glsqr_cli);
+
+    // Reconstruction geometry
+    addVolumeSizeArgs();
+    addVoxelSizeArgs();
+    addPixelSizeArgs();
+
+    // Program flow parameters
+    addSettingsArgs();
 }
 
 int main(int argc, char* argv[])
 {
-    plog::Severity verbosityLevel = plog::debug; // debug, info, ...
-    char exepath[PATH_MAX + 1] = { 0 };
-    readlink("/proc/self/exe", exepath, sizeof(exepath));
-    std::string argv0(exepath);
-    std::string csvLogFile
-        = io::xprintf("/tmp/%s.csv", io::getBasename(argv0.c_str()).c_str()); // Set NULL to disable
-    std::string xpath = io::getParent(argv0);
-    bool logToConsole = true;
-    plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);
-    plogSetup.initLogging();
-    auto start = std::chrono::steady_clock::now();
-    LOGI << io::xprintf("START %s", argv[0]);
+    Program PRG(argc, argv);
+    Args ARG(argc, argv,
+             "OpenCL implementation of CGLS and GLSQR applied on the cone beam CT operator.");
     // Argument parsing
-    Args a;
-    int parseResult = a.parseArguments(argc, argv);
-    if(parseResult != 0)
+    int parseResult = ARG.parse();
+    if(parseResult > 0)
     {
-        if(parseResult > 0)
-        {
-            return 0; // Exited sucesfully, help message printed
-        } else
-        {
-            return -1; // Exited somehow wrong
-        }
+        return 0; // Exited sucesfully, help message printed
+    } else if(parseResult != 0)
+    {
+        return -1; // Exited somehow wrong
     }
+    PRG.startLog(true);
+    std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
     std::shared_ptr<io::DenProjectionMatrixReader> dr
-        = std::make_shared<io::DenProjectionMatrixReader>(a.inputProjectionMatrices);
-    float* projection = new float[a.totalProjectionsSize];
-    io::readBytesFrom(a.inputProjections, 6, (uint8_t*)projection, a.totalProjectionsSize * 4);
+        = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
+    float* projection = new float[ARG.totalProjectionsSize];
+    io::readBytesFrom(ARG.inputProjections, 6, (uint8_t*)projection, ARG.totalProjectionsSize * 4);
     std::string startPath;
-    startPath = io::getParent(a.outputVolume);
-    std::string bname = io::getBasename(a.outputVolume);
+    startPath = io::getParent(ARG.outputVolume);
+    std::string bname = io::getBasename(ARG.outputVolume);
     bname = bname.substr(0, bname.find_last_of("."));
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
-    if(!a.glsqr)
+    if(!ARG.glsqr)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX, a.pixelSizeY,
-            a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ,
-            xpath, a.debug, a.itemsPerWorkgroup, a.reportIntermediate, startPath);
-        int res = cgls->initializeOpenCL(a.platformId);
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX, ARG.pixelSizeY,
+            ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
+            xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup, ARG.reportKthIteration, startPath);
+        int res = cgls->initializeOpenCL(ARG.CLplatformID);
         if(res < 0)
         {
-            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", a.platformId);
+            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
             LOGE << ERR;
             io::throwerr(ERR);
         }
-        float* volume = new float[a.totalVolumeSize]();
+        float* volume = new float[ARG.totalVolumeSize]();
         // testing
-        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
+        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
         cgls->initializeVectors(projection, volume);
         uint16_t buf[3];
-        buf[0] = a.volumeSizeY;
-        buf[1] = a.volumeSizeX;
-        buf[2] = a.volumeSizeZ;
-        io::createEmptyFile(a.outputVolume, 0, true);
-        io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-        cgls->reconstruct(dr, a.maxIterations, a.stoppingError);
-        io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
+        buf[0] = ARG.volumeSizeY;
+        buf[1] = ARG.volumeSizeX;
+        buf[2] = ARG.volumeSizeZ;
+        io::createEmptyFile(ARG.outputVolume, 0, true);
+        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
+        cgls->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+        io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start);
-        LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
     } else
     {
         std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
-            a.projectionSizeX, a.projectionSizeY, a.projectionSizeZ, a.pixelSizeX, a.pixelSizeY,
-            a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ,
-            xpath, a.debug, a.itemsPerWorkgroup, a.reportIntermediate, startPath);
-        int res = glsqr->initializeOpenCL(a.platformId);
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX, ARG.pixelSizeY,
+            ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
+            xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup, ARG.reportKthIteration, startPath);
+        int res = glsqr->initializeOpenCL(ARG.CLplatformID);
         if(res < 0)
         {
-            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", a.platformId);
+            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
             LOGE << ERR;
             io::throwerr(ERR);
         }
-        float* volume = new float[a.totalVolumeSize]();
+        float* volume = new float[ARG.totalVolumeSize]();
         // testing
-        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, a.totalVolumeSize * 4);
+        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
         glsqr->initializeVectors(projection, volume);
         uint16_t buf[3];
-        buf[0] = a.volumeSizeY;
-        buf[1] = a.volumeSizeX;
-        buf[2] = a.volumeSizeZ;
-        io::createEmptyFile(a.outputVolume, 0, true);
-        io::appendBytes(a.outputVolume, (uint8_t*)buf, 6);
-        if(a.tikhonovLambda <= 0.0)
+        buf[0] = ARG.volumeSizeY;
+        buf[1] = ARG.volumeSizeX;
+        buf[2] = ARG.volumeSizeZ;
+        io::createEmptyFile(ARG.outputVolume, 0, true);
+        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
+        if(ARG.tikhonovLambda <= 0.0)
         {
-            glsqr->reconstruct(dr, a.maxIterations, a.stoppingError);
+            glsqr->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
         } else
         {
-            glsqr->reconstructTikhonov(dr, a.tikhonovLambda, a.maxIterations, a.stoppingError);
+            glsqr->reconstructTikhonov(dr, ARG.tikhonovLambda, ARG.maxIterationCount, ARG.stoppingRelativeError);
         }
-        io::appendBytes(a.outputVolume, (uint8_t*)volume, a.totalVolumeSize * sizeof(float));
+        io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start);
-        LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
     }
+    PRG.endLog(true);
 }

@@ -189,7 +189,7 @@ void CArmArguments::addSettingsArgs()
         ->add_option("--stopping-relative-error", stoppingRelativeError,
                      io::xprintf("Stopping relative error of ||Ax-b||/||b||, defaults to %f.",
                                  stoppingRelativeError))
-        ->check(CLI::Range(1, 65535));
+        ->check(CLI::Range(0.0, 1.0));
 
     addCLSettingsGroup();
     og_cl_settings

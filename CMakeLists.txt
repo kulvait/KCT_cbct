@@ -132,7 +132,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 
-SET(CLLINCGLS_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-cgls.cpp)
+SET(CLLINCGLS_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-cgls.cpp src/CArmArguments.cpp)
 add_executable(CLlin-cgls ${CLLINCGLS_SOURCES})
 set_target_properties(
     CLlin-cgls
@@ -332,6 +332,23 @@ target_link_libraries (volprojector ${CMAKE_THREAD_LIBS_INIT})
 #target_link_libraries(dacprojector /usr/lib/liblapacke.so)
 #target_link_libraries(dacprojector ${MKL_CORE_LIBRARY})
 install (TARGETS volprojector RUNTIME DESTINATION .)
+
+
+#Catch lib
+include_directories(${CMAKE_SOURCE_DIR}/tests)
+add_library(Catch INTERFACE)
+target_include_directories(Catch INTERFACE ${CMAKE_SOURCE_DIR}/submodules/Catch2/single_include/catch2)
+FILE( GLOB TST_SRC ${CMAKE_SOURCE_DIR}/tests/*.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp )
+add_executable(test_all ${TST_SRC})
+target_link_libraries(test_all Catch)
+target_link_libraries(test_all ctiol)
+target_link_libraries(test_all ctmal)
+target_link_libraries(test_all stdc++fs)
+target_link_libraries(test_all OpenCL::OpenCL)
+target_link_libraries(test_all CTIOL_OPENCL)
+
+
+
 #Documentation target
 find_package(Doxygen)
 if (DOXYGEN_FOUND)

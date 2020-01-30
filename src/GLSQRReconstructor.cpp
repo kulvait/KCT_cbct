@@ -727,11 +727,6 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 {
     LOGI << io::xprintf("WELCOME TO GLSQR");
     reportTime("GLSQR INIT");
-    if(reportProgress)
-    {
-        // writeProjections(*b_buf, io::xprintf("%sb.den", progressBeginPath.c_str()));
-        // writeVolume(*x_buf, io::xprintf("%sx_0.den", progressBeginPath.c_str()));
-    }
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
@@ -927,10 +922,10 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
         LOGW << io::xprintf("After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
-        if(reportProgress)
+        if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_%d.den", progressBeginPath.c_str(), iteration);
-            writeVolume(*x_cur, io::xprintf("%sx_%d.den", progressBeginPath.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressBeginPath.c_str(), iteration);
+            writeVolume(*x_cur, io::xprintf("%sx_it%02d.den", progressBeginPath.c_str(), iteration));
         }
     }
     Q->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
@@ -945,11 +940,6 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
     LOGI << io::xprintf("TIKHONOV GLSQR");
     reportTime("INIT");
     // Ke vsem b bufferum je treba pridat jeden x buffer
-    if(reportProgress)
-    {
-        // writeProjections(*b_buf, io::xprintf("%sb.den", progressBeginPath.c_str()));
-        // writeVolume(*x_buf, io::xprintf("%sx_0.den", progressBeginPath.c_str()));
-    }
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
@@ -1015,7 +1005,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
     // Now allocate memmory for the buffers that I will need
     std::shared_ptr<cl::Buffer> tmp_buf;
     u_prev = bc_buf;
-    u_prev_x = xm_buf; //x part
+    u_prev_x = xm_buf; // x part
     v_prev = xf_buf;
     x_prev = xg_buf;
     w_prev_prev = xh_buf;
@@ -1130,7 +1120,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
         tau_cur += scalarProductXBuffer_barier_double(*BZ_x, *u_cur_x);
         addIntoFirstVectorSecondVectorScaled(*BZ, *u_cur, float(-tau_cur), BDIM);
         addIntoFirstVectorSecondVectorScaled(*BZ_x, *u_cur_x, float(-tau_cur), XDIM);
-        tau_next = std::sqrt(normBBuffer_barier_double(*BZ)+normXBuffer_barier_double(*BZ_x));
+        tau_next = std::sqrt(normBBuffer_barier_double(*BZ) + normXBuffer_barier_double(*BZ_x));
         LOGE << io::xprintf("tau_prev=%f, tau_cur=%f, tau_next=%f", tau_prev, tau_cur, tau_next);
 
         if(tau_next != 0)
@@ -1169,14 +1159,26 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
 
         LOGW << io::xprintf("After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
-        if(reportProgress)
+        if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_%d.den", progressBeginPath.c_str(), iteration);
-            writeVolume(*x_cur, io::xprintf("%sx_%d.den", progressBeginPath.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_it%03d.den", progressBeginPath.c_str(), iteration);
+            writeVolume(*x_cur, io::xprintf("%sx_it%03d.den", progressBeginPath.c_str(), iteration));
         }
     }
     Q->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
+}
+	
+double GLSQRReconstructor::adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices)
+{
+    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
+    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
+    std::vector<float> scalingFactors = computeScalingFactors(PM);
+    backproject(*b_buf, *xa_buf, PM, ICM, scalingFactors);
+    project(*x_buf, *ba_buf, PM, ICM, scalingFactors);
+	double bdotAx = scalarProductBBuffer_barier_double(*b_buf, *ba_buf);
+	double ATbdotx = scalarProductXBuffer_barier_double(*x_buf, *xa_buf);
+	return (bdotAx/ATbdotx);
 }
 
 } // namespace CTL
