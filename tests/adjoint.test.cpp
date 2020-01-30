@@ -12,7 +12,7 @@
 using namespace CTL;
 
 std::string basedir(); // Defined in main file so that it will be accessible to linker
-
+uint32_t CLplatformID = 0;
 /*
  *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details
  */
@@ -45,7 +45,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
         volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
         itemsPerWorkgroup, reportIterations, startPath);
-    int res = glsqr->initializeOpenCL(1);
+    int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
@@ -110,7 +110,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TEST", "[adjointop][cut
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
         volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
         itemsPerWorkgroup, reportIterations, startPath);
-    int res = glsqr->initializeOpenCL(1);
+    int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
@@ -227,7 +227,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
         volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
         itemsPerWorkgroup, reportIterations, startPath, true);
-    int res = glsqr->initializeOpenCL(1);
+    int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
@@ -290,7 +290,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST", 
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
         volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
         itemsPerWorkgroup, reportIterations, startPath, true);
-    int res = glsqr->initializeOpenCL(1);
+    int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
