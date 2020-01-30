@@ -16,12 +16,12 @@
 
 // Internal libraries
 #include "CArmArguments.hpp"
-#include "PROG/Program.hpp"
 #include "CuttingVoxelProjector.hpp"
 #include "DEN/DenFileInfo.hpp"
-#include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenFrame2DReader.hpp"
+#include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
+#include "PROG/Program.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
 using namespace CTL;
@@ -58,7 +58,7 @@ struct Args
     bool force = false;
     bool siddon = false;
     uint32_t probesPerEdge = 1;
-	
+
     int parseArguments(int argc, char* argv[]);
 };
 
@@ -181,33 +181,20 @@ int Args::parseArguments(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-    plog::Severity verbosityLevel = plog::debug; // debug, info, ...
-    char exepath[PATH_MAX + 1] = { 0 };
-    readlink("/proc/self/exe", exepath, sizeof(exepath));
-    std::string argv0(exepath);
-    std::string csvLogFile
-        = io::xprintf("/tmp/%s.csv", io::getBasename(argv0.c_str()).c_str()); // Set NULL to disable
-    std::string xpath = io::getParent(argv0);
-    bool logToConsole = true;
-    plog::PlogSetup plogSetup(verbosityLevel, csvLogFile, logToConsole);
-    plogSetup.initLogging();
-    LOGI << io::xprintf("Xpath is %s", xpath.c_str());
-    LOGI << io::xprintf("argv[0] is %s", argv[0]);
-    auto start = std::chrono::steady_clock::now();
-    LOGI << io::xprintf("START %s", argv[0]);
+    using namespace CTL::util;
+    Program PRG(argc, argv);
+    PRG.startLog(true);
     // Argument parsing
     Args a;
     int parseResult = a.parseArguments(argc, argv);
-    if(parseResult != 0)
+    if(parseResult > 0)
     {
-        if(parseResult > 0)
-        {
-            return 0; // Exited sucesfully, help message printed
-        } else
-        {
-            return -1; // Exited somehow wrong
-        }
+        return 0; // Exited sucesfully, help message printed
+    } else if(parseResult != 0)
+    {
+        return -1; // Exited somehow wrong
     }
+    std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
     std::shared_ptr<io::DenProjectionMatrixReader> dr
         = std::make_shared<io::DenProjectionMatrixReader>(a.inputProjectionMatrices);
     io::DenFileInfo pmi(a.inputProjectionMatrices);
@@ -300,9 +287,6 @@ int main(int argc, char* argv[])
     }
     delete[] volume;
     delete[] projection;
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-    LOGI << io::xprintf("END %s, duration %d ms.", argv[0], duration.count());
     if(dpr != nullptr)
     {
         LOGI << io::xprintf(
@@ -310,4 +294,5 @@ int main(int argc, char* argv[])
             std::sqrt(normSquare), std::sqrt(normSquareDifference),
             std::sqrt(normSquareDifference / normSquare) * 100);
     }
+    PRG.endLog(true);
 }

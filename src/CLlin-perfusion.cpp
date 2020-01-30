@@ -38,7 +38,12 @@ public:
     Args(int argc, char** argv, std::string programName)
         : CArmArguments(argc, argv, programName){};
     void defineArguments();
-    int preParse() { return 0; };
+    int preParse()
+    {
+        maxIterationCount = 100;
+        stoppingRelativeError = 0.00025;
+        return 0;
+    };
     int postParse()
     {
         if(!force)
@@ -106,16 +111,10 @@ public:
     // Geometry
     uint64_t totalVolumeSize;
     uint64_t totalProjectionsSize;
-    uint32_t platformId = 0;
-    bool debug = false;
-    bool reportIntermediate = false;
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint32_t baseOffset = 0;
-    uint32_t maxIterations = 100;
-    double stoppingError = 0.00025;
     bool noFrameOffset = false;
     bool force = false;
-    uint32_t itemsPerWorkgroup = 256;
 
     /** Frame Time. (0018, 1063) Nominal time (in msec) per individual frame.
      *
@@ -176,29 +175,11 @@ void Args::defineArguments()
     addVoxelSizeArgs();
     addPixelSizeArgs();
     addBasisSpecificationArgs();
+    addSettingsArgs();
 
     // Specification of the basis of the volume data, each voxel is approximated as v_i(t) =  sum
     // v_i^j b_j(t).
     // Program flow parameters
-    cliApp
-        ->add_option("--max-iterations", maxIterations,
-                     "Maximum number of LSQR iterations, defaults to 100.")
-        ->check(CLI::Range(1, 65535))
-        ->group("Platform settings");
-    cliApp->add_option("-p,--platform_id", platformId, "OpenCL platform ID to use.")
-        ->check(CLI::Range(0, 65535))
-        ->group("Platform settings");
-    cliApp->add_flag("-d,--debug", debug, "OpenCL compilation including debugging information.")
-        ->group("Platform settings");
-    cliApp
-        ->add_option("--items-per-workgroup", itemsPerWorkgroup,
-                     "OpenCL parameter that is important for norm computation, defaults to 256.")
-        ->check(CLI::Range(1, 65535))
-        ->group("Platform settings");
-    cliApp
-        ->add_flag("--report-intermediate", reportIntermediate,
-                   "Report intermediate values of x, defaults to false.")
-        ->group("Platform settings");
 }
 
 int main(int argc, char* argv[])
@@ -214,7 +195,7 @@ int main(int argc, char* argv[])
     {
         return -1; // Exited somehow wrong
     }
-    PRG.startLog();
+    PRG.startLog(true);
     std::shared_ptr<io::DenProjectionMatrixReader> dr
         = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
     float* projection;
@@ -333,12 +314,12 @@ int main(int argc, char* argv[])
         = std::make_shared<GLSQRPerfusionReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
             ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
-            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.debug, ARG.itemsPerWorkgroup,
-            ARG.reportIntermediate, startPath);
-    int res = LSQR->initializeOpenCL(ARG.platformId);
+            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup,
+            ARG.reportKthIteration, startPath);
+    int res = LSQR->initializeOpenCL(ARG.CLplatformID);
     if(res < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.platformId);
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
         LOGE << ERR;
         io::throwerr(ERR);
     }
@@ -353,7 +334,7 @@ int main(int argc, char* argv[])
     //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
     LSQR->initializeData(projections, basisFunctionsValues, volumes);
-    LSQR->reconstruct(dr, ARG.maxIterations);
+    LSQR->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
 
     uint16_t buf[3];
     buf[0] = ARG.volumeSizeY;

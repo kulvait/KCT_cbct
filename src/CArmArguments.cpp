@@ -5,13 +5,21 @@ namespace CTL::util {
 CArmArguments::CArmArguments(int argc, char** argv, std::string appName)
     : Arguments(argc, argv, appName)
 {
-    og_geometry = cliApp->add_option_group("Geometry specification",
-                                           "Specification of the dimensions of the CT geometry.");
+}
+
+void CArmArguments::addGeometryGroup()
+{
+    if(og_geometry == nullptr)
+    {
+        og_geometry = cliApp->add_option_group(
+            "Geometry specification", "Specification of the dimensions of the CT geometry.");
+    }
 }
 
 void CArmArguments::addVolumeSizeArgs()
 {
     using namespace CLI;
+    addGeometryGroup();
     Option* vx = og_geometry->add_option(
         "--volume-sizex", volumeSizeX,
         io::xprintf("X dimension of volume as voxel count, defaults to %d.", volumeSizeX));
@@ -29,6 +37,7 @@ void CArmArguments::addVolumeSizeArgs()
 void CArmArguments::addProjectionSizeArgs()
 {
     using namespace CLI;
+    addGeometryGroup();
     Option* px = og_geometry->add_option(
         "--projection-sizex", projectionSizeX,
         io::xprintf("X dimension of detector in pixel count, defaults to %d.", projectionSizeX));
@@ -42,6 +51,7 @@ void CArmArguments::addProjectionSizeArgs()
 void CArmArguments::addVoxelSizeArgs()
 {
     using namespace CLI;
+    addGeometryGroup();
     Option* vox
         = og_geometry
               ->add_option("--voxel-sizex", voxelSizeX,
@@ -65,6 +75,7 @@ void CArmArguments::addVoxelSizeArgs()
 void CArmArguments::addPixelSizeArgs()
 {
     using namespace CLI;
+    addGeometryGroup();
     Option* psx
         = og_geometry
               ->add_option(
@@ -81,11 +92,19 @@ void CArmArguments::addPixelSizeArgs()
     psy->needs(psx);
 }
 
+void CArmArguments::addBasisGroup()
+{
+    if(og_basis == nullptr)
+    {
+        og_basis = cliApp->add_option_group(
+            "Basis functions specification and timings.",
+            "Specification of the basis functions that include definitions of the timings.");
+    }
+}
+
 void CArmArguments::addBasisSpecificationArgs(bool includeBasisSize)
 {
-    CLI::Option_group* og_basis = cliApp->add_option_group(
-        "Basis functions specification and timings.",
-        "Specification of the basis functions that include definitions of the timings.");
+    addBasisGroup();
     CLI::Option_group* og_basis_type
         = og_basis->add_option_group("Basis type.", "Specification of the basis type.");
 
@@ -132,6 +151,62 @@ void CArmArguments::addBasisSpecificationArgs(bool includeBasisSize)
             "acquisition in which all basis functions are considered having the same value "
             "as at the end of their support [defaults to 0.0].")
         ->check(CLI::Range(0.0, 100000.0));
+}
+
+void CArmArguments::addSettingsGroup()
+{
+    if(og_settings == nullptr)
+    {
+        og_settings
+            = cliApp->add_option_group("Settings", "Setting of the algorithm and the program.");
+    }
+}
+
+void CArmArguments::addCLSettingsGroup()
+{
+    addSettingsGroup();
+    if(og_cl_settings == nullptr)
+    {
+        og_cl_settings
+            = og_settings->add_option_group("CL settings", "Setting of the OpenCL computing.");
+    }
+}
+
+void CArmArguments::addSettingsArgs()
+{
+    addSettingsGroup();
+    og_settings
+        ->add_option("--report-kth-intermediate", reportKthIteration,
+                     io::xprintf("Report each k-th iteration 0 for no reports, defaults to %d.",
+                                 reportKthIteration))
+        ->check(CLI::Range(0, 100));
+    og_settings
+        ->add_option(
+            "--max-iterations", maxIterationCount,
+            io::xprintf("Maximum number of LSQR iterations, defaults to %d.", maxIterationCount))
+        ->check(CLI::Range(1, 65535));
+    og_settings
+        ->add_option("--stopping-relative-error", stoppingRelativeError,
+                     io::xprintf("Stopping relative error of ||Ax-b||/||b||, defaults to %f.",
+                                 stoppingRelativeError))
+        ->check(CLI::Range(1, 65535));
+
+    addCLSettingsGroup();
+    og_cl_settings
+        ->add_option("-p,--platform_id", CLplatformID,
+                     io::xprintf("OpenCL platform ID to use, defaults to %d.", CLplatformID))
+        ->check(CLI::Range(0, 65535));
+    std::string debugValue = (CLdebug ? "true" : "false");
+    og_cl_settings->add_flag(
+        "-d,--debug", CLdebug,
+        io::xprintf("OpenCL compilation including debugging information, defaults to %s.",
+                    debugValue.c_str()));
+    og_cl_settings
+        ->add_option(
+            "--items-per-workgroup", CLitemsPerWorkgroup,
+            io::xprintf("OpenCL parameter that is important for norm computation, defaults to %d.",
+                        CLitemsPerWorkgroup))
+        ->check(CLI::Range(1, 65535));
 }
 
 } // namespace CTL::util
