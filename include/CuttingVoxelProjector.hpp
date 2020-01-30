@@ -125,7 +125,7 @@ private:
                                     cl_int2&,
                                     float&,
                                     cl_uint2&>>
-        projector_siddon;
+        projector_sidon;
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     unsigned int&,
                                     cl_double16&,

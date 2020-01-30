@@ -35,7 +35,7 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
         io::concatenateTextFiles(
             clFile, true,
             { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
-              io::xprintf("%s/opencl/projector_siddon.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector_sidon.cl", this->xpath.c_str()),
               io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()) });
     }
     std::string projectorSource = io::fileToString(clFile);
@@ -75,7 +75,7 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                             cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcutting_voxel_project"));
-        projector_siddon = std::make_shared<
+        projector_sidon = std::make_shared<
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                             cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
             cl::Kernel(program, "FLOATsidon_project"));
@@ -297,7 +297,7 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
     unsigned int offset = 0;
     float scalingOne = 1.0;
     cl::EnqueueArgs eargs(*Q, cl::NDRange(pdimx, pdimy));
-    (*projector_siddon)(eargs, *volumeBuffer, *projectionBuffer, offset, ICM, SOURCEPOSITION,
+    (*projector_sidon)(eargs, *volumeBuffer, *projectionBuffer, offset, ICM, SOURCEPOSITION,
                         NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingOne, pixelGranularity)
         .wait();
 
