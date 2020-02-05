@@ -201,6 +201,8 @@ private:
                                              unsigned int size);
     int addIntoFirstVectorSecondVectorScaledOffset(
         cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, unsigned int offset);
+    int addIntoFirstVectorSecondVectorScaledOffsetOffset(
+        cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, size_t offseta, size_t offsetb);
     int addIntoFirstVectorScaledSecondVector(std::vector<std::shared_ptr<cl::Buffer>>& A,
                                              std::vector<std::shared_ptr<cl::Buffer>>& B,
                                              float f,
@@ -226,9 +228,10 @@ private:
     std::vector<std::shared_ptr<cl::Buffer>> b_buf, ba_buf, bb_buf, bc_buf, bd_buf, be_buf,
         tmp_b_buf;
     std::vector<std::shared_ptr<cl::Buffer>> x_buf, xa_buf, xb_buf, xc_buf, xd_buf, xe_buf, xf_buf,
-        xg_buf, xh_buf, xi_buf, xj_buf, xk_buf, xl_buf, xm_buf, xn_buf, xB_tmp_buf;
+        xg_buf, xh_buf, xi_buf, xj_buf, xk_buf, xl_buf, xm_buf, xn_buf;//, xB_tmp_buf;
     std::shared_ptr<cl::Buffer> tmp_b = nullptr, tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
     std::shared_ptr<cl::Buffer> tmp_x = nullptr, tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
+    std::shared_ptr<cl::Buffer> tmp_XL = nullptr;
 
     // Functions
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOAT_scaleVector;
@@ -237,6 +240,8 @@ private:
         FLOAT_addIntoFirstVectorSecondVectorScaled;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned int&>>
         FLOAT_addIntoFirstVectorSecondVectorScaledOffset;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, size_t&, size_t&>>
+        FLOAT_addIntoFirstVectorSecondVectorScaledOffsetOffset;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOAT_addIntoFirstVectorScaledSecondVector;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_NormSquare;

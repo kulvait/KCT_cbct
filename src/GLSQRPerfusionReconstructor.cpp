@@ -116,6 +116,9 @@ int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
     FLOAT_addIntoFirstVectorSecondVectorScaledOffset
         = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned int&>>(
             cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled_offset"));
+    FLOAT_addIntoFirstVectorSecondVectorScaledOffsetOffset
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, size_t&, size_t&>>(
+            cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled_offset_offset"));
     FLOAT_addIntoFirstVectorScaledSecondVector
         = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
             cl::Kernel(program, "FLOAT_add_into_first_vector_scaled_second_vector"));
@@ -327,13 +330,13 @@ int GLSQRPerfusionReconstructor::initializeData(std::vector<float*> projections,
     for(std::size_t i = 0; i != b.size(); i++)
     {
         // Special buffer to optimize backprojection time not to erase it every time
-        xB_tmp_buf.push_back(std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+        /*xB_tmp_buf.push_back(std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
                                                           sizeof(float) * XDIM, nullptr, &err));
         if(err != CL_SUCCESS)
         {
             LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
             return -1;
-        }
+        }*/
 
         b_buf.push_back(
             std::make_shared<cl::Buffer>(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -385,6 +388,13 @@ int GLSQRPerfusionReconstructor::initializeData(std::vector<float*> projections,
             LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
             return -1;
         }
+    }
+    tmp_XL = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                          sizeof(float) * XDIM * x.size(), nullptr, &err);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+        return -1;
     }
     tmp_x = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM, nullptr,
                                          &err);
@@ -717,6 +727,139 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
     Q->finish();
     w.press("START Backrojection");
     zeroXBuffers(X);
+    zeroFloatVector(*tmp_XL, XDIM * X.size());
+    unsigned int frameSize = pdimx * pdimy;
+    for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
+    {
+        copyFloatVector(*B[sweepID], *tmp_b_buf[sweepID], BDIM);
+    }
+    unsigned int frameID;
+    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
+    cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
+    cl_int2 pdims({ int(pdimx), int(pdimy) });
+    // float FLOATONE = 1.0;
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    float FLOATONE = 1.0;
+    if(!sidon)
+    {
+        for(std::size_t angleID = 0; angleID != pdimz; angleID++)
+        {
+            unsigned int offset = angleID * frameSize;
+            matrix::ProjectionMatrix mat = V[angleID];
+            float scalingFactor = scalingFactors[angleID];
+            std::array<double, 3> sourcePosition = mat.sourcePosition();
+            std::array<double, 3> normalToDetector = mat.normalToDetector();
+            double* P = mat.getPtr();
+            cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10],
+                             P[11], 0.0, 0.0, 0.0, 0.0 });
+            cl_double16 ICM = invertedProjectionMatrices[angleID];
+            cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+            cl_double3 NORMALTODETECTOR(
+                { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+            // Somehow better from the optimalization point of view
+            // zeroFloatVector(*xB_tmp_buf[sweepID], XDIM);
+            //        zeroFloatVector(*tmp_x, XDIM);
+            //   Q->finish();
+            //    w.press(io::xprintf("A angle %03d sweepID %02d", angleID, sweepID));
+            // frameID = sweepID * pdimz + angleID;
+            // Q->enqueueFillBuffer<cl_float>(*tmp_x, FLOATZERO, 0, XDIM * sizeof(float));
+            // zeroFloatVector(*tmp_x, XDIM);
+            for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
+            {
+                (*scalingProjections)(eargs2, *tmp_b_buf[sweepID], offset, ICM, SOURCEPOSITION,
+                                      NORMALTODETECTOR, pdims, scalingFactor);
+            }
+        }
+    }
+    Q->finish();
+    w.press("Prepared for Backrojection");
+    for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
+    {
+        for(std::size_t angleID = 0; angleID != pdimz; angleID++)
+        {
+            unsigned int offset = angleID * frameSize;
+            matrix::ProjectionMatrix mat = V[angleID];
+            std::array<double, 3> sourcePosition = mat.sourcePosition();
+            std::array<double, 3> normalToDetector = mat.normalToDetector();
+            double* P = mat.getPtr();
+            cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10],
+                             P[11], 0.0, 0.0, 0.0, 0.0 });
+            cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+            cl_double3 NORMALTODETECTOR(
+                { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+            cl_double16 ICM = invertedProjectionMatrices[angleID];
+            // Somehow better from the optimalization point of view
+            // zeroFloatVector(*xB_tmp_buf[sweepID], XDIM);
+            //        zeroFloatVector(*tmp_x, XDIM);
+            //   Q->finish();
+            //    w.press(io::xprintf("A angle %03d sweepID %02d", angleID, sweepID));
+            // frameID = sweepID * pdimz + angleID;
+            // Q->enqueueFillBuffer<cl_float>(*tmp_x, FLOATZERO, 0, XDIM * sizeof(float));
+            // zeroFloatVector(*tmp_x, XDIM);
+            //            .wait();
+
+            //            (*FLOATcutting_voxel_backproject)(eargs, *tmp_x, *tmp_b_buf[sweepID],
+            //            offset, PM,
+            //                                              SOURCEPOSITION, NORMALTODETECTOR,
+            //                                              vdims, voxelSizes, pdims, FLOATONE);
+
+            // (*FLOATcutting_voxel_backproject)(eargs, *xB_tmp_buf[sweepID],
+            // *tmp_b_buf[sweepID],
+            //                                   offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
+            //                                   vdims, voxelSizes, pdims, FLOATONE);
+            // Q->finish();
+            //     w.press(io::xprintf("B angle %03d sweepID %02d", angleID, sweepID));
+            // sleep(100);
+            // w.press(io::xprintf("W angle %03d", angleID));
+
+            // sleep(10);
+            //       addIntoFirstVectorSecondVectorScaled(*X[basisIND], *tmp_x, scaleBy, XDIM);
+            frameID = sweepID * pdimz + angleID;
+            zeroFloatVector(*tmp_x, XDIM);
+            if(sidon)
+            {
+                cl_uint2 pixelGranularity({ 1, 1 });
+                (*FLOATbackprojector_sidon)(eargs2, *tmp_x, *tmp_b_buf[sweepID], offset, ICM,
+                                            SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                            pdims, FLOATONE, pixelGranularity);
+            } else
+            {
+                (*FLOATcutting_voxel_backproject)(eargs, *tmp_x, *tmp_b_buf[sweepID], offset, PM,
+                                                  SOURCEPOSITION, NORMALTODETECTOR, vdims,
+                                                  voxelSizes, pdims, FLOATONE);
+            }
+            for(std::size_t basisIND = 0; basisIND != X.size(); basisIND++)
+            {
+                float scaleBy = basisFunctionsValues[basisIND][frameID];
+                addIntoFirstVectorSecondVectorScaledOffsetOffset(*tmp_XL, *tmp_x, scaleBy, XDIM,
+                                                                 basisIND * XDIM, 0);
+            }
+            // Q->finish();
+            // w.press(io::xprintf("X angle %03d sweepID %02d", angleID, sweepID));
+        }
+    }
+    for(std::size_t basisIND = 0; basisIND != X.size(); basisIND++)
+    {
+        addIntoFirstVectorSecondVectorScaledOffsetOffset(*X[basisIND], *tmp_XL, 1.0, XDIM, 0,
+                                                         basisIND * XDIM);
+    }
+    Q->finish();
+    w.press("END Backrojection");
+    return 0;
+}
+/*
+int GLSQRPerfusionReconstructor::backproject_overoptimized(
+    std::vector<std::shared_ptr<cl::Buffer>>& B,
+    std::vector<std::shared_ptr<cl::Buffer>>& X,
+    std::vector<matrix::ProjectionMatrix>& V,
+    std::vector<cl_double16>& invertedProjectionMatrices,
+    std::vector<float>& scalingFactors)
+{
+    Watches w;
+    Q->finish();
+    w.press("START Backrojection");
+    zeroXBuffers(X);
     unsigned int frameSize = pdimx * pdimy;
     for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
     {
@@ -833,7 +976,7 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
     Q->finish();
     w.press("END Backrojection");
     return 0;
-}
+}*/
 
 int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>>& X,
                                          std::vector<std::shared_ptr<cl::Buffer>>& B,
@@ -968,6 +1111,14 @@ int GLSQRPerfusionReconstructor::addIntoFirstVectorSecondVectorScaledOffset(
 {
     cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
     (*FLOAT_addIntoFirstVectorSecondVectorScaledOffset)(eargs, a, b, f, offset);
+    return 0;
+}
+
+int GLSQRPerfusionReconstructor::addIntoFirstVectorSecondVectorScaledOffsetOffset(
+    cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, size_t offseta, size_t offsetb)
+{
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    (*FLOAT_addIntoFirstVectorSecondVectorScaledOffsetOffset)(eargs, a, b, f, offseta, offsetb);
     return 0;
 }
 

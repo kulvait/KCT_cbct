@@ -333,6 +333,18 @@ void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset(global float
     a[index] = val;
 }
 
+void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset_offset(global float* a,
+                                                                    global float* b,
+                                                                    private float f,
+                                                                    private const size_t offsetA,
+                                                                    private const size_t offsetB)
+{
+	const size_t gid = get_global_id(0);
+	const size_t indexA = gid + offsetA;
+	const size_t indexB = gid + offsetB;
+    a[indexA] = a[indexA] + f * b[indexB];
+}
+
 void kernel FLOAT_add_into_first_vector_scaled_second_vector(global float* a,
                                                              global float* b,
                                                              private float f)

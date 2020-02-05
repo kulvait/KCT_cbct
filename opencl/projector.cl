@@ -391,7 +391,7 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
         = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
 }
 
-void kernel FLOATrescale_projections(global float* projection,
+void kernel FLOATrescale_projections_old(global float* projection,
                                      private uint projectionOffset,
                                      private double16 ICM,
                                      private double3 sourcePosition,
@@ -425,6 +425,39 @@ void kernel FLOATrescale_projections(global float* projection,
     projection[projectionOffset + ind] = value;
 }
 
+void kernel FLOATrescale_projections(global float* projection,
+                                     private uint projectionOffset,
+                                     private double16 ICM,
+                                     private double3 sourcePosition,
+                                     private double3 normalToDetector,
+                                     private int2 pdims,
+                                     private float scalingFactor)
+{
+    uint px = get_global_id(0);
+    uint py = get_global_id(1);
+    const double4 P = { (double)px, (double)py, 1.0, 0.0 };
+    double4 V; // Point that will be projected to P by CM
+
+    V.s0 = dot(ICM.s0123, P);
+    V.s1 = dot(ICM.s4567, P);
+    V.s2 = dot(ICM.s89ab, P);
+    V.s3 = dot(ICM.scdef, P);
+    if(fabs(V.s3) < 0.001) // This is legal operation since source is projected to (0,0,0)
+    {
+        V.s012 = V.s012 + sourcePosition;
+        V.s3 = V.s3 + 1.0;
+    }
+    V.s0 = V.s0 / V.s3;
+    V.s1 = V.s1 / V.s3;
+    V.s2 = V.s2 / V.s3;
+    double3 n = normalize(V.s012 - sourcePosition);
+    double cosine = fabs(-dot(normalToDetector, n));
+    double cosPowThree = cosine * cosine * cosine;
+    uint ind = px + pdims.x * py;
+    float pixelValue = projection[projectionOffset + ind];
+    float value = pixelValue * scalingFactor / cosPowThree;
+    projection[projectionOffset + ind] = value;
+}
 /** Project given volume using cutting voxel projector.
  *
  *
