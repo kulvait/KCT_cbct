@@ -54,6 +54,7 @@ struct Args
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
     bool centerVoxelProjector = false;
+    bool useCosScaling = false;
     std::vector<std::string> inputVolumes;
     std::string inputProjectionMatrices;
     std::string outputProjection;
@@ -101,6 +102,7 @@ int Args::parseArguments(int argc, char* argv[])
                    "side from the projected vector.");
     app.add_flag("--center-voxel-projector", centerVoxelProjector,
                  "Use center voxel projector instead of cutting voxel projector.");
+    app.add_flag("--cos-scaling", useCosScaling, "Scaling scheme with f^2/cos^3.");
     CLI::Option* sid = app.add_flag("-s,--sidon", sidon, "Use Siddon's projector");
     CLI::Option* ppe
         = app.add_option("--probes-per-edge", probesPerEdge,
@@ -258,7 +260,8 @@ int main(int argc, char* argv[])
     float* volume = new float[a.totalVolumeSize];
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
         volume, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX, a.voxelSizeY,
-        a.voxelSizeZ, xpath, a.debug, a.centerVoxelProjector);
+        a.voxelSizeZ, a.pixelSizeX, a.pixelSizeY, xpath, a.debug, a.centerVoxelProjector,
+        !a.useCosScaling);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {

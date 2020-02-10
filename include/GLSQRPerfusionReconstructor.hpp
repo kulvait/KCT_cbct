@@ -65,6 +65,11 @@ public:
         , reportEachK(reportEachK)
         , sidon(sidon)
     {
+        pdims = cl_int2({ int(pdimx), int(pdimy) });
+        pdims_uint = cl_uint2({ pdimx, pdimy });
+        vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
+        pixelSizes = cl_double2({ pixelSpacingX, pixelSpacingY });
+        voxelSizes = cl_double3({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
         uint32_t UINT32_MAXXX = ((uint32_t)-1);
         uint64_t xdim = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
         uint64_t bdim = uint64_t(pdimx) * uint64_t(pdimy) * uint64_t(pdimz);
@@ -138,8 +143,9 @@ public:
     double adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
-    const cl_float FLOATZERO = 0.0;
+    const cl_float FLOATZERO = 0.0f;
     const cl_double DOUBLEZERO = 0.0;
+    float FLOATONE = 1.0f;
     // Constructor defined variables
     const uint32_t pdimx, pdimy, pdimz;
     const double pixelSpacingX, pixelSpacingY;
@@ -148,6 +154,11 @@ private:
     const std::string xpath; // Path where the program executes
     const bool debug;
     const uint32_t workGroupSize = 256;
+    cl_int2 pdims;
+    cl_uint2 pdims_uint;
+    cl_int3 vdims;
+    cl_double2 pixelSizes;
+    cl_double3 voxelSizes;
     uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
         XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
         XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
@@ -228,7 +239,7 @@ private:
     std::vector<std::shared_ptr<cl::Buffer>> b_buf, ba_buf, bb_buf, bc_buf, bd_buf, be_buf,
         tmp_b_buf;
     std::vector<std::shared_ptr<cl::Buffer>> x_buf, xa_buf, xb_buf, xc_buf, xd_buf, xe_buf, xf_buf,
-        xg_buf, xh_buf, xi_buf, xj_buf, xk_buf, xl_buf, xm_buf, xn_buf;//, xB_tmp_buf;
+        xg_buf, xh_buf, xi_buf, xj_buf, xk_buf, xl_buf, xm_buf, xn_buf; //, xB_tmp_buf;
     std::shared_ptr<cl::Buffer> tmp_b = nullptr, tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
     std::shared_ptr<cl::Buffer> tmp_x = nullptr, tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
     std::shared_ptr<cl::Buffer> tmp_XL = nullptr;
@@ -283,15 +294,6 @@ private:
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         ScalarProductPartial_barier;
 
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&>>
-        scalingProjections;
-
     std::chrono::time_point<std::chrono::steady_clock> timepoint;
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
@@ -317,7 +319,19 @@ private:
                                     float&,
                                     cl_uint2&>>
         FLOATbackprojector_sidon;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_uint2&,
+                                    float&>>
+        scalingProjectionsCos;
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&, cl_double2&, double&>>
+        scalingProjectionsExact;
     bool sidon = false;
+    bool exactProjectionScaling = true;
 };
 
 } // namespace CTL

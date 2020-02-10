@@ -1,18 +1,18 @@
 #include "catch.hpp"
 
 // Internal libs
-#include "GLSQRReconstructor.hpp"
-#include "GLSQRPerfusionReconstructor.hpp"
-#include "PROG/RunTimeInfo.hpp"
-#include "FUN/VectorFunctionI.h"
 #include "FUN/LegendrePolynomialsExplicit.hpp"
+#include "FUN/VectorFunctionI.h"
+#include "GLSQRPerfusionReconstructor.hpp"
+#include "GLSQRReconstructor.hpp"
+#include "PROG/RunTimeInfo.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
 
 using namespace CTL;
 
 std::string basedir(); // Defined in main file so that it will be accessible to linker
-uint32_t CLplatformID = 0;
+uint32_t CLplatformID = 1;
 /*
  *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details
  */
@@ -48,7 +48,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
     int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d", CLplatformID);
         LOGE << ERR;
         io::throwerr(ERR);
     }
@@ -106,14 +106,15 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TEST", "[adjointop][cut
     uint32_t basisSize = 6;
     uint32_t sweepCount = 10;
 
-    std::shared_ptr<GLSQRPerfusionReconstructor> glsqr = std::make_shared<GLSQRPerfusionReconstructor>(
-        projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
-        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
-        itemsPerWorkgroup, reportIterations, startPath);
+    std::shared_ptr<GLSQRPerfusionReconstructor> glsqr
+        = std::make_shared<GLSQRPerfusionReconstructor>(
+            projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
+            volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
+            itemsPerWorkgroup, reportIterations, startPath);
     int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d", CLplatformID);
         LOGE << ERR;
         io::throwerr(ERR);
     }
@@ -139,8 +140,8 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TEST", "[adjointop][cut
     std::vector<float*> basisFunctionsValues;
 
     float *x, *b, *basisVals;
-	float *vals;
-	vals = new float[basisSize];
+    float* vals;
+    vals = new float[basisSize];
 
     for(std::size_t i = 0; i != basisSize; i++)
     {
@@ -159,14 +160,12 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TEST", "[adjointop][cut
         {
             if(sweepID % 2 == 0)
             {
-                baseFunctionsEvaluator->valuesAt(
-                    sweepID * mean_sweep_time + angleID * frame_time, vals);
+                baseFunctionsEvaluator->valuesAt(sweepID * mean_sweep_time + angleID * frame_time,
+                                                 vals);
             } else
             {
-                baseFunctionsEvaluator->valuesAt(sweepID * mean_sweep_time
-                                                     + (projectionSizeZ - 1 - angleID)
-                                                         * frame_time,
-                                                 vals);
+                baseFunctionsEvaluator->valuesAt(
+                    sweepID * mean_sweep_time + (projectionSizeZ - 1 - angleID) * frame_time, vals);
             }
             for(std::size_t basisIND = 0; basisIND != basisSize; basisIND++)
             {
@@ -230,7 +229,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
     int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d", CLplatformID);
         LOGE << ERR;
         io::throwerr(ERR);
     }
@@ -259,7 +258,8 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
     delete[] randomB;
 }
 
-TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST", "[adjointop][sidon][NOVIZ]")
+TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST",
+          "[adjointop][sidon][NOVIZ]")
 {
     double tol = 1e-5;
     uint32_t projectionSizeX = 616;
@@ -286,14 +286,15 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST", 
     uint32_t basisSize = 6;
     uint32_t sweepCount = 10;
 
-    std::shared_ptr<GLSQRPerfusionReconstructor> glsqr = std::make_shared<GLSQRPerfusionReconstructor>(
-        projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
-        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
-        itemsPerWorkgroup, reportIterations, startPath, true);
+    std::shared_ptr<GLSQRPerfusionReconstructor> glsqr
+        = std::make_shared<GLSQRPerfusionReconstructor>(
+            projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
+            volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
+            itemsPerWorkgroup, reportIterations, startPath, true);
     int res = glsqr->initializeOpenCL(CLplatformID);
     if(res < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform 1");
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d", CLplatformID);
         LOGE << ERR;
         io::throwerr(ERR);
     }
@@ -319,8 +320,8 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST", 
     std::vector<float*> basisFunctionsValues;
 
     float *x, *b, *basisVals;
-	float *vals;
-	vals = new float[basisSize];
+    float* vals;
+    vals = new float[basisSize];
 
     for(std::size_t i = 0; i != basisSize; i++)
     {
@@ -339,14 +340,12 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST", 
         {
             if(sweepID % 2 == 0)
             {
-                baseFunctionsEvaluator->valuesAt(
-                    sweepID * mean_sweep_time + angleID * frame_time, vals);
+                baseFunctionsEvaluator->valuesAt(sweepID * mean_sweep_time + angleID * frame_time,
+                                                 vals);
             } else
             {
-                baseFunctionsEvaluator->valuesAt(sweepID * mean_sweep_time
-                                                     + (projectionSizeZ - 1 - angleID)
-                                                         * frame_time,
-                                                 vals);
+                baseFunctionsEvaluator->valuesAt(
+                    sweepID * mean_sweep_time + (projectionSizeZ - 1 - angleID) * frame_time, vals);
             }
             for(std::size_t basisIND = 0; basisIND != basisSize; basisIND++)
             {

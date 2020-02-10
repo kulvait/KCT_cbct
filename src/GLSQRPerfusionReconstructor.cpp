@@ -146,21 +146,38 @@ int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
         cl::Kernel(program, "FLOAT_copy_vector"));
     FLOAT_ZeroVector
         = std::make_shared<cl::make_kernel<cl::Buffer&>>(cl::Kernel(program, "FLOAT_zero_vector"));
-    FLOATcutting_voxel_project = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                        cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-        cl::Kernel(program, "FLOATcutting_voxel_project"));
-    FLOATcutting_voxel_backproject = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                        cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-        cl::Kernel(program, "FLOATcutting_voxel_backproject"));
     ScalarProductPartial_barier = std::make_shared<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
         cl::Kernel(program, "vector_ScalarProductPartial_barier"));
-    scalingProjections
-        = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                                           cl_double3&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATrescale_projections"));
+    if(sidon)
+    {
+        FLOATprojector_sidon = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
+            cl::Kernel(program, "FLOATsidon_project"));
+        FLOATbackprojector_sidon = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
+            cl::Kernel(program, "FLOATsidon_backproject"));
+    } else
+    {
+        FLOATcutting_voxel_project = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATcutting_voxel_project"));
+        FLOATcutting_voxel_backproject = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATcutting_voxel_backproject"));
+        scalingProjectionsCos
+            = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&,
+                                               cl_double3&, cl_double3&, cl_uint2&, float&>>(
+                cl::Kernel(program, "FLOATrescale_projections_cos"));
+        scalingProjectionsExact
+            = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&,
+                                               cl_double2&, double&>>(
+                cl::Kernel(program, "FLOATrescale_projections_exact"));
+    }
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
 }
@@ -741,6 +758,8 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
     float FLOATONE = 1.0;
+    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
+    double sourceToDetector;
     if(!sidon)
     {
         for(std::size_t angleID = 0; angleID != pdimz; angleID++)
@@ -750,6 +769,18 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
             float scalingFactor = scalingFactors[angleID];
             std::array<double, 3> sourcePosition = mat.sourcePosition();
             std::array<double, 3> normalToDetector = mat.normalToDetector();
+            std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
+            mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                        sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                        sourcePosition[2] - normalToDetector[2] + tangentToDetector[2],
+                        &projection45X, &projection45Y);
+            mat.project(
+                sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+                sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
+            fX = (projection45X - normalProjectionX) * pixelSpacingX;
+            fY = (projection45Y - normalProjectionY) * pixelSpacingY;
+            sourceToDetector = std::sqrt(fX * fX + fY * fY);
+            cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
             double* P = mat.getPtr();
             cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10],
                              P[11], 0.0, 0.0, 0.0, 0.0 });
@@ -767,8 +798,16 @@ int GLSQRPerfusionReconstructor::backproject(std::vector<std::shared_ptr<cl::Buf
             // zeroFloatVector(*tmp_x, XDIM);
             for(std::size_t sweepID = 0; sweepID != B.size(); sweepID++)
             {
-                (*scalingProjections)(eargs2, *tmp_b_buf[sweepID], offset, ICM, SOURCEPOSITION,
-                                      NORMALTODETECTOR, pdims, scalingFactor);
+                if(exactProjectionScaling)
+                {
+                    (*scalingProjectionsExact)(eargs2, *tmp_b_buf[sweepID], offset, pdims_uint,
+                                               normalProjection, pixelSizes, sourceToDetector);
+                } else
+                {
+                    (*scalingProjectionsCos)(eargs2, *tmp_b_buf[sweepID], offset, ICM,
+                                             SOURCEPOSITION, NORMALTODETECTOR, pdims_uint,
+                                             scalingFactor);
+                }
             }
         }
     }
@@ -988,13 +1027,11 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
     Q->finish();
     w.press("START Projection");
     zeroBBuffers(B);
-    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-    cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
-    cl_int2 pdims({ int(pdimx), int(pdimy) });
     unsigned int frameSize = pdimx * pdimy;
-    float FLOATONE = 1.0;
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
+    double sourceToDetector;
     for(uint32_t basisIND = 0; basisIND != X.size(); ++basisIND)
     {
         Q->enqueueFillBuffer<cl_float>(*tmp_b, FLOATZERO, 0, BDIM * sizeof(float));
@@ -1004,6 +1041,18 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
             float scalingFactor = scalingFactors[angleID];
             std::array<double, 3> sourcePosition = mat.sourcePosition();
             std::array<double, 3> normalToDetector = mat.normalToDetector();
+            std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
+            mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                        sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                        sourcePosition[2] - normalToDetector[2] + tangentToDetector[2],
+                        &projection45X, &projection45Y);
+            mat.project(
+                sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+                sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
+            fX = (projection45X - normalProjectionX) * pixelSpacingX;
+            fY = (projection45Y - normalProjectionY) * pixelSpacingY;
+            sourceToDetector = std::sqrt(fX * fX + fY * fY);
+            cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
             double* P = mat.getPtr();
             cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10],
                              P[11], 0.0, 0.0, 0.0, 0.0 });
@@ -1024,8 +1073,16 @@ int GLSQRPerfusionReconstructor::project(std::vector<std::shared_ptr<cl::Buffer>
                                               SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
                                               pdims,
                                               FLOATONE); //        .wait();
-                (*scalingProjections)(eargs2, *tmp_b, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                      pdims, scalingFactor); //     .wait();
+                if(exactProjectionScaling)
+                {
+                    (*scalingProjectionsExact)(eargs2, *tmp_b, offset, pdims_uint, normalProjection,
+                                               pixelSizes, sourceToDetector);
+                } else
+                {
+                    (*scalingProjectionsCos)(eargs2, *tmp_b, offset, ICM, SOURCEPOSITION,
+                                             NORMALTODETECTOR, pdims_uint,
+                                             scalingFactor); //     .wait();
+                }
             }
         }
         for(uint32_t sweepID = 0; sweepID != B.size(); sweepID++)

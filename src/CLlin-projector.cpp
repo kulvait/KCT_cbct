@@ -51,12 +51,13 @@ struct Args
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
     bool centerVoxelProjector = false;
+    bool useCosScaling = false;
     std::string inputVolume;
     std::string inputProjectionMatrices;
     std::string outputProjection;
     std::string rightHandSide = "";
     bool force = false;
-    bool siddon = false;
+    bool sidon = false;
     uint32_t probesPerEdge = 1;
 
     int parseArguments(int argc, char* argv[]);
@@ -89,7 +90,8 @@ int Args::parseArguments(int argc, char* argv[])
                    "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "
                    "does matter. Accepts end literal that means total number of slices of the "
                    "input.");
-    CLI::Option* sid = app.add_flag("-s,--siddon", siddon, "Use Siddon's projector");
+    CLI::Option* sid = app.add_flag("-s,--sidon", sidon, "Use Sidon's projector");
+    app.add_flag("--cos-scaling", useCosScaling, "Scaling scheme with f^2/cos^3.");
     CLI::Option* ppe
         = app.add_option("--probes-per-edge", probesPerEdge,
                          "Number of probes in each pixel edge, complexity scales with the "
@@ -223,8 +225,8 @@ int main(int argc, char* argv[])
     float* volume = new float[totalVolumeSize];
     io::readBytesFrom(a.inputVolume, 6, (uint8_t*)volume, totalVolumeSize * 4);
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        volume, inf.dimx(), inf.dimy(), inf.dimz(), a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ, xpath,
-        a.debug, a.centerVoxelProjector);
+        volume, inf.dimx(), inf.dimy(), inf.dimz(), a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ,
+        a.pixelSizeX, a.pixelSizeY, xpath, a.debug, a.centerVoxelProjector, !a.useCosScaling);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {
@@ -265,13 +267,23 @@ int main(int argc, char* argv[])
                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
         double scalingFactor
             = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
-        if(a.siddon)
+        if(a.sidon)
         {
             cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor,
                                a.probesPerEdge);
         } else
         {
-            cvp->project(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+            if(a.useCosScaling)
+            {
+				cvp->projectCos(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+            } else
+            {
+                double sourceToDetector
+                    = std::sqrt((x1 - x2) * (x1 - x2) * a.pixelSizeX * a.pixelSizeX
+                                + (y1 - y2) * (y1 - y2) * a.pixelSizeY * a.pixelSizeY);
+                cvp->projectExact(projection, a.projectionSizeX, a.projectionSizeY, x1, y1,
+                                sourceToDetector, pm);
+            }
         }
         if(dpr != nullptr)
         {

@@ -101,10 +101,6 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
     ScalarProductPartial_barier = std::make_shared<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
         cl::Kernel(program, "vector_ScalarProductPartial_barier"));
-    scalingProjections
-        = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                                           cl_double3&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATrescale_projections"));
     if(sidon)
     {
         FLOATprojector_sidon = std::make_shared<
@@ -125,6 +121,14 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                             cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
             cl::Kernel(program, "FLOATcutting_voxel_backproject"));
+        scalingProjectionsCos
+            = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&,
+                                               cl_double3&, cl_double3&, cl_uint2&, float&>>(
+                cl::Kernel(program, "FLOATrescale_projections_cos"));
+        scalingProjectionsExact
+            = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&,
+                                               cl_double2&, double&>>(
+                cl::Kernel(program, "FLOATrescale_projections_exact"));
     }
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
@@ -546,20 +550,31 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
 {
     Q->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
-    float FLOATONE = 1.0;
-    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
     cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
     copyFloatVector(B, *tmp_b_buf, BDIM);
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
-    cl_int2 pdims({ int(pdimx), int(pdimy) });
     cl_uint2 pixelGranularity({ 1, 1 });
+    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
+    double sourceToDetector;
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
         float scalingFactor = scalingFactors[i];
         std::array<double, 3> sourcePosition = mat.sourcePosition();
         std::array<double, 3> normalToDetector = mat.normalToDetector();
+        std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
+        mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                    sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &projection45X,
+                    &projection45Y);
+        mat.project(
+            sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+            sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
+        fX = (projection45X - normalProjectionX) * pixelSpacingX;
+        fY = (projection45Y - normalProjectionY) * pixelSpacingY;
+        sourceToDetector = std::sqrt(fX * fX + fY * fY);
+        cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
         double* P = mat.getPtr();
         cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
                          0.0, 0.0, 0.0, 0.0 });
@@ -575,8 +590,15 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
                                         pixelGranularity);
         } else
         {
-            (*scalingProjections)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                  pdims, scalingFactor);
+            if(exactProjectionScaling)
+            {
+                (*scalingProjectionsExact)(eargs2, *tmp_b_buf, offset, pdims_uint, normalProjection,
+                                           pixelSizes, sourceToDetector);
+            } else
+            {
+                (*scalingProjectionsCos)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
+                                         NORMALTODETECTOR, pdims_uint, scalingFactor);
+            }
             (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
                                               NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE);
         }
@@ -592,17 +614,28 @@ int GLSQRReconstructor::project(cl::Buffer& X,
 {
     Q->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
-    float FLOATONE = 1.0;
-    cl_int3 vdims({ int(vdimx), int(vdimy), int(vdimz) });
-    cl_double3 voxelSizes({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
     cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
+    double sourceToDetector;
     for(std::size_t i = 0; i != pdimz; i++)
     {
         matrix::ProjectionMatrix mat = V[i];
         float scalingFactor = scalingFactors[i];
         std::array<double, 3> sourcePosition = mat.sourcePosition();
         std::array<double, 3> normalToDetector = mat.normalToDetector();
+        std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
+        mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                    sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &projection45X,
+                    &projection45Y);
+        mat.project(
+            sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+            sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
+        fX = (projection45X - normalProjectionX) * pixelSpacingX;
+        fY = (projection45Y - normalProjectionY) * pixelSpacingY;
+        sourceToDetector = std::sqrt(fX * fX + fY * fY);
+        cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
         double* P = mat.getPtr();
         cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
                          0.0, 0.0, 0.0, 0.0 });
@@ -610,7 +643,6 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        cl_int2 pdims({ int(pdimx), int(pdimy) });
         unsigned int offset = i * frameSize;
         if(sidon)
         {
@@ -621,8 +653,15 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         {
             (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
                                           vdims, voxelSizes, pdims, FLOATONE);
-            (*scalingProjections)(eargs2, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR, pdims,
-                                  scalingFactor);
+            if(exactProjectionScaling)
+            {
+                (*scalingProjectionsExact)(eargs2, B, offset, pdims_uint, normalProjection,
+                                           pixelSizes, sourceToDetector);
+            } else
+            {
+                (*scalingProjectionsCos)(eargs2, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                                         pdims_uint, scalingFactor);
+            }
         }
     }
     return 0;

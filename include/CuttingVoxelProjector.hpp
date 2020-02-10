@@ -38,9 +38,12 @@ public:
                           double vxs,
                           double vys,
                           double vzs,
+                          double pixelSpacingX,
+                          double pixelSpacingY,
                           std::string xpath,
                           bool debug,
-                          bool centerVoxelProjector)
+                          bool centerVoxelProjector,
+                          bool exactProjectionScaling = true)
         : volume(volume)
         , vdimx(vdimx)
         , vdimy(vdimy)
@@ -48,10 +51,16 @@ public:
         , vxs(vxs)
         , vys(vys)
         , vzs(vzs)
+        , pixelSpacingX(pixelSpacingX)
+        , pixelSpacingY(pixelSpacingY)
         , xpath(xpath)
         , debug(debug)
         , centerVoxelProjector(centerVoxelProjector)
+        , exactProjectionScaling(exactProjectionScaling)
     {
+        vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
+        voxelSizes = cl_double3({ vxs, vys, vzs });
+        pixelSizes = cl_double2({ pixelSpacingX, pixelSpacingY });
     }
 
     /** Initializes OpenCL.
@@ -75,6 +84,18 @@ public:
                 uint32_t pdimy,
                 matrix::ProjectionMatrix P,
                 float scalingFactor);
+    int projectCos(float* projection,
+                   uint32_t pdimx,
+                   uint32_t pdimy,
+                   matrix::ProjectionMatrix P,
+                   float scalingFactor);
+    int projectExact(float* projection,
+                     uint32_t pdimx,
+                     uint32_t pdimy,
+                     double normalProjectionX,
+                     double normalProjectionY,
+                     double sourceToDetector,
+                     matrix::ProjectionMatrix P);
 
     int projectSiddon(float* projection,
                       uint32_t pdimx,
@@ -87,12 +108,20 @@ public:
     double normSquareDifference(float* projection, uint32_t pdimx, uint32_t pdimy);
 
 private:
+    const cl_float FLOATZERO = 0.0f;
+    const cl_double DOUBLEZERO = 0.0;
+    float FLOATONE = 1.0f;
     float* volume = nullptr;
     uint32_t vdimx, vdimy, vdimz;
     double vxs, vys, vzs;
+    double pixelSpacingX, pixelSpacingY;
     std::string xpath; // Path where the program executes
     bool debug;
     bool centerVoxelProjector = false;
+    bool exactProjectionScaling;
+    cl_int3 vdims;
+    cl_double3 voxelSizes;
+    cl_double2 pixelSizes;
 
     std::shared_ptr<cl::Device> device = nullptr;
     std::shared_ptr<cl::Context> context = nullptr;
@@ -131,14 +160,15 @@ private:
                                     cl_double16&,
                                     cl_double3&,
                                     cl_double3&,
-                                    cl_int2&,
+                                    cl_uint2&,
                                     float&>>
-        scalingProjections;
+        scalingProjectionsCos;
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&, cl_double2&, double&>>
+        scalingProjectionsExact;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOAT_addIntoFirstVectorSecondVectorScaled;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> NormSquare;
 };
-const cl_float FLOATZERO = 0.0;
-const cl_double DOUBLEZERO = 0.0;
 
 } // namespace CTL

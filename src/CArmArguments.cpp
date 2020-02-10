@@ -155,11 +155,11 @@ void CArmArguments::addBasisSpecificationArgs(bool includeBasisSize)
 
 void CArmArguments::addSettingsGroup()
 {
-    if(og_settings == nullptr)
-    {
-        og_settings
-            = cliApp->add_option_group("Settings", "Setting of the algorithm and the program.");
-    }
+	if(getRegisteredOptionGroup("settings") == nullptr)
+	{
+		registerOptionGroup("settings", cliApp->add_option_group("Settings", "Settings of the program and used algorithms."));
+	}
+	og_settings = getRegisteredOptionGroup("settings");
 }
 
 void CArmArguments::addCLSettingsGroup()
