@@ -58,6 +58,7 @@ struct Args
     std::string rightHandSide = "";
     bool force = false;
     bool sidon = false;
+    bool t3 = false;
     uint32_t probesPerEdge = 1;
 
     int parseArguments(int argc, char* argv[]);
@@ -90,14 +91,18 @@ int Args::parseArguments(int argc, char* argv[])
                    "range i.e. 0-20 or individual comma separated frames i.e. 1,8,9. Order "
                    "does matter. Accepts end literal that means total number of slices of the "
                    "input.");
-    CLI::Option* sid = app.add_flag("-s,--sidon", sidon, "Use Sidon's projector");
+    CLI::Option* sidon_opt = app.add_flag("-s,--sidon", sidon, "Use Sidon's projector");
+    CLI::Option* t3_opt = app.add_flag("--tt", t3, "Use TT projector with A3 amplitude.");
+    sidon_opt->excludes(t3_opt);
+    t3_opt->excludes(sidon_opt);
+
     app.add_flag("--cos-scaling", useCosScaling, "Scaling scheme with f^2/cos^3.");
     CLI::Option* ppe
         = app.add_option("--probes-per-edge", probesPerEdge,
                          "Number of probes in each pixel edge, complexity scales with the "
                          "square of this number. Defaults to 1")
               ->check(CLI::Range(1, 1000));
-    ppe->needs(sid);
+    ppe->needs(sidon_opt);
     app.add_option("-k,--each-kth", eachkth,
                    "Process only each k-th frame intended for output. The frames to output "
                    "are then 1st specified, 1+kN, N=1...\\infty if such frame exists. Parameter k "
@@ -271,18 +276,26 @@ int main(int argc, char* argv[])
         {
             cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor,
                                a.probesPerEdge);
-        } else
+        } else if(a.t3)
+		{
+                double sourceToDetector
+                    = std::sqrt((x1 - x2) * (x1 - x2) * a.pixelSizeX * a.pixelSizeX
+                                + (y1 - y2) * (y1 - y2) * a.pixelSizeY * a.pixelSizeY);
+                cvp->projectTA3(projection, a.projectionSizeX, a.projectionSizeY, x1, y1,
+                                  sourceToDetector, pm);
+		}else
         {
             if(a.useCosScaling)
             {
-				cvp->projectCos(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor);
+                cvp->projectCos(projection, a.projectionSizeX, a.projectionSizeY, pm,
+                                scalingFactor);
             } else
             {
                 double sourceToDetector
                     = std::sqrt((x1 - x2) * (x1 - x2) * a.pixelSizeX * a.pixelSizeX
                                 + (y1 - y2) * (y1 - y2) * a.pixelSizeY * a.pixelSizeY);
                 cvp->projectExact(projection, a.projectionSizeX, a.projectionSizeY, x1, y1,
-                                sourceToDetector, pm);
+                                  sourceToDetector, pm);
             }
         }
         if(dpr != nullptr)

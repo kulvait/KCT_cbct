@@ -25,14 +25,23 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
     std::string sourceText;
     // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", this->xpath.c_str());
     clFile = io::xprintf("%s/opencl/allsources.cl", this->xpath.c_str());
-    if(sidon)
+    if(useSidonProjector)
     {
         io::concatenateTextFiles(
             clFile, true,
             { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
               io::xprintf("%s/opencl/projector_sidon.cl", this->xpath.c_str()),
               io::xprintf("%s/opencl/backprojector_sidon.cl", this->xpath.c_str()) });
-    } else
+    } else if(useTTProjector)
+	{
+        io::concatenateTextFiles(
+            clFile, true,
+            { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/projector_tt.cl", this->xpath.c_str()),
+              io::xprintf("%s/opencl/backprojector_tt.cl", this->xpath.c_str())});
+	}else
     {
         io::concatenateTextFiles(
             clFile, true,
@@ -101,7 +110,7 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
     ScalarProductPartial_barier = std::make_shared<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
         cl::Kernel(program, "vector_ScalarProductPartial_barier"));
-    if(sidon)
+    if(useSidonProjector)
     {
         FLOATprojector_sidon = std::make_shared<
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
@@ -111,7 +120,17 @@ int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                             cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
             cl::Kernel(program, "FLOATsidon_backproject"));
-    } else
+    } else if(useTTProjector)
+	{
+        FLOATta3_project = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATtta3_project"));
+        FLOATta3_backproject = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATtta3_backproject"));
+	}else
     {
         FLOATcutting_voxel_project = std::make_shared<
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
@@ -583,12 +602,16 @@ int GLSQRReconstructor::backproject(cl::Buffer& B,
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
         unsigned int offset = i * frameSize;
-        if(sidon)
+        if(useSidonProjector)
         {
             (*FLOATbackprojector_sidon)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
                                         NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE,
                                         pixelGranularity);
-        } else
+        } else if(useTTProjector)
+		{
+            (*FLOATta3_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
+                                              NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE);
+		}else
         {
             if(exactProjectionScaling)
             {
@@ -644,12 +667,16 @@ int GLSQRReconstructor::project(cl::Buffer& X,
         cl_double3 NORMALTODETECTOR(
             { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
         unsigned int offset = i * frameSize;
-        if(sidon)
+        if(useSidonProjector)
         {
             cl_uint2 pixelGranularity({ 1, 1 });
             (*FLOATprojector_sidon)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
                                     vdims, voxelSizes, pdims, FLOATONE, pixelGranularity);
-        } else
+        } else if(useTTProjector)
+		{
+            (*FLOATta3_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
+                                          vdims, voxelSizes, pdims, FLOATONE);
+		}else
         {
             (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
                                           vdims, voxelSizes, pdims, FLOATONE);

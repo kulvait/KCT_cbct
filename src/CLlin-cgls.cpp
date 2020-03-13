@@ -138,7 +138,7 @@ void Args::defineArguments()
 
     // Program flow parameters
     addSettingsArgs();
-    addSidonArgs();
+    addProjectorArgs();
 }
 
 int main(int argc, char* argv[])
@@ -200,7 +200,7 @@ int main(int argc, char* argv[])
         std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX, ARG.pixelSizeY,
             ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-            xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup, ARG.reportKthIteration, startPath, ARG.useSidonProjector);
+            xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup, ARG.reportKthIteration, startPath, ARG.useSidonProjector, ARG.useTTProjector);
         int res = glsqr->initializeOpenCL(ARG.CLplatformID);
         if(res < 0)
         {

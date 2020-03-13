@@ -37,10 +37,13 @@ public:
 	
 	//Settings
     CLI::Option_group* og_settings = nullptr;
-	bool useSidonProjector = false;
 	uint32_t maxIterationCount = 40;
     double stoppingRelativeError = 0.00025;
     uint32_t reportKthIteration = 0;
+	
+	//Projector settings
+	bool useSidonProjector = false;
+	bool useTTProjector = false;
 	//OpenCL
     CLI::Option_group* og_cl_settings = nullptr;
     uint32_t CLplatformID = 0;
@@ -62,6 +65,6 @@ protected:
 	void addSettingsGroup();
 	void addCLSettingsGroup();
 	void addSettingsArgs();
-	void addSidonArgs();
+	void addProjectorArgs();
 };
 } // namespace CTL::util

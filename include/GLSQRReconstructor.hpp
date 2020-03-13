@@ -47,7 +47,8 @@ public:
                        uint32_t workGroupSize = 256,
                        uint32_t reportKthIteration = 0,
                        std::string progressBeginPath = "",
-                       bool sidon = false)
+                       bool useSidonProjector = false,
+                       bool useTTProjector = false)
         : pdimx(pdimx)
         , pdimy(pdimy)
         , pdimz(pdimz)
@@ -63,8 +64,16 @@ public:
         , debug(debug)
         , workGroupSize(workGroupSize)
         , reportKthIteration(reportKthIteration)
-        , sidon(sidon)
+        , useSidonProjector(useSidonProjector)
+        , useTTProjector(useTTProjector)
     {
+        if(useSidonProjector && useTTProjector)
+        {
+            std::string err = "Only one projector could be used but both useSidonProjector and "
+                              "useTTProjector were set to true!";
+            LOGE << err;
+            throw std::runtime_error(err);
+        }
         pdims = cl_int2({ int(pdimx), int(pdimy) });
         pdims_uint = cl_uint2({ pdimx, pdimy });
         vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
@@ -257,6 +266,28 @@ private:
                                     cl_int2&,
                                     float&>>
         FLOATcutting_voxel_backproject;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOATta3_project;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOATta3_backproject;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOAT_scaleVector;
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
@@ -297,7 +328,8 @@ private:
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&, cl_double2&, double&>>
         scalingProjectionsExact;
-    bool sidon = false;
+    bool useSidonProjector = false;
+    bool useTTProjector = false;
     bool exactProjectionScaling = true;
 };
 

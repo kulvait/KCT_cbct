@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
     {
         int numberOfFunctions = io::DenFileInfo(ARG.engineerBasis).dimz();
         baseFunctionsEvaluator = std::make_shared<util::StepFunction>(
-            ARG.basisSize, ARG.engineerBasis, numberOfFunctions, startTime, endTime);
+            ARG.engineerBasis, numberOfFunctions, startTime, endTime);
     }
     for(std::size_t j = 0; j != ARG.basisSize; j++)
     {

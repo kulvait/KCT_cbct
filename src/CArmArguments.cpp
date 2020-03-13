@@ -209,14 +209,25 @@ void CArmArguments::addSettingsArgs()
         ->check(CLI::Range(1, 65535));
 }
 
-void CArmArguments::addSidonArgs()
+void CArmArguments::addProjectorArgs()
 {
     addSettingsGroup();
-    std::string sidonValue = (useSidonProjector ? "true" : "false");
-    og_settings->add_flag("--sidon", useSidonProjector,
+	std::string optValue;
+    CLI::Option* optSid;
+	CLI::Option* optTT;
+    optValue = (useSidonProjector ? "true" : "false");
+	optSid  = og_settings->add_flag("--sidon", useSidonProjector,
                           io::xprintf("Use sidon projector and backprojector pair instead of "
                                       "cuting voxel projector, defaults to %s.",
-                                      sidonValue.c_str()));
+                                      optValue.c_str()));
+    optValue = (useTTProjector ? "true" : "false");
+    optTT = og_settings->add_flag("--tt", useTTProjector,
+                          io::xprintf("Use TT projector with A3 amplitude and adjoint backprojector pair instead of "
+                                      "cuting voxel projector, defaults to %s.",
+                                      optValue.c_str()));
+	optSid->excludes(optTT);
+	optTT->excludes(optSid);
+	
 }
 
 } // namespace CTL::util

@@ -23,6 +23,7 @@
 #include "FUN/FourierSeries.hpp"
 #include "FUN/LegendrePolynomialsExplicit.hpp"
 #include "FUN/StepFunction.hpp"
+#include "FUN/SplineInterpolatedFunction.hpp"
 #include "GLSQRPerfusionReconstructor.hpp"
 #include "PROG/Program.hpp"
 #include "PROG/RunTimeInfo.hpp"
@@ -101,6 +102,14 @@ public:
             LOGE << ERR;
             io::throwerr(ERR);
         }
+        if(!engineerBasis.empty())
+        {
+            uint32_t numberOfFunctions = io::DenFileInfo(engineerBasis).dimz();
+            if(basisSize > numberOfFunctions)
+            {
+                basisSize = numberOfFunctions;
+            }
+        }
         return 0;
     }
     // Output files
@@ -123,8 +132,6 @@ public:
      *experiment 16.8ms.
      */
     /**Fourier functions basisSize*/
-
-    int parseArguments(int argc, char* argv[]);
     std::string getVolumeName(uint32_t baseIND);
 };
 
@@ -176,7 +183,7 @@ void Args::defineArguments()
     addPixelSizeArgs();
     addBasisSpecificationArgs();
     addSettingsArgs();
-    addSidonArgs();
+    addProjectorArgs();
 
     // Specification of the basis of the volume data, each voxel is approximated as v_i(t) =  sum
     // v_i^j b_j(t).
@@ -228,7 +235,9 @@ int main(int argc, char* argv[])
     {
         int numberOfFunctions = io::DenFileInfo(ARG.engineerBasis).dimz();
         baseFunctionsEvaluator = std::make_shared<util::StepFunction>(
-            ARG.basisSize, ARG.engineerBasis, numberOfFunctions, startTime, endTime);
+            ARG.engineerBasis, numberOfFunctions, startTime, endTime);
+        baseFunctionsEvaluator = std::make_shared<util::SplineInterpolatedFunction>(
+            ARG.engineerBasis, numberOfFunctions, startTime, endTime, 24000);
     }
     for(std::size_t j = 0; j != ARG.basisSize; j++)
     {

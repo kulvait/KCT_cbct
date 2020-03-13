@@ -96,6 +96,13 @@ public:
                      double normalProjectionY,
                      double sourceToDetector,
                      matrix::ProjectionMatrix P);
+    int projectTA3(float* projection,
+                     uint32_t pdimx,
+                     uint32_t pdimy,
+                     double normalProjectionX,
+                     double normalProjectionY,
+                     double sourceToDetector,
+                     matrix::ProjectionMatrix P);
 
     int projectSiddon(float* projection,
                       uint32_t pdimx,
@@ -143,6 +150,17 @@ private:
                                     cl_int2&,
                                     float&>>
         projector;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        projector_ta3;
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
