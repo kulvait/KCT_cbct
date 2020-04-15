@@ -1,9 +1,6 @@
 # CBCT
 
 Cutting voxel projector and LSQR implementation for cone beam CT operator.
-Source code in this repository is released under GPL3.
-
-
 
 
 ## Submodules
