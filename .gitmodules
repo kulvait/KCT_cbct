@@ -4,9 +4,6 @@
 [submodule "submodules/CLI11"]
 	path = submodules/CLI11
 	url = https://github.com/CLIUtils/CLI11
-[submodule "submodules/Matrix-Template"]
-	path = submodules/Matrix-Template
-	url = ssh://git@gitlab.stimulate.ovgu.de:2200/robert-frysch/Matrix-Template.git
 [submodule "submodules/ctpl"]
 	path = submodules/ctpl
 	url = https://github.com/vit-vit/ctpl

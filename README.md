@@ -1,6 +1,9 @@
-# Divide and Conquer CT Projector
+# CBCT
 
-Using divide and conquer techniques to construct CT system matrix.
+Cutting voxel projector and LSQR implementation for cone beam CT operator.
+Source code in this repository is released under GPL3.
+
+
 
 
 ## Submodules

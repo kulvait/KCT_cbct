@@ -2,4 +2,5 @@ build
 exec
 doc
 *.swp
+*.pdf
 opencl/allsources.cl
