@@ -2,6 +2,8 @@
 
 Cutting voxel projector and LSQR implementation for cone beam CT operator.
 
+LSQR algorithm was implemented according to https://doi.org/10.1002/nla.611
+
 
 ## Submodules
 
