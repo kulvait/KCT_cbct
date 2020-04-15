@@ -20,11 +20,11 @@ git clone --recurse-submodules
 ```
 
 
-### [CTIOL](ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTIOL.git)
+### [CTIOL](https://bitbucket.org/kulvait/ctiol)
 
 Input output routines for asynchronous thread safe reading/writing CT data. The DEN format read/write is implemented.
 
-### [CTMAL](ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTMAL.git)
+### [CTMAL](https://bitbucket.org/kulvait/ctmal)
 
 Mathematic/Algebraic algorithms for supporting CT data manipulation.
 
