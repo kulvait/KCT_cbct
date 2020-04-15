@@ -20,6 +20,11 @@ or use the following command when cloning repository
 git clone --recurse-submodules
 ```
 
+
+### [CTIOL](ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTIOL.git)
+
+Input output routines for asynchronous thread safe reading/writing CT data. The DEN format read/write is implemented.
+
 ### [Plog](https://github.com/SergiusTheBest/plog) logger
 
 Logger Plog is used for logging. It is licensed under the Mozilla Public License Version 2.0.
@@ -32,17 +37,10 @@ Comand line parser CLI11. It is licensed under 3 Clause BSD License.
 
 Testing framework. Licensed under Boost Software License 1.0.
 
-### [Matrix template](ssh://git@gitlab.stimulate.ovgu.de:2200/robert-frysch/Matrix-Template.git)
-
-Manipulations with matrices by Robert Frysch.
-
 ### [CTPL](https://github.com/vit-vit/ctpl)
 
 Threadpool library.
 
-### [CTIOL](ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTIOL.git)
-
-Input output routines for asynchronous thread safe reading/writing CT data. The DEN format read/write is implemented.
 
 ## Documentation
 
