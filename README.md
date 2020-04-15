@@ -25,6 +25,10 @@ git clone --recurse-submodules
 
 Input output routines for asynchronous thread safe reading/writing CT data. The DEN format read/write is implemented.
 
+### [CTMAL](ssh://git@gitlab.stimulate.ovgu.de:2200/vojtech.kulvait/CTMAL.git)
+
+Mathematic/Algebraic algorithms for supporting CT data manipulation.
+
 ### [Plog](https://github.com/SergiusTheBest/plog) logger
 
 Logger Plog is used for logging. It is licensed under the Mozilla Public License Version 2.0.
@@ -55,3 +59,24 @@ Doc files and this file can be written using [Markdown syntax](https://daringfir
 */
 ```
 .
+
+## Licensing
+
+When there is no other licensing and/or copyright information in the source files of this project, the following apply for the source files in the directories include and src and for CMakeLists.txt file:
+
+Copyright (C) 2018-2020 Vojtěch Kulvait
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, version 3 of the License.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+This licensing applies to the direct source files in the directories include and src of this project and not for submodules.

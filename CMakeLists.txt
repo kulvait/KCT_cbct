@@ -21,31 +21,30 @@ include_directories(${GLOBAL_INCLUDE_DIR})
 #OpenCL
 find_package(OpenCL REQUIRED)
 
-#Plog logger
+#Plog logger include
 include_directories(${CMAKE_SOURCE_DIR}/submodules/plog/include)
 
-#CLI11 comand line parser library
+#CLI11 comand line parser library include
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CLI11/include)
 
-#Matrix class ssh://git@gitlab.stimulate.ovgu.de:2200/robert-frysch/Matrix-Template.git
-include_directories(${CMAKE_SOURCE_DIR}/submodules/Matrix-Template)
-
-#Thread pool management lib ctpl from https://github.com/vit-vit/ctpl
+#Thread pool management lib ctpl from https://github.com/vit-vit/ctpl include
 include_directories(${CMAKE_SOURCE_DIR}/submodules/ctpl)
 find_package (Threads)#include pthreads
 
-#Intel MKL
-find_package(MKL)
-include_directories(${MKL_INCLUDE_DIRS})
 
-#Matplotlibcpp
+#Matplotlibcpp include
 include_directories(${CMAKE_SOURCE_DIR}/submodules/matplotlib-cpp)
 
 #Python for matplotlib
 find_package(PythonLibs 2.7)
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-#CT input output library
+#Intel MKL
+find_package(MKL)
+include_directories(${MKL_INCLUDE_DIRS})
+
+
+#CTIOL library
 FILE( GLOB CTIOL_SRC ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/*.cpp ${CMAKE_SOURCE_DIR}/submodules/CTIOL/src/PROG/*.cpp)
 add_library(ctiol ${CTIOL_SRC})
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTIOL/include)
@@ -65,7 +64,6 @@ set_target_properties(
 target_link_libraries(CTIOL_OPENCL OpenCL::OpenCL)
 target_link_libraries(CTIOL_OPENCL ctiol)
 ENDIF()
-
 
 #CTMAL library
 include_directories(${CMAKE_SOURCE_DIR}/submodules/CTMAL/include)
