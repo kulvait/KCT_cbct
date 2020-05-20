@@ -277,13 +277,13 @@ int main(int argc, char* argv[])
             cvp->projectSiddon(projection, a.projectionSizeX, a.projectionSizeY, pm, scalingFactor,
                                a.probesPerEdge);
         } else if(a.t3)
-		{
-                double sourceToDetector
-                    = std::sqrt((x1 - x2) * (x1 - x2) * a.pixelSizeX * a.pixelSizeX
-                                + (y1 - y2) * (y1 - y2) * a.pixelSizeY * a.pixelSizeY);
-                cvp->projectTA3(projection, a.projectionSizeX, a.projectionSizeY, x1, y1,
-                                  sourceToDetector, pm);
-		}else
+        {
+            double sourceToDetector
+                = std::sqrt((x1 - x2) * (x1 - x2) * a.pixelSizeX * a.pixelSizeX
+                            + (y1 - y2) * (y1 - y2) * a.pixelSizeY * a.pixelSizeY);
+            cvp->projectTA3(projection, a.projectionSizeX, a.projectionSizeY, x1, y1,
+                            sourceToDetector, pm);
+        } else
         {
             if(a.useCosScaling)
             {

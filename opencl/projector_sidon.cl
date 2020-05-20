@@ -45,17 +45,11 @@ void kernel FLOATsidon_project(global float* volume,
             V.s2 = V.s2 / V.s3;
             double3 a = normalize(V.s012 - sourcePosition);
             // Direction from the source to a given detector position sourcePosition   + alpha * a
-            // The following is to ensure a is in the volume direction
             double cosine = dot(a, -sourcePosition);
             if(cosine < 0.0)
             {
                 a = -a;
             }
-            //            double cosine = -dot(normalToDetector, a);
-            //            if(cosine < 0.0)
-            //            {
-            //                a = -a;
-            //            }
             double minalpha = 0.0;
             double maxalpha = DBL_MAX;
             double minalphai, maxalphai, tmp;

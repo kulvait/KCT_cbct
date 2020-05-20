@@ -155,11 +155,13 @@ void CArmArguments::addBasisSpecificationArgs(bool includeBasisSize)
 
 void CArmArguments::addSettingsGroup()
 {
-	if(getRegisteredOptionGroup("settings") == nullptr)
-	{
-		registerOptionGroup("settings", cliApp->add_option_group("Settings", "Settings of the program and used algorithms."));
-	}
-	og_settings = getRegisteredOptionGroup("settings");
+    if(getRegisteredOptionGroup("settings") == nullptr)
+    {
+        registerOptionGroup(
+            "settings",
+            cliApp->add_option_group("Settings", "Settings of the program and used algorithms."));
+    }
+    og_settings = getRegisteredOptionGroup("settings");
 }
 
 void CArmArguments::addCLSettingsGroup()
@@ -212,22 +214,33 @@ void CArmArguments::addSettingsArgs()
 void CArmArguments::addProjectorArgs()
 {
     addSettingsGroup();
-	std::string optValue;
+    std::string optValue;
     CLI::Option* optSid;
-	CLI::Option* optTT;
+    CLI::Option* optPPE;
+    CLI::Option* optTT;
     optValue = (useSidonProjector ? "true" : "false");
-	optSid  = og_settings->add_flag("--sidon", useSidonProjector,
-                          io::xprintf("Use sidon projector and backprojector pair instead of "
-                                      "cuting voxel projector, defaults to %s.",
-                                      optValue.c_str()));
+    optSid
+        = og_settings->add_flag("--sidon", useSidonProjector,
+                                io::xprintf("Use sidon projector and backprojector pair instead of "
+                                            "cuting voxel projector, defaults to %s.",
+                                            optValue.c_str()));
+    optPPE = og_settings
+                 ->add_option("--probes-per-edge", probesPerEdge,
+                              io::xprintf("Number of probes in each pixel edge in Sidon raycaster, "
+                                          "complexity scales with the "
+                                          "square of this number. Defaults to %d.",
+                                          probesPerEdge))
+                 ->check(CLI::Range(1, 1000));
+
     optValue = (useTTProjector ? "true" : "false");
-    optTT = og_settings->add_flag("--tt", useTTProjector,
-                          io::xprintf("Use TT projector with A3 amplitude and adjoint backprojector pair instead of "
-                                      "cuting voxel projector, defaults to %s.",
-                                      optValue.c_str()));
-	optSid->excludes(optTT);
-	optTT->excludes(optSid);
-	
+    optTT = og_settings->add_flag(
+        "--tt", useTTProjector,
+        io::xprintf("Use TT projector with A3 amplitude and adjoint backprojector pair instead of "
+                    "cuting voxel projector, defaults to %s.",
+                    optValue.c_str()));
+    optSid->excludes(optTT);
+    optPPE->needs(optSid);
+    optTT->excludes(optSid);
 }
 
 } // namespace CTL::util

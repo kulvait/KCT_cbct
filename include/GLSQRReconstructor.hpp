@@ -140,6 +140,8 @@ public:
 
     int initializeVectors(float* projection, float* volume);
 
+    void setSidonParameters(uint32_t probesPerX, uint32_t probesPerY);
+
     int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
                     uint32_t maxIterations = 100,
                     float errCondition = 0.01);
@@ -329,6 +331,7 @@ private:
         cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&, cl_double2&, double&>>
         scalingProjectionsExact;
     bool useSidonProjector = false;
+    cl_uint2 pixelGranularity = {1,1};
     bool useTTProjector = false;
     bool exactProjectionScaling = true;
 };

@@ -22,8 +22,8 @@ public:
     double voxelSizeZ = 1.0;
     double pixelSizeX = 0.616;
     double pixelSizeY = 0.616;
-    
-	// Basis specification
+
+    // Basis specification
     CLI::Option_group* og_basis = nullptr;
     bool useLegendrePolynomials = false;
     bool useChebyshevPolynomials = false;
@@ -34,17 +34,18 @@ public:
     float pause_size = 1171;
     float frame_time = 16.8;
     float start_offset = 0.0, end_offset = 0.0;
-	
-	//Settings
+
+    // Settings
     CLI::Option_group* og_settings = nullptr;
-	uint32_t maxIterationCount = 40;
+    uint32_t maxIterationCount = 40;
     double stoppingRelativeError = 0.00025;
     uint32_t reportKthIteration = 0;
-	
-	//Projector settings
-	bool useSidonProjector = false;
-	bool useTTProjector = false;
-	//OpenCL
+
+    // Projector settings
+    bool useSidonProjector = false;
+    uint32_t probesPerEdge = 1;
+    bool useTTProjector = false;
+    // OpenCL
     CLI::Option_group* og_cl_settings = nullptr;
     uint32_t CLplatformID = 0;
     bool CLdebug = false;
@@ -52,19 +53,19 @@ public:
 
 protected:
     CArmArguments(int argc, char* argv[], std::string appName);
-	
-	void addGeometryGroup();	
+
+    void addGeometryGroup();
     void addVolumeSizeArgs();
     void addVoxelSizeArgs();
     void addProjectionSizeArgs();
     void addPixelSizeArgs();
 
-	void addBasisGroup();
+    void addBasisGroup();
     void addBasisSpecificationArgs(bool includeBasisSize = true);
-	
-	void addSettingsGroup();
-	void addCLSettingsGroup();
-	void addSettingsArgs();
-	void addProjectorArgs();
+
+    void addSettingsGroup();
+    void addCLSettingsGroup();
+    void addSettingsArgs();
+    void addProjectorArgs();
 };
 } // namespace CTL::util

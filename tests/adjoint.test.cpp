@@ -12,8 +12,8 @@
 using namespace CTL;
 
 std::string basedir(); // Defined in main file so that it will be accessible to linker
-//uint32_t CLplatformID = 1;
-uint32_t CLplatformID = 0;
+uint32_t CLplatformID = 1;
+//uint32_t CLplatformID = 0;
 /*
  *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details
  */

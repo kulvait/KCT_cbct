@@ -126,9 +126,10 @@ void Args::defineArguments()
     cliApp->add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
     CLI::Option* glsqr_cli = cliApp->add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
 
-    CLI::Option* tl_cli
-        = cliApp->add_option("--tikhonov-lambda", tikhonovLambda, "Tikhonov regularization parameter.")
-              ->check(CLI::Range(0.0, 100.0));
+    CLI::Option* tl_cli = cliApp
+                              ->add_option("--tikhonov-lambda", tikhonovLambda,
+                                           "Tikhonov regularization parameter.")
+                              ->check(CLI::Range(0.0, 100.0));
     tl_cli->needs(glsqr_cli);
 
     // Reconstruction geometry
@@ -170,21 +171,29 @@ int main(int argc, char* argv[])
     if(!ARG.glsqr)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX, ARG.pixelSizeY,
-            ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-            xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup, ARG.reportKthIteration, startPath);
-        int res = cgls->initializeOpenCL(ARG.CLplatformID);
-        if(res < 0)
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
+            ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
+            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup,
+            ARG.reportKthIteration, startPath);
+        int ecd = cgls->initializeOpenCL(ARG.CLplatformID);
+        if(ecd < 0)
         {
-            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+            std::string ERR
+                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
             LOGE << ERR;
-            io::throwerr(ERR);
+            throw std::runtime_error(ERR);
         }
         float* volume = new float[ARG.totalVolumeSize]();
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
-        cgls->initializeVectors(projection, volume);
+        ecd = cgls->initializeVectors(projection, volume);
+        if(ecd != 0)
+        {
+            std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
         uint16_t buf[3];
         buf[0] = ARG.volumeSizeY;
         buf[1] = ARG.volumeSizeX;
@@ -198,21 +207,33 @@ int main(int argc, char* argv[])
     } else
     {
         std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
-            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX, ARG.pixelSizeY,
-            ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-            xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup, ARG.reportKthIteration, startPath, ARG.useSidonProjector, ARG.useTTProjector);
-        int res = glsqr->initializeOpenCL(ARG.CLplatformID);
-        if(res < 0)
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
+            ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
+            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup,
+            ARG.reportKthIteration, startPath, ARG.useSidonProjector, ARG.useTTProjector);
+        if(ARG.useSidonProjector)
         {
-            std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+            glsqr->setSidonParameters(ARG.probesPerEdge, ARG.probesPerEdge);
+        }
+        int ecd = glsqr->initializeOpenCL(ARG.CLplatformID);
+        if(ecd < 0)
+        {
+            std::string ERR
+                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
             LOGE << ERR;
-            io::throwerr(ERR);
+            throw std::runtime_error(ERR);
         }
         float* volume = new float[ARG.totalVolumeSize]();
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
-        glsqr->initializeVectors(projection, volume);
+        ecd = glsqr->initializeVectors(projection, volume);
+        if(ecd != 0)
+        {
+            std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
         uint16_t buf[3];
         buf[0] = ARG.volumeSizeY;
         buf[1] = ARG.volumeSizeX;
@@ -224,7 +245,8 @@ int main(int argc, char* argv[])
             glsqr->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
         } else
         {
-            glsqr->reconstructTikhonov(dr, ARG.tikhonovLambda, ARG.maxIterationCount, ARG.stoppingRelativeError);
+            glsqr->reconstructTikhonov(dr, ARG.tikhonovLambda, ARG.maxIterationCount,
+                                       ARG.stoppingRelativeError);
         }
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
