@@ -218,6 +218,8 @@ void CArmArguments::addProjectorArgs()
     CLI::Option* optSid;
     CLI::Option* optPPE;
     CLI::Option* optTT;
+    CLI::Option* optCVP;
+    CLI::Option* optExactScaling;
     optValue = (useSidonProjector ? "true" : "false");
     optSid
         = og_settings->add_flag("--sidon", useSidonProjector,
@@ -238,9 +240,23 @@ void CArmArguments::addProjectorArgs()
         io::xprintf("Use TT projector with A3 amplitude and adjoint backprojector pair instead of "
                     "cuting voxel projector, defaults to %s.",
                     optValue.c_str()));
+    optValue = (useCVPProjector ? "true" : "false");
+    optCVP = og_settings->add_flag(
+        "--cvp", useTTProjector,
+        io::xprintf("Use Cutting voxel projector, defaults to %s.", optValue.c_str()));
+    optValue = (useExactScaling ? "true" : "false");
+    optExactScaling = og_settings->add_flag(
+        "--exact-scaling,!--cos-scaling", useExactScaling,
+        io::xprintf("Use exact scaling as an oposite to cos scaling, defaults to %s.",
+                    optValue.c_str()));
     optSid->excludes(optTT);
+    optSid->excludes(optCVP);
     optPPE->needs(optSid);
     optTT->excludes(optSid);
+    optTT->excludes(optCVP);
+    optCVP->excludes(optSid);
+    optCVP->excludes(optTT);
+    optExactScaling->needs(optCVP);
 }
 
 } // namespace CTL::util

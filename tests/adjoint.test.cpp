@@ -13,7 +13,7 @@ using namespace CTL;
 
 std::string basedir(); // Defined in main file so that it will be accessible to linker
 uint32_t CLplatformID = 1;
-//uint32_t CLplatformID = 0;
+// uint32_t CLplatformID = 0;
 /*
  *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details
  */
@@ -35,23 +35,21 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
     uint32_t itemsPerWorkgroup = 256;
-    uint32_t reportIterations = 0;
     std::string startPath = "";
     uint64_t totalVolumeSize
         = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
     uint64_t totalProjectionsSize
         = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
-
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
-        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
-        itemsPerWorkgroup, reportIterations, startPath);
-    int res = glsqr->initializeOpenCL(CLplatformID);
-    if(res < 0)
+        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, itemsPerWorkgroup);
+    glsqr->initializeCVPProjector(true);
+    int ecd = glsqr->initializeOpenCL(xpath, CLplatformID, debug);
+    if(ecd < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d", CLplatformID);
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
         LOGE << ERR;
-        io::throwerr(ERR);
+        throw std::runtime_error(ERR);
     }
 
     // Pseudorandom vectors
@@ -216,7 +214,6 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TA3 projector TEST", "[adjointop
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
     uint32_t itemsPerWorkgroup = 256;
-    uint32_t reportIterations = 0;
     std::string startPath = "";
     uint64_t totalVolumeSize
         = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
@@ -225,14 +222,14 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TA3 projector TEST", "[adjointop
 
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
-        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
-        itemsPerWorkgroup, reportIterations, startPath, false, true);
-    int res = glsqr->initializeOpenCL(CLplatformID);
-    if(res < 0)
+        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, itemsPerWorkgroup);
+    glsqr->initializeTTProjector();
+    int ecd = glsqr->initializeOpenCL(xpath, CLplatformID, debug);
+    if(ecd < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d", CLplatformID);
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
         LOGE << ERR;
-        io::throwerr(ERR);
+        throw std::runtime_error(ERR);
     }
 
     // Pseudorandom vectors
@@ -277,7 +274,6 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
     uint32_t itemsPerWorkgroup = 256;
-    uint32_t reportIterations = 0;
     std::string startPath = "";
     uint64_t totalVolumeSize
         = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
@@ -286,14 +282,14 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
 
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
-        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, xpath, debug,
-        itemsPerWorkgroup, reportIterations, startPath, true);
-    int res = glsqr->initializeOpenCL(CLplatformID);
-    if(res < 0)
+        volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, itemsPerWorkgroup);
+    glsqr->initializeSidonProjector(1,1);
+    int ecd = glsqr->initializeOpenCL(xpath, CLplatformID, debug);
+    if(ecd < 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d", CLplatformID);
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
         LOGE << ERR;
-        io::throwerr(ERR);
+        throw std::runtime_error(ERR);
     }
 
     // Pseudorandom vectors

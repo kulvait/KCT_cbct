@@ -136,26 +136,26 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 
-SET(CLLINCGLS_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-cgls.cpp src/CArmArguments.cpp)
-add_executable(CLlin-cgls ${CLLINCGLS_SOURCES})
+SET(CLLINCGLS_SOURCES src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/CLlin-krylov.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp)
+add_executable(CLlin-krylov ${CLLINCGLS_SOURCES})
 set_target_properties(
-    CLlin-cgls
+    CLlin-krylov
     PROPERTIES 
-        OUTPUT_NAME "cllin-cgls"
+        OUTPUT_NAME "cllin-krylov"
         SUFFIX ""
 )
-target_link_libraries(CLlin-cgls ctiol)
-target_link_libraries(CLlin-cgls ctmal)
-target_link_libraries(CLlin-cgls OpenCL::OpenCL)
-target_link_libraries(CLlin-cgls CTIOL_OPENCL)
-target_include_directories(CLlin-cgls PUBLIC ${OpenCL_INCLUDE_DIRS})
-target_compile_definitions(CLlin-cgls PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
-target_link_libraries (CLlin-cgls ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(CLlin-krylov ctiol)
+target_link_libraries(CLlin-krylov ctmal)
+target_link_libraries(CLlin-krylov OpenCL::OpenCL)
+target_link_libraries(CLlin-krylov CTIOL_OPENCL)
+target_include_directories(CLlin-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-krylov PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-krylov ${CMAKE_THREAD_LIBS_INIT})
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
-install (TARGETS CLlin-cgls RUNTIME DESTINATION .)
+install (TARGETS CLlin-krylov RUNTIME DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
@@ -342,7 +342,7 @@ install (TARGETS volprojector RUNTIME DESTINATION .)
 include_directories(${CMAKE_SOURCE_DIR}/tests)
 add_library(Catch INTERFACE)
 target_include_directories(Catch INTERFACE ${CMAKE_SOURCE_DIR}/submodules/Catch2/single_include/catch2)
-FILE( GLOB TST_SRC ${CMAKE_SOURCE_DIR}/tests/*.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/GLSQRPerfusionReconstructor.cpp)
+FILE( GLOB TST_SRC ${CMAKE_SOURCE_DIR}/tests/*.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/GLSQRPerfusionReconstructor.cpp src/BaseReconstructor.cpp)
 add_executable(test_all ${TST_SRC})
 target_link_libraries(test_all Catch)
 target_link_libraries(test_all ctiol)
@@ -377,7 +377,7 @@ if (DOXYGEN_FOUND)
         COMMENT "Generating PDF manual"
         VERBATIM )
 
-	add_dependencies(doxygen doxygen_doc)
+    add_dependencies(doxygen doxygen_doc)
 
 else (DOXYGEN_FOUND)
   message("Doxygen need to be installed to generate the doxygen documentation")

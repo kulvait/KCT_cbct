@@ -168,14 +168,20 @@ int main(int argc, char* argv[])
     bname = bname.substr(0, bname.find_last_of("."));
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
+    bool reportProgress = false;
+    if(ARG.reportKthIteration != 0)
+    {
+        reportProgress = true;
+    }
+    float* volume;
     if(!ARG.glsqr)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
             ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
-            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup,
-            ARG.reportKthIteration, startPath);
-        int ecd = cgls->initializeOpenCL(ARG.CLplatformID);
+            ARG.voxelSizeY, ARG.voxelSizeZ, ARG.CLitemsPerWorkgroup);
+        cgls->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
+        int ecd = cgls->initializeOpenCL(xpath, ARG.CLplatformID, ARG.CLdebug);
         if(ecd < 0)
         {
             std::string ERR
@@ -183,9 +189,20 @@ int main(int argc, char* argv[])
             LOGE << ERR;
             throw std::runtime_error(ERR);
         }
-        float* volume = new float[ARG.totalVolumeSize]();
+        volume = new float[ARG.totalVolumeSize]();
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
+        if(ARG.useSidonProjector)
+        {
+            cgls->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        } else if(ARG.useTTProjector)
+        {
+
+            cgls->initializeTTProjector();
+        } else
+        {
+            cgls->initializeCVPProjector(ARG.useExactScaling);
+        }
 
         ecd = cgls->initializeVectors(projection, volume);
         if(ecd != 0)
@@ -209,13 +226,20 @@ int main(int argc, char* argv[])
         std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
             ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
-            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup,
-            ARG.reportKthIteration, startPath, ARG.useSidonProjector, ARG.useTTProjector);
+            ARG.voxelSizeY, ARG.voxelSizeZ, ARG.CLitemsPerWorkgroup);
+        glsqr->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
         if(ARG.useSidonProjector)
         {
-            glsqr->setSidonParameters(ARG.probesPerEdge, ARG.probesPerEdge);
+            glsqr->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        } else if(ARG.useTTProjector)
+        {
+
+            glsqr->initializeTTProjector();
+        } else
+        {
+            glsqr->initializeCVPProjector(ARG.useExactScaling);
         }
-        int ecd = glsqr->initializeOpenCL(ARG.CLplatformID);
+        int ecd = glsqr->initializeOpenCL(xpath, ARG.CLplatformID, ARG.CLdebug);
         if(ecd < 0)
         {
             std::string ERR
