@@ -275,13 +275,10 @@ void CArmArguments::addSettingsArgs()
         ->check(CLI::Range(0.0, 1.0));
 
     addCLSettingsGroup();
-    og_cl_settings
-        ->add_option(
-            "-p,--platform_id", CLplatformString,
-            io::xprintf(
-                "OpenCL platform and device IDs to use, can be 0:1 or 0:0-5, defaults to %s.",
-                CLplatformString.c_str()))
-        ->check(CLI::Range(0, 65535));
+    og_cl_settings->add_option(
+        "-p,--platform_id", CLplatformString,
+        io::xprintf("OpenCL platform and device IDs to use, can be 0:1 or 0:0-5, defaults to %s.",
+                    CLplatformString.c_str()));
     std::string debugValue = (CLdebug ? "true" : "false");
     og_cl_settings->add_flag(
         "-d,--debug", CLdebug,
