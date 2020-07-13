@@ -14,6 +14,7 @@ using namespace CTL;
 std::string basedir(); // Defined in main file so that it will be accessible to linker
 uint32_t CLplatformID = 1;
 // uint32_t CLplatformID = 0;
+uint32_t CLdeviceID = 0;
 /*
  *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details
  */
@@ -44,7 +45,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
         volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, itemsPerWorkgroup);
     glsqr->initializeCVPProjector(true);
-    int ecd = glsqr->initializeOpenCL(xpath, CLplatformID, debug);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
@@ -224,7 +225,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TA3 projector TEST", "[adjointop
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
         volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, itemsPerWorkgroup);
     glsqr->initializeTTProjector();
-    int ecd = glsqr->initializeOpenCL(xpath, CLplatformID, debug);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
@@ -283,8 +284,8 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, pixelSizeX, pixelSizeY, volumeSizeX,
         volumeSizeY, volumeSizeZ, voxelSizeX, voxelSizeY, voxelSizeZ, itemsPerWorkgroup);
-    glsqr->initializeSidonProjector(1,1);
-    int ecd = glsqr->initializeOpenCL(xpath, CLplatformID, debug);
+    glsqr->initializeSidonProjector(1, 1);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);

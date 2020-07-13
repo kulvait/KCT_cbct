@@ -110,7 +110,11 @@ public:
      * @see [OpenCL C++
      * tutorial](http://simpleopencl.blogspot.com/2013/06/tutorial-simple-start-with-opencl-and-c.html)
      */
-    int initializeOpenCL(std::string xpath, uint32_t platformId = 0, bool debug = true);
+    int initializeOpenCL(uint32_t platformId,
+                         uint32_t* deviceIds,
+                         uint32_t deviceIdsLength,
+                         std::string xpath,
+                         bool debug);
 
     int initializeVectors(float* projection, float* volume);
     int allocateXBuffers(uint32_t xBufferCount);
@@ -234,7 +238,8 @@ protected:
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         Sum_barier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOAT_CopyVector;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned int&, cl::Buffer&, unsigned int&>> FLOAT_CopyVector_offset;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned int&, cl::Buffer&, unsigned int&>>
+        FLOAT_CopyVector_offset;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOAT_scaleVector;
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>

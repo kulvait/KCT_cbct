@@ -7,6 +7,87 @@ CArmArguments::CArmArguments(int argc, char** argv, std::string appName)
 {
 }
 
+void CArmArguments::parsePlatformString()
+{
+    std::string ERR;
+    // Remove spaces
+    CLplatformString.erase(
+        std::remove_if(CLplatformString.begin(), CLplatformString.end(), ::isspace),
+        CLplatformString.end());
+    // Separate it to two parts, before : and after
+    std::list<std::string> platform_device_list;
+    strtk::parse(CLplatformString, ":", platform_device_list);
+    // Only platform, device defaults to 0
+    CLdeviceIDs.clear();
+    if(platform_device_list.size() == 1)
+    {
+        CLplatformID = std::stoi(CLplatformString.c_str());
+        CLdeviceIDs.push_back(0);
+
+    } else if(platform_device_list.size() == 2)
+    {
+        CLplatformID = std::stoi(platform_device_list.front().c_str());
+        std::list<std::string> string_list;
+        strtk::parse(platform_device_list.back(), ",", string_list);
+        auto it = string_list.begin();
+        while(it != string_list.end())
+        {
+            size_t numRangeSigns = std::count(it->begin(), it->end(), '-');
+            if(numRangeSigns > 1)
+            {
+                std::string msg = io::xprintf("Wrong number of range specifiers in the string %s.",
+                                              (*it).c_str());
+                LOGE << msg;
+                throw std::runtime_error(msg);
+            } else if(numRangeSigns == 1)
+            {
+                std::vector<int> int_vector;
+                strtk::parse((*it), "-", int_vector);
+                if(0 <= int_vector[0] && int_vector[0] <= int_vector[1])
+                {
+                    for(int k = int_vector[0]; k != int_vector[1] + 1; k++)
+                    {
+                        CLdeviceIDs.push_back(k);
+                    }
+                } else
+                {
+                    std::string msg
+                        = io::xprintf("String %s is invalid range specifier.", (*it).c_str());
+                    LOGE << msg;
+                    throw std::runtime_error(msg);
+                }
+            } else
+            {
+                int index = std::stoi(it->c_str());
+                if(0 <= index)
+                {
+                    CLdeviceIDs.push_back(index);
+                } else
+                {
+                    std::string msg = io::xprintf("Negative identifier!.", (*it).c_str());
+                    LOGE << msg;
+                    throw std::runtime_error(msg);
+                }
+            }
+            it++;
+        }
+    } else
+    {
+        ERR = io::xprintf("Only one : delimiter is recognized but %d was provided",
+                          platform_device_list.size() - 1);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    LOGD << io::xprintf("Selected %d devices on platformID %d.", CLdeviceIDs.size(), CLplatformID);
+    std::string str = io::xprintf("DeviceIDs:%d", CLdeviceIDs[0]);
+    for(uint32_t i = 1; i != CLdeviceIDs.size(); i++)
+    {
+        str = io::xprintf("%s,%d", str.c_str(), CLdeviceIDs[i]);
+    }
+    str = io::xprintf("%s.", str.c_str());
+    LOGD << str;
+} // namespace CTL::util
+
 void CArmArguments::addGeometryGroup()
 {
     if(og_geometry == nullptr)
@@ -195,8 +276,11 @@ void CArmArguments::addSettingsArgs()
 
     addCLSettingsGroup();
     og_cl_settings
-        ->add_option("-p,--platform_id", CLplatformID,
-                     io::xprintf("OpenCL platform ID to use, defaults to %d.", CLplatformID))
+        ->add_option(
+            "-p,--platform_id", CLplatformString,
+            io::xprintf(
+                "OpenCL platform and device IDs to use, can be 0:1 or 0:0-5, defaults to %s.",
+                CLplatformString.c_str()))
         ->check(CLI::Range(0, 65535));
     std::string debugValue = (CLdebug ? "true" : "false");
     og_cl_settings->add_flag(

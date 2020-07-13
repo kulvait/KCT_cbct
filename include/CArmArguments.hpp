@@ -49,9 +49,13 @@ public:
     bool useExactScaling = true;
     // OpenCL
     CLI::Option_group* og_cl_settings = nullptr;
+    std::string CLplatformString = "0:0";
     uint32_t CLplatformID = 0;
+    std::vector<uint32_t> CLdeviceIDs;
     bool CLdebug = false;
     uint32_t CLitemsPerWorkgroup = 256;
+
+    void parsePlatformString();
 
 protected:
     CArmArguments(int argc, char* argv[], std::string appName);

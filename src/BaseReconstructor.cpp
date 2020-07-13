@@ -53,7 +53,11 @@ void BaseReconstructor::initializeTTProjector()
     }
 }
 
-int BaseReconstructor::initializeOpenCL(std::string xpath, uint32_t platformId, bool debug)
+int BaseReconstructor::initializeOpenCL(uint32_t platformId,
+                                        uint32_t* deviceIds,
+                                        uint32_t deviceIdsLength,
+                                        std::string xpath,
+                                        bool debug)
 {
     // Select the first available platform.
     std::shared_ptr<cl::Platform> platform = util::OpenCLManager::getPlatform(platformId, true);
@@ -62,12 +66,36 @@ int BaseReconstructor::initializeOpenCL(std::string xpath, uint32_t platformId, 
         return -1;
     }
     // Select the first available device for given platform
-    device = util::OpenCLManager::getDevice(*platform, 0, true);
-    if(device == nullptr)
+    std::vector<cl::Device> devices;
+    std::shared_ptr<cl::Device> dev;
+    if(deviceIdsLength == 0)
     {
-        return -2;
+        LOGD << io::xprintf("Adding deviceID %d on the platform %d.", 0, platformId);
+        dev = util::OpenCLManager::getDevice(*platform, 0, true);
+        if(dev == nullptr)
+        {
+            return -2;
+        }
+        device = dev;
+        devices.push_back(*dev);
+    } else
+    {
+        for(uint32_t i = 0; i != deviceIdsLength; i++)
+        {
+            LOGD << io::xprintf("Adding deviceID %d on the platform %d.", deviceIds[i], platformId);
+            dev = util::OpenCLManager::getDevice(*platform, deviceIds[i], true);
+            if(i == 0)
+            {
+                device = dev;
+            }
+            if(dev == nullptr)
+            {
+                return -2;
+            }
+            devices.push_back(*dev);
+        }
     }
-    cl::Context tmp({ *device });
+    cl::Context tmp(devices);
     context = std::make_shared<cl::Context>(tmp);
 
     // Debug info
@@ -104,14 +132,14 @@ int BaseReconstructor::initializeOpenCL(std::string xpath, uint32_t platformId, 
     if(debug)
     {
         std::string options = io::xprintf("-g -s \"%s\"", clFile.c_str());
-        if(program.build({ *device }, options.c_str()) != CL_SUCCESS)
+        if(program.build(devices, options.c_str()) != CL_SUCCESS)
         {
             LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
             return -3;
         }
     } else
     {
-        if(program.build({ *device }) != CL_SUCCESS)
+        if(program.build(devices) != CL_SUCCESS)
         {
             LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
             return -3;

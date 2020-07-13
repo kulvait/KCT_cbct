@@ -86,6 +86,7 @@ public:
             LOGE << ERR;
             io::throwerr(ERR);
         }
+        parsePlatformString();
         return 0;
     };
     void defineArguments();
@@ -129,7 +130,7 @@ void Args::defineArguments()
     CLI::Option* tl_cli = cliApp
                               ->add_option("--tikhonov-lambda", tikhonovLambda,
                                            "Tikhonov regularization parameter.")
-                              ->check(CLI::Range(0.0, 100.0));
+                              ->check(CLI::Range(0.0, 5000.0));
     tl_cli->needs(glsqr_cli);
 
     // Reconstruction geometry
@@ -181,7 +182,7 @@ int main(int argc, char* argv[])
             ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
             ARG.voxelSizeY, ARG.voxelSizeZ, ARG.CLitemsPerWorkgroup);
         cgls->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
-        int ecd = cgls->initializeOpenCL(xpath, ARG.CLplatformID, ARG.CLdebug);
+        int ecd = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
         if(ecd < 0)
         {
             std::string ERR
@@ -239,7 +240,7 @@ int main(int argc, char* argv[])
         {
             glsqr->initializeCVPProjector(ARG.useExactScaling);
         }
-        int ecd = glsqr->initializeOpenCL(xpath, ARG.CLplatformID, ARG.CLdebug);
+        int ecd = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
         if(ecd < 0)
         {
             std::string ERR
