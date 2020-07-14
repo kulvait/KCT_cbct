@@ -213,7 +213,7 @@ private:
     int addIntoFirstVectorSecondVectorScaledOffset(
         cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, unsigned int offset);
     int addIntoFirstVectorSecondVectorScaledOffsetOffset(
-        cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, size_t offseta, size_t offsetb);
+        cl::Buffer& a, cl::Buffer& b, float f, unsigned int size, unsigned long offseta, unsigned long offsetb);
     int addIntoFirstVectorScaledSecondVector(std::vector<std::shared_ptr<cl::Buffer>>& A,
                                              std::vector<std::shared_ptr<cl::Buffer>>& B,
                                              float f,

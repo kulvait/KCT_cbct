@@ -318,10 +318,7 @@ void kernel FLOAT_add_into_first_vector_second_vector_scaled(global float* a,
     a[gid] = a[gid] + f * b[gid];
 }
 
-void kernel FLOAT_zero_vector(global float* a)
-{
-    a[get_global_id(0)] = 0.0f;
-}
+void kernel FLOAT_zero_vector(global float* a) { a[get_global_id(0)] = 0.0f; }
 
 void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset(global float* a,
                                                                     global float* b,
@@ -333,15 +330,16 @@ void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset(global float
     a[index] = val;
 }
 
-void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset_offset(global float* a,
-                                                                    global float* b,
-                                                                    private float f,
-                                                                    private const size_t offsetA,
-                                                                    private const size_t offsetB)
+void kernel
+FLOAT_add_into_first_vector_second_vector_scaled_offset_offset(global float* a,
+                                                               global float* b,
+                                                               private float f,
+                                                               private const ulong offsetA,
+                                                               private const ulong offsetB)
 {
-	const size_t gid = get_global_id(0);
-	const size_t indexA = gid + offsetA;
-	const size_t indexB = gid + offsetB;
+    const ulong gid = get_global_id(0);
+    const ulong indexA = gid + offsetA;
+    const ulong indexB = gid + offsetB;
     a[indexA] = a[indexA] + f * b[indexB];
 }
 
@@ -349,7 +347,7 @@ void kernel FLOAT_add_into_first_vector_scaled_second_vector(global float* a,
                                                              global float* b,
                                                              private float f)
 {
-    int gid = get_global_id(0);
+    uint gid = get_global_id(0);
     float val = f * a[gid] + b[gid];
     a[gid] = val;
 }
@@ -359,24 +357,24 @@ void kernel FLOAT_copy_vector_offset(global float* from,
                                      global float* to,
                                      uint offset_to)
 {
-    int gid = get_global_id(0);
+    uint gid = get_global_id(0);
     to[gid + offset_to] += from[gid + offset_from];
 }
 
 void kernel FLOAT_compute_sqrt(global float* v)
 {
-    int gid = get_global_id(0);
+    uint gid = get_global_id(0);
     v[gid] = sqrt(v[gid]);
 }
 
 void kernel FLOAT_compute_inverse(global float* v)
 {
-    int gid = get_global_id(0);
+    uint gid = get_global_id(0);
     v[gid] = 1.0 / v[gid];
 }
 
 void kernel FLOAT_multiply_vectors_into_first_vector(global float* a, global float* b)
 {
-    int gid = get_global_id(0);
+    uint gid = get_global_id(0);
     a[gid] = a[gid] * b[gid];
 }

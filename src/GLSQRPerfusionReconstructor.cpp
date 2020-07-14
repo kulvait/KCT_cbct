@@ -117,7 +117,7 @@ int GLSQRPerfusionReconstructor::initializeOpenCL(uint32_t platformId)
         = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned int&>>(
             cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled_offset"));
     FLOAT_addIntoFirstVectorSecondVectorScaledOffsetOffset
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, size_t&, size_t&>>(
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned long&, unsigned long&>>(
             cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled_offset_offset"));
     FLOAT_addIntoFirstVectorScaledSecondVector
         = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
