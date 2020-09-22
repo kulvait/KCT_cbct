@@ -36,8 +36,11 @@ find_package (Threads)#include pthreads
 include_directories(${CMAKE_SOURCE_DIR}/submodules/matplotlib-cpp)
 
 #Python for matplotlib
-find_package(PythonLibs 2.7)
-include_directories(${PYTHON_INCLUDE_DIRS})
+#find_package(PythonLibs 2.7)
+#include_directories(${PYTHON_INCLUDE_DIRS})
+find_package (Python3 COMPONENTS Interpreter Development NumPy)
+include_directories(${Python3_INCLUDE_DIRS})
+include_directories(${Python3_NumPy_INCLUDE_DIRS})
 
 #Intel MKL
 find_package(MKL)
@@ -201,7 +204,7 @@ target_link_libraries(CLlin-perfusion CTIOL_OPENCL)
 target_include_directories(CLlin-perfusion PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-perfusion PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-perfusion ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(CLlin-perfusion ${PYTHON_LIBRARIES})
+target_link_libraries(CLlin-perfusion ${Python3_LIBRARIES})
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
@@ -226,7 +229,7 @@ target_link_libraries(CLlin-perfusion-projector CTIOL_OPENCL)
 target_include_directories(CLlin-perfusion-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-perfusion-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_link_libraries (CLlin-perfusion-projector ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(CLlin-perfusion-projector ${PYTHON_LIBRARIES})
+target_link_libraries(CLlin-perfusion-projector ${Python3_LIBRARIES})
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
@@ -350,7 +353,7 @@ target_link_libraries(test_all ctmal)
 target_link_libraries(test_all stdc++fs)
 target_link_libraries(test_all OpenCL::OpenCL)
 target_link_libraries(test_all CTIOL_OPENCL)
-target_link_libraries(test_all ${PYTHON_LIBRARIES})
+target_link_libraries(test_all ${Python3_LIBRARIES})
 
 
 
