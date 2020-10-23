@@ -235,17 +235,13 @@ inline double findIntersectionPoints(const double PX,
         } else if(PX <= (*PX_ccw2))
         {
             q = intersectionXTime(PX, *PX_ccw3, *PX_ccw2);
-            v_cw = (*v3) * (1.0 - p) + (*v2) * p;
-            tmp = (q - p) * 0.5;
-            totalweight = p + tmp;
-            (*centroid)
-                = (p * ((v_ccw + (*v3)) / 2.0) + tmp * (v_ccw + v_cw + v_ccw + (*v3) - (*v0)) / 3.0)
-                / totalweight;
-            return totalweight;
+            v_cw = (*v3) * (1.0 - q) + (*v2) * q;
+            (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_ccw) / 3.0;
+            return (p + q) * 0.5;
         } else
         {
             q = intersectionXTime(PX, *PX_ccw2, *PX_ccw1);
-            v_cw = (*v2) * (1.0 - p) + (*v1) * p;
+            v_cw = (*v2) * (1.0 - q) + (*v1) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1 - tmp;
             (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v1)) / 3.0) / totalweight;
@@ -258,17 +254,13 @@ inline double findIntersectionPoints(const double PX,
         if(PX <= (*PX_ccw3))
         {
             q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
-            v_cw = (*v0) * (1.0 - p) + (*v3) * p;
-            tmp = (q - p) * 0.5;
-            totalweight = p + tmp;
-            (*centroid)
-                = (p * ((v_ccw + (*v0)) / 2.0) + tmp * (v_ccw + v_cw + v_ccw + (*v0) - (*v1)) / 3.0)
-                / totalweight;
-            return totalweight;
+            v_cw = (*v0) * (1.0 - q) + (*v3) * q;
+            (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_ccw) / 3.0;
+            return (p + q) * 0.5;
         } else
         {
             q = intersectionXTime(PX, *PX_ccw3, *PX_ccw2);
-            v_cw = (*v3) * (1.0 - p) + (*v2) * p;
+            v_cw = (*v3) * (1.0 - q) + (*v2) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1.0 - tmp;
             (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v2)) / 3.0) / totalweight;
@@ -279,7 +271,7 @@ inline double findIntersectionPoints(const double PX,
         p = intersectionXTime(PX, *PX_ccw2, *PX_ccw3);
         v_ccw = (*v2) * (1.0 - p) + (*v3) * p;
         q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
-        v_cw = (*v0) * (1.0 - p) + (*v3) * p;
+        v_cw = (*v0) * (1.0 - q) + (*v3) * q;
         tmp = (1.0 - p) * (1.0 - q) * 0.5;
         totalweight = 1.0 - tmp;
         (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_ccw + v_cw + (*v3)) / 3.0) / totalweight;
