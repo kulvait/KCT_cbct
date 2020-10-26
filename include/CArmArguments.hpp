@@ -1,5 +1,8 @@
 #pragma once
+#include <cctype>
+#include <string>
 
+#include "OPENCL/OpenCLManager.hpp"
 #include "PROG/Arguments.hpp"
 #include "rawop.h"
 
@@ -49,16 +52,20 @@ public:
     bool useExactScaling = true;
     // OpenCL
     CLI::Option_group* og_cl_settings = nullptr;
-    std::string CLplatformString = "0:0";
+    std::string CLplatformString = "";
     uint32_t CLplatformID = 0;
     std::vector<uint32_t> CLdeviceIDs;
     bool CLdebug = false;
     uint32_t CLitemsPerWorkgroup = 256;
 
-    void parsePlatformString();
+    void parsePlatformString(bool verbose = false);
 
 protected:
     CArmArguments(int argc, char* argv[], std::string appName);
+
+    // From parsePlatformString()
+    void insertDeviceID(uint32_t deviceID, uint32_t devicesOnPlatform);
+    void fillDevicesList(std::string commaSeparatedEntries, uint32_t CLplatformID);
 
     void addGeometryGroup();
     void addVolumeSizeArgs();

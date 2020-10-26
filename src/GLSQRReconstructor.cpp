@@ -27,7 +27,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
     // Anything might be supplied here, but we will do standard initialization first
     v_next = getXBuffer(0);
-    Q->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
     backproject(*b_buf, *v_next, PM, ICM, scalingFactors);
     double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
@@ -37,25 +37,25 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
     double d = 0.0;
 
     u_cur = getBBuffer(0);
-    Q->enqueueFillBuffer<cl_float>(*u_cur, FLOATZERO, 0, BDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*u_cur, FLOATZERO, 0, BDIM * sizeof(float));
 
     v_cur = getXBuffer(1);
-    Q->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
 
     double varphi_hat = NB0;
 
     u_next = getBBuffer(1);
-    Q->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
     addIntoFirstVectorSecondVectorScaled(*u_next, *b_buf, float(1.0 / varphi_hat), BDIM);
 
     x_cur = x_buf;
-    Q->enqueueFillBuffer<cl_float>(*x_cur, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*x_cur, FLOATZERO, 0, XDIM * sizeof(float));
 
     w_cur = getXBuffer(2);
-    Q->enqueueFillBuffer<cl_float>(*w_cur, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*w_cur, FLOATZERO, 0, XDIM * sizeof(float));
 
     w_prev = getXBuffer(3);
-    Q->enqueueFillBuffer<cl_float>(*w_prev, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*w_prev, FLOATZERO, 0, XDIM * sizeof(float));
 
     double rho_cur = 1.0;
     double rho_prev = 1.0;
@@ -128,7 +128,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
             if(sigma_next > sigma_tol)
             {
-                Q->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
+                Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
                 addIntoFirstVectorSecondVectorScaled(*v_next, *XZ, float(1.0 / sigma_next), XDIM);
             } else
             {
@@ -142,7 +142,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
             if(sigma_cur > sigma_tol)
             {
-                Q->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
+                Q[0]->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
                 addIntoFirstVectorSecondVectorScaled(*v_cur, *XZ, float(1.0 / sigma_cur), XDIM);
             } else
             {
@@ -163,7 +163,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
         if(tau_next != 0)
         {
-            Q->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
+            Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
             addIntoFirstVectorSecondVectorScaled(*u_next, *BZ, float(1 / tau_next), BDIM);
         }
 
@@ -202,7 +202,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
                         io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
         }
     }
-    Q->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    Q[0]->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 
@@ -235,7 +235,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
 
     // Anything might be supplied here, but we will do standard initialization first
     v_next = getXBuffer(0);
-    Q->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
     backproject(*b_buf, *v_next, PM, ICM,
                 scalingFactors); // Backprojection of zero is obviously zero for potential b_buf_x
     double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
@@ -246,29 +246,29 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
     double d = 0.0;
 
     u_cur = getBBuffer(0);
-    Q->enqueueFillBuffer<cl_float>(*u_cur, FLOATZERO, 0, BDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*u_cur, FLOATZERO, 0, BDIM * sizeof(float));
     u_cur_x = getXBuffer(1);
-    Q->enqueueFillBuffer<cl_float>(*u_cur_x, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*u_cur_x, FLOATZERO, 0, XDIM * sizeof(float));
 
     v_cur = getXBuffer(2);
-    Q->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
 
     double varphi_hat = NB0;
 
     u_next = getBBuffer(1);
-    Q->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
     u_next_x = getXBuffer(3);
-    Q->enqueueFillBuffer<cl_float>(*u_next_x, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*u_next_x, FLOATZERO, 0, XDIM * sizeof(float));
     addIntoFirstVectorSecondVectorScaled(*u_next, *b_buf, float(1.0 / varphi_hat), BDIM);
 
     x_cur = x_buf;
-    Q->enqueueFillBuffer<cl_float>(*x_cur, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*x_cur, FLOATZERO, 0, XDIM * sizeof(float));
 
     w_cur = getXBuffer(4);
-    Q->enqueueFillBuffer<cl_float>(*w_cur, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*w_cur, FLOATZERO, 0, XDIM * sizeof(float));
 
     w_prev = getXBuffer(5);
-    Q->enqueueFillBuffer<cl_float>(*w_prev, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*w_prev, FLOATZERO, 0, XDIM * sizeof(float));
 
     double rho_cur = 1.0;
     double rho_prev = 1.0;
@@ -284,7 +284,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
     //w_prev_prev = xh_buf;
     BZ = tmp_b_buf;
     BZ_x = getTmpXBuffer(0);
-    Q->enqueueFillBuffer<cl_float>(*BZ_x, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*BZ_x, FLOATZERO, 0, XDIM * sizeof(float));
     XZ = getTmpXBuffer(1);
     double c_prev_prev;
     double s_prev_prev;
@@ -354,7 +354,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
 
             if(sigma_next > sigma_tol)
             {
-                Q->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
+                Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
                 addIntoFirstVectorSecondVectorScaled(*v_next, *XZ, float(1.0 / sigma_next), XDIM);
             } else
             {
@@ -368,7 +368,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
 
             if(sigma_cur > sigma_tol)
             {
-                Q->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
+                Q[0]->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
                 addIntoFirstVectorSecondVectorScaled(*v_cur, *XZ, float(1.0 / sigma_cur), XDIM);
             } else
             {
@@ -396,8 +396,8 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
 
         if(tau_next != 0)
         {
-            Q->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
-            Q->enqueueFillBuffer<cl_float>(*u_next_x, FLOATZERO, 0, XDIM * sizeof(float));
+            Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
+            Q[0]->enqueueFillBuffer<cl_float>(*u_next_x, FLOATZERO, 0, XDIM * sizeof(float));
             addIntoFirstVectorSecondVectorScaled(*u_next, *BZ, float(1 / tau_next), BDIM);
             addIntoFirstVectorSecondVectorScaled(*u_next_x, *BZ_x, float(1 / tau_next), XDIM);
         }
@@ -436,7 +436,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
                         io::xprintf("%sx_it%03d.den", progressPrefixPath.c_str(), iteration));
         }
     }
-    Q->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    Q[0]->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 

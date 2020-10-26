@@ -64,7 +64,7 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
             "After the iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.", iteration,
             norm, 100.0 * norm / NB0);
     }
-    Q->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 
@@ -123,9 +123,9 @@ int CGLSReconstructor::reconstruct_experimental(
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-    Q->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
-    Q->enqueueFillBuffer<cl_float>(*w_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
-    Q->enqueueFillBuffer<cl_float>(*x_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*w_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*x_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
     // Experimental
     LOGI << io::xprintf("Initial norm of b is %f and initial |Ax-b| is %f.", NB0, norm);
     // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
@@ -135,7 +135,7 @@ int CGLSReconstructor::reconstruct_experimental(
     backproject(*c_buf, *v_buf, PM, ICM, scalingFactors);
     // Experimental
     LOGI << "Backprojection correction vector";
-    Q->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, pdimx * pdimy * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, pdimx * pdimy * sizeof(float));
     for(unsigned int i = 0; i != pdimz; i++)
     {
         copyFloatVectorOffset(*c_buf, i * pdimx * pdimy, *v_proj, 0, uint32_t(pdimx) * pdimy);
@@ -150,9 +150,9 @@ int CGLSReconstructor::reconstruct_experimental(
     // EXPERIMENTAL
     double sum;
     uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
     (*NormSquare)(eargs1, *v_proj, *tmp_x_red1, framesize).wait();
-    Q->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     vnorm2_old += sum;
     // EXPERIMENTAL
     copyFloatVector(*v_buf, *w_buf, XDIM);
@@ -199,7 +199,7 @@ int CGLSReconstructor::reconstruct_experimental(
         }
         backproject(*c_buf, *v_buf, PM, ICM, scalingFactors);
         // Experimental
-        Q->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, pdimx * pdimy * sizeof(float));
+        Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, pdimx * pdimy * sizeof(float));
         for(unsigned int i = 0; i != pdimz; i++)
         {
             copyFloatVectorOffset(*c_buf, i * pdimx * pdimy, *v_proj, 0, pdimx * pdimy);
@@ -214,9 +214,9 @@ int CGLSReconstructor::reconstruct_experimental(
         }
         vnorm2_now = normXBuffer_barier_double(*v_buf);
         // EXPERIMENTAL
-        cl::EnqueueArgs eargs1(*Q, cl::NDRange(1));
+        cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
         (*NormSquare)(eargs1, *v_proj, *tmp_x_red1, framesize).wait();
-        Q->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+        Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
         vnorm2_now += sum;
         // EXPERIMENTAL
         beta = vnorm2_now / vnorm2_old;
@@ -260,7 +260,7 @@ int CGLSReconstructor::reconstruct_experimental(
     // EXPERIMENTAL
     addIntoFirstVectorSecondVectorScaled(*x_proj, *w_proj, alpha, pdimx * pdimy);
     // EXPERIMENTAL
-    Q->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 

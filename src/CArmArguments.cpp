@@ -7,85 +7,144 @@ CArmArguments::CArmArguments(int argc, char** argv, std::string appName)
 {
 }
 
-void CArmArguments::parsePlatformString()
+inline void CArmArguments::insertDeviceID(uint32_t deviceID, uint32_t devicesOnPlatform)
 {
     std::string ERR;
+    if(deviceID < devicesOnPlatform)
+    {
+        if(std::find(CLdeviceIDs.begin(), CLdeviceIDs.end(), deviceID) == CLdeviceIDs.end())
+        {
+            CLdeviceIDs.push_back(deviceID);
+        } else
+        {
+            ERR = io::xprintf("The device %d was already inserted to the CLdeviceIDs list.",
+                              deviceID);
+            LOGW << ERR;
+        }
+    } else
+    {
+        ERR = io::xprintf("The device %d not exist can not be in the CLdeviceIDs list.", deviceID);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+}
+
+inline void CArmArguments::fillDevicesList(std::string commaSeparatedEntries, uint32_t CLplatformID)
+{
+    const std::regex range("(\\d+)-(\\d+)");
+    const std::regex digitsRegex("(\\d+)");
+    std::string ERR;
+    uint32_t devicesOnPlatform = util::OpenCLManager::deviceCount(CLplatformID);
+    std::stringstream entries(commaSeparatedEntries);
+    std::string segment;
+    while(std::getline(entries, segment, ','))
+    {
+        if(std::regex_match(segment, digitsRegex))
+        {
+            uint32_t deviceID = std::stoul(segment);
+            insertDeviceID(deviceID, devicesOnPlatform);
+        } else
+        {
+            std::smatch pieces_match;
+            std::regex_match(segment, pieces_match, range);
+            if(pieces_match.size() != 3)
+            {
+                ERR = io::xprintf("Error!");
+                LOGE << ERR;
+                throw std::runtime_error(ERR);
+            }
+            uint32_t deviceIDstart, deviceIDend;
+            deviceIDstart = std::stoul(pieces_match[1].str());
+            deviceIDend = std::stoul(pieces_match[2].str());
+            for(uint32_t deviceID = deviceIDstart; deviceID != deviceIDend + 1; deviceID++)
+            {
+                insertDeviceID(deviceID, devicesOnPlatform);
+            }
+        }
+    }
+}
+
+void CArmArguments::parsePlatformString(bool verbose)
+{
+    const std::regex platformDeviceRegex("(\\d+|\\d+:((\\d+-\\d+|\\d+),)*(\\d+-\\d+|\\d+))");
+    const std::regex platformOnlyRegex("\\d+");
+    const std::regex platformExtendedRegex("(\\d+):([\\d-,]+)");
+    // Handle empty string
+    std::string ERR;
+    uint32_t platformsOpenCL = util::OpenCLManager::platformCount();
+    if(platformsOpenCL == 0)
+    {
+        ERR = io::xprintf("No OpenCL platform available to this program.");
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    CLdeviceIDs.clear();
+    if(CLplatformString.empty())
+    {
+        for(uint32_t platformID = 0; platformID != platformsOpenCL; platformID++)
+        {
+            uint32_t devicesOnPlatform = util::OpenCLManager::deviceCount(platformID);
+            if(devicesOnPlatform > 0)
+            {
+                CLplatformID = platformID;
+                CLdeviceIDs.push_back(0);
+                if(verbose)
+                {
+                    LOGD << io::xprintf("Selected device %d on platform %d.", 0, CLplatformID);
+                }
+                return;
+            }
+        }
+    }
+
+    std::string platformString;
+    std::string deviceString;
     // Remove spaces
     CLplatformString.erase(
         std::remove_if(CLplatformString.begin(), CLplatformString.end(), ::isspace),
         CLplatformString.end());
-    // Separate it to two parts, before : and after
-    std::list<std::string> platform_device_list;
-    strtk::parse(CLplatformString, ":", platform_device_list);
-    // Only platform, device defaults to 0
-    CLdeviceIDs.clear();
-    if(platform_device_list.size() == 1)
+    if(!std::regex_match(CLplatformString, platformDeviceRegex))
     {
-        CLplatformID = std::stoi(CLplatformString.c_str());
-        CLdeviceIDs.push_back(0);
-
-    } else if(platform_device_list.size() == 2)
-    {
-        CLplatformID = std::stoi(platform_device_list.front().c_str());
-        std::list<std::string> string_list;
-        strtk::parse(platform_device_list.back(), ",", string_list);
-        auto it = string_list.begin();
-        while(it != string_list.end())
-        {
-            size_t numRangeSigns = std::count(it->begin(), it->end(), '-');
-            if(numRangeSigns > 1)
-            {
-                std::string msg = io::xprintf("Wrong number of range specifiers in the string %s.",
-                                              (*it).c_str());
-                LOGE << msg;
-                throw std::runtime_error(msg);
-            } else if(numRangeSigns == 1)
-            {
-                std::vector<int> int_vector;
-                strtk::parse((*it), "-", int_vector);
-                if(0 <= int_vector[0] && int_vector[0] <= int_vector[1])
-                {
-                    for(int k = int_vector[0]; k != int_vector[1] + 1; k++)
-                    {
-                        CLdeviceIDs.push_back(k);
-                    }
-                } else
-                {
-                    std::string msg
-                        = io::xprintf("String %s is invalid range specifier.", (*it).c_str());
-                    LOGE << msg;
-                    throw std::runtime_error(msg);
-                }
-            } else
-            {
-                int index = std::stoi(it->c_str());
-                if(0 <= index)
-                {
-                    CLdeviceIDs.push_back(index);
-                } else
-                {
-                    std::string msg = io::xprintf("Negative identifier!.", (*it).c_str());
-                    LOGE << msg;
-                    throw std::runtime_error(msg);
-                }
-            }
-            it++;
-        }
-    } else
-    {
-        ERR = io::xprintf("Only one : delimiter is recognized but %d was provided",
-                          platform_device_list.size() - 1);
+        ERR = io::xprintf("The platform string does not match the required regexp");
         LOGE << ERR;
         throw std::runtime_error(ERR);
     }
-    LOGD << io::xprintf("Selected %d devices on platformID %d.", CLdeviceIDs.size(), CLplatformID);
-    std::string str = io::xprintf("DeviceIDs:%d", CLdeviceIDs[0]);
-    for(uint32_t i = 1; i != CLdeviceIDs.size(); i++)
+    if(std::regex_match(CLplatformString, platformOnlyRegex))
     {
-        str = io::xprintf("%s,%d", str.c_str(), CLdeviceIDs[i]);
+        CLplatformID = std::stoul(CLplatformString);
+        uint32_t devicesOnPlatform = util::OpenCLManager::deviceCount(CLplatformID);
+        if(devicesOnPlatform > 0)
+        {
+            CLdeviceIDs.push_back(0);
+        } else
+        {
+            ERR = io::xprintf("The platform %d does not contain any device!", CLplatformID);
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
+    } else
+    {
+        std::smatch pieces_match;
+        std::regex_match(CLplatformString, pieces_match, platformExtendedRegex);
+        if(pieces_match.size() != 3)
+        {
+            ERR = io::xprintf("Error!");
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
+        CLplatformID = std::stoul(pieces_match[1].str());
+        fillDevicesList(pieces_match[2].str(), CLplatformID);
     }
-    str = io::xprintf("%s.", str.c_str());
-    LOGD << str;
+    if(verbose)
+    {
+        std::string str = io::xprintf("%d", CLdeviceIDs[0]);
+        for(uint32_t i = 1; i != CLdeviceIDs.size(); i++)
+        {
+            str = io::xprintf("%s, %d", str.c_str(), CLdeviceIDs[i]);
+        }
+        str = io::xprintf("%s.", str.c_str());
+        LOGD << io::xprintf("Selected devices %s on platformID %d.", str.c_str(), CLplatformID);
+    }
 } // namespace CTL::util
 
 void CArmArguments::addGeometryGroup()

@@ -60,13 +60,12 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
                                         bool debug)
 {
     // Select the first available platform.
-    std::shared_ptr<cl::Platform> platform = util::OpenCLManager::getPlatform(platformId, true);
+    platform = util::OpenCLManager::getPlatform(platformId, true);
     if(platform == nullptr)
     {
         return -1;
     }
     // Select the first available device for given platform
-    std::vector<cl::Device> devices;
     std::shared_ptr<cl::Device> dev;
     if(deviceIdsLength == 0)
     {
@@ -76,7 +75,6 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
         {
             return -2;
         }
-        device = dev;
         devices.push_back(*dev);
     } else
     {
@@ -84,10 +82,6 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
         {
             LOGD << io::xprintf("Adding deviceID %d on the platform %d.", deviceIds[i], platformId);
             dev = util::OpenCLManager::getDevice(*platform, deviceIds[i], true);
-            if(i == 0)
-            {
-                device = dev;
-            }
             if(dev == nullptr)
             {
                 return -2;
@@ -129,21 +123,43 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
     LOGI << io::xprintf("Building file %s.", clFile.c_str());
+    std::string options = "";
     if(debug)
     {
-        std::string options = io::xprintf("-g -s \"%s\"", clFile.c_str());
-        if(program.build(devices, options.c_str()) != CL_SUCCESS)
-        {
-            LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
-            return -3;
-        }
+        options = io::xprintf("-g -s \"%s\"", clFile.c_str());
     } else
     {
-        if(program.build(devices) != CL_SUCCESS)
+        options = "-Werror";
+    }
+    LOGI << io::xprintf("Build options : %s", options.c_str());
+    if(program.build(devices, options.c_str()) != CL_SUCCESS)
+    {
+        LOGE << " Error building: ";
+        for(cl::Device dev : devices)
         {
-            LOGE << " Error building: " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(*device);
-            return -3;
+            cl_build_status s = program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(dev);
+            std::string status = "CL_BUILD_SUCCESS";
+            if(s == CL_BUILD_NONE)
+            {
+                status = "CL_BUILD_NONE";
+            } else if(s == CL_BUILD_ERROR)
+            {
+                status = "CL_BUILD_ERROR";
+            } else if(s == CL_BUILD_IN_PROGRESS)
+            {
+                status = "CL_BUILD_IN_PROGRESS";
+            }
+            std::string name = dev.getInfo<CL_DEVICE_NAME>();
+            std::string buildlog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(dev);
+            LOGE << io::xprintf("Device %s, status %s LOG:", name.c_str(), status.c_str())
+                 << std::endl
+                 << buildlog << std::endl;
         }
+        return -3;
+    }
+    if(platform->unloadCompiler() != CL_SUCCESS)
+    {
+        LOGE << "Error compiler unloading";
     }
     // OpenCL 1.2 got rid of KernelFunctor
     // https://forums.khronos.org/showthread.php/8317-cl-hpp-KernelFunctor-gone-replaced-with-KernelFunctorGlobal
@@ -229,7 +245,10 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
                                                cl_double2&, double&>>(
                 cl::Kernel(program, "FLOATrescale_projections_exact"));
     }
-    Q = std::make_shared<cl::CommandQueue>(*context, *device);
+    for(uint32_t i = 0; i != devices.size(); i++)
+    {
+        Q.push_back(std::make_shared<cl::CommandQueue>(*context, devices[i]));
+    }
     return 0;
 }
 
@@ -440,7 +459,7 @@ int BaseReconstructor::copyFloatVectorOffset(cl::Buffer& from,
                                              unsigned int to_offset,
                                              unsigned int size)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     (*FLOAT_CopyVector_offset)(eargs, from, from_offset, to, to_offset).wait();
     return 0;
 }
@@ -456,12 +475,12 @@ double BaseReconstructor::normXBuffer_frame_double(cl::Buffer& X)
 {
     double sum;
     uint32_t framesize = vdimx * vdimy;
-    cl::EnqueueArgs eargs1(*Q, cl::NDRange(vdimz));
+    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(vdimz));
     (*NormSquare)(eargs1, X, *tmp_x_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     unsigned int arg = vdimz;
     (*SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
-    Q->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(double), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
 
@@ -476,14 +495,15 @@ double BaseReconstructor::normXBuffer_barier_double(cl::Buffer& X)
 {
 
     double sum;
-    cl::EnqueueArgs eargs_red1(*Q, cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
     (*NormSquare_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q, cl::NDRange(XDIM_REDUCED1_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
     (*Sum_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
-    Q->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
 
@@ -499,14 +519,15 @@ double BaseReconstructor::scalarProductXBuffer_barier_double(cl::Buffer& A, cl::
 {
 
     double sum;
-    cl::EnqueueArgs eargs_red1(*Q, cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
     (*ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_x_red1, localsize, XDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q, cl::NDRange(XDIM_REDUCED1_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
     (*Sum_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
-    Q->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
 
@@ -522,14 +543,15 @@ double BaseReconstructor::scalarProductBBuffer_barier_double(cl::Buffer& A, cl::
 {
 
     double sum;
-    cl::EnqueueArgs eargs_red1(*Q, cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
     (*ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_b_red1, localsize, BDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q, cl::NDRange(BDIM_REDUCED1_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
     (*Sum_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
-    Q->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
 
@@ -544,12 +566,12 @@ double BaseReconstructor::normBBuffer_frame_double(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     double sum;
     uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q, cl::NDRange(pdimz));
+    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
     (*NormSquare)(eargs1, B, *tmp_b_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     unsigned int arg = pdimz;
     (*SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
-    Q->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(double), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
 
@@ -563,14 +585,15 @@ double BaseReconstructor::normBBuffer_frame_double(cl::Buffer& B)
 double BaseReconstructor::normBBuffer_barier_double(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     double sum;
-    cl::EnqueueArgs eargs_red1(*Q, cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
     (*NormSquare_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q, cl::NDRange(BDIM_REDUCED1_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
     (*Sum_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
-    Q->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
 
@@ -585,12 +608,12 @@ float BaseReconstructor::normXBuffer_frame(cl::Buffer& X)
 {
     float sum;
     uint32_t framesize = vdimx * vdimy;
-    cl::EnqueueArgs eargs1(*Q, cl::NDRange(vdimz));
+    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(vdimz));
     (*FLOAT_NormSquare)(eargs1, X, *tmp_x_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     unsigned int arg = vdimz;
     (*FLOAT_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
-    Q->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(float), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
@@ -605,14 +628,15 @@ float BaseReconstructor::normXBuffer_barier(cl::Buffer& X)
 {
 
     float sum;
-    cl::EnqueueArgs eargs_red1(*Q, cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
     (*FLOAT_NormSquare_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q, cl::NDRange(XDIM_REDUCED1_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
     (*FLOAT_Sum_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOAT_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
-    Q->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
@@ -627,12 +651,12 @@ float BaseReconstructor::normBBuffer_frame(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     float sum;
     uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q, cl::NDRange(pdimz));
+    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
     (*FLOAT_NormSquare)(eargs1, B, *tmp_b_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     unsigned int arg = pdimz;
     (*FLOAT_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
-    Q->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(float), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
@@ -646,14 +670,15 @@ float BaseReconstructor::normBBuffer_frame(cl::Buffer& B)
 float BaseReconstructor::normBBuffer_barier(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     float sum;
-    cl::EnqueueArgs eargs_red1(*Q, cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
     (*FLOAT_NormSquare_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q, cl::NDRange(BDIM_REDUCED1_ALIGNED), cl::NDRange(workGroupSize));
+    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
     (*FLOAT_Sum_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(1));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOAT_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
-    Q->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
+    Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
@@ -663,11 +688,11 @@ int BaseReconstructor::backproject(cl::Buffer& B,
                                    std::vector<cl_double16>& invertedProjectionMatrices,
                                    std::vector<float>& scalingFactors)
 {
-    Q->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     copyFloatVector(B, *tmp_b_buf, BDIM);
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
     double sourceToDetector;
     for(std::size_t i = 0; i != pdimz; i++)
@@ -729,10 +754,10 @@ int BaseReconstructor::project(cl::Buffer& X,
                                std::vector<cl_double16>& invertedProjectionMatrices,
                                std::vector<float>& scalingFactors)
 {
-    Q->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
-    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
     double sourceToDetector;
     for(std::size_t i = 0; i != pdimz; i++)
@@ -789,14 +814,14 @@ int BaseReconstructor::project(cl::Buffer& X,
 
 int BaseReconstructor::copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     (*FLOAT_CopyVector)(eargs, from, to).wait();
     return 0;
 }
 
 int BaseReconstructor::scaleFloatVector(cl::Buffer& v, float f, unsigned int size)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     (*FLOAT_scaleVector)(eargs, v, f).wait();
     return 0;
 }
@@ -806,7 +831,7 @@ int BaseReconstructor::addIntoFirstVectorSecondVectorScaled(cl::Buffer& a,
                                                             float f,
                                                             unsigned int size)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f).wait();
     return 0;
 }
@@ -816,7 +841,7 @@ int BaseReconstructor::addIntoFirstVectorScaledSecondVector(cl::Buffer& a,
                                                             float f,
                                                             unsigned int size)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     (*FLOAT_addIntoFirstVectorScaledSecondVector)(eargs, a, b, f).wait();
     return 0;
 }
@@ -891,7 +916,7 @@ void BaseReconstructor::writeVolume(cl::Buffer& X, std::string path)
     buf[2] = vdimz;
     io::createEmptyFile(path, 0, true); // Try if this is faster
     io::appendBytes(path, (uint8_t*)buf, 6);
-    Q->enqueueReadBuffer(X, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    Q[0]->enqueueReadBuffer(X, CL_TRUE, 0, sizeof(float) * XDIM, x);
     io::appendBytes(path, (uint8_t*)x, XDIM * sizeof(float));
 }
 
@@ -903,7 +928,7 @@ void BaseReconstructor::writeProjections(cl::Buffer& B, std::string path)
     buf[2] = pdimz;
     io::createEmptyFile(path, 0, true); // Try if this is faster
     io::appendBytes(path, (uint8_t*)buf, 6);
-    Q->enqueueReadBuffer(B, CL_TRUE, 0, sizeof(float) * BDIM, b);
+    Q[0]->enqueueReadBuffer(B, CL_TRUE, 0, sizeof(float) * BDIM, b);
     io::appendBytes(path, (uint8_t*)b, BDIM * sizeof(float));
 }
 

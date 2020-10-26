@@ -210,9 +210,10 @@ protected:
     float* b = nullptr; // Projection data
 
     // OpenCL objects
-    std::shared_ptr<cl::Device> device = nullptr;
+    std::shared_ptr<cl::Platform> platform = nullptr;
+    std::vector<cl::Device> devices;
     std::shared_ptr<cl::Context> context = nullptr;
-    std::shared_ptr<cl::CommandQueue> Q = nullptr;
+    std::vector<std::shared_ptr<cl::CommandQueue>> Q;
     std::shared_ptr<cl::Buffer> b_buf = nullptr, tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
     std::shared_ptr<cl::Buffer> x_buf = nullptr, tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
     // tmp_b_buf for rescaling, tmp_x_buf for LSQR
