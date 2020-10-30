@@ -165,7 +165,7 @@ void inline exactEdgeValues(global float* projection,
                 J = 0;
                 Fvector = CM.s456 + 0.5 * CM.s89a;
                 lastLambda = (dot(v_up, Fvector) + CM.s7 + 0.5 * CM.sb)
-                    / (negativeEdgeLength * Fvector[2]);
+                    / (negativeEdgeLength * Fvector.s2);
             } else
             {
                 J = PJ_up;
