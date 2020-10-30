@@ -91,11 +91,11 @@ void inline exactEdgeValues(global float* projection,
                             private double3 voxelSizes,
                             private int2 pdims)
 {
-    const double3 distanceToEdge = (double3)(0.0, 0.0, 0.5 * voxelSizes[2]);
+    const double3 distanceToEdge = (double3)(0.0, 0.0, 0.5 * voxelSizes.s2);
     const double3 v_up = v + distanceToEdge;
     const double3 v_down = v - distanceToEdge;
     // const double3 v_diff = v_down - v_up;
-    const double negativeEdgeLength = -voxelSizes[2];
+    const double negativeEdgeLength = -voxelSizes.s2;
     const double PY_up = projectY(CM, v_up);
     const double PY_down = projectY(CM, v_down);
     const int PJ_up = convert_int_rtn(PY_up + 0.5);
@@ -117,7 +117,7 @@ void inline exactEdgeValues(global float* projection,
                 // lastLambda = (dot(v_down, Fvector) + CM.s7 + 0.5 * CM.sb) / (dot(v_diff,
                 // Fvector));
                 lastLambda = (dot(v_down, Fvector) + CM.s7 + 0.5 * CM.sb)
-                    / (negativeEdgeLength * Fvector[2]);
+                    / (negativeEdgeLength * Fvector.s2);
             } else
             {
                 J = PJ_down;
@@ -130,7 +130,7 @@ void inline exactEdgeValues(global float* projection,
                 // leastLambda = (dot(v_down, Qvector) + CM.s7 - ((double)PJ_max + 0.5) * CM.sb)
                 //    / (dot(v_diff, Qvector));
                 leastLambda = (dot(v_down, Qvector) + CM.s7 - ((double)PJ_max + 0.5) * CM.sb)
-                    / (negativeEdgeLength * Qvector[2]);
+                    / (negativeEdgeLength * Qvector.s2);
             } else
             {
                 PJ_max = PJ_up;
@@ -140,7 +140,7 @@ void inline exactEdgeValues(global float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_down, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
-                    / (negativeEdgeLength * Fvector[2]);
+                    / (negativeEdgeLength * Fvector.s2);
                 AtomicAdd_g_f(&projection[PX + pdims.x * J],
                               (lambda - lastLambda)
                                   * value); // Atomic version of projection[ind] += value;
@@ -176,7 +176,7 @@ void inline exactEdgeValues(global float* projection,
                 PJ_max = pdims.y - 1;
                 double3 Qvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;
                 leastLambda = (dot(v_up, Qvector) + CM.s7 - ((double)PJ_max + 0.5) * CM.sb)
-                    / (negativeEdgeLength * Qvector[2]);
+                    / (negativeEdgeLength * Qvector.s2);
             } else
             {
                 PJ_max = PJ_down;
@@ -186,7 +186,7 @@ void inline exactEdgeValues(global float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_up, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
-                    / (negativeEdgeLength * Fvector[2]);
+                    / (negativeEdgeLength * Fvector.s2);
                 AtomicAdd_g_f(&projection[PX + pdims.x * J],
                               (lastLambda - lambda)
                                   * value); // Atomic version of projection[ind] += value;
