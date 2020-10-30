@@ -89,6 +89,13 @@ public:
                    uint32_t pdimy,
                    matrix::ProjectionMatrix P,
                    float scalingFactor);
+    int projectorWithoutScaling(float* projection,
+                              uint32_t pdimx,
+                              uint32_t pdimy,
+                              double normalProjectionX,
+                              double normalProjectionY,
+                              double sourceToDetector,
+                              matrix::ProjectionMatrix P);
     int projectExact(float* projection,
                      uint32_t pdimx,
                      uint32_t pdimy,
@@ -97,12 +104,12 @@ public:
                      double sourceToDetector,
                      matrix::ProjectionMatrix P);
     int projectTA3(float* projection,
-                     uint32_t pdimx,
-                     uint32_t pdimy,
-                     double normalProjectionX,
-                     double normalProjectionY,
-                     double sourceToDetector,
-                     matrix::ProjectionMatrix P);
+                   uint32_t pdimx,
+                   uint32_t pdimy,
+                   double normalProjectionX,
+                   double normalProjectionY,
+                   double sourceToDetector,
+                   matrix::ProjectionMatrix P);
 
     int projectSiddon(float* projection,
                       uint32_t pdimx,

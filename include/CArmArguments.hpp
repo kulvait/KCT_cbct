@@ -8,7 +8,7 @@
 
 namespace CTL::util {
 
-class CArmArguments : public Arguments
+class CArmArguments : public virtual Arguments
 {
 public:
     // Dimensions
@@ -27,7 +27,6 @@ public:
     double pixelSizeY = 0.616;
 
     // Basis specification
-    CLI::Option_group* og_basis = nullptr;
     bool useLegendrePolynomials = false;
     bool useChebyshevPolynomials = false;
     bool useFourierBasis = false;
@@ -39,19 +38,20 @@ public:
     float start_offset = 0.0, end_offset = 0.0;
 
     // Settings
-    CLI::Option_group* og_settings = nullptr;
     uint32_t maxIterationCount = 40;
     double stoppingRelativeError = 0.00025;
     uint32_t reportKthIteration = 0;
 
     // Projector settings
+    bool useCVPProjector = false;
+    bool useExactScaling = true;
+    bool useCosScaling = false;
+    bool useNoScaling = false;
+    bool useCenterVoxelProjector = false;
     bool useSidonProjector = false;
     uint32_t probesPerEdge = 1;
     bool useTTProjector = false;
-    bool useCVPProjector = true;
-    bool useExactScaling = true;
     // OpenCL
-    CLI::Option_group* og_cl_settings = nullptr;
     std::string CLplatformString = "";
     uint32_t CLplatformID = 0;
     std::vector<uint32_t> CLdeviceIDs;
@@ -79,6 +79,21 @@ protected:
     void addSettingsGroup();
     void addCLSettingsGroup();
     void addSettingsArgs();
+    void addCLSettingsArgs();
+
+    // Projector setup
+    void addProjectorSettingsGroups();
+    void addCuttingVoxelProjectorArgs(bool includeNoScaling = false);
+    void addTTProjectorArgs();
+    void addSidonProjectorArgs();
+    void addCenterVoxelProjectorArgs();
     void addProjectorArgs();
+
+private:
+    CLI::Option_group* og_basis = nullptr;
+    CLI::Option_group* og_settings = nullptr;
+    CLI::Option_group* og_projectorsettings = nullptr;
+    CLI::Option_group* og_projectortypesettings = nullptr;
+    CLI::Option_group* og_cl_settings = nullptr;
 };
 } // namespace CTL::util

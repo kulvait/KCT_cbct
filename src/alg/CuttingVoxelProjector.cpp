@@ -284,6 +284,61 @@ int CuttingVoxelProjector::projectCos(float* projection,
     return 0;
 }
 
+int CuttingVoxelProjector::projectorWithoutScaling(float* projection,
+                                        uint32_t pdimx,
+                                        uint32_t pdimy,
+                                        double normalProjectionX,
+                                        double normalProjectionY,
+                                        double sourceToDetector,
+                                        matrix::ProjectionMatrix matrix)
+{
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
+    cl_int err;
+    size_t projectionSize = sizeof(float) * pdimx * pdimy;
+    if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
+    {
+        projectionBuffer_size = projectionSize;
+        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                        projectionBuffer_size, nullptr, &err);
+        if(err != CL_SUCCESS)
+        {
+            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+            return -1;
+        }
+    }
+    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
+        return -1;
+    }
+    unsigned int offset = 0;
+    double* P = matrix.getPtr();
+    cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
+                     0.0, 0.0, 0.0 });
+    std::array<double, 3> sourcePosition = matrix.sourcePosition();
+    cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+    std::array<double, 3> normalToDetector = matrix.normalToDetector();
+    cl_double3 NORMALTODETECTOR({ normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+    cl_int2 pdims({ int(pdimx), int(pdimy) });
+    cl_uint2 pdims_uint({ pdimx, pdimy });
+    cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
+    float scalingOne = 1.0;
+    (*projector)(eargs, *volumeBuffer, *projectionBuffer, offset, PM, SOURCEPOSITION,
+                 NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingOne)
+        .wait();
+
+    err = Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy,
+                               projection);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
+        return -1;
+    }
+    return 0;
+}
+
 int CuttingVoxelProjector::projectExact(float* projection,
                                         uint32_t pdimx,
                                         uint32_t pdimy,

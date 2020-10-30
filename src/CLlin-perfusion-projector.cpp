@@ -37,7 +37,8 @@ class Args : public CArmArguments
 
 public:
     Args(int argc, char** argv, std::string prgName)
-        : CArmArguments(argc, argv, prgName){};
+        : Arguments(argc, argv, prgName)
+        , CArmArguments(argc, argv, prgName){};
 
     std::string projectionFilePath(uint32_t sweepID)
     {

@@ -1,4 +1,124 @@
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
+float inline backprojectExactEdgeValues(global float* projection,
+                                        private double16 CM,
+                                        private double3 v,
+                                        private int PX,
+                                        private double value,
+                                        private double3 voxelSizes,
+                                        private int2 pdims)
+{
+    const double3 distanceToEdge = (double3)(0.0, 0.0, 0.5 * voxelSizes[2]);
+    const double3 v_up = v + distanceToEdge;
+    const double3 v_down = v - distanceToEdge;
+    // const double3 v_diff = v_down - v_up;
+    const double negativeEdgeLength = -voxelSizes[2];
+    const double PY_up = projectY(CM, v_up);
+    const double PY_down = projectY(CM, v_down);
+    const int PJ_up = convert_int_rtn(PY_up + 0.5);
+    const int PJ_down = convert_int_rtn(PY_down + 0.5);
+    double lambda;
+    double lastLambda = 0.0;
+    double leastLambda;
+    double3 Fvector;
+    int PJ_max;
+    float ADD = 0.0;
+    if(PJ_down < PJ_up)
+    {
+        if(PJ_up >= 0 && PJ_down < pdims.y)
+        {
+            int J;
+            if(PJ_down < 0)
+            {
+                J = 0;
+                Fvector = CM.s456 + 0.5 * CM.s89a;
+                // lastLambda = (dot(v_down, Fvector) + CM.s7 + 0.5 * CM.sb) / (dot(v_diff,
+                // Fvector));
+                lastLambda = (dot(v_down, Fvector) + CM.s7 + 0.5 * CM.sb)
+                    / (negativeEdgeLength * Fvector[2]);
+            } else
+            {
+                J = PJ_down;
+                Fvector = CM.s456 - (J - 0.5) * CM.s89a;
+            }
+            if(PJ_up >= pdims.y)
+            {
+                PJ_max = pdims.y - 1;
+                double3 Qvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;
+                // leastLambda = (dot(v_down, Qvector) + CM.s7 - ((double)PJ_max + 0.5) * CM.sb)
+                //    / (dot(v_diff, Qvector));
+                leastLambda = (dot(v_down, Qvector) + CM.s7 - ((double)PJ_max + 0.5) * CM.sb)
+                    / (negativeEdgeLength * Qvector[2]);
+            } else
+            {
+                PJ_max = PJ_up;
+                leastLambda = 1.0;
+            }
+            for(; J < PJ_max; J++)
+            {
+                Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
+                lambda = (dot(v_down, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
+                    / (negativeEdgeLength * Fvector[2]);
+                ADD += projection[PX + pdims.x * J] * (lambda - lastLambda) * value;
+                // Atomic version of projection[ind] += value;
+                lastLambda = lambda;
+            }
+            // PJ_max
+            ADD += projection[PX + pdims.x * PJ_max] * (leastLambda - lastLambda)
+                * value; // Atomic version of projection[ind] += value;
+        }
+    } else if(PJ_down > PJ_up)
+    {
+        if(PJ_down >= 0 && PJ_up < pdims.y)
+        {
+            // We will count with negative value of lambda by dividing by dot(v_diff, Fvector)
+            // instead of dot(-v_diff, Fvector)  Because valuePerUnit is negative the value (lambda
+            // - lastLambda)*valuePerUnit will be positive
+            // lambda here measures negative distance from v_up to a given intersection point
+            int J;
+            if(PJ_up < 0)
+            {
+                J = 0;
+                Fvector = CM.s456 + 0.5 * CM.s89a;
+                lastLambda = (dot(v_up, Fvector) + CM.s7 + 0.5 * CM.sb)
+                    / (negativeEdgeLength * Fvector[2]);
+            } else
+            {
+                J = PJ_up;
+                Fvector = CM.s456 - (J - 0.5) * CM.s89a;
+            }
+            if(PJ_down >= pdims.y)
+            {
+                PJ_max = pdims.y - 1;
+                double3 Qvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;
+                leastLambda = (dot(v_up, Qvector) + CM.s7 - ((double)PJ_max + 0.5) * CM.sb)
+                    / (negativeEdgeLength * Qvector[2]);
+            } else
+            {
+                PJ_max = PJ_down;
+                leastLambda = -1.0;
+            }
+            for(; J < PJ_max; J++)
+            {
+                Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
+                lambda = (dot(v_up, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
+                    / (negativeEdgeLength * Fvector[2]);
+                ADD += projection[PX + pdims.x * J] * (lastLambda - lambda)
+                    * value; // Atomic version of projection[ind] += value;
+                lastLambda = lambda;
+            }
+            // PJ_max
+            ADD += projection[PX + pdims.x * PJ_max] * (lastLambda - leastLambda)
+                * value; // Atomic version of projection[ind] += value;
+        }
+    } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
+    {
+        ADD += projection[PX + pdims.x * PJ_down]
+            * value; // Atomic version of projection[ind] += value;
+    }
+    return ADD;
+}
+
+/// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline backprojectEdgeValues(global float* projection,
                                    private double16 CM,
                                    private double3 v,
@@ -231,7 +351,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     if(max_PX == min_PX) // Due to the previous statement I know that these indices are inside the
                          // admissible range
     {
-        ADD = backprojectEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0, min_PX,
+        ADD = backprojectExactEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0, min_PX,
                                     value, voxelSizes, pdims);
         volume[IND] += ADD;
         return;
@@ -309,24 +429,30 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     // Section of the square that corresponds to the indices < i
     // CCW and CW coordinates of the last intersection on the lines specified by the points in
     // V_ccw
+    // lastSectionSize
+    //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+    //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
     lastSectionSize
-        = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                 PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
+        = exactIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+                                  PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
     if(I >= 0)
     {
         factor = value * lastSectionSize;
-        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
+        ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
                                      voxelSizes, pdims);
     }
     for(I = I + 1; I < I_STOP; I++)
     {
+        // nextSectionSize
+        //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+        //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
         nextSectionSize
-            = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                     PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
+            = exactIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+                                      PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
         polygonSize = nextSectionSize - lastSectionSize;
         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize;
-        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
+        ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
                                      pdims);
         lastSectionSize = nextSectionSize;
         lastInt = nextInt;
@@ -336,7 +462,7 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
         polygonSize = 1 - lastSectionSize;
         Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
         factor = value * polygonSize;
-        ADD += backprojectEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
+        ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
                                      pdims);
     }
     volume[IND] += ADD;

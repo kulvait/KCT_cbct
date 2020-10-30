@@ -22,6 +22,7 @@
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "GLSQRReconstructor.hpp"
+#include "PROG/ArgumentsForce.hpp"
 #include "PROG/Program.hpp"
 
 using namespace CTL;
@@ -29,11 +30,13 @@ using namespace CTL::util;
 
 /**Arguments parsed by the main function.
  */
-class Args : public CArmArguments
+class Args : public CArmArguments, public ArgumentsForce
 {
 public:
     Args(int argc, char** argv, std::string programName)
-        : CArmArguments(argc, argv, programName){};
+        : Arguments(argc, argv, programName)
+        , CArmArguments(argc, argv, programName)
+        , ArgumentsForce(argc, argv, programName){};
     int preParse() { return 0; };
     int postParse()
     {
@@ -100,7 +103,6 @@ public:
     std::string outputVolume;
     std::string inputProjectionMatrices;
     std::string inputProjections;
-    bool force = false;
     bool glsqr = false;
 };
 
@@ -124,7 +126,7 @@ void Args::defineArguments()
         ->required()
         ->check(CLI::ExistingFile);
     cliApp->add_option("output_volume", outputVolume, "Volume to project")->required();
-    cliApp->add_flag("-f,--force", force, "Overwrite outputProjection if it exists.");
+    addForceArgs();
     CLI::Option* glsqr_cli = cliApp->add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
 
     CLI::Option* tl_cli = cliApp
@@ -140,6 +142,7 @@ void Args::defineArguments()
 
     // Program flow parameters
     addSettingsArgs();
+    addCLSettingsArgs();
     addProjectorArgs();
 }
 
@@ -182,7 +185,8 @@ int main(int argc, char* argv[])
             ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
             ARG.voxelSizeY, ARG.voxelSizeZ, ARG.CLitemsPerWorkgroup);
         cgls->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
-        int ecd = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+        int ecd = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
         if(ecd < 0)
         {
             std::string ERR
@@ -240,7 +244,8 @@ int main(int argc, char* argv[])
         {
             glsqr->initializeCVPProjector(ARG.useExactScaling);
         }
-        int ecd = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+        int ecd = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                          ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
         if(ecd < 0)
         {
             std::string ERR

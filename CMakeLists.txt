@@ -86,7 +86,7 @@ add_custom_target(formatWebkit
 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #####################START PROGRAM DEFS##################################
-SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/alg/CuttingVoxelProjector.cpp)
+SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
 add_executable(CLlin-projector ${CLLINPROJECTOR_SOURCES})
 set_target_properties(
     CLlin-projector

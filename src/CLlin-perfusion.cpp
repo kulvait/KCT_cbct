@@ -22,8 +22,8 @@
 #include "FUN/ChebyshevPolynomialsExplicit.hpp"
 #include "FUN/FourierSeries.hpp"
 #include "FUN/LegendrePolynomialsExplicit.hpp"
-#include "FUN/StepFunction.hpp"
 #include "FUN/SplineInterpolatedFunction.hpp"
+#include "FUN/StepFunction.hpp"
 #include "GLSQRPerfusionReconstructor.hpp"
 #include "PROG/Program.hpp"
 #include "PROG/RunTimeInfo.hpp"
@@ -37,7 +37,8 @@ class Args : public CArmArguments
 {
 public:
     Args(int argc, char** argv, std::string programName)
-        : CArmArguments(argc, argv, programName){};
+        : Arguments(argc, argv, programName)
+        , CArmArguments(argc, argv, programName){};
     void defineArguments();
     int preParse()
     {

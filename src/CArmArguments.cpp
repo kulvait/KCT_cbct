@@ -314,6 +314,22 @@ void CArmArguments::addCLSettingsGroup()
     }
 }
 
+void CArmArguments::addProjectorSettingsGroups()
+{
+    addSettingsGroup();
+    if(og_projectorsettings == nullptr)
+    {
+        og_projectorsettings
+            = og_settings->add_option_group("Projector settings", "Configuration of projectors.");
+    }
+    if(og_projectortypesettings == nullptr)
+    {
+        og_projectortypesettings
+            = og_projectorsettings->add_option_group("Projector type", "Select projector type.");
+        og_projectortypesettings->require_option(1);
+    }
+}
+
 void CArmArguments::addSettingsArgs()
 {
     addSettingsGroup();
@@ -332,7 +348,10 @@ void CArmArguments::addSettingsArgs()
                      io::xprintf("Stopping relative error of ||Ax-b||/||b||, defaults to %f.",
                                  stoppingRelativeError))
         ->check(CLI::Range(0.0, 1.0));
+}
 
+void CArmArguments::addCLSettingsArgs()
+{
     addCLSettingsGroup();
     og_cl_settings->add_option(
         "-p,--platform_id", CLplatformString,
@@ -351,21 +370,78 @@ void CArmArguments::addSettingsArgs()
         ->check(CLI::Range(1, 65535));
 }
 
-void CArmArguments::addProjectorArgs()
+void CArmArguments::addCuttingVoxelProjectorArgs(bool includeNoScaling)
 {
-    addSettingsGroup();
+    addProjectorSettingsGroups();
+    std::string optValue;
+    CLI::Option* optCVP;
+    CLI::Option* optExactScaling;
+    CLI::Option* optCosScaling;
+    CLI::Option* optWithoutScaling;
+    optValue = (useCVPProjector ? "true" : "false");
+    optCVP = og_projectortypesettings->add_flag(
+        "--cvp", useCVPProjector,
+        io::xprintf("Use Cutting voxel projector, defaults to %s.", optValue.c_str()));
+    if(includeNoScaling)
+    {
+        optValue = (useExactScaling ? "true" : "false");
+        optExactScaling = og_projectorsettings->add_flag(
+            "--exact-scaling", useExactScaling,
+            io::xprintf("Use exact scaling as an oposite to cos scaling, defaults to %s.",
+                        optValue.c_str()));
+        optValue = (useExactScaling ? "true" : "false");
+        optCosScaling = og_projectorsettings->add_flag(
+            "--cos-scaling", useCosScaling,
+            io::xprintf("Use exact scaling as an oposite to cos scaling, defaults to %s.",
+                        optValue.c_str()));
+        optValue = (useNoScaling ? "true" : "false");
+        optWithoutScaling = og_projectorsettings->add_flag(
+            "--without-scaling", useNoScaling,
+            io::xprintf("Use no scaling in CVP, defaults to %s. FOR DEBUG ONLY!",
+                        optValue.c_str()));
+        optWithoutScaling->needs(optCVP);
+        optWithoutScaling->excludes(optExactScaling);
+        optWithoutScaling->excludes(optCosScaling);
+        optCosScaling->excludes(optWithoutScaling);
+        optExactScaling->excludes(optWithoutScaling);
+        optCosScaling->needs(optCVP);
+        optCosScaling->excludes(optExactScaling);
+        optExactScaling->excludes(optCosScaling);
+    } else
+    {
+        optValue = (useExactScaling ? "true" : "false");
+        optExactScaling = og_projectorsettings->add_flag(
+            "--exact-scaling,!--cos-scaling", useExactScaling,
+            io::xprintf("Use exact scaling as an oposite to cos scaling, defaults to %s.",
+                        optValue.c_str()));
+    }
+    optExactScaling->needs(optCVP);
+}
+
+void CArmArguments::addTTProjectorArgs()
+{
+    addProjectorSettingsGroups();
+    std::string optValue;
+    optValue = (useTTProjector ? "true" : "false");
+    og_projectortypesettings->add_flag(
+        "--tt", useTTProjector,
+        io::xprintf("Use TT projector with A3 amplitude and adjoint backprojector pair instead of "
+                    "cuting voxel projector, defaults to %s.",
+                    optValue.c_str()));
+}
+
+void CArmArguments::addSidonProjectorArgs()
+{
+    addProjectorSettingsGroups();
     std::string optValue;
     CLI::Option* optSid;
     CLI::Option* optPPE;
-    CLI::Option* optTT;
-    CLI::Option* optCVP;
-    CLI::Option* optExactScaling;
     optValue = (useSidonProjector ? "true" : "false");
-    optSid
-        = og_settings->add_flag("--sidon", useSidonProjector,
-                                io::xprintf("Use sidon projector and backprojector pair instead of "
-                                            "cuting voxel projector, defaults to %s.",
-                                            optValue.c_str()));
+    optSid = og_projectortypesettings->add_flag(
+        "--sidon", useSidonProjector,
+        io::xprintf("Use sidon projector and backprojector pair instead of "
+                    "cuting voxel projector, defaults to %s.",
+                    optValue.c_str()));
     optPPE = og_settings
                  ->add_option("--probes-per-edge", probesPerEdge,
                               io::xprintf("Number of probes in each pixel edge in Sidon raycaster, "
@@ -373,30 +449,26 @@ void CArmArguments::addProjectorArgs()
                                           "square of this number. Defaults to %d.",
                                           probesPerEdge))
                  ->check(CLI::Range(1, 1000));
-
-    optValue = (useTTProjector ? "true" : "false");
-    optTT = og_settings->add_flag(
-        "--tt", useTTProjector,
-        io::xprintf("Use TT projector with A3 amplitude and adjoint backprojector pair instead of "
-                    "cuting voxel projector, defaults to %s.",
-                    optValue.c_str()));
-    optValue = (useCVPProjector ? "true" : "false");
-    optCVP = og_settings->add_flag(
-        "--cvp", useTTProjector,
-        io::xprintf("Use Cutting voxel projector, defaults to %s.", optValue.c_str()));
-    optValue = (useExactScaling ? "true" : "false");
-    optExactScaling = og_settings->add_flag(
-        "--exact-scaling,!--cos-scaling", useExactScaling,
-        io::xprintf("Use exact scaling as an oposite to cos scaling, defaults to %s.",
-                    optValue.c_str()));
-    optSid->excludes(optTT);
-    optSid->excludes(optCVP);
     optPPE->needs(optSid);
-    optTT->excludes(optSid);
-    optTT->excludes(optCVP);
-    optCVP->excludes(optSid);
-    optCVP->excludes(optTT);
-    optExactScaling->needs(optCVP);
+}
+
+void CArmArguments::addCenterVoxelProjectorArgs()
+{
+    addProjectorSettingsGroups();
+    std::string optValue;
+    optValue = (useCenterVoxelProjector ? "true" : "false");
+    og_projectortypesettings->add_flag(
+        "--center-voxel-projector", useCenterVoxelProjector,
+        io::xprintf(
+            "Use center voxel projector to approximate voxel by its center, defaults to %s.",
+            optValue.c_str()));
+}
+
+void CArmArguments::addProjectorArgs()
+{
+    addCuttingVoxelProjectorArgs(false);
+    addTTProjectorArgs();
+    addSidonProjectorArgs();
 }
 
 } // namespace CTL::util
