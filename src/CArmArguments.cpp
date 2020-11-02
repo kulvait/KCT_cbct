@@ -442,7 +442,7 @@ void CArmArguments::addSidonProjectorArgs()
         io::xprintf("Use sidon projector and backprojector pair instead of "
                     "cuting voxel projector, defaults to %s.",
                     optValue.c_str()));
-    optPPE = og_settings
+    optPPE = og_projectorsettings
                  ->add_option("--probes-per-edge", probesPerEdge,
                               io::xprintf("Number of probes in each pixel edge in Sidon raycaster, "
                                           "complexity scales with the "
