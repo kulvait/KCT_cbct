@@ -157,9 +157,16 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
         }
         return -3;
     }
-    if(platform->unloadCompiler() != CL_SUCCESS)
+    // Unloading compiler to free resources is causing Segmentation fault on Intel platform
+    // Was reported on
+    // https://github.com/beagle-dev/beagle-lib/blob/master/libhmsbeagle/GPU/GPUInterfaceOpenCL.cpp
+    // Nvidia platform seems to be unaffected contrary to the report
+    if(util::OpenCLManager::getPlatformName(platformId) != "Intel(R) OpenCL")
     {
-        LOGE << "Error compiler unloading";
+        if(platform->unloadCompiler() != CL_SUCCESS)
+        {
+            LOGE << "Error compiler unloading";
+        }
     }
     // OpenCL 1.2 got rid of KernelFunctor
     // https://forums.khronos.org/showthread.php/8317-cl-hpp-KernelFunctor-gone-replaced-with-KernelFunctorGlobal
