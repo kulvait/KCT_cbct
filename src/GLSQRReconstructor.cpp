@@ -29,6 +29,8 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
     v_next = getXBuffer(0);
     Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
     backproject(*b_buf, *v_next, PM, ICM, scalingFactors);
+    //    LOGD << io::xprintf("Writing file v_init.den");
+    //    writeVolume(*v_next, io::xprintf("v_init.den"));
     double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
     scaleFloatVector(*v_next, float(1.0 / vnextnorm), XDIM);
@@ -232,7 +234,6 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
     allocateTmpXBuffers(2);
     allocateBBuffers(2);
 
-
     // Anything might be supplied here, but we will do standard initialization first
     v_next = getXBuffer(0);
     Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
@@ -281,7 +282,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
     //    u_prev = bc_buf;
     //    u_prev_x = xm_buf; // x part
     //    v_prev = xf_buf;
-    //w_prev_prev = xh_buf;
+    // w_prev_prev = xh_buf;
     BZ = tmp_b_buf;
     BZ_x = getTmpXBuffer(0);
     Q[0]->enqueueFillBuffer<cl_float>(*BZ_x, FLOATZERO, 0, XDIM * sizeof(float));
@@ -325,7 +326,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
         //tmp_buf = w_prev_prev;
         w_prev_prev = w_prev;
         w_prev = w_cur;
-        //w_cur = tmp_buf;
+        // w_cur = tmp_buf;
 
         rho_prev_prev = rho_prev;
         rho_prev = rho_cur;

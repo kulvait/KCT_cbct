@@ -1,3 +1,7 @@
+#ifndef zeroPrecisionTolerance
+#define zeroPrecisionTolerance 1e-10
+#endif
+
 /** Projection of a volume point v onto X coordinate on projector.
  * No checks for boundaries.
  *
@@ -795,7 +799,6 @@ void kernel FLOATcutting_voxel_project(global float* volume,
     const float voxelValue = volume[IND];
     const double3 voxelcenter_xyz
         = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
-    const double zeroPrecisionTolerance = 1e-10;
     if(voxelValue != 0.0)
     {
         // EXPERIMENTAL ... reconstruct inner circle

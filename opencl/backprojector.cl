@@ -1,3 +1,7 @@
+#ifndef zeroPrecisionTolerance
+#define zeroPrecisionTolerance 1e-10
+#endif
+
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline backprojectExactEdgeValues(global float* projection,
                                         private double16 CM,
@@ -339,41 +343,72 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
     // We now figure out the vertex that projects to minimum and maximum px
     double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
     int max_PX,
-        min_PX; // Pixel to which are the voxels with minimum and maximum values are projected
-    pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
-    pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
-    max_PX = convert_int_rtn(pxx_max + 0.5);
-    min_PX = convert_int_rtn(pxx_min + 0.5);
-    if(max_PX < 0 || min_PX >= pdims.x)
+        min_PX; // Pixel to which are the voxels with minimum and maximum values are
+                // projected
+    // pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
+    // pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
+    double3* V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
+    // from the minimum voxel
+    double* PX_ccw[4]; // Point in which maximum is achieved and counter clock wise  points
+    // from the minimum voxel
+    if(px00 < px01)
     {
-        return;
-    }
-    if(max_PX == min_PX) // Due to the previous statement I know that these indices are inside the
-                         // admissible range
-    {
-        ADD = backprojectExactEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0, min_PX,
-                                    value, voxelSizes, pdims);
-        volume[IND] += ADD;
-        return;
-    }
+        if(px00 < px10)
+        {
+            pxx_min = px00;
+            V_ccw[0] = &vx00;
+            V_ccw[1] = &vx01;
+            V_ccw[2] = &vx11;
+            V_ccw[3] = &vx10;
+            PX_ccw[0] = &px00;
+            PX_ccw[1] = &px01;
+            PX_ccw[2] = &px11;
+            PX_ccw[3] = &px10;
+            if(px10 > px11)
+            {
+                pxx_max = px10;
+            } else if(px01 > px11)
+            {
+                pxx_max = px01;
+            } else
+            {
+                pxx_max = px11;
+            }
+        } else if(px10 < px11)
+        {
+            pxx_min = px10;
+            V_ccw[0] = &vx10;
+            V_ccw[1] = &vx00;
+            V_ccw[2] = &vx01;
+            V_ccw[3] = &vx11;
+            PX_ccw[0] = &px10;
+            PX_ccw[1] = &px00;
+            PX_ccw[2] = &px01;
+            PX_ccw[3] = &px11;
+            if(px01 > px11)
+            {
+                pxx_max = px01;
+            } else
+            {
+                pxx_max = px11;
+            }
+        } else
+        {
+            pxx_min = px11;
+            pxx_max = px01;
+            V_ccw[0] = &vx11;
+            V_ccw[1] = &vx10;
+            V_ccw[2] = &vx00;
+            V_ccw[3] = &vx01;
+            PX_ccw[0] = &px11;
+            PX_ccw[1] = &px10;
+            PX_ccw[2] = &px00;
+            PX_ccw[3] = &px01;
+        }
 
-    double3 *V_max, *V_ccw[4]; // Point in which maximum is achieved and counter clock wise points
-    // from the minimum voxel
-    double *PX_max,
-        *PX_ccw[4]; // Point in which maximum is achieved and counter clock wise  points
-    // from the minimum voxel
-    if(px00 == pxx_min)
+    } else if(px01 < px11)
     {
-        V_ccw[0] = &vx00;
-        V_ccw[1] = &vx01;
-        V_ccw[2] = &vx11;
-        V_ccw[3] = &vx10;
-        PX_ccw[0] = &px00;
-        PX_ccw[1] = &px01;
-        PX_ccw[2] = &px11;
-        PX_ccw[3] = &px10;
-    } else if(px01 == pxx_min)
-    {
+        pxx_min = px01;
         V_ccw[0] = &vx01;
         V_ccw[1] = &vx11;
         V_ccw[2] = &vx10;
@@ -382,18 +417,19 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
         PX_ccw[1] = &px11;
         PX_ccw[2] = &px10;
         PX_ccw[3] = &px00;
-    } else if(px10 == pxx_min)
+        if(px00 > px10)
+        {
+            pxx_max = px00;
+        } else if(px11 > px10)
+        {
+            pxx_max = px11;
+        } else
+        {
+            pxx_max = px10;
+        }
+    } else if(px11 < px10)
     {
-        V_ccw[0] = &vx10;
-        V_ccw[1] = &vx00;
-        V_ccw[2] = &vx01;
-        V_ccw[3] = &vx11;
-        PX_ccw[0] = &px10;
-        PX_ccw[1] = &px00;
-        PX_ccw[2] = &px01;
-        PX_ccw[3] = &px11;
-    } else // its px11
-    {
+        pxx_min = px11;
         V_ccw[0] = &vx11;
         V_ccw[1] = &vx10;
         V_ccw[2] = &vx00;
@@ -402,68 +438,87 @@ void kernel FLOATcutting_voxel_backproject(global float* volume,
         PX_ccw[1] = &px10;
         PX_ccw[2] = &px00;
         PX_ccw[3] = &px01;
+        if(px00 > px10)
+        {
+            pxx_max = px00;
+        } else
+        {
+            pxx_max = px10;
+        }
+    } else
+    {
+        pxx_min = px10;
+        pxx_max = px00;
+        V_ccw[0] = &vx10;
+        V_ccw[1] = &vx00;
+        V_ccw[2] = &vx01;
+        V_ccw[3] = &vx11;
+        PX_ccw[0] = &px10;
+        PX_ccw[1] = &px00;
+        PX_ccw[2] = &px01;
+        PX_ccw[3] = &px11;
     }
-    if(px10 == pxx_max)
+
+    min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + 0.5);
+    max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
+    if(max_PX >= 0 && min_PX < pdims.x)
     {
-        V_max = &vx10;
-        PX_max = &px10;
-    } else if(px11 == pxx_max)
-    {
-        V_max = &vx11;
-        PX_max = &px11;
-    } else if(px00 == pxx_max)
-    {
-        V_max = &vx00;
-        PX_max = &px00;
-    } else // its px01
-    {
-        V_max = &vx01;
-        PX_max = &px01;
+        if(max_PX <= min_PX) // These indices are in the admissible range
+        {
+            min_PX = convert_int_rtn(0.5 * (pxx_min + pxx_max) + 0.5);
+            ADD = backprojectExactEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0,
+                                             min_PX, value, voxelSizes, pdims);
+            volume[IND] += ADD;
+        } else
+        {
+            double lastSectionSize, nextSectionSize, polygonSize;
+            double3 lastInt, nextInt, Int;
+            int I = max(-1, min_PX);
+            int I_STOP = min(max_PX, pdims.x);
+            int numberOfEdges;
+            double factor;
+            // Section of the square that corresponds to the indices < i
+            // CCW and CW coordinates of the last intersection on the lines specified by the points
+            // in V_ccw lastSectionSize
+            //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2],
+            //    V_ccw[3],
+            //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
+            lastSectionSize
+                = exactIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
+                                          PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
+            if(I >= 0)
+            {
+                factor = value * lastSectionSize;
+                ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, lastInt, I,
+                                                  factor, voxelSizes, pdims);
+            }
+            for(I = I + 1; I < I_STOP; I++)
+            {
+                // nextSectionSize
+                //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2],
+                //    V_ccw[3],
+                //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3],
+                //                             &nextInt);
+                nextSectionSize = exactIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1],
+                                                          V_ccw[2], V_ccw[3], PX_ccw[0], PX_ccw[1],
+                                                          PX_ccw[2], PX_ccw[3], CM, &nextInt);
+                polygonSize = nextSectionSize - lastSectionSize;
+                Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
+                factor = value * polygonSize;
+                ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, Int, I, factor,
+                                                  voxelSizes, pdims);
+                lastSectionSize = nextSectionSize;
+                lastInt = nextInt;
+            }
+            if(I_STOP < pdims.x)
+            {
+                polygonSize = 1 - lastSectionSize;
+                Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
+                factor = value * polygonSize;
+                ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, Int, I, factor,
+                                                  voxelSizes, pdims);
+            }
+            volume[IND] += ADD;
+        }
     }
-    double lastSectionSize, nextSectionSize, polygonSize;
-    double3 lastInt, nextInt, Int;
-    int I = max(-1, min_PX);
-    int I_STOP = min(max_PX, pdims.x);
-    int numberOfEdges;
-    double factor;
-    // Section of the square that corresponds to the indices < i
-    // CCW and CW coordinates of the last intersection on the lines specified by the points in
-    // V_ccw
-    // lastSectionSize
-    //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-    //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
-    lastSectionSize
-        = exactIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                  PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
-    if(I >= 0)
-    {
-        factor = value * lastSectionSize;
-        ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
-                                     voxelSizes, pdims);
-    }
-    for(I = I + 1; I < I_STOP; I++)
-    {
-        // nextSectionSize
-        //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-        //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &nextInt);
-        nextSectionSize
-            = exactIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                      PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
-        polygonSize = nextSectionSize - lastSectionSize;
-        Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize;
-        ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
-                                     pdims);
-        lastSectionSize = nextSectionSize;
-        lastInt = nextInt;
-    }
-    if(I_STOP < pdims.x)
-    {
-        polygonSize = 1 - lastSectionSize;
-        Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
-        factor = value * polygonSize;
-        ADD += backprojectExactEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes,
-                                     pdims);
-    }
-    volume[IND] += ADD;
 }
