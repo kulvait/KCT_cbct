@@ -90,7 +90,7 @@ public:
         {
             LOGI << "Beware buffer overflows for b buffer.";
         }
-        timepoint = std::chrono::steady_clock::now();
+        timestamp = std::chrono::steady_clock::now();
     }
 
     void initializeCVPProjector(bool useExactScaling);
@@ -116,7 +116,7 @@ public:
                          std::string xpath,
                          bool debug);
 
-    int initializeVectors(float* projection, float* volume);
+    int initializeVectors(float* projection, float* volume, bool useVolumeAsInitialX0 = false);
     int allocateXBuffers(uint32_t xBufferCount);
     int allocateBBuffers(uint32_t bBufferCount);
     int allocateTmpXBuffers(uint32_t xBufferCount);
@@ -158,12 +158,14 @@ protected:
     bool useSidonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;
+    bool useVolumeAsInitialX0 = false;
 
     uint32_t xBufferCount, bBufferCount, tmpXBufferCount, tmpBBufferCount;
 
     // Class functions
-    void setTimepoint();
-    void reportTime(std::string msg);
+    void setTimestamp(bool finishCommandQueue);
+    std::chrono::milliseconds millisecondsFromTimestamp(bool setNewTimestamp);
+    void reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp);
     void writeVolume(cl::Buffer& X, std::string path);
     void writeProjections(cl::Buffer& B, std::string path);
     std::vector<cl_double16> inverseProjectionMatrices(std::vector<matrix::ProjectionMatrix>);
@@ -328,7 +330,7 @@ protected:
                                     cl_uint2&>>
         FLOATbackprojector_sidon;
 
-    std::chrono::time_point<std::chrono::steady_clock> timepoint;
+    std::chrono::time_point<std::chrono::steady_clock> timestamp;
 };
 
 } // namespace CTL

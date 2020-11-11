@@ -89,7 +89,6 @@ protected:
     void addCenterVoxelProjectorArgs();
     void addProjectorArgs();
 
-private:
     CLI::Option_group* og_basis = nullptr;
     CLI::Option_group* og_settings = nullptr;
     CLI::Option_group* og_projectorsettings = nullptr;

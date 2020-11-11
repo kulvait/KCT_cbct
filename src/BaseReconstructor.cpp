@@ -267,15 +267,25 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
  *
  * @return
  */
-int BaseReconstructor::initializeVectors(float* projections, float* volume)
+int BaseReconstructor::initializeVectors(float* projections,
+                                         float* volume,
+                                         bool useVolumeAsInitialX0)
 {
+    this->useVolumeAsInitialX0 = useVolumeAsInitialX0;
     this->b = projections;
     this->x = volume;
     cl_int err;
 
-    // Initialize buffers x_buf, v_buf and v_buf by zeros
-    x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                         sizeof(float) * XDIM, (void*)volume, &err);
+    // Initialize buffers
+    if(useVolumeAsInitialX0)
+    {
+        x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                             sizeof(float) * XDIM, (void*)volume, &err);
+    } else
+    {
+        x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM,
+                                             nullptr, &err);
+    }
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
@@ -939,14 +949,33 @@ void BaseReconstructor::writeProjections(cl::Buffer& B, std::string path)
     io::appendBytes(path, (uint8_t*)b, BDIM * sizeof(float));
 }
 
-void BaseReconstructor::setTimepoint() { timepoint = std::chrono::steady_clock::now(); }
-
-void BaseReconstructor::reportTime(std::string msg)
+void BaseReconstructor::setTimestamp(bool finishCommandQueue)
 {
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - timepoint);
-    LOGW << io::xprintf("%s: %ds", msg.c_str(), duration.count());
-    setTimepoint();
+    if(finishCommandQueue)
+    {
+        Q[0]->finish();
+    }
+    timestamp = std::chrono::steady_clock::now();
+}
+std::chrono::milliseconds BaseReconstructor::millisecondsFromTimestamp(bool setNewTimestamp)
+{
+    std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - timestamp);
+    if(setNewTimestamp)
+    {
+        setTimestamp(false);
+    }
+    return ms;
+}
+
+void BaseReconstructor::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+{
+    if(finishCommandQueue)
+    {
+        Q[0]->finish();
+    }
+    auto duration = millisecondsFromTimestamp(setNewTimestamp);
+    LOGD << io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
 }
 
 double

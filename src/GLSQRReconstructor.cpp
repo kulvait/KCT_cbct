@@ -6,8 +6,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
                                     uint32_t maxIterations,
                                     float errCondition)
 {
-    LOGI << io::xprintf("WELCOME TO GLSQR");
-    reportTime("GLSQR INIT");
+    reportTime("WELCOME TO GLSQR, init in", false, true);
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
@@ -213,8 +212,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
                                             uint32_t maxIterations,
                                             float errCondition)
 {
-    LOGI << io::xprintf("TIKHONOV GLSQR");
-    reportTime("INIT");
+    reportTime("TIKHONOV GLSQR", false, true);
     // Ke vsem b bufferum je treba pridat jeden x buffer
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
