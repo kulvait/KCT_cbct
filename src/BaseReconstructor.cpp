@@ -291,6 +291,36 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
     return 0;
 }
 
+int BaseReconstructor::vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size)
+{
+    cl_int err = CL_SUCCESS;
+    std::string e;
+    std::size_t bufferSize;
+    X.getInfo(CL_MEM_SIZE, &bufferSize);
+    std::size_t totalSize = size * sizeof(float);
+    e = io::xprintf("The buffer is %d bytes to represent vector of size %d that is %d bytes.",
+                    bufferSize, size, totalSize);
+    LOGE << e;
+    if(bufferSize >= totalSize)
+    {
+        err = Q[0]->enqueueWriteBuffer(X, CL_TRUE, 0, totalSize, (void*)v);
+        if(err != CL_SUCCESS)
+        {
+            e = io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
+            LOGE << e;
+            throw std::runtime_error(e);
+        }
+    } else
+    {
+        e = io::xprintf(
+            "The buffer is too small %d bytes to represent vector of size %d that is %d bytes.",
+            bufferSize, size, totalSize);
+        LOGE << e;
+        throw std::runtime_error(e);
+    }
+    return 0;
+}
+
 /**
  * @brief
  *

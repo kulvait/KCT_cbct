@@ -6,7 +6,7 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
                                    uint32_t maxIterations,
                                    float errCondition)
 {
-    bool blockingReport = true;
+    bool blockingReport = false;
     reportTime("WELCOME TO CGLS, init", blockingReport, true);
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
@@ -56,7 +56,7 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
     addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
     addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
     norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
-    while(std::sqrt(AdirectionNorm2) / NB0 > errCondition && iteration < maxIterations)
+    while(norm / NB0 > errCondition && iteration < maxIterations)
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
@@ -120,6 +120,8 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
 {
     bool blockingReport = true;
     reportTime("WELCOME TO CGLS WITH PRECONDITIONING, init", blockingReport, true);
+    LOGI << io::xprintf("Maximum number of iterations is set to %d and errCondition %f",
+                        maxIterations, errCondition);
     std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
     std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
     std::vector<float> scalingFactors = computeScalingFactors(PM);
@@ -175,7 +177,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
     addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
     addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
     norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
-    while(std::sqrt(norm) / NB0 > errCondition && iteration < maxIterations)
+    while(norm / NB0 > errCondition && iteration < maxIterations)
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
@@ -204,9 +206,12 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
         backproject(*discrepancy_bbuf, *residualVector_xbuf, PM, ICM, scalingFactors);
         vectorA_multiple_B_equals_C(*residualVector_xbuf, *invertedpreconditioner_xbuf,
                                     *preconditionedResidualVector_xbuf, XDIM);
-        writeVolume(*residualVector_xbuf, io::xprintf("%sresidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
-        writeVolume(*invertedpreconditioner_xbuf, io::xprintf("%sinvertedpreconditioner_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
-        writeVolume(*preconditionedResidualVector_xbuf, io::xprintf("%spreconditionedResidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
+        writeVolume(
+            *residualVector_xbuf,
+            io::xprintf("%sresidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
+        writeVolume(*preconditionedResidualVector_xbuf,
+                    io::xprintf("%spreconditionedResidualVector_xbuf_it%02d.den",
+                                progressPrefixPath.c_str(), iteration));
         reportTime(io::xprintf("Backprojection %d", iteration), blockingReport, true);
         residualNorm2_now = scalarProductXBuffer_barier_double(*residualVector_xbuf,
                                                                *preconditionedResidualVector_xbuf);
@@ -229,22 +234,6 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
         project(*directionVector_xbuf, *AdirectionVector_bbuf, PM, ICM, scalingFactors);
         reportTime(io::xprintf("Projection %d", iteration), blockingReport, true);
         AdirectionNorm2 = normBBuffer_barier_double(*AdirectionVector_bbuf);
-        /*DEBUG*/
-
-        double AdirectionNorm3
-            = scalarProductBBuffer_barier_double(*AdirectionVector_bbuf, *AdirectionVector_bbuf);
-        double residualNorm = normXBuffer_barier_double(*residualVector_xbuf);
-        double rn = scalarProductXBuffer_barier_double(*residualVector_xbuf, *residualVector_xbuf);
-        if(std::abs((rn - residualNorm) / residualNorm) > 1e10)
-        {
-            LOGE << io::xprintf("Problem with norming.");
-        }
-        if(std::abs((AdirectionNorm2 - AdirectionNorm3) / AdirectionNorm3) > 1e10)
-        {
-            LOGE << io::xprintf("Problem with norming.");
-        }
-        /*DEBUG*/
-
         alpha = residualNorm2_old / AdirectionNorm2;
         addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
         addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha,
@@ -497,6 +486,22 @@ void CGLSReconstructor::precomputeJacobiPreconditioner(
     }
     LOGD << io::xprintf("Writing file %s_preconditioner.den", progressPrefixPath.c_str());
     writeVolume(*X, io::xprintf("%sx_preconditioner.den", progressPrefixPath.c_str()));
+}
+
+int CGLSReconstructor::reconstructDiagonalPreconditioner(
+    std::shared_ptr<io::DenProjectionMatrixReader> matrices,
+    float* invertedpreconditioner,
+    uint32_t maxIterations,
+    float errCondition)
+{
+    std::shared_ptr<cl::Buffer> preconditioner_xbuf; // X buffers
+    allocateXBuffers(4);
+    preconditioner_xbuf = getXBuffer(3);
+    vectorIntoBuffer(*preconditioner_xbuf, invertedpreconditioner, XDIM);
+    double norm = std::sqrt(normXBuffer_barier_double(*preconditioner_xbuf));
+    LOGE << "Norm " << norm;
+    reconstructDiagonalPreconditioner(matrices, preconditioner_xbuf, maxIterations, errCondition);
+    return 0;
 }
 
 } // namespace CTL

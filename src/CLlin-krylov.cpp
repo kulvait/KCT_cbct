@@ -119,6 +119,31 @@ public:
                 throw std::runtime_error(ERR);
             }
         }
+        if(diagonalPreconditioner != "")
+        {
+            io::DenFileInfo x0inf(diagonalPreconditioner);
+            if(volumeSizeX != x0inf.dimx() || volumeSizeY != x0inf.dimy()
+               || volumeSizeZ != x0inf.dimz())
+            {
+
+                std::string ERR = io::xprintf("Declared dimensions of volume (%d, %d, %d) and the "
+                                              "dimensions of x0 (%d, %d, %d) does not match!",
+                                              volumeSizeX, volumeSizeY, volumeSizeZ, x0inf.dimx(),
+                                              x0inf.dimy(), x0inf.dimz());
+                LOGE << ERR;
+                throw std::runtime_error(ERR);
+            }
+            DenSupportedType dataType = x0inf.getDataType();
+            if(dataType != DenSupportedType::float_)
+            {
+                std::string ERR = io::xprintf(
+                    "The file %s has declared data type %s but this implementation "
+                    "only supports floats!",
+                    diagonalPreconditioner.c_str(), DenSupportedTypeToString(dataType));
+                LOGE << ERR;
+                throw std::runtime_error(ERR);
+            }
+        }
         parsePlatformString();
         return 0;
     };
@@ -135,6 +160,7 @@ public:
     std::string outputVolume;
     std::string inputProjectionMatrices;
     std::string inputProjections;
+    std::string diagonalPreconditioner;
     bool glsqr = false;
 };
 
@@ -179,10 +205,14 @@ void Args::defineArguments()
     tl_cli->needs(glsqr_cli);
 
     og_settings->add_option("--x0", initialVectorX0, "Specify x0 vector, zero by default.");
+    CLI::Option* dpc = og_settings->add_option(
+        "--diagonal-preconditioner", diagonalPreconditioner,
+        "Specify diagonal preconditioner vector to be used in preconditioned CGLS.");
 
     CLI::Option* jacobi_cli = og_settings->add_flag("--jacobi", useJacobiPreconditioning,
                                                     "Use Jacobi preconditioning.");
     jacobi_cli->excludes(glsqr_cli);
+    dpc->excludes(jacobi_cli);
 }
 
 int main(int argc, char* argv[])
@@ -254,7 +284,6 @@ int main(int argc, char* argv[])
             cgls->initializeTTProjector();
         } else
         {
-            LOGI << "Calling initialization CVP";
             cgls->initializeCVPProjector(ARG.useExactScaling);
         }
         if(ARG.useJacobiPreconditioning)
@@ -288,7 +317,18 @@ int main(int argc, char* argv[])
             cgls->reconstructJacobi(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
         } else
         {
-            cgls->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+            if(ARG.diagonalPreconditioner != "")
+            {
+                float* preconditionerVolume = new float[ARG.totalVolumeSize];
+                io::readBytesFrom(ARG.diagonalPreconditioner, 6, (uint8_t*)preconditionerVolume,
+                                  ARG.totalVolumeSize * 4);
+                cgls->reconstructDiagonalPreconditioner(
+                    dr, preconditionerVolume, ARG.maxIterationCount, ARG.stoppingRelativeError);
+                delete[] preconditionerVolume;
+            } else
+            {
+                cgls->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+            }
         }
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;

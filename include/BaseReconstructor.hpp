@@ -132,6 +132,7 @@ public:
                             float minDiscrepancyError)
         = 0;
     double adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices);
+    int vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size);
 
 protected:
     const cl_float FLOATZERO = 0.0;
