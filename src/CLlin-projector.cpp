@@ -155,15 +155,10 @@ int main(int argc, char* argv[])
     std::shared_ptr<io::DenProjectionMatrixReader> dr
         = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
 
-    // Write individual submatrices
-    LOGD << io::xprintf("Number of projections to process is %d.", ARG.frames.size());
-    // End parsing arguments
-    float* volume = new float[ARG.totalVolumeSize];
-    io::readBytesFrom(ARG.inputVolume, 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
+    // Construct projector and initialize OpenCL
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        volume, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX, ARG.voxelSizeY,
-        ARG.voxelSizeZ, ARG.pixelSizeX, ARG.pixelSizeY, xpath, ARG.CLdebug, ARG.useCenterVoxelProjector,
-        ARG.useExactScaling);
+        ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.pixelSizeX, ARG.pixelSizeY, xpath,
+        ARG.CLdebug, ARG.useCenterVoxelProjector, ARG.useExactScaling);
     int res = cvp->initializeOpenCL(ARG.CLplatformID);
     if(res < 0)
     {
@@ -171,7 +166,12 @@ int main(int argc, char* argv[])
         LOGE << ERR;
         io::throwerr(ERR);
     }
-    cvp->initializeVolumeImage();
+    // Write individual submatrices
+    LOGD << io::xprintf("Number of projections to process is %d.", ARG.frames.size());
+    // End parsing arguments
+    float* volume = new float[ARG.totalVolumeSize];
+    io::readBytesFrom(ARG.inputVolume, 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
+    cvp->initializeOrUpdateVolumeBuffer(ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, volume);
     uint32_t projectionElementsCount = ARG.projectionSizeX * ARG.projectionSizeY;
     float* projection = new float[projectionElementsCount]();
     uint16_t buf[3];
@@ -185,6 +185,7 @@ int main(int argc, char* argv[])
     std::shared_ptr<io::DenFrame2DReader<float>> dpr = nullptr;
     if(!ARG.rightHandSide.empty())
     {
+        LOGD << io::xprintf("Initialize RHS");
         dpr = std::make_shared<io::DenFrame2DReader<float>>(ARG.rightHandSide);
     }
     double xoveryspacing = ARG.pixelSizeX / ARG.pixelSizeY;
@@ -229,7 +230,7 @@ int main(int argc, char* argv[])
                                 + (y1 - y2) * (y1 - y2) * ARG.pixelSizeY * ARG.pixelSizeY);
                 cvp->projectorWithoutScaling(projection, ARG.projectionSizeX, ARG.projectionSizeY,
                                              x1, y1, sourceToDetector, pm);
-            }else
+            } else
             {
                 double sourceToDetector
                     = std::sqrt((x1 - x2) * (x1 - x2) * ARG.pixelSizeX * ARG.pixelSizeX

@@ -78,7 +78,7 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
             LOGE << io::xprintf(
                 "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
                 "loss of orthogonality %f%%.",
-                iteration, norm2, 100.0 * norm2 / NB0, 100*(norm2-norm)/norm);
+                iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
         }
         // DEBUG
         setTimestamp(blockingReport);
@@ -88,7 +88,8 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
-        LOGE << io::xprintf("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f that is %0.3f%% of |AT(Ax0-b)|.",
+        LOGE << io::xprintf("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
+                            "that is %0.3f%% of |AT(Ax0-b)|.",
                             iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
         addIntoFirstVectorScaledSecondVector(*directionVector_xbuf, *residualVector_xbuf, beta,
                                              XDIM);
@@ -99,6 +100,151 @@ int CGLSReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader
         project(*directionVector_xbuf, *AdirectionVector_bbuf, PM, ICM, scalingFactors);
         reportTime(io::xprintf("Projection %d", iteration), blockingReport, true);
         AdirectionNorm2 = normBBuffer_barier_double(*AdirectionVector_bbuf);
+        alpha = residualNorm2_old / AdirectionNorm2;
+        addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
+        addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha,
+                                             BDIM);
+        norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
+    }
+    LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
+                        norm, 100.0 * norm / NB0);
+    Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    return 0;
+}
+
+int CGLSReconstructor::reconstructDiagonalPreconditioner(
+    std::shared_ptr<io::DenProjectionMatrixReader> matrices,
+    std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
+    uint32_t maxIterations,
+    float errCondition)
+{
+    bool blockingReport = true;
+    reportTime("WELCOME TO CGLS WITH PRECONDITIONING, init", blockingReport, true);
+    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
+    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
+    std::vector<float> scalingFactors = computeScalingFactors(PM);
+    uint32_t iteration = 1;
+
+    // Initialization
+    double norm, residualNorm2_old, residualNorm2_now, AdirectionNorm2, alpha, beta;
+    double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
+    double NR0, NX;
+    LOGI << io::xprintf("||b||=%f", NB0);
+    std::shared_ptr<cl::Buffer> directionVector_xbuf, residualVector_xbuf,
+        preconditionedResidualVector_xbuf; // X buffers
+    allocateXBuffers(3);
+    directionVector_xbuf = getXBuffer(0);
+    residualVector_xbuf = getXBuffer(1);
+    preconditionedResidualVector_xbuf = getXBuffer(2);
+    allocateBBuffers(2);
+    std::shared_ptr<cl::Buffer> discrepancy_bbuf, AdirectionVector_bbuf; // B buffers
+    discrepancy_bbuf = getBBuffer(0);
+    AdirectionVector_bbuf = getBBuffer(1);
+
+    // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
+    // c_0 is filled by b
+    // v_0=w_0=BACKPROJECT(c_0)
+    // writeProjections(*discrepancy_bbuf, io::xprintf("/tmp/cgls/c_0.den"));
+    copyFloatVector(*b_buf, *discrepancy_bbuf, BDIM); // discrepancy_bbuf stores initial discrepancy
+    if(useVolumeAsInitialX0)
+    {
+        setTimestamp(blockingReport);
+        project(*x_buf, *AdirectionVector_bbuf, PM, ICM, scalingFactors);
+        reportTime("Projection x0", blockingReport, true);
+        addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -1.0, BDIM);
+    } else
+    {
+        Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
+    }
+    setTimestamp(blockingReport);
+    backproject(*discrepancy_bbuf, *residualVector_xbuf, PM, ICM, scalingFactors);
+    reportTime("Backprojection 0", blockingReport, true);
+    copyFloatVector(*residualVector_xbuf, *directionVector_xbuf, XDIM);
+    multiplyVectorsIntoFirstVector(*directionVector_xbuf, *invertedpreconditioner_xbuf, XDIM);
+    copyFloatVector(*directionVector_xbuf, *preconditionedResidualVector_xbuf, XDIM);
+    residualNorm2_old = scalarProductXBuffer_barier_double(*residualVector_xbuf,
+                                                           *preconditionedResidualVector_xbuf);
+    NR0 = std::sqrt(residualNorm2_old);
+    // DEBUG
+    NR0 = std::sqrt(normXBuffer_barier_double(*residualVector_xbuf));
+    setTimestamp(blockingReport);
+    project(*directionVector_xbuf, *AdirectionVector_bbuf, PM, ICM, scalingFactors);
+    reportTime("Projection 1", blockingReport, true);
+    AdirectionNorm2 = normBBuffer_barier_double(*AdirectionVector_bbuf);
+    alpha = residualNorm2_old / AdirectionNorm2;
+    addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
+    addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
+    norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
+    while(std::sqrt(norm) / NB0 > errCondition && iteration < maxIterations)
+    {
+        if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
+        {
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+                                iteration);
+            writeVolume(*x_buf,
+                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+        }
+        // DEBUG
+        if(iteration % 10 == 0)
+        {
+            setTimestamp(blockingReport);
+            project(*x_buf, *discrepancy_bbuf, PM, ICM, scalingFactors);
+            reportTime(io::xprintf("Reothrogonalization projection %d", iteration), blockingReport,
+                       true);
+            addIntoFirstVectorScaledSecondVector(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
+            double norm2 = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
+
+            LOGE << io::xprintf(
+                "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
+                "loss of orthogonality %f%%.",
+                iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
+        }
+        // DEBUG
+        setTimestamp(blockingReport);
+        backproject(*discrepancy_bbuf, *residualVector_xbuf, PM, ICM, scalingFactors);
+        vectorA_multiple_B_equals_C(*residualVector_xbuf, *invertedpreconditioner_xbuf,
+                                    *preconditionedResidualVector_xbuf, XDIM);
+        writeVolume(*residualVector_xbuf, io::xprintf("%sresidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
+        writeVolume(*invertedpreconditioner_xbuf, io::xprintf("%sinvertedpreconditioner_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
+        writeVolume(*preconditionedResidualVector_xbuf, io::xprintf("%spreconditionedResidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
+        reportTime(io::xprintf("Backprojection %d", iteration), blockingReport, true);
+        residualNorm2_now = scalarProductXBuffer_barier_double(*residualVector_xbuf,
+                                                               *preconditionedResidualVector_xbuf);
+        // Delayed update of residual vector
+        beta = residualNorm2_now / residualNorm2_old;
+        LOGI << io::xprintf("Beta=%f/%f is %f", residualNorm2_now, residualNorm2_old, beta);
+        NX = std::sqrt(residualNorm2_now);
+        // DEBUG
+        NX = std::sqrt(normXBuffer_barier_double(*residualVector_xbuf));
+        // DEBUG
+        LOGE << io::xprintf("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
+                            "that is %0.3f%% of |AT(Ax0-b)|.",
+                            iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
+        addIntoFirstVectorScaledSecondVector(*directionVector_xbuf,
+                                             *preconditionedResidualVector_xbuf, beta, XDIM);
+        // Delayed update of direction vector
+        iteration = iteration + 1;
+        residualNorm2_old = residualNorm2_now;
+        setTimestamp(blockingReport);
+        project(*directionVector_xbuf, *AdirectionVector_bbuf, PM, ICM, scalingFactors);
+        reportTime(io::xprintf("Projection %d", iteration), blockingReport, true);
+        AdirectionNorm2 = normBBuffer_barier_double(*AdirectionVector_bbuf);
+        /*DEBUG*/
+
+        double AdirectionNorm3
+            = scalarProductBBuffer_barier_double(*AdirectionVector_bbuf, *AdirectionVector_bbuf);
+        double residualNorm = normXBuffer_barier_double(*residualVector_xbuf);
+        double rn = scalarProductXBuffer_barier_double(*residualVector_xbuf, *residualVector_xbuf);
+        if(std::abs((rn - residualNorm) / residualNorm) > 1e10)
+        {
+            LOGE << io::xprintf("Problem with norming.");
+        }
+        if(std::abs((AdirectionNorm2 - AdirectionNorm3) / AdirectionNorm3) > 1e10)
+        {
+            LOGE << io::xprintf("Problem with norming.");
+        }
+        /*DEBUG*/
+
         alpha = residualNorm2_old / AdirectionNorm2;
         addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
         addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha,
@@ -310,6 +456,47 @@ int CGLSReconstructor::reconstruct_experimental(
     // EXPERIMENTAL
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
+}
+
+int CGLSReconstructor::reconstructJacobi(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
+                                         uint32_t maxIterations,
+                                         float errCondition)
+{
+    std::shared_ptr<cl::Buffer> preconditioner_xbuf; // X buffers
+    allocateXBuffers(4);
+    preconditioner_xbuf = getXBuffer(3);
+    precomputeJacobiPreconditioner(preconditioner_xbuf, matrices);
+    invertFloatVector(*preconditioner_xbuf, XDIM);
+    LOGD << io::xprintf("Writing file %s_preconditioner.inv", progressPrefixPath.c_str());
+    writeVolume(*preconditioner_xbuf,
+                io::xprintf("%sx_preconditioner.inv", progressPrefixPath.c_str()));
+    reconstructDiagonalPreconditioner(matrices, preconditioner_xbuf, maxIterations, errCondition);
+    return 0;
+}
+
+void CGLSReconstructor::precomputeJacobiPreconditioner(
+    std::shared_ptr<cl::Buffer> X, std::shared_ptr<io::DenProjectionMatrixReader> matrices)
+{
+    Q[0]->enqueueFillBuffer<cl_float>(*X, FLOATZERO, 0, XDIM * sizeof(float));
+    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    for(uint32_t k = 0; k != PM.size(); k++)
+    {
+        matrix::LightProjectionMatrix lpm(PM[k]);
+        std::array<double, 2> focalLength = lpm.focalLength();
+        // Kernel parameters
+        cl_double16 CM;
+        cl_double3 sourcePosition, normalToDetector;
+        float scalingFactor = focalLength[0] * focalLength[1];
+        lpm.projectionMatrixAsVector12((double*)&CM);
+        lpm.normalToDetector((double*)&normalToDetector);
+        lpm.sourcePosition((double*)&sourcePosition);
+        (*FLOATcutting_voxel_jacobiPreconditionerVector)(eargs, *X, CM, sourcePosition,
+                                                         normalToDetector, vdims, voxelSizes, pdims,
+                                                         scalingFactor);
+    }
+    LOGD << io::xprintf("Writing file %s_preconditioner.den", progressPrefixPath.c_str());
+    writeVolume(*X, io::xprintf("%sx_preconditioner.den", progressPrefixPath.c_str()));
 }
 
 } // namespace CTL

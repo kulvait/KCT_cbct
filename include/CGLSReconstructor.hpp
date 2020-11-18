@@ -13,6 +13,7 @@
 #include "BaseReconstructor.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
+#include "MATRIX/LightProjectionMatrix.hpp"
 #include "OPENCL/OpenCLManager.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
@@ -78,6 +79,17 @@ public:
     int reconstruct_experimental(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
                                  uint32_t maxIterations = 100,
                                  float errCondition = 0.01);
+
+    int reconstructDiagonalPreconditioner(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
+                                          std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
+                                          uint32_t maxIterations = 100,
+                                          float errCondition = 0.01);
+
+    int reconstructJacobi(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
+                          uint32_t maxIterations = 100,
+                          float errCondition = 0.01);
+
+    void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X, std::shared_ptr<io::DenProjectionMatrixReader> matrices);
 
 private:
     bool reportProgress = false;

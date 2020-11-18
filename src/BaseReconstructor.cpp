@@ -11,6 +11,10 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling)
         useSidonProjector = false;
         pixelGranularity = { 1, 1 };
         useTTProjector = false;
+        CLFiles.push_back("opencl/utils.cl");
+        CLFiles.push_back("opencl/projector.cl");
+        CLFiles.push_back("opencl/backprojector.cl");
+        LOGI << io::xprintf("Initializing CVP %d.", CLFiles.size());
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
@@ -28,6 +32,9 @@ void BaseReconstructor::initializeSidonProjector(uint32_t probesPerEdgeX, uint32
         useCVPProjector = false;
         exactProjectionScaling = false;
         useTTProjector = false;
+        CLFiles.push_back("opencl/utils.cl");
+        CLFiles.push_back("opencl/projector_sidon.cl");
+        CLFiles.push_back("opencl/backprojector_sidon.cl");
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
@@ -45,6 +52,29 @@ void BaseReconstructor::initializeTTProjector()
         exactProjectionScaling = false;
         useSidonProjector = false;
         pixelGranularity = { 1, 1 };
+        CLFiles.push_back("opencl/utils.cl");
+        CLFiles.push_back("opencl/projector_tt.cl");
+        CLFiles.push_back("opencl/backprojector_tt.cl");
+    } else
+    {
+        std::string err = "Could not initialize projector when OpenCL was already initialized.";
+        LOGE << err;
+        throw std::runtime_error(err.c_str());
+    }
+}
+
+void BaseReconstructor::useJacobiVectorCLCode()
+{
+    if(!openCLinitialized)
+    {
+        CLFiles.push_back("opencl/precomputeJacobiPreconditioner.cl");
+        std::function<void(cl::Program)> f = [this](cl::Program program) {
+            FLOATcutting_voxel_jacobiPreconditionerVector = std::make_shared<
+                cl::make_kernel<cl::Buffer&, cl_double16&, cl_double3&, cl_double3&, cl_int3&,
+                                cl_double3&, cl_int2&, float&>>(
+                cl::Kernel(program, "FLOATcutting_voxel_jacobiPreconditionerVector"));
+        };
+        callbacks.push_back(f);
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
@@ -59,6 +89,12 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
                                         std::string xpath,
                                         bool debug)
 {
+    if(openCLinitialized)
+    {
+        std::string err = "Could not initialize OpenCL platform twice.";
+        LOGE << err;
+        throw std::runtime_error(err.c_str());
+    }
     // Select the first available platform.
     platform = util::OpenCLManager::getPlatform(platformId, true);
     if(platform == nullptr)
@@ -96,33 +132,15 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
     // https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
     std::string clFile;
     std::string sourceText;
-    // clFile = io::xprintf("%s/opencl/centerVoxelProjector.cl", xpath.c_str());
     clFile = io::xprintf("%s/opencl/allsources.cl", xpath.c_str());
-    if(useSidonProjector)
+    std::vector<std::string> clFilesXpath;
+    for(std::string f : CLFiles)
     {
-        io::concatenateTextFiles(
-            clFile, true,
-            { io::xprintf("%s/opencl/utils.cl", xpath.c_str()),
-              io::xprintf("%s/opencl/projector_sidon.cl", xpath.c_str()),
-              io::xprintf("%s/opencl/backprojector_sidon.cl", xpath.c_str()) });
-    } else if(useTTProjector)
-    {
-        io::concatenateTextFiles(clFile, true,
-                                 { io::xprintf("%s/opencl/utils.cl", xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector.cl", xpath.c_str()),
-                                   io::xprintf("%s/opencl/backprojector.cl", xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector_tt.cl", xpath.c_str()),
-                                   io::xprintf("%s/opencl/backprojector_tt.cl", xpath.c_str()) });
-    } else
-    {
-        io::concatenateTextFiles(clFile, true,
-                                 { io::xprintf("%s/opencl/utils.cl", xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector.cl", xpath.c_str()),
-                                   io::xprintf("%s/opencl/backprojector.cl", xpath.c_str()) });
+        clFilesXpath.push_back(io::xprintf("%s/%s", xpath.c_str(), f.c_str()));
     }
+    io::concatenateTextFiles(clFile, true, clFilesXpath);
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
-    LOGI << io::xprintf("Building file %s.", clFile.c_str());
     std::string options = "";
     if(debug)
     {
@@ -131,7 +149,7 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
     {
         options = "-Werror";
     }
-    LOGI << io::xprintf("Build options : %s", options.c_str());
+    LOGI << io::xprintf("Building file %s with options : %s", clFile.c_str(), options.c_str());
     if(program.build(devices, options.c_str()) != CL_SUCCESS)
     {
         LOGE << " Error building: ";
@@ -157,6 +175,7 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
         }
         return -3;
     }
+    LOGI << io::xprintf("Build succesfull", options.c_str());
     // Unloading compiler to free resources is causing Segmentation fault on Intel platform
     // Was reported on
     // https://github.com/beagle-dev/beagle-lib/blob/master/libhmsbeagle/GPU/GPUInterfaceOpenCL.cpp
@@ -213,6 +232,14 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
     ScalarProductPartial_barier = std::make_shared<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
         cl::Kernel(program, "vector_ScalarProductPartial_barier"));
+    FLOAT_multiplyVectorsIntoFirstVector
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
+            cl::Kernel(program, "FLOAT_multiply_vectors_into_first_vector"));
+    FLOAT_A_multiple_B_equals_C
+        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&>>(
+            cl::Kernel(program, "FLOAT_A_multiple_B_equals_C"));
+    FLOAT_invert
+        = std::make_shared<cl::make_kernel<cl::Buffer&>>(cl::Kernel(program, "FLOAT_invert"));
     if(useSidonProjector)
     {
         FLOATprojector_sidon = std::make_shared<
@@ -252,10 +279,15 @@ int BaseReconstructor::initializeOpenCL(uint32_t platformId,
                                                cl_double2&, double&>>(
                 cl::Kernel(program, "FLOATrescale_projections_exact"));
     }
+    for(std::function<void(cl::Program)> f : callbacks)
+    {
+        f(program);
+    }
     for(uint32_t i = 0; i != devices.size(); i++)
     {
         Q.push_back(std::make_shared<cl::CommandQueue>(*context, devices[i]));
     }
+    openCLinitialized = true;
     return 0;
 }
 
@@ -478,6 +510,30 @@ int BaseReconstructor::copyFloatVectorOffset(cl::Buffer& from,
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     (*FLOAT_CopyVector_offset)(eargs, from, from_offset, to, to_offset).wait();
+    return 0;
+}
+
+int BaseReconstructor::invertFloatVector(cl::Buffer& X, unsigned int size)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
+    (*FLOAT_invert)(eargs, X).wait();
+    return 0;
+}
+
+int BaseReconstructor::vectorA_multiple_B_equals_C(cl::Buffer& A,
+                                                   cl::Buffer& B,
+                                                   cl::Buffer& C,
+                                                   uint64_t size)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
+    (*FLOAT_A_multiple_B_equals_C)(eargs, A, B, C).wait();
+    return 0;
+}
+
+int BaseReconstructor::multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
+    (*FLOAT_multiplyVectorsIntoFirstVector)(eargs, A, B).wait();
     return 0;
 }
 
@@ -867,7 +923,7 @@ std::vector<matrix::ProjectionMatrix>
 BaseReconstructor::encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm)
 {
     std::vector<matrix::ProjectionMatrix> v;
-    for(std::size_t i = 0; i != pdimz; i++)
+    for(std::size_t i = 0; i != pm->count(); i++)
     {
         matrix::ProjectionMatrix p = pm->readMatrix(i);
         v.push_back(p);
@@ -879,7 +935,7 @@ std::vector<cl_double16>
 BaseReconstructor::inverseProjectionMatrices(std::vector<matrix::ProjectionMatrix> CM)
 {
     std::vector<cl_double16> inverseProjectionMatrices;
-    for(std::size_t i = 0; i != pdimz; i++)
+    for(std::size_t i = 0; i != CM.size(); i++)
     {
         matrix::ProjectionMatrix matrix = CM[i];
 
@@ -900,13 +956,15 @@ BaseReconstructor::inverseProjectionMatrices(std::vector<matrix::ProjectionMatri
     return inverseProjectionMatrices;
 }
 
+// Scaling factor is a expression f*f/(px*py), where f is source to detector distance and pixel
+// sizes are (px and py)  Focal length http://ksimek.github.io/2013/08/13/intrinsic/
 std::vector<float>
 BaseReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM)
 {
     std::vector<float> scalingFactors;
     double xoveryspacing = pixelSpacingX / pixelSpacingY;
     double yoverxspacing = pixelSpacingY / pixelSpacingX;
-    for(std::size_t i = 0; i != pdimz; i++)
+    for(std::size_t i = 0; i != PM.size(); i++)
     {
         double x1, x2, y1, y2;
         matrix::ProjectionMatrix pm = PM[i];

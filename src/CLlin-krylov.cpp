@@ -14,6 +14,7 @@
 // External libraries
 #include "CLI/CLI.hpp" //Command line parser
 #include "ctpl_stl.h" //Threadpool
+#include "gitversion/version.h"
 
 // Internal libraries
 #include "CArmArguments.hpp"
@@ -122,6 +123,7 @@ public:
         return 0;
     };
     void defineArguments();
+    bool useJacobiPreconditioning = false;
     int threads = 1;
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint64_t totalProjectionsSize;
@@ -177,13 +179,28 @@ void Args::defineArguments()
     tl_cli->needs(glsqr_cli);
 
     og_settings->add_option("--x0", initialVectorX0, "Specify x0 vector, zero by default.");
+
+    CLI::Option* jacobi_cli = og_settings->add_flag("--jacobi", useJacobiPreconditioning,
+                                                    "Use Jacobi preconditioning.");
+    jacobi_cli->excludes(glsqr_cli);
 }
 
 int main(int argc, char* argv[])
 {
     Program PRG(argc, argv);
-    Args ARG(argc, argv,
-             "OpenCL implementation of CGLS and GLSQR applied on the cone beam CT operator.");
+    std::string prgInfo;
+    if(version::MODIFIED_SINCE_COMMIT == true)
+    {
+        prgInfo = io::xprintf("OpenCL implementation of CGLS and GLSQR applied on the cone beam CT "
+                              "operator. Dirty commit %s",
+                              version::GIT_COMMIT_ID);
+    } else
+    {
+        prgInfo = io::xprintf("OpenCL implementation of CGLS and GLSQR applied on the cone beam CT "
+                              "operator. Git commit %s",
+                              version::GIT_COMMIT_ID);
+    }
+    Args ARG(argc, argv, prgInfo);
     // Argument parsing
     int parseResult = ARG.parse();
     if(parseResult > 0)
@@ -226,15 +243,6 @@ int main(int argc, char* argv[])
             ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
             ARG.voxelSizeY, ARG.voxelSizeZ, ARG.CLitemsPerWorkgroup);
         cgls->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
-        int ecd = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
-        if(ecd < 0)
-        {
-            std::string ERR
-                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-            LOGE << ERR;
-            throw std::runtime_error(ERR);
-        }
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
         if(ARG.useSidonProjector)
@@ -246,7 +254,21 @@ int main(int argc, char* argv[])
             cgls->initializeTTProjector();
         } else
         {
+            LOGI << "Calling initialization CVP";
             cgls->initializeCVPProjector(ARG.useExactScaling);
+        }
+        if(ARG.useJacobiPreconditioning)
+        {
+            cgls->useJacobiVectorCLCode();
+        }
+        int ecd = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+        if(ecd < 0)
+        {
+            std::string ERR
+                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
         }
         ecd = cgls->initializeVectors(projection, volume, ARG.initialVectorX0 != "");
         if(ecd != 0)
@@ -261,7 +283,13 @@ int main(int argc, char* argv[])
         buf[2] = ARG.volumeSizeZ;
         io::createEmptyFile(ARG.outputVolume, 0, true);
         io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
-        cgls->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+        if(ARG.useJacobiPreconditioning)
+        {
+            cgls->reconstructJacobi(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+        } else
+        {
+            cgls->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+        }
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;

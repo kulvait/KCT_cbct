@@ -259,9 +259,8 @@ int main(int argc, char* argv[])
     // End parsing arguments
     float* volume = new float[a.totalVolumeSize];
     std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        volume, a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, a.voxelSizeX, a.voxelSizeY,
-        a.voxelSizeZ, a.pixelSizeX, a.pixelSizeY, xpath, a.debug, a.centerVoxelProjector,
-        !a.useCosScaling);
+        a.voxelSizeX, a.voxelSizeY, a.voxelSizeZ, a.pixelSizeX, a.pixelSizeY, xpath, a.debug,
+        a.centerVoxelProjector, !a.useCosScaling);
     int res = cvp->initializeOpenCL(a.platformId);
     if(res < 0)
     {
@@ -269,7 +268,7 @@ int main(int argc, char* argv[])
         LOGE << ERR;
         io::throwerr(ERR);
     }
-    cvp->initializeVolumeImage();
+    cvp->initializeOrUpdateVolumeBuffer(a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, volume);
     uint32_t projectionElementsCount = a.projectionSizeX * a.projectionSizeY;
     float* projection = new float[projectionElementsCount]; //();
     uint16_t buf[3];
@@ -288,7 +287,7 @@ int main(int argc, char* argv[])
     for(uint32_t i = 0; i != a.frames.size(); i++)
     {
         io::readBytesFrom(a.inputVolumes[i], 6, (uint8_t*)volume, a.totalVolumeSize * 4);
-        cvp->updateVolumeImage();
+        cvp->initializeOrUpdateVolumeBuffer(a.volumeSizeX, a.volumeSizeY, a.volumeSizeZ, volume);
         matrix::ProjectionMatrix pm = dr->readMatrix(a.frames[i]);
         assert((i == (uint32_t)a.frames[i]));
         double x1, x2, y1, y2;

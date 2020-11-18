@@ -32,11 +32,19 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
 
     } else
     {
-        io::concatenateTextFiles(clFile, true,
-                                 { io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector_sidon.cl", this->xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
-                                   io::xprintf("%s/opencl/projector_tt.cl", this->xpath.c_str()) });
+        io::concatenateTextFiles(
+            clFile, true,
+            {
+                io::xprintf("%s/opencl/utils.cl", this->xpath.c_str()),
+                io::xprintf("%s/opencl/projector_sidon.cl", this->xpath.c_str()),
+                io::xprintf("%s/opencl/projector.cl", this->xpath.c_str()),
+                io::xprintf("%s/opencl/projector_tt.cl", this->xpath.c_str()),
+                io::xprintf("%s/opencl/backprojector.cl", this->xpath.c_str()),
+                io::xprintf("%s/opencl/backprojector_tt.cl", this->xpath.c_str()),
+                io::xprintf("%s/opencl/backprojector_sidon.cl", this->xpath.c_str()),
+                io::xprintf("%s/opencl/backprojector_minmax.cl", this->xpath.c_str()),
+
+            });
     }
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
@@ -71,6 +79,7 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
 
     } else
     {
+        // Projectors
         projector = std::make_shared<
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                             cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
@@ -83,11 +92,24 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
             cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
                             cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
             cl::Kernel(program, "FLOATsidon_project"));
-        FLOAT_addIntoFirstVectorSecondVectorScaled
-            = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
-                cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled"));
-        NormSquare = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
-            cl::Kernel(program, "vector_NormSquarePartial"));
+        // Backprojectors
+        FLOATbackprojector_sidon = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
+            cl::Kernel(program, "FLOATsidon_backproject"));
+        FLOATta3_backproject = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATtta3_backproject"));
+        FLOATcutting_voxel_backproject = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATcutting_voxel_backproject"));
+        FLOATcutting_voxel_minmaxbackproject = std::make_shared<
+            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
+                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
+            cl::Kernel(program, "FLOATcutting_voxel_minmaxbackproject"));
+        // Utils
         scalingProjectionsCos
             = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&,
                                                cl_double3&, cl_double3&, cl_uint2&, float&>>(
@@ -96,37 +118,169 @@ int CuttingVoxelProjector::initializeOpenCL(uint32_t platformId)
             = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&,
                                                cl_double2&, double&>>(
                 cl::Kernel(program, "FLOATrescale_projections_exact"));
+        scalingBackprojectionsExact
+            = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&,
+                                               cl_double2&, double&>>(
+                cl::Kernel(program, "FLOATrescale_backprojections_exact"));
+        FLOAT_CopyVector = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
+            cl::Kernel(program, "FLOAT_copy_vector"));
+        FLOAT_addIntoFirstVectorSecondVectorScaled
+            = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
+                cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled"));
+        NormSquare = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
+            cl::Kernel(program, "vector_NormSquarePartial"));
+        SubstituteLowerThan = std::make_shared<cl::make_kernel<cl::Buffer&, float&, float&>>(
+            cl::Kernel(program, "FLOAT_substitute_lower_than"));
+        SubstituteGreaterThan = std::make_shared<cl::make_kernel<cl::Buffer&, float&, float&>>(
+            cl::Kernel(program, "FLOAT_substitute_greater_than"));
+        ZeroInfinity = std::make_shared<cl::make_kernel<cl::Buffer&>>(
+            cl::Kernel(program, "FLOAT_zero_infinity"));
     }
     Q = std::make_shared<cl::CommandQueue>(*context, *device);
     return 0;
 }
 
-int CuttingVoxelProjector::initializeVolumeImage()
+int CuttingVoxelProjector::initializeOrUpdateVolumeBuffer(uint32_t volumeSizeX,
+                                                          uint32_t volumeSizeY,
+                                                          uint32_t volumeSizeZ,
+                                                          float* volumeArray)
 {
-    //    cl::ImageFormat f(CL_INTENSITY, CL_FLOAT);
-    cl_int err;
-    volumeBuffer
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE,
-                                       sizeof(float) * vdimx * vdimy * vdimz, (void*)volume, &err);
+    cl_int err = CL_SUCCESS;
+    std::string msg;
+    this->volumeSizeX = volumeSizeX;
+    this->volumeSizeY = volumeSizeY;
+    this->volumeSizeZ = volumeSizeZ;
+    this->totalVolumeSize = volumeSizeX * volumeSizeY * volumeSizeZ;
+    vdims = cl_int3({ int(volumeSizeX), int(volumeSizeY), int(volumeSizeZ) });
+    if(volumeBuffer != nullptr)
+    {
+        if(this->totalVolumeBufferSize == sizeof(float) * this->totalVolumeSize)
+        {
+            if(volumeArray != nullptr)
+            {
+                err = Q->enqueueWriteBuffer(*volumeBuffer, CL_TRUE, 0, totalVolumeBufferSize,
+                                            (void*)volumeArray);
+            }
+        } else
+        {
+            this->totalVolumeBufferSize = sizeof(float) * this->totalVolumeSize;
+            if(volumeArray != nullptr)
+            {
+                volumeBuffer = std::make_shared<cl::Buffer>(
+                    *context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE, totalVolumeBufferSize,
+                    (void*)volumeArray, &err);
+            } else
+            {
+                volumeBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                            totalVolumeBufferSize, nullptr, &err);
+            }
+        }
+    } else
+    {
+        this->totalVolumeBufferSize = sizeof(float) * this->totalVolumeSize;
+        if(volumeArray != nullptr)
+        {
+            volumeBuffer
+                = std::make_shared<cl::Buffer>(*context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE,
+                                               totalVolumeBufferSize, (void*)volumeArray, &err);
+        } else
+        {
+            volumeBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                        totalVolumeBufferSize, nullptr, &err);
+        }
+    }
     if(err != CL_SUCCESS)
     {
-        LOGE << io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
-        return -1;
+        msg = io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
+        LOGE << msg;
+        throw std::runtime_error(msg);
     }
     return 0;
 }
 
-int CuttingVoxelProjector::updateVolumeImage()
+int CuttingVoxelProjector::initializeOrUpdateProjectionBuffer(uint32_t projectionSizeX,
+                                                              uint32_t projectionSizeY,
+                                                              uint32_t projectionSizeZ,
+                                                              float* projectionArray)
 {
-    cl_int err;
-    err = Q->enqueueWriteBuffer(*volumeBuffer, CL_TRUE, 0, sizeof(float) * vdimx * vdimy * vdimz,
-                                (void*)volume);
+    cl_int err = CL_SUCCESS;
+    std::string msg;
+    this->projectionSizeX = projectionSizeX;
+    this->projectionSizeY = projectionSizeY;
+    this->projectionSizeZ = projectionSizeZ;
+    this->totalProjectionSize = projectionSizeX * projectionSizeY * projectionSizeZ;
+    pdims = cl_int2({ int(projectionSizeX), int(projectionSizeY) });
+    if(projectionBuffer != nullptr)
+    {
+        if(this->totalProjectionBufferSize == sizeof(float) * this->totalProjectionSize)
+        {
+            if(projectionArray != nullptr)
+            {
+                err = Q->enqueueWriteBuffer(*projectionBuffer, CL_TRUE, 0,
+                                            totalProjectionBufferSize, (void*)projectionArray);
+            }
+        } else
+        {
+            this->totalProjectionBufferSize = sizeof(float) * this->totalProjectionSize;
+            if(projectionArray != nullptr)
+            {
+                projectionBuffer = std::make_shared<cl::Buffer>(
+                    *context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE, totalProjectionBufferSize,
+                    (void*)projectionArray, &err);
+            } else
+            {
+                projectionBuffer = std::make_shared<cl::Buffer>(
+                    *context, CL_MEM_READ_WRITE, totalProjectionBufferSize, nullptr, &err);
+            }
+        }
+    } else
+    {
+        this->totalProjectionBufferSize = sizeof(float) * this->totalProjectionSize;
+        if(projectionArray != nullptr)
+        {
+            projectionBuffer = std::make_shared<cl::Buffer>(
+                *context, CL_MEM_COPY_HOST_PTR | CL_MEM_READ_WRITE, totalProjectionBufferSize,
+                (void*)projectionArray, &err);
+        } else
+        {
+            projectionBuffer = std::make_shared<cl::Buffer>(
+                *context, CL_MEM_READ_WRITE, totalProjectionBufferSize, nullptr, &err);
+        }
+    }
     if(err != CL_SUCCESS)
     {
-        LOGE << io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
-        return -1;
+        msg = io::xprintf("Unsucessful initialization of Projection with error code %d!", err);
+        LOGE << msg;
+        throw std::runtime_error(msg);
     }
     return 0;
+}
+
+int CuttingVoxelProjector::fillVolumeBufferByConstant(float constant)
+{
+    std::string msg;
+    if(volumeBuffer == nullptr)
+    {
+        msg = io::xprintf(
+            "Volume buffer is not yet initialized, call initializeVolumeBuffer first!");
+        LOGE << msg;
+        throw std::runtime_error(msg);
+    }
+    return Q->enqueueFillBuffer<cl_float>(*volumeBuffer, constant, 0, totalVolumeBufferSize);
+}
+
+int CuttingVoxelProjector::fillProjectionBufferByConstant(float constant)
+{
+    std::string msg;
+    if(projectionBuffer == nullptr)
+    {
+        msg = io::xprintf(
+            "Projection buffer is not yet initialized, call initializeProjectionBuffer first!");
+        LOGE << msg;
+        throw std::runtime_error(msg);
+    }
+    return Q->enqueueFillBuffer<cl_float>(*projectionBuffer, constant, 0,
+                                          totalProjectionBufferSize);
 }
 
 double CuttingVoxelProjector::normSquare(float* v, uint32_t pdimx, uint32_t pdimy)
@@ -136,7 +290,7 @@ double CuttingVoxelProjector::normSquare(float* v, uint32_t pdimx, uint32_t pdim
     {
         tmpBuffer_size = vecsize;
         tmpBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                                 projectionBuffer_size, (void*)v);
+                                                 tmpBuffer_size, (void*)v);
     } else
     {
         Q->enqueueWriteBuffer(*tmpBuffer, CL_TRUE, 0, tmpBuffer_size, (void*)v);
@@ -159,7 +313,7 @@ double CuttingVoxelProjector::normSquareDifference(float* v, uint32_t pdimx, uin
         LOGE << msg;
         throw new std::runtime_error(msg);
     }
-    if(vecsize != projectionBuffer_size)
+    if(vecsize != totalProjectionBufferSize)
     {
         std::string msg = "Ca not compare buffers of incompatible dimensions.";
         throw new std::runtime_error(msg);
@@ -169,7 +323,7 @@ double CuttingVoxelProjector::normSquareDifference(float* v, uint32_t pdimx, uin
     {
         tmpBuffer_size = vecsize;
         tmpBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                                 projectionBuffer_size, (void*)v);
+                                                 tmpBuffer_size, (void*)v);
     } else
     {
         Q->enqueueWriteBuffer(*tmpBuffer, CL_TRUE, 0, tmpBuffer_size, (void*)v);
@@ -207,8 +361,8 @@ int CuttingVoxelProjector::project(float* projection,
         matrix.project(
             sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
             sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
-        fX = (projection45X - normalProjectionX) * pixelSpacingX;
-        fY = (projection45Y - normalProjectionY) * pixelSpacingY;
+        fX = (projection45X - normalProjectionX) * pixelSizeX;
+        fY = (projection45Y - normalProjectionY) * pixelSizeY;
         sourceToDetector = std::sqrt(fX * fX + fY * fY);
         return projectExact(projection, pdimx, pdimy, normalProjectionX, normalProjectionY,
                             sourceToDetector, matrix);
@@ -236,24 +390,8 @@ int CuttingVoxelProjector::projectCos(float* projection,
     matrix::SquareMatrix invertedCameraMatrix = lu.inverseMatrix();
     double* icm = invertedCameraMatrix.getPtr();
     //    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
-    size_t projectionSize = sizeof(float) * pdimx * pdimy;
-    if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
-    {
-        projectionBuffer_size = projectionSize;
-        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                                        projectionBuffer_size, nullptr, &err);
-        if(err != CL_SUCCESS)
-        {
-            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-            return -1;
-        }
-    }
-    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
+    initializeOrUpdateProjectionBuffer(pdimx, pdimy, 1);
+    fillProjectionBufferByConstant(0.0f);
 
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
                      0.0, 0.0, 0.0 });
@@ -261,7 +399,7 @@ int CuttingVoxelProjector::projectCos(float* projection,
                       icm[9], icm[10], icm[11], icm[12], icm[13], icm[14], icm[15] });
     cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
     cl_double3 NORMALTODETECTOR({ normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(volumeSizeZ, volumeSizeY, volumeSizeX));
     cl_int2 pdims({ int(pdimx), int(pdimy) });
     cl_uint2 pdims_uint({ pdimx, pdimy });
     unsigned int offset = 0;
@@ -285,34 +423,18 @@ int CuttingVoxelProjector::projectCos(float* projection,
 }
 
 int CuttingVoxelProjector::projectorWithoutScaling(float* projection,
-                                        uint32_t pdimx,
-                                        uint32_t pdimy,
-                                        double normalProjectionX,
-                                        double normalProjectionY,
-                                        double sourceToDetector,
-                                        matrix::ProjectionMatrix matrix)
+                                                   uint32_t pdimx,
+                                                   uint32_t pdimy,
+                                                   double normalProjectionX,
+                                                   double normalProjectionY,
+                                                   double sourceToDetector,
+                                                   matrix::ProjectionMatrix matrix)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(volumeSizeZ, volumeSizeY, volumeSizeX));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
     cl_int err;
-    size_t projectionSize = sizeof(float) * pdimx * pdimy;
-    if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
-    {
-        projectionBuffer_size = projectionSize;
-        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                                        projectionBuffer_size, nullptr, &err);
-        if(err != CL_SUCCESS)
-        {
-            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-            return -1;
-        }
-    }
-    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
+    initializeOrUpdateProjectionBuffer(pdimx, pdimy, 1);
+    fillProjectionBufferByConstant(0.0f);
     unsigned int offset = 0;
     double* P = matrix.getPtr();
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
@@ -347,27 +469,11 @@ int CuttingVoxelProjector::projectExact(float* projection,
                                         double sourceToDetector,
                                         matrix::ProjectionMatrix matrix)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(volumeSizeZ, volumeSizeY, volumeSizeX));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
     cl_int err;
-    size_t projectionSize = sizeof(float) * pdimx * pdimy;
-    if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
-    {
-        projectionBuffer_size = projectionSize;
-        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                                        projectionBuffer_size, nullptr, &err);
-        if(err != CL_SUCCESS)
-        {
-            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-            return -1;
-        }
-    }
-    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
+    initializeOrUpdateProjectionBuffer(pdimx, pdimy, 1);
+    fillProjectionBufferByConstant(0.0f);
     unsigned int offset = 0;
     double* P = matrix.getPtr();
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
@@ -406,6 +512,8 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
 {
     double* P = matrix.getPtr();
     cl_int err;
+    initializeOrUpdateProjectionBuffer(pdimx, pdimy, 1);
+    fillProjectionBufferByConstant(0.0f);
     std::array<double, 3> sourcePosition = matrix.sourcePosition();
     std::array<double, 3> normalToDetector = matrix.normalToDetector();
     CTL::matrix::SquareMatrix CME(4,
@@ -416,25 +524,6 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
     matrix::SquareMatrix invertedCameraMatrix = lu.inverseMatrix();
     double* icm = invertedCameraMatrix.getPtr();
     //    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
-    size_t projectionSize = sizeof(float) * pdimx * pdimy;
-    if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
-    {
-        projectionBuffer_size = projectionSize;
-        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                                        projectionBuffer_size, nullptr, &err);
-        if(err != CL_SUCCESS)
-        {
-            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-            return -1;
-        }
-    }
-    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
-
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
                      0.0, 0.0, 0.0 });
     cl_double16 ICM({ icm[0], icm[1], icm[2], icm[3], icm[4], icm[5], icm[6], icm[7], icm[8],
@@ -461,34 +550,18 @@ int CuttingVoxelProjector::projectSiddon(float* projection,
 }
 
 int CuttingVoxelProjector::projectTA3(float* projection,
-                                        uint32_t pdimx,
-                                        uint32_t pdimy,
-                                        double normalProjectionX,
-                                        double normalProjectionY,
-                                        double sourceToDetector,
-                                        matrix::ProjectionMatrix matrix)
+                                      uint32_t pdimx,
+                                      uint32_t pdimy,
+                                      double normalProjectionX,
+                                      double normalProjectionY,
+                                      double sourceToDetector,
+                                      matrix::ProjectionMatrix matrix)
 {
-    cl::EnqueueArgs eargs(*Q, cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(volumeSizeZ, volumeSizeY, volumeSizeX));
     cl::EnqueueArgs eargs2(*Q, cl::NDRange(pdimx, pdimy));
     cl_int err;
-    size_t projectionSize = sizeof(float) * pdimx * pdimy;
-    if(projectionBuffer == nullptr || projectionSize != projectionBuffer_size)
-    {
-        projectionBuffer_size = projectionSize;
-        projectionBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                                        projectionBuffer_size, nullptr, &err);
-        if(err != CL_SUCCESS)
-        {
-            LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-            return -1;
-        }
-    }
-    err = Q->enqueueFillBuffer<cl_float>(*projectionBuffer, FLOATZERO, 0, projectionBuffer_size);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
+    initializeOrUpdateProjectionBuffer(pdimx, pdimy, 1);
+    fillProjectionBufferByConstant(0.0f);
     unsigned int offset = 0;
     double* P = matrix.getPtr();
     cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11], 0.0,
@@ -502,7 +575,7 @@ int CuttingVoxelProjector::projectTA3(float* projection,
     cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
     float scalingOne = 1.0;
     (*projector_ta3)(eargs, *volumeBuffer, *projectionBuffer, offset, PM, SOURCEPOSITION,
-                 NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingOne)
+                     NORMALTODETECTOR, vdims, voxelSizes, pdims, scalingOne)
         .wait();
 
     err = Q->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0, sizeof(float) * pdimx * pdimy,
@@ -512,6 +585,212 @@ int CuttingVoxelProjector::projectTA3(float* projection,
         LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
         return -1;
     }
+    return 0;
+}
+
+std::vector<cl_double16>
+CuttingVoxelProjector::invertProjectionMatrices(std::vector<matrix::ProjectionMatrix> CM)
+{
+    std::vector<cl_double16> inverseProjectionMatrices;
+    for(std::size_t i = 0; i != CM.size(); i++)
+    {
+        matrix::ProjectionMatrix matrix = CM[i];
+
+        double* P = matrix.getPtr();
+        std::array<double, 3> sourcePosition = matrix.sourcePosition();
+        CTL::matrix::SquareMatrix CME(4,
+                                      { P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9],
+                                        P[10], P[11], sourcePosition[0], sourcePosition[1],
+                                        sourcePosition[2], 1.0 });
+        matrix::LUDoolittleForm lu = matrix::LUDoolittleForm::LUDecomposeDoolittle(CME, 0.001);
+        matrix::SquareMatrix invertedCameraMatrix = lu.inverseMatrix();
+        double* icm = invertedCameraMatrix.getPtr();
+        //    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
+        cl_double16 ICM({ icm[0], icm[1], icm[2], icm[3], icm[4], icm[5], icm[6], icm[7], icm[8],
+                          icm[9], icm[10], icm[11], icm[12], icm[13], icm[14], icm[15] });
+        inverseProjectionMatrices.push_back(ICM);
+    }
+    return inverseProjectionMatrices;
+}
+
+std::vector<float>
+CuttingVoxelProjector::computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM)
+{
+    std::vector<float> scalingFactors;
+    double xoveryspacing = pixelSizeX / pixelSizeY;
+    double yoverxspacing = pixelSizeY / pixelSizeX;
+    for(std::size_t i = 0; i != PM.size(); i++)
+    {
+        double x1, x2, y1, y2;
+        matrix::ProjectionMatrix pm = PM[i];
+        std::array<double, 3> sourcePosition = pm.sourcePosition();
+        std::array<double, 3> normalToDetector = pm.normalToDetector();
+        std::array<double, 3> tangentToDetector = pm.tangentToDetectorYDirection();
+        pm.project(sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+                   sourcePosition[2] - normalToDetector[2], &x1, &y1);
+        pm.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                   sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                   sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
+        double scalingFactor
+            = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
+        scalingFactors.push_back(scalingFactor);
+    }
+    return scalingFactors;
+}
+
+int CuttingVoxelProjector::backproject(float* volume,
+                                       uint32_t vdimx,
+                                       uint32_t vdimy,
+                                       uint32_t vdimz,
+                                       std::vector<matrix::ProjectionMatrix>& CMS,
+                                       uint64_t baseOffset)
+{
+    std::vector<cl_double16> invertedProjectionMatrices = invertProjectionMatrices(CMS);
+    std::vector<float> scalingFactors = computeScalingFactors(CMS);
+    initializeOrUpdateVolumeBuffer(vdimx, vdimy, vdimz);
+    fillVolumeBufferByConstant(0.0f);
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(volumeSizeZ, volumeSizeY, volumeSizeX));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(projectionSizeX, projectionSizeY));
+    cl_uint2 pdims_uint({ projectionSizeX, projectionSizeY });
+    unsigned int frameSize = projectionSizeX * projectionSizeY;
+    if(tmpBuffer == nullptr || totalProjectionBufferSize > tmpBuffer_size)
+    {
+        tmpBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                 totalProjectionBufferSize, nullptr);
+        tmpBuffer_size = totalProjectionBufferSize;
+    }
+    copyFloatVector(*projectionBuffer, *tmpBuffer, totalProjectionSize);
+    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
+    double sourceToDetector;
+    for(std::size_t i = 0; i != projectionSizeZ; i++)
+    {
+        matrix::ProjectionMatrix mat = CMS[i];
+        float scalingFactor = scalingFactors[i];
+        std::array<double, 3> sourcePosition = mat.sourcePosition();
+        std::array<double, 3> normalToDetector = mat.normalToDetector();
+        std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
+        mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                    sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &projection45X,
+                    &projection45Y);
+        mat.project(
+            sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+            sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
+        fX = (projection45X - normalProjectionX) * pixelSizeX;
+        fY = (projection45Y - normalProjectionY) * pixelSizeY;
+        sourceToDetector = std::sqrt(fX * fX + fY * fY);
+        cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
+        double* P = mat.getPtr();
+        cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
+                         0.0, 0.0, 0.0, 0.0 });
+        cl_double16 ICM = invertedProjectionMatrices[i];
+        cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+        cl_double3 NORMALTODETECTOR(
+            { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+        unsigned int offset = baseOffset + i * frameSize;
+        if(useSidonProjector)
+        {
+            (*FLOATbackprojector_sidon)(eargs2, *volumeBuffer, *tmpBuffer, offset, ICM,
+                                        SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes, pdims,
+                                        FLOATONE, pixelGranularity);
+        } else if(useTTProjector)
+        {
+            (*FLOATta3_backproject)(eargs, *volumeBuffer, *tmpBuffer, offset, PM, SOURCEPOSITION,
+                                    NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE);
+        } else
+        {
+            if(exactProjectionScaling)
+            {
+                (*scalingProjectionsExact)(eargs2, *tmpBuffer, offset, pdims_uint, normalProjection,
+                                           pixelSizes, sourceToDetector);
+            } else
+            {
+                (*scalingProjectionsCos)(eargs2, *tmpBuffer, offset, ICM, SOURCEPOSITION,
+                                         NORMALTODETECTOR, pdims_uint, scalingFactor);
+            }
+            (*FLOATcutting_voxel_backproject)(eargs, *volumeBuffer, *tmpBuffer, offset, PM,
+                                              SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                              pdims, FLOATONE);
+        }
+    }
+    cl_int err = Q->enqueueReadBuffer(*volumeBuffer, CL_TRUE, 0, totalVolumeBufferSize, volume);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
+        return -1;
+    }
+    return 0;
+}
+
+int CuttingVoxelProjector::backproject_minmax(float* volume,
+                                              uint32_t vdimx,
+                                              uint32_t vdimy,
+                                              uint32_t vdimz,
+                                              std::vector<matrix::ProjectionMatrix>& CMS,
+                                              uint64_t baseOffset)
+{
+    std::vector<cl_double16> invertedProjectionMatrices = invertProjectionMatrices(CMS);
+    std::vector<float> scalingFactors = computeScalingFactors(CMS);
+    initializeOrUpdateVolumeBuffer(vdimx, vdimy, vdimz);
+    fillVolumeBufferByConstant(std::numeric_limits<float>::infinity());
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(volumeSizeZ, volumeSizeY, volumeSizeX));
+    cl::EnqueueArgs eargs2(*Q, cl::NDRange(projectionSizeX, projectionSizeY));
+    cl::EnqueueArgs eargsVolumeFlat(*Q, cl::NDRange(totalVolumeSize));
+    cl_uint2 pdims_uint({ projectionSizeX, projectionSizeY });
+    unsigned int frameSize = projectionSizeX * projectionSizeY;
+    if(tmpBuffer == nullptr || totalProjectionBufferSize > tmpBuffer_size)
+    {
+        tmpBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                 totalProjectionBufferSize, nullptr);
+        tmpBuffer_size = totalProjectionBufferSize;
+    }
+    copyFloatVector(*projectionBuffer, *tmpBuffer, totalProjectionSize);
+    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
+    double sourceToDetector;
+    for(std::size_t i = 0; i != projectionSizeZ; i++)
+    {
+        matrix::ProjectionMatrix mat = CMS[i];
+        std::array<double, 3> sourcePosition = mat.sourcePosition();
+        std::array<double, 3> normalToDetector = mat.normalToDetector();
+        std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
+        mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
+                    sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
+                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &projection45X,
+                    &projection45Y);
+        mat.project(
+            sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
+            sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
+        fX = (projection45X - normalProjectionX) * pixelSizeX;
+        fY = (projection45Y - normalProjectionY) * pixelSizeY;
+        sourceToDetector = std::sqrt(fX * fX + fY * fY);
+        cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
+        double* P = mat.getPtr();
+        cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
+                         0.0, 0.0, 0.0, 0.0 });
+        cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
+        cl_double3 NORMALTODETECTOR(
+            { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
+        unsigned int offset = baseOffset + i * frameSize;
+        (*scalingBackprojectionsExact)(eargs2, *tmpBuffer, offset, pdims_uint, normalProjection,
+                                       pixelSizes, sourceToDetector);
+        (*FLOATcutting_voxel_minmaxbackproject)(eargs, *volumeBuffer, *tmpBuffer, offset, PM,
+                                                SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                                pdims, FLOATONE);
+    }
+    (*ZeroInfinity)(eargsVolumeFlat, *volumeBuffer);
+    cl_int err = Q->enqueueReadBuffer(*volumeBuffer, CL_TRUE, 0, totalVolumeBufferSize, volume);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
+        return -1;
+    }
+    return 0;
+}
+
+int CuttingVoxelProjector::copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size)
+{
+    cl::EnqueueArgs eargs(*Q, cl::NDRange(size));
+    (*FLOAT_CopyVector)(eargs, from, to).wait();
     return 0;
 }
 

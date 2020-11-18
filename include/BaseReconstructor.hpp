@@ -97,6 +97,7 @@ public:
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
 
+    void useJacobiVectorCLCode();
     /** Initializes OpenCL.
      * @brief Initialize OpenCL engine. Before calling this function one of initializeProjector
      * function should be called to select the projector code to compile into openCL kernel.
@@ -181,6 +182,8 @@ protected:
     double normXBuffer_frame_double(cl::Buffer& X);
     double scalarProductBBuffer_barier_double(cl::Buffer& A, cl::Buffer& B);
     double scalarProductXBuffer_barier_double(cl::Buffer& A, cl::Buffer& B);
+    int multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size);
+    int vectorA_multiple_B_equals_C(cl::Buffer& A, cl::Buffer& B, cl::Buffer& C, uint64_t size);
     int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
     int scaleFloatVector(cl::Buffer& v, float f, unsigned int size);
     int copyFloatVectorOffset(cl::Buffer& from,
@@ -192,6 +195,7 @@ protected:
     addIntoFirstVectorSecondVectorScaled(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
     int
     addIntoFirstVectorScaledSecondVector(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
+    int invertFloatVector(cl::Buffer& X, unsigned int size);
     std::vector<matrix::ProjectionMatrix>
     encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
     std::vector<float> computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM);
@@ -228,6 +232,7 @@ protected:
         FLOAT_addIntoFirstVectorSecondVectorScaled;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOAT_addIntoFirstVectorScaledSecondVector;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOAT_multiplyVectorsIntoFirstVector;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_NormSquare;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> FLOAT_SumPartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
@@ -247,6 +252,9 @@ protected:
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         ScalarProductPartial_barier;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&>>
+        FLOAT_A_multiple_B_equals_C;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOAT_invert;
     // CVP
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
@@ -329,8 +337,20 @@ protected:
                                     float&,
                                     cl_uint2&>>
         FLOATbackprojector_sidon;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOATcutting_voxel_jacobiPreconditionerVector;
 
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
+
+    std::vector<std::string> CLFiles;
+    std::vector<std::function<void(cl::Program)>> callbacks;
 };
 
 } // namespace CTL

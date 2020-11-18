@@ -23,6 +23,31 @@ inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
     } while(tmp.u32 != adrcatch.u32);
 }
 
+/** Atomic float minimum.
+ *
+ * Function from
+ * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
+ *
+ *
+ * @param source Pointer to the memory to perform atomic operation on.
+ * @param operand Float to add.
+ */
+inline void AtomicMin_g_f(volatile __global float* adr, const float v)
+{
+    union
+    {
+        unsigned int u32;
+        float f32;
+    } tmp, adrcatch;
+    tmp.f32 = *adr;
+    do
+    {
+        adrcatch.f32 = tmp.f32;
+        tmp.f32 = min(v, tmp.f32);
+        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
+    } while(tmp.u32 != adrcatch.u32);
+}
+
 void kernel FLOATvector_NormSquarePartial(global float* x,
                                           global float* normSquare,
                                           private uint frameLen)
@@ -377,4 +402,55 @@ void kernel FLOAT_multiply_vectors_into_first_vector(global float* a, global flo
 {
     uint gid = get_global_id(0);
     a[gid] = a[gid] * b[gid];
+}
+
+void kernel FLOAT_substitute_greater_than(global float* X,
+                                          const float minValue,
+                                          const float substitution)
+{
+    uint gid = get_global_id(0);
+    float val = X[gid];
+    if(val > minValue)
+    {
+        X[gid] = substitution;
+    }
+}
+
+void kernel FLOAT_substitute_lower_than(global float* X,
+                                        const float maxValue,
+                                        const float substitution)
+{
+    uint gid = get_global_id(0);
+    float val = X[gid];
+    if(val < maxValue)
+    {
+        X[gid] = substitution;
+    }
+}
+
+void kernel FLOAT_zero_infinity(global float* X)
+{
+    uint gid = get_global_id(0);
+    float val = X[gid];
+    if(isinf(val))
+    {
+        X[gid] = 0.0f;
+    }
+}
+
+void kernel FLOAT_A_multiple_B_equals_C(global float* A, global float* B, global float* C)
+{
+    uint gid = get_global_id(0);
+    float val = A[gid] * B[gid];
+    C[gid] = val;
+}
+
+void kernel FLOAT_invert(global float* X)
+{
+    uint gid = get_global_id(0);
+    float val = X[gid];
+    if(val != 0.0f)
+    {
+        X[gid] = 1 / val;
+    }
 }

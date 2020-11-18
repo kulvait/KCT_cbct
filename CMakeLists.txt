@@ -14,6 +14,7 @@ set(CMAKE_BUILD_TYPE Debug)
 set(BUILD_SHARED_LIBS False)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+
 #Header directories for the project
 set(GLOBAL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories(${GLOBAL_INCLUDE_DIR})
@@ -45,6 +46,10 @@ include_directories(${Python3_NumPy_INCLUDE_DIRS})
 #Intel MKL
 find_package(MKL)
 include_directories(${MKL_INCLUDE_DIRS})
+
+#Git versioning
+INCLUDE(${CMAKE_SOURCE_DIR}/submodules/gitversion/cmake.cmake)
+include_directories(${CMAKE_SOURCE_DIR}/submodules/gitversion)
 
 
 #CTIOL library
@@ -117,6 +122,41 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
+
+SET(CLLINBACKPROJECTOR_SOURCES src/CLlin-backprojector.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
+add_executable(CLlin-backprojector ${CLLINBACKPROJECTOR_SOURCES})
+set_target_properties(
+    CLlin-backprojector
+    PROPERTIES 
+        OUTPUT_NAME "cllin-backprojector"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-backprojector ctiol)
+target_link_libraries(CLlin-backprojector ctmal)
+target_link_libraries(CLlin-backprojector OpenCL::OpenCL)
+target_link_libraries(CLlin-backprojector CTIOL_OPENCL)
+target_include_directories(CLlin-backprojector PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-backprojector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_link_libraries (CLlin-backprojector ${CMAKE_THREAD_LIBS_INIT})
+configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl opencl/projector_sidon.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl opencl/projector_tt.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl opencl/backprojector_sidon.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl opencl/backprojector_tt.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl opencl/backprojector_minmax.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
+install (TARGETS CLlin-backprojector RUNTIME DESTINATION .)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
+
+
 SET(CLLINPROJECTORVOLUMES_SOURCES src/CLlin-projector-volumes.cpp src/alg/CuttingVoxelProjector.cpp)
 add_executable(CLlin-projector-volumes ${CLLINPROJECTORVOLUMES_SOURCES})
 set_target_properties(
@@ -151,9 +191,10 @@ target_link_libraries(CLlin-krylov ctiol)
 target_link_libraries(CLlin-krylov ctmal)
 target_link_libraries(CLlin-krylov OpenCL::OpenCL)
 target_link_libraries(CLlin-krylov CTIOL_OPENCL)
+#target_link_libraries (CLlin-krylov ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(CLlin-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-krylov PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
-target_link_libraries (CLlin-krylov ${CMAKE_THREAD_LIBS_INIT})
+target_git_version_init(CLlin-krylov)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
