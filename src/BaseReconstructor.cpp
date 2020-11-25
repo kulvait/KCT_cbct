@@ -4,17 +4,18 @@ namespace CTL {
 
 void BaseReconstructor::initializeCVPProjector(bool useExactScaling)
 {
-    if(!openCLinitialized)
+    if(!isOpenCLInitialized())
     {
         useCVPProjector = true;
         exactProjectionScaling = useExactScaling;
         useSidonProjector = false;
         pixelGranularity = { 1, 1 };
         useTTProjector = false;
-        CLFiles.push_back("opencl/utils.cl");
-        CLFiles.push_back("opencl/projector.cl");
-        CLFiles.push_back("opencl/backprojector.cl");
-        LOGI << io::xprintf("Initializing CVP %d.", CLFiles.size());
+        CLINCLUDEutils();
+        CLINCLUDEinclude();
+        CLINCLUDEprojector();
+        CLINCLUDEbackprojector();
+        CLINCLUDErescaleProjections();
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
@@ -25,16 +26,17 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling)
 
 void BaseReconstructor::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
 {
-    if(!openCLinitialized)
+    if(!isOpenCLInitialized())
     {
         useSidonProjector = true;
         pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
         useCVPProjector = false;
         exactProjectionScaling = false;
         useTTProjector = false;
-        CLFiles.push_back("opencl/utils.cl");
-        CLFiles.push_back("opencl/projector_sidon.cl");
-        CLFiles.push_back("opencl/backprojector_sidon.cl");
+        CLINCLUDEutils();
+        CLINCLUDEinclude();
+        CLINCLUDEprojector_sidon();
+        CLINCLUDEbackprojector_sidon();
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
@@ -45,16 +47,19 @@ void BaseReconstructor::initializeSidonProjector(uint32_t probesPerEdgeX, uint32
 
 void BaseReconstructor::initializeTTProjector()
 {
-    if(!openCLinitialized)
+    if(!isOpenCLInitialized())
     {
         useTTProjector = true;
         useCVPProjector = false;
         exactProjectionScaling = false;
         useSidonProjector = false;
         pixelGranularity = { 1, 1 };
-        CLFiles.push_back("opencl/utils.cl");
-        CLFiles.push_back("opencl/projector_tt.cl");
-        CLFiles.push_back("opencl/backprojector_tt.cl");
+        CLINCLUDEutils();
+        CLINCLUDEinclude();
+        CLINCLUDEprojector();
+        CLINCLUDEbackprojector();
+        CLINCLUDEprojector_tt();
+        CLINCLUDEbackprojector_tt();
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
@@ -65,230 +70,15 @@ void BaseReconstructor::initializeTTProjector()
 
 void BaseReconstructor::useJacobiVectorCLCode()
 {
-    if(!openCLinitialized)
+    if(!isOpenCLInitialized())
     {
-        CLFiles.push_back("opencl/precomputeJacobiPreconditioner.cl");
-        std::function<void(cl::Program)> f = [this](cl::Program program) {
-            FLOATcutting_voxel_jacobiPreconditionerVector = std::make_shared<
-                cl::make_kernel<cl::Buffer&, cl_double16&, cl_double3&, cl_double3&, cl_int3&,
-                                cl_double3&, cl_int2&, float&>>(
-                cl::Kernel(program, "FLOATcutting_voxel_jacobiPreconditionerVector"));
-        };
-        callbacks.push_back(f);
+        CLINCLUDEprecomputeJacobiPreconditioner();
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
         LOGE << err;
         throw std::runtime_error(err.c_str());
     }
-}
-
-int BaseReconstructor::initializeOpenCL(uint32_t platformId,
-                                        uint32_t* deviceIds,
-                                        uint32_t deviceIdsLength,
-                                        std::string xpath,
-                                        bool debug)
-{
-    if(openCLinitialized)
-    {
-        std::string err = "Could not initialize OpenCL platform twice.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
-    }
-    // Select the first available platform.
-    platform = util::OpenCLManager::getPlatform(platformId, true);
-    if(platform == nullptr)
-    {
-        return -1;
-    }
-    // Select the first available device for given platform
-    std::shared_ptr<cl::Device> dev;
-    if(deviceIdsLength == 0)
-    {
-        LOGD << io::xprintf("Adding deviceID %d on the platform %d.", 0, platformId);
-        dev = util::OpenCLManager::getDevice(*platform, 0, true);
-        if(dev == nullptr)
-        {
-            return -2;
-        }
-        devices.push_back(*dev);
-    } else
-    {
-        for(uint32_t i = 0; i != deviceIdsLength; i++)
-        {
-            LOGD << io::xprintf("Adding deviceID %d on the platform %d.", deviceIds[i], platformId);
-            dev = util::OpenCLManager::getDevice(*platform, deviceIds[i], true);
-            if(dev == nullptr)
-            {
-                return -2;
-            }
-            devices.push_back(*dev);
-        }
-    }
-    cl::Context tmp(devices);
-    context = std::make_shared<cl::Context>(tmp);
-
-    // Debug info
-    // https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
-    std::string clFile;
-    std::string sourceText;
-    clFile = io::xprintf("%s/opencl/allsources.cl", xpath.c_str());
-    std::vector<std::string> clFilesXpath;
-    for(std::string f : CLFiles)
-    {
-        clFilesXpath.push_back(io::xprintf("%s/%s", xpath.c_str(), f.c_str()));
-    }
-    io::concatenateTextFiles(clFile, true, clFilesXpath);
-    std::string projectorSource = io::fileToString(clFile);
-    cl::Program program(*context, projectorSource);
-    std::string options = "";
-    if(debug)
-    {
-        options = io::xprintf("-g -s \"%s\"", clFile.c_str());
-    } else
-    {
-        options = "-Werror";
-    }
-    LOGI << io::xprintf("Building file %s with options : %s", clFile.c_str(), options.c_str());
-    if(program.build(devices, options.c_str()) != CL_SUCCESS)
-    {
-        LOGE << " Error building: ";
-        for(cl::Device dev : devices)
-        {
-            cl_build_status s = program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(dev);
-            std::string status = "CL_BUILD_SUCCESS";
-            if(s == CL_BUILD_NONE)
-            {
-                status = "CL_BUILD_NONE";
-            } else if(s == CL_BUILD_ERROR)
-            {
-                status = "CL_BUILD_ERROR";
-            } else if(s == CL_BUILD_IN_PROGRESS)
-            {
-                status = "CL_BUILD_IN_PROGRESS";
-            }
-            std::string name = dev.getInfo<CL_DEVICE_NAME>();
-            std::string buildlog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(dev);
-            LOGE << io::xprintf("Device %s, status %s LOG:", name.c_str(), status.c_str())
-                 << std::endl
-                 << buildlog << std::endl;
-        }
-        return -3;
-    }
-    LOGI << io::xprintf("Build succesfull", options.c_str());
-    // Unloading compiler to free resources is causing Segmentation fault on Intel platform
-    // Was reported on
-    // https://github.com/beagle-dev/beagle-lib/blob/master/libhmsbeagle/GPU/GPUInterfaceOpenCL.cpp
-    // Nvidia platform seems to be unaffected contrary to the report
-    if(util::OpenCLManager::getPlatformName(platformId) != "Intel(R) OpenCL")
-    {
-        if(platform->unloadCompiler() != CL_SUCCESS)
-        {
-            LOGE << "Error compiler unloading";
-        }
-    }
-    // OpenCL 1.2 got rid of KernelFunctor
-    // https://forums.khronos.org/showthread.php/8317-cl-hpp-KernelFunctor-gone-replaced-with-KernelFunctorGlobal
-    // https://stackoverflow.com/questions/23992369/what-should-i-use-instead-of-clkernelfunctor/54344990#54344990
-    //    FLOATcutting_voxel_project
-    //        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_double16&,
-    //        cl_double4&,
-    //                                           cl_double4&, cl_int4&, cl_double4&, cl_int2&,
-    //                                           float&>>(
-    //            cl::Kernel(program, "FLOATcutting_voxel_project"));
-    FLOAT_scaleVector = std::make_shared<cl::make_kernel<cl::Buffer&, float&>>(
-        cl::Kernel(program, "FLOAT_scale_vector"));
-    FLOAT_addIntoFirstVectorSecondVectorScaled
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
-            cl::Kernel(program, "FLOAT_add_into_first_vector_second_vector_scaled"));
-    FLOAT_addIntoFirstVectorScaledSecondVector
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>(
-            cl::Kernel(program, "FLOAT_add_into_first_vector_scaled_second_vector"));
-    FLOAT_NormSquare = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
-        cl::Kernel(program, "FLOATvector_NormSquarePartial"));
-    FLOAT_SumPartial = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
-        cl::Kernel(program, "FLOATvector_SumPartial"));
-    FLOAT_NormSquare_barier = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
-        cl::Kernel(program, "FLOATvector_NormSquarePartial_barier"));
-    FLOAT_Sum_barier = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
-        cl::Kernel(program, "FLOATvector_SumPartial_barier"));
-    NormSquare = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
-        cl::Kernel(program, "vector_NormSquarePartial"));
-    SumPartial = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>(
-        cl::Kernel(program, "vector_SumPartial"));
-    NormSquare_barier = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
-        cl::Kernel(program, "vector_NormSquarePartial_barier"));
-    Sum_barier = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
-        cl::Kernel(program, "vector_SumPartial_barier"));
-    FLOAT_CopyVector = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
-        cl::Kernel(program, "FLOAT_copy_vector"));
-    FLOAT_CopyVector_offset
-        = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl::Buffer&, unsigned int&>>(
-            cl::Kernel(program, "FLOAT_copy_vector_offset"));
-    ScalarProductPartial_barier = std::make_shared<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>(
-        cl::Kernel(program, "vector_ScalarProductPartial_barier"));
-    FLOAT_multiplyVectorsIntoFirstVector
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&>>(
-            cl::Kernel(program, "FLOAT_multiply_vectors_into_first_vector"));
-    FLOAT_A_multiple_B_equals_C
-        = std::make_shared<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&>>(
-            cl::Kernel(program, "FLOAT_A_multiple_B_equals_C"));
-    FLOAT_invert
-        = std::make_shared<cl::make_kernel<cl::Buffer&>>(cl::Kernel(program, "FLOAT_invert"));
-    if(useSidonProjector)
-    {
-        FLOATprojector_sidon = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
-            cl::Kernel(program, "FLOATsidon_project"));
-        FLOATbackprojector_sidon = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&, cl_uint2&>>(
-            cl::Kernel(program, "FLOATsidon_backproject"));
-    } else if(useTTProjector)
-    {
-        FLOATta3_project = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATtta3_project"));
-        FLOATta3_backproject = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATtta3_backproject"));
-    } else
-    {
-        FLOATcutting_voxel_project = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATcutting_voxel_project"));
-        FLOATcutting_voxel_backproject = std::make_shared<
-            cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&, cl_double16&, cl_double3&,
-                            cl_double3&, cl_int3&, cl_double3&, cl_int2&, float&>>(
-            cl::Kernel(program, "FLOATcutting_voxel_backproject"));
-        scalingProjectionsCos
-            = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_double16&,
-                                               cl_double3&, cl_double3&, cl_uint2&, float&>>(
-                cl::Kernel(program, "FLOATrescale_projections_cos"));
-        scalingProjectionsExact
-            = std::make_shared<cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&,
-                                               cl_double2&, double&>>(
-                cl::Kernel(program, "FLOATrescale_projections_exact"));
-    }
-    for(std::function<void(cl::Program)> f : callbacks)
-    {
-        f(program);
-    }
-    for(uint32_t i = 0; i != devices.size(); i++)
-    {
-        Q.push_back(std::make_shared<cl::CommandQueue>(*context, devices[i]));
-    }
-    openCLinitialized = true;
-    return 0;
 }
 
 int BaseReconstructor::vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size)
@@ -319,6 +109,88 @@ int BaseReconstructor::vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size
         throw std::runtime_error(e);
     }
     return 0;
+}
+
+int BaseReconstructor::problemSetup(float* projection,
+                                    float* volume,
+                                    bool volumeContainsX0,
+                                    std::vector<std::shared_ptr<CameraI>> cameraVector,
+                                    double voxelSpacingX,
+                                    double voxelSpacingY,
+                                    double voxelSpacingZ,
+                                    double volumeCenterX,
+                                    double volumeCenterY,
+                                    double volumeCenterZ)
+{
+    if(cameraVector.size() != pdimz)
+    {
+        std::string err
+            = io::xprintf("The pdimz=%d but the size of camera geometries vector is %d!");
+        LOGE << err;
+        throw std::runtime_error(err);
+    }
+    this->cameraVector = cameraVector;
+    PM12Vector.clear();
+    ICM16Vector.clear();
+    scalingFactorVector.clear();
+    cl_double16 CM, ICM;
+    std::array<double, 2> focalLength;
+    for(uint32_t k = 0; k != cameraVector.size(); k++)
+    {
+        std::shared_ptr<CameraI> P = cameraVector[k];
+        focalLength = P->focalLength();
+        P->projectionMatrixAsVector12((double*)&CM);
+        P->inverseProjectionMatrixAsVector16((double*)&ICM);
+        PM12Vector.emplace_back(CM);
+        ICM16Vector.emplace_back(ICM);
+        scalingFactorVector.emplace_back(focalLength[0] * focalLength[1]);
+    }
+    voxelSizes = cl_double3({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
+    volumeCenter = cl_double3({ volumeCenterX, volumeCenterY, volumeCenterZ });
+    std::array<double, 3> centerGlobal = { volumeOffsetX, volumeOffsetY, volumeOffsetZ };
+    std::array<double, 3> offsetx = { voxelSpacingX * vdims.x * 0.5, 0.0, 0.0 };
+    std::array<double, 3> offsety = { 0.0, voxelSpacingY * vdims.y * 0.5, 0.0 };
+    std::array<double, 3> offsetz = { 0.0, 0.0, voxelSpacingZ * vdims.z * 0.5 };
+    std::array<double, 3> A, B, C, D, E, F, G, H; // Corners of volume
+    std::array<double, 3> center;
+    std::array<double, 3> source;
+    std::array<double, 3> VN;
+    for(uint32_t k = 0; k != cameraVector.size(); k++)
+    {
+        std::shared_ptr<CameraI> P = cameraVector[k];
+        source = P->sourcePosition();
+        center = vectorDiff(centerGlobal, source);
+        A = vectorDiff(vectorDiff(vectorDiff(center, offsetx), offsety), offsetz);
+        B = vectorDiff(vectorDiff(vectorSum(center, offsetx), offsety), offsetz);
+        C = vectorDiff(vectorSum(vectorDiff(center, offsetx), offsety), offsetz);
+        D = vectorDiff(vectorSum(vectorSum(center, offsetx), offsety), offsetz);
+        E = vectorSum(vectorDiff(vectorDiff(center, offsetx), offsety), offsetz);
+        F = vectorSum(vectorDiff(vectorSum(center, offsetx), offsety), offsetz);
+        G = vectorSum(vectorSum(vectorDiff(center, offsetx), offsety), offsetz);
+        H = vectorSum(vectorSum(vectorSum(center, offsetx), offsety), offsetz);
+        VN = P->directionVectorVN();
+        if(vectorDotProduct(VN, center) < 0)
+        {
+            LOGW << io::xprintf(
+                "Apparently the volume is specified such that its center do not "
+                "belong to the half space orthogonal to the principal ray in %d-th projection.",
+                k);
+        }
+        if(vectorDotProduct(VN, A) < 0 || vectorDotProduct(VN, B) < 0 || vectorDotProduct(VN, C) < 0
+           || vectorDotProduct(VN, D) < 0 || vectorDotProduct(VN, E) < 0
+           || vectorDotProduct(VN, F) < 0 || vectorDotProduct(VN, G) < 0
+           || vectorDotProduct(VN, H) < 0)
+        {
+            LOGW << io::xprintf(
+                "Apparently the volume is so big that some its corners do not fit "
+                "to the half space orthogonal to the principal ray in %d-th projection.",
+                k);
+        }
+
+        // Test positions of corners relative to source
+    }
+    initializeAlgorithmsBuffers();
+    return initializeVectors(projection, volume, volumeContainsX0);
 }
 
 /**
@@ -362,21 +234,6 @@ int BaseReconstructor::initializeVectors(float* projections,
         return -1;
     }
 
-    tmp_x_red1 = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                              sizeof(double) * XDIM_REDUCED1, nullptr, &err);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
-    tmp_x_red2 = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                              sizeof(double) * XDIM_REDUCED2, nullptr, &err);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
-
     tmp_b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
                                              nullptr, &err);
     if(err != CL_SUCCESS)
@@ -385,37 +242,23 @@ int BaseReconstructor::initializeVectors(float* projections,
         return -1;
     }
 
-    tmp_b_red1 = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                              sizeof(double) * BDIM_REDUCED1, nullptr, &err);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
-    tmp_b_red2 = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
-                                              sizeof(double) * BDIM_REDUCED2, nullptr, &err);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
     return 0;
 }
 
 int BaseReconstructor::allocateXBuffers(uint32_t xBufferCount)
 {
     cl_int err;
-    std::shared_ptr<cl::Buffer> x_buf;
+    std::shared_ptr<cl::Buffer> xbufptr;
     while(this->x_buffers.size() < xBufferCount)
     {
-        x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM,
-                                             nullptr, &err);
+        xbufptr = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM,
+                                               nullptr, &err);
         if(err != CL_SUCCESS)
         {
             LOGE << io::xprintf("Unsucessful initialization of X buffer with error code %d!", err);
             return -1;
         }
-        x_buffers.push_back(x_buf);
+        x_buffers.push_back(xbufptr);
     }
     return 0;
 }
@@ -423,17 +266,17 @@ int BaseReconstructor::allocateXBuffers(uint32_t xBufferCount)
 int BaseReconstructor::allocateBBuffers(uint32_t bBufferCount)
 {
     cl_int err;
-    std::shared_ptr<cl::Buffer> b_buf;
+    std::shared_ptr<cl::Buffer> bbufptr;
     while(this->b_buffers.size() < bBufferCount)
     {
-        b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
-                                             nullptr, &err);
+        bbufptr = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
+                                               nullptr, &err);
         if(err != CL_SUCCESS)
         {
             LOGE << io::xprintf("Unsucessful initialization of B buffer with error code %d!", err);
             return -1;
         }
-        b_buffers.push_back(b_buf);
+        b_buffers.push_back(bbufptr);
     }
     return 0;
 }
@@ -441,17 +284,17 @@ int BaseReconstructor::allocateBBuffers(uint32_t bBufferCount)
 int BaseReconstructor::allocateTmpXBuffers(uint32_t xBufferCount)
 {
     cl_int err;
-    std::shared_ptr<cl::Buffer> x_buf;
+    std::shared_ptr<cl::Buffer> xbufptr;
     while(this->tmp_x_buffers.size() < xBufferCount)
     {
-        x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM,
-                                             nullptr, &err);
+        xbufptr = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM,
+                                               nullptr, &err);
         if(err != CL_SUCCESS)
         {
             LOGE << io::xprintf("Unsucessful initialization of X buffer with error code %d!", err);
             return -1;
         }
-        tmp_x_buffers.push_back(x_buf);
+        tmp_x_buffers.push_back(xbufptr);
     }
     return 0;
 }
@@ -459,17 +302,17 @@ int BaseReconstructor::allocateTmpXBuffers(uint32_t xBufferCount)
 int BaseReconstructor::allocateTmpBBuffers(uint32_t bBufferCount)
 {
     cl_int err;
-    std::shared_ptr<cl::Buffer> b_buf;
+    std::shared_ptr<cl::Buffer> bbufptr;
     while(this->tmp_b_buffers.size() < bBufferCount)
     {
-        b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
-                                             nullptr, &err);
+        bbufptr = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
+                                               nullptr, &err);
         if(err != CL_SUCCESS)
         {
             LOGE << io::xprintf("Unsucessful initialization of B buffer with error code %d!", err);
             return -1;
         }
-        tmp_b_buffers.push_back(b_buf);
+        tmp_b_buffers.push_back(bbufptr);
     }
     return 0;
 }
@@ -532,21 +375,21 @@ std::shared_ptr<cl::Buffer> BaseReconstructor::getTmpBBuffer(uint32_t i)
     }
 }
 
-int BaseReconstructor::copyFloatVectorOffset(cl::Buffer& from,
-                                             unsigned int from_offset,
-                                             cl::Buffer& to,
-                                             unsigned int to_offset,
-                                             unsigned int size)
+int BaseReconstructor::B_equals_A_plus_B_offsets(cl::Buffer& from,
+                                                 unsigned int from_offset,
+                                                 cl::Buffer& to,
+                                                 unsigned int to_offset,
+                                                 unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_CopyVector_offset)(eargs, from, from_offset, to, to_offset).wait();
+    (*FLOATvector_B_equals_A_plus_B_offsets)(eargs, from, from_offset, to, to_offset).wait();
     return 0;
 }
 
 int BaseReconstructor::invertFloatVector(cl::Buffer& X, unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_invert)(eargs, X).wait();
+    (*FLOATvector_invert_except_zero)(eargs, X).wait();
     return 0;
 }
 
@@ -556,359 +399,127 @@ int BaseReconstructor::vectorA_multiple_B_equals_C(cl::Buffer& A,
                                                    uint64_t size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_A_multiple_B_equals_C)(eargs, A, B, C).wait();
+    (*FLOATvector_C_equals_A_times_B)(eargs, A, B, C).wait();
     return 0;
 }
 
 int BaseReconstructor::multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_multiplyVectorsIntoFirstVector)(eargs, A, B).wait();
+    (*FLOATvector_A_equals_A_times_B)(eargs, A, B).wait();
     return 0;
 }
 
-/**
- * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
- *
- * @param X
- *
- * @return
- */
-double BaseReconstructor::normXBuffer_frame_double(cl::Buffer& X)
-{
-    double sum;
-    uint32_t framesize = vdimx * vdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(vdimz));
-    (*NormSquare)(eargs1, X, *tmp_x_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    unsigned int arg = vdimz;
-    (*SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
-    Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
- *
- * @param X
- *
- * @return
- */
-double BaseReconstructor::normXBuffer_barier_double(cl::Buffer& X)
-{
-
-    double sum;
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*NormSquare_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*Sum_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
-    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the scalar product of two Buffers that has vdimx * vdimy * vdimz elements.
- *
- * @param A CL buffer of the size vdimx * vdimy * vdimz
- * @param B CL buffer of the size vdimx * vdimy * vdimz
- *
- * @return
- */
-double BaseReconstructor::scalarProductXBuffer_barier_double(cl::Buffer& A, cl::Buffer& B)
-{
-
-    double sum;
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_x_red1, localsize, XDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*Sum_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
-    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the scalar product of two Buffers that has pdimx * pdimy * pdimz elements.
- *
- * @param A CL buffer of the size pdimx * pdimy * pdimz
- * @param B CL buffer of the size pdimx * pdimy * pdimz
- *
- * @return
- */
-double BaseReconstructor::scalarProductBBuffer_barier_double(cl::Buffer& A, cl::Buffer& B)
-{
-
-    double sum;
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_b_red1, localsize, BDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*Sum_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
-    Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
- *
- * @param X
- *
- * @return
- */
-double BaseReconstructor::normBBuffer_frame_double(cl::Buffer& B)
-{ // Use workGroupSize that is private constant default to 256
-    double sum;
-    uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
-    (*NormSquare)(eargs1, B, *tmp_b_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    unsigned int arg = pdimz;
-    (*SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
-    Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
- *
- * @param X
- *
- * @return
- */
-double BaseReconstructor::normBBuffer_barier_double(cl::Buffer& B)
-{ // Use workGroupSize that is private constant default to 256
-    double sum;
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*NormSquare_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*Sum_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
-    Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
- *
- * @param X
- *
- * @return
- */
-float BaseReconstructor::normXBuffer_frame(cl::Buffer& X)
-{
-    float sum;
-    uint32_t framesize = vdimx * vdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(vdimz));
-    (*FLOAT_NormSquare)(eargs1, X, *tmp_x_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    unsigned int arg = vdimz;
-    (*FLOAT_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
-    Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(float), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
- *
- * @param X
- *
- * @return
- */
-float BaseReconstructor::normXBuffer_barier(cl::Buffer& X)
-{
-
-    float sum;
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOAT_NormSquare_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*FLOAT_Sum_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOAT_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
-    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
- *
- * @param X
- *
- * @return
- */
-float BaseReconstructor::normBBuffer_frame(cl::Buffer& B)
-{ // Use workGroupSize that is private constant default to 256
-    float sum;
-    uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
-    (*FLOAT_NormSquare)(eargs1, B, *tmp_b_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    unsigned int arg = pdimz;
-    (*FLOAT_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
-    Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(float), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
- *
- * @param X
- *
- * @return
- */
-float BaseReconstructor::normBBuffer_barier(cl::Buffer& B)
-{ // Use workGroupSize that is private constant default to 256
-    float sum;
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOAT_NormSquare_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM).wait();
-    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*FLOAT_Sum_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOAT_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
-    Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
-    return sum;
-}
-
-int BaseReconstructor::backproject(cl::Buffer& B,
-                                   cl::Buffer& X,
-                                   std::vector<matrix::ProjectionMatrix>& V,
-                                   std::vector<cl_double16>& invertedProjectionMatrices,
-                                   std::vector<float>& scalingFactors)
+int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     copyFloatVector(B, *tmp_b_buf, BDIM);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
-    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
-    double sourceToDetector;
+    cl_double16 CM;
+    cl_double16 ICM;
+    cl_double3 SOURCEPOSITION, NORMALTODETECTOR;
+    cl_double2 NORMALPROJECTION;
+    cl_double2 VIRTUALPIXELSIZES;
+    double VIRTUALDETECTORDISTANCE = 1.0;
+    std::shared_ptr<CameraI> P;
+    std::array<double, 2> focalLength;
+    float scalingFactor;
+    unsigned int offset;
     for(std::size_t i = 0; i != pdimz; i++)
     {
-        matrix::ProjectionMatrix mat = V[i];
-        float scalingFactor = scalingFactors[i];
-        std::array<double, 3> sourcePosition = mat.sourcePosition();
-        std::array<double, 3> normalToDetector = mat.normalToDetector();
-        std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
-        mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
-                    sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
-                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &projection45X,
-                    &projection45Y);
-        mat.project(
-            sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
-            sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
-        fX = (projection45X - normalProjectionX) * pixelSpacingX;
-        fY = (projection45Y - normalProjectionY) * pixelSpacingY;
-        sourceToDetector = std::sqrt(fX * fX + fY * fY);
-        cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
-        double* P = mat.getPtr();
-        cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
-                         0.0, 0.0, 0.0, 0.0 });
-        cl_double16 ICM = invertedProjectionMatrices[i];
-        cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
-        cl_double3 NORMALTODETECTOR(
-            { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        unsigned int offset = i * frameSize;
+        P = cameraVector[i];
+        focalLength = P->focalLength();
+        // Kernel parameters
+        scalingFactor = focalLength[0] * focalLength[1];
+        P->projectionMatrixAsVector12((double*)&CM);
+        P->inverseProjectionMatrixAsVector16((double*)&ICM);
+        P->normalToDetector((double*)&NORMALTODETECTOR);
+        P->principalRayProjection((double*)&NORMALPROJECTION);
+        P->sourcePosition((double*)&SOURCEPOSITION);
+        VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
+        offset = i * frameSize;
         if(useSidonProjector)
         {
-            (*FLOATbackprojector_sidon)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
-                                        NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE,
-                                        pixelGranularity);
+            (*FLOATsidon_backproject)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
+                                      NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims,
+                                      FLOATONE, pixelGranularity);
         } else if(useTTProjector)
         {
-            (*FLOATta3_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
-                                    NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE);
+            (*FLOATta3_backproject)(eargs, X, *tmp_b_buf, offset, CM, SOURCEPOSITION,
+                                    NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims,
+                                    FLOATONE);
         } else
         {
             if(exactProjectionScaling)
             {
-                (*scalingProjectionsExact)(eargs2, *tmp_b_buf, offset, pdims_uint, normalProjection,
-                                           pixelSizes, sourceToDetector);
+                (*FLOATrescale_projections_exact)(eargs2, *tmp_b_buf, offset, pdims_uint,
+                                                  NORMALPROJECTION, VIRTUALPIXELSIZES,
+                                                  VIRTUALDETECTORDISTANCE);
             } else
             {
-                (*scalingProjectionsCos)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
-                                         NORMALTODETECTOR, pdims_uint, scalingFactor);
+                (*FLOATrescale_projections_cos)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
+                                                NORMALTODETECTOR, pdims_uint, scalingFactor);
             }
-            (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, PM, SOURCEPOSITION,
-                                              NORMALTODETECTOR, vdims, voxelSizes, pdims, FLOATONE);
+            (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, CM, SOURCEPOSITION,
+                                              NORMALTODETECTOR, vdims, voxelSizes, volumeCenter,
+                                              pdims, FLOATONE);
         }
     }
     return 0;
 }
 
-int BaseReconstructor::project(cl::Buffer& X,
-                               cl::Buffer& B,
-                               std::vector<matrix::ProjectionMatrix>& V,
-                               std::vector<cl_double16>& invertedProjectionMatrices,
-                               std::vector<float>& scalingFactors)
+int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
-    double normalProjectionX, normalProjectionY, projection45X, projection45Y, fX, fY;
-    double sourceToDetector;
+    cl_double16 CM;
+    cl_double16 ICM;
+    cl_double3 SOURCEPOSITION, NORMALTODETECTOR;
+    cl_double2 NORMALPROJECTION;
+    cl_double2 VIRTUALPIXELSIZES;
+    double VIRTUALDETECTORDISTANCE = 1.0;
+    std::shared_ptr<CameraI> P;
+    std::array<double, 2> focalLength;
+    float scalingFactor;
+    unsigned int offset;
     for(std::size_t i = 0; i != pdimz; i++)
     {
-        matrix::ProjectionMatrix mat = V[i];
-        float scalingFactor = scalingFactors[i];
-        std::array<double, 3> sourcePosition = mat.sourcePosition();
-        std::array<double, 3> normalToDetector = mat.normalToDetector();
-        std::array<double, 3> tangentToDetector = mat.tangentToDetectorYDirection();
-        mat.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
-                    sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
-                    sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &projection45X,
-                    &projection45Y);
-        mat.project(
-            sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
-            sourcePosition[2] - normalToDetector[2], &normalProjectionX, &normalProjectionY);
-        fX = (projection45X - normalProjectionX) * pixelSpacingX;
-        fY = (projection45Y - normalProjectionY) * pixelSpacingY;
-        sourceToDetector = std::sqrt(fX * fX + fY * fY);
-        cl_double2 normalProjection({ normalProjectionX, normalProjectionY });
-        double* P = mat.getPtr();
-        cl_double16 PM({ P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9], P[10], P[11],
-                         0.0, 0.0, 0.0, 0.0 });
-        cl_double16 ICM = invertedProjectionMatrices[i];
-        cl_double3 SOURCEPOSITION({ sourcePosition[0], sourcePosition[1], sourcePosition[2] });
-        cl_double3 NORMALTODETECTOR(
-            { normalToDetector[0], normalToDetector[1], normalToDetector[2] });
-        unsigned int offset = i * frameSize;
+        P = cameraVector[i];
+        focalLength = P->focalLength();
+        // Kernel parameters
+        scalingFactor = focalLength[0] * focalLength[1];
+        P->projectionMatrixAsVector12((double*)&CM);
+        P->inverseProjectionMatrixAsVector16((double*)&ICM);
+        P->normalToDetector((double*)&NORMALTODETECTOR);
+        P->principalRayProjection((double*)&NORMALPROJECTION);
+        P->sourcePosition((double*)&SOURCEPOSITION);
+        VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
+        offset = i * frameSize;
         if(useSidonProjector)
         {
-            (*FLOATprojector_sidon)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                    vdims, voxelSizes, pdims, FLOATONE, pixelGranularity);
+            (*FLOATsidon_project)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                                  vdims, voxelSizes, volumeCenter, pdims, FLOATONE,
+                                  pixelGranularity);
         } else if(useTTProjector)
         {
-            (*FLOATta3_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR, vdims,
-                                voxelSizes, pdims, FLOATONE);
+            (*FLOATta3_project)(eargs, X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR, vdims,
+                                voxelSizes, volumeCenter, pdims, FLOATONE);
         } else
         {
-            (*FLOATcutting_voxel_project)(eargs, X, B, offset, PM, SOURCEPOSITION, NORMALTODETECTOR,
-                                          vdims, voxelSizes, pdims, FLOATONE);
+            (*FLOATcutting_voxel_project)(eargs, X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR,
+                                          vdims, voxelSizes, volumeCenter, pdims, FLOATONE);
             if(exactProjectionScaling)
             {
-                (*scalingProjectionsExact)(eargs2, B, offset, pdims_uint, normalProjection,
-                                           pixelSizes, sourceToDetector);
+                (*FLOATrescale_projections_exact)(eargs2, B, offset, pdims_uint, NORMALPROJECTION,
+                                                  VIRTUALPIXELSIZES, VIRTUALDETECTORDISTANCE);
             } else
             {
-                (*scalingProjectionsCos)(eargs2, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                         pdims_uint, scalingFactor);
+                (*FLOATrescale_projections_cos)(eargs2, B, offset, ICM, SOURCEPOSITION,
+                                                NORMALTODETECTOR, pdims_uint, scalingFactor);
             }
         }
     }
@@ -918,14 +529,14 @@ int BaseReconstructor::project(cl::Buffer& X,
 int BaseReconstructor::copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_CopyVector)(eargs, from, to).wait();
+    (*FLOATvector_copy)(eargs, from, to).wait();
     return 0;
 }
 
 int BaseReconstructor::scaleFloatVector(cl::Buffer& v, float f, unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_scaleVector)(eargs, v, f).wait();
+    (*FLOATvector_scale)(eargs, v, f).wait();
     return 0;
 }
 
@@ -935,7 +546,7 @@ int BaseReconstructor::addIntoFirstVectorSecondVectorScaled(cl::Buffer& a,
                                                             unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_addIntoFirstVectorSecondVectorScaled)(eargs, a, b, f).wait();
+    (*FLOATvector_A_equals_A_plus_cB)(eargs, a, b, f).wait();
     return 0;
 }
 
@@ -945,70 +556,33 @@ int BaseReconstructor::addIntoFirstVectorScaledSecondVector(cl::Buffer& a,
                                                             unsigned int size)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOAT_addIntoFirstVectorScaledSecondVector)(eargs, a, b, f).wait();
+    (*FLOATvector_A_equals_Ac_plus_B)(eargs, a, b, f).wait();
     return 0;
 }
 
-std::vector<matrix::ProjectionMatrix>
+std::vector<std::shared_ptr<CameraI>>
 BaseReconstructor::encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm)
 {
-    std::vector<matrix::ProjectionMatrix> v;
+    std::vector<std::shared_ptr<CameraI>> v;
+    std::shared_ptr<CameraI> P;
     for(std::size_t i = 0; i != pm->count(); i++)
     {
-        matrix::ProjectionMatrix p = pm->readMatrix(i);
-        v.push_back(p);
+        P = std::make_shared<LightProjectionMatrix>(pm->readMatrix(i));
+        v.emplace_back(P);
     }
     return v;
 }
 
-std::vector<cl_double16>
-BaseReconstructor::inverseProjectionMatrices(std::vector<matrix::ProjectionMatrix> CM)
-{
-    std::vector<cl_double16> inverseProjectionMatrices;
-    for(std::size_t i = 0; i != CM.size(); i++)
-    {
-        matrix::ProjectionMatrix matrix = CM[i];
-
-        double* P = matrix.getPtr();
-        std::array<double, 3> sourcePosition = matrix.sourcePosition();
-        CTL::matrix::SquareMatrix CME(4,
-                                      { P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9],
-                                        P[10], P[11], sourcePosition[0], sourcePosition[1],
-                                        sourcePosition[2], 1.0 });
-        matrix::LUDoolittleForm lu = matrix::LUDoolittleForm::LUDecomposeDoolittle(CME, 0.001);
-        matrix::SquareMatrix invertedCameraMatrix = lu.inverseMatrix();
-        double* icm = invertedCameraMatrix.getPtr();
-        //    cl::Buffer buffer_P(*context, CL_MEM_COPY_HOST_PTR, sizeof(double) * 12, (void*)P);
-        cl_double16 ICM({ icm[0], icm[1], icm[2], icm[3], icm[4], icm[5], icm[6], icm[7], icm[8],
-                          icm[9], icm[10], icm[11], icm[12], icm[13], icm[14], icm[15] });
-        inverseProjectionMatrices.push_back(ICM);
-    }
-    return inverseProjectionMatrices;
-}
-
 // Scaling factor is a expression f*f/(px*py), where f is source to detector distance and pixel
 // sizes are (px and py)  Focal length http://ksimek.github.io/2013/08/13/intrinsic/
-std::vector<float>
-BaseReconstructor::computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM)
+std::vector<float> BaseReconstructor::computeScalingFactors()
 {
     std::vector<float> scalingFactors;
-    double xoveryspacing = pixelSpacingX / pixelSpacingY;
-    double yoverxspacing = pixelSpacingY / pixelSpacingX;
-    for(std::size_t i = 0; i != PM.size(); i++)
+    std::array<double, 2> focalLength;
+    for(std::size_t i = 0; i != pdimz; i++)
     {
-        double x1, x2, y1, y2;
-        matrix::ProjectionMatrix pm = PM[i];
-        std::array<double, 3> sourcePosition = pm.sourcePosition();
-        std::array<double, 3> normalToDetector = pm.normalToDetector();
-        std::array<double, 3> tangentToDetector = pm.tangentToDetectorYDirection();
-        pm.project(sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
-                   sourcePosition[2] - normalToDetector[2], &x1, &y1);
-        pm.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
-                   sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
-                   sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
-        double scalingFactor
-            = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
-        scalingFactors.push_back(scalingFactor);
+        focalLength = cameraVector[i]->focalLength();
+        scalingFactors.emplace_back(focalLength[0] * focalLength[1]);
     }
     return scalingFactors;
 }
@@ -1066,8 +640,7 @@ void BaseReconstructor::reportTime(std::string msg, bool finishCommandQueue, boo
     LOGD << io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
 }
 
-double
-BaseReconstructor::adjointProductTest(std::shared_ptr<io::DenProjectionMatrixReader> matrices)
+double BaseReconstructor::adjointProductTest()
 {
     std::shared_ptr<cl::Buffer> xa_buf; // X buffers
     allocateXBuffers(1);
@@ -1075,11 +648,8 @@ BaseReconstructor::adjointProductTest(std::shared_ptr<io::DenProjectionMatrixRea
     allocateBBuffers(1);
     std::shared_ptr<cl::Buffer> ba_buf; // B buffers
     ba_buf = getBBuffer(0);
-    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
-    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
-    std::vector<float> scalingFactors = computeScalingFactors(PM);
-    project(*x_buf, *ba_buf, PM, ICM, scalingFactors);
-    backproject(*b_buf, *xa_buf, PM, ICM, scalingFactors);
+    project(*x_buf, *ba_buf);
+    backproject(*b_buf, *xa_buf);
     double bdotAx = scalarProductBBuffer_barier_double(*b_buf, *ba_buf);
     double ATbdotx = scalarProductXBuffer_barier_double(*x_buf, *xa_buf);
     return (bdotAx / ATbdotx);

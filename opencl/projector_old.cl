@@ -1,27 +1,7 @@
-/** Atomic float addition.
- *
- * Function from
- * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
- *
- *
- * @param source Pointer to the memory to perform atomic operation on.
- * @param operand Float to add.
- */
-inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
-{
-    union
-    {
-        unsigned int u32;
-        float f32;
-    } tmp, adrcatch;
-    tmp.f32 = *adr;
-    do
-    {
-        adrcatch.f32 = tmp.f32;
-        tmp.f32 += v;
-        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
-    } while(tmp.u32 != adrcatch.u32);
-}
+//==============================projector_old.cl=====================================
+#ifndef zeroPrecisionTolerance
+#define zeroPrecisionTolerance 1e-10
+#endif
 
 /** Projection of a volume point v onto X coordinate on projector.
  * No checks for boundaries.
@@ -441,23 +421,25 @@ inline uint voxelIndex(uint i, uint j, uint k, int4 vdims)
  *
  * @return
  */
-void kernel FLOATcutting_voxel_project(global float* volume,
-                                       global float* projection,
-                                       private uint projectionOffset,
-                                       private double16 CM,
-                                       private double3 sourcePosition,
-                                       private double3 normalToDetector,
-                                       private int4 vdims,
-                                       private double3 voxelSizes,
-                                       private int2 pdims,
-                                       private float scalingFactor)
+void kernel OLD_FLOATcutting_voxel_project(global const float* restrict volume,
+                                           global float* restrict projection,
+                                           private uint projectionOffset,
+                                           private double16 CM,
+                                           private double3 sourcePosition,
+                                           private double3 normalToDetector,
+                                           private int3 vdims,
+                                           private double3 voxelSizes,
+                                           private double3 volumeCenter,
+                                           private int2 pdims,
+                                           private float scalingFactor)
 {
     uint i = get_global_id(2);
     uint j = get_global_id(1);
     uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
-                                     -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
+                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
+                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     // If all the corners of given voxel points to a common coordinate, then compute the value based
     // on the center
     int8 cube_abi
@@ -631,3 +613,4 @@ void kernel FLOATcutting_voxel_project(global float* volume,
         insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
     }
 }
+//==============================END projector_old.cl=====================================

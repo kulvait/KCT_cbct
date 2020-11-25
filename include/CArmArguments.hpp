@@ -23,6 +23,9 @@ public:
     double voxelSizeX = 1.0;
     double voxelSizeY = 1.0;
     double voxelSizeZ = 1.0;
+    double volumeCenterX = 0.0;
+    double volumeCenterY = 0.0;
+    double volumeCenterZ = 0.0;
     double pixelSizeX = 0.616;
     double pixelSizeY = 0.616;
 
@@ -70,6 +73,7 @@ protected:
     void addGeometryGroup();
     void addVolumeSizeArgs();
     void addVoxelSizeArgs();
+    void addVolumeCenterArgs();
     void addProjectionSizeArgs();
     void addPixelSizeArgs();
 

@@ -1,62 +1,13 @@
-/** Atomic float addition.
- *
- * Function from
- * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
- *
- *
- * @param source Pointer to the memory to perform atomic operation on.
- * @param operand Float to add.
- */
-inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
-{
-    union
-    {
-        unsigned int u32;
-        float f32;
-    } tmp, adrcatch;
-    tmp.f32 = *adr;
-    do
-    {
-        adrcatch.f32 = tmp.f32;
-        tmp.f32 += v;
-        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
-    } while(tmp.u32 != adrcatch.u32);
-}
-
-/** Atomic float minimum.
- *
- * Function from
- * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
- *
- *
- * @param source Pointer to the memory to perform atomic operation on.
- * @param operand Float to add.
- */
-inline void AtomicMin_g_f(volatile __global float* adr, const float v)
-{
-    union
-    {
-        unsigned int u32;
-        float f32;
-    } tmp, adrcatch;
-    tmp.f32 = *adr;
-    do
-    {
-        adrcatch.f32 = tmp.f32;
-        tmp.f32 = min(v, tmp.f32);
-        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
-    } while(tmp.u32 != adrcatch.u32);
-}
-
-void kernel FLOATvector_NormSquarePartial(global float* x,
-                                          global float* normSquare,
+//==============================utils.cl=====================================
+void kernel FLOATvector_NormSquarePartial(global const float* restrict x,
+                                          global float* restrict normSquare,
                                           private uint frameLen)
 {
-    int gid = get_global_id(0);
-    float sum = 0;
+    uint gid = get_global_id(0);
+    uint start = gid * frameLen;
+    uint end = start + frameLen;
+    float sum = 0.0f;
     float val;
-    int start = gid * frameLen;
-    int end = start + frameLen;
     for(int i = start; i < end; i++)
     {
         val = x[i];
@@ -65,13 +16,13 @@ void kernel FLOATvector_NormSquarePartial(global float* x,
     normSquare[gid] = sum;
 }
 
-void kernel FLOATvector_SumPartial(global float* x, global float* sumPartial, private uint frameLen)
+void kernel FLOATvector_SumPartial(global const float* restrict x, global float* restrict sumPartial, private uint frameLen)
 {
-    int gid = get_global_id(0);
-    float sum = 0;
+    uint gid = get_global_id(0);
+    uint start = gid * frameLen;
+    uint end = start + frameLen;
+    float sum = 0.0f;
     float val;
-    int start = gid * frameLen;
-    int end = start + frameLen;
     for(int i = start; i < end; i++)
     {
         val = x[i];
@@ -83,22 +34,22 @@ void kernel FLOATvector_SumPartial(global float* x, global float* sumPartial, pr
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel FLOATvector_NormSquarePartial_barier(global float* x,
-                                                 global float* normSquare,
+void kernel FLOATvector_NormSquarePartial_barier(global const float* restrict x,
+                                                 global float* restrict normSquare,
                                                  local float* localx,
                                                  private uint vecLength)
 {
-    int gid = get_global_id(0);
-    int gs = get_global_size(0);
-    int lid = get_local_id(0);
-    int ls = get_local_size(0);
+    uint gid = get_global_id(0);
+    uint gs = get_global_size(0);
+    uint lid = get_local_id(0);
+    uint ls = get_local_size(0);
     float val;
     if(gid < vecLength)
     {
         val = x[gid];
     } else
     {
-        val = 0.0;
+        val = 0.0f;
     }
     localx[lid] = val * val;
 
@@ -121,15 +72,15 @@ void kernel FLOATvector_NormSquarePartial_barier(global float* x,
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel FLOATvector_SumPartial_barier(global float* x,
-                                          global float* partialSum,
+void kernel FLOATvector_SumPartial_barier(global const float* restrict x,
+                                          global float* restrict partialSum,
                                           local float* loc,
                                           private uint vecLength)
 {
-    int gid = get_global_id(0);
-    int gs = get_global_size(0);
-    int lid = get_local_id(0);
-    int ls = get_local_size(0);
+    uint gid = get_global_id(0);
+    uint gs = get_global_size(0);
+    uint lid = get_local_id(0);
+    uint ls = get_local_size(0);
     float val;
     if(gid < vecLength)
     {
@@ -172,15 +123,15 @@ void kernel FLOATvector_SumPartial_barier(global float* x,
  *
  * @return
  */
-void kernel vector_NormSquarePartial(global float* x,
-                                     global double* normSquare,
+void kernel vector_NormSquarePartial(global const float* restrict x,
+                                     global double* restrict normSquare,
                                      private uint frameLen)
 {
     int gid = get_global_id(0);
-    double sum = 0;
-    double val;
     int start = gid * frameLen;
     int end = start + frameLen;
+    double sum = 0.0;
+    double val;
     for(int i = start; i < end; i++)
     {
         val = x[i];
@@ -198,12 +149,12 @@ void kernel vector_NormSquarePartial(global float* x,
  *
  * @return
  */
-void kernel vector_SumPartial(global double* x, global double* sumPartial, private uint frameLen)
+void kernel vector_SumPartial(global const double* restrict x, global double* restrict sumPartial, private uint frameLen)
 {
     uint gid = get_global_id(0);
-    double sum = 0;
     uint start = gid * frameLen;
     uint end = start + frameLen;
+    double sum = 0.0;
     for(uint i = start; i < end; i++)
     {
         sum += x[i];
@@ -214,8 +165,8 @@ void kernel vector_SumPartial(global double* x, global double* sumPartial, priva
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel vector_NormSquarePartial_barier(global float* x,
-                                            global double* normSquare,
+void kernel vector_NormSquarePartial_barier(global const float* restrict x,
+                                            global double* restrict normSquare,
                                             local double* localx,
                                             private uint vecLength)
 {
@@ -249,9 +200,47 @@ void kernel vector_NormSquarePartial_barier(global float* x,
     }
 }
 
-void kernel vector_ScalarProductPartial_barier(global float* a,
-                                               global float* b,
-                                               global double* product,
+// Want to use it in second line where I am loading doubles into it
+// https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
+// Evidently gs must be multiple of ls and for this code to work ls must be 2^n
+void kernel vector_SumPartial_barier(global const double* restrict x,
+                                     global double* restrict partialSum,
+                                     local double* loc,
+                                     private uint vecLength)
+{
+    uint gid = get_global_id(0);
+    uint gs = get_global_size(0);
+    uint lid = get_local_id(0);
+    uint ls = get_local_size(0);
+    double val;
+    if(gid < vecLength)
+    {
+        val = x[gid];
+    } else
+    {
+        val = 0.0;
+    }
+    loc[lid] = val;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    {
+        if(lid < stride)
+        {
+            loc[lid] += loc[lid + stride];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    if(lid == 0)
+    {
+        gid = get_group_id(0);
+        partialSum[gid] = loc[0] + loc[1];
+    }
+}
+
+void kernel vector_ScalarProductPartial_barier(global const float* restrict a,
+                                               global const float* restrict b,
+                                               global double* restrict product,
                                                local double* localx,
                                                private uint vecLength)
 {
@@ -285,150 +274,9 @@ void kernel vector_ScalarProductPartial_barier(global float* a,
     }
 }
 
-// Want to use it in second line where I am loading doubles into it
-// https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
-// Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel vector_SumPartial_barier(global double* x,
-                                     global double* partialSum,
-                                     local double* loc,
-                                     private uint vecLength)
-{
-    int gid = get_global_id(0);
-    int gs = get_global_size(0);
-    int lid = get_local_id(0);
-    int ls = get_local_size(0);
-    double val;
-    if(gid < vecLength)
-    {
-        val = x[gid];
-    } else
-    {
-        val = 0.0;
-    }
-    loc[lid] = val;
+void kernel FLOATvector_zero(global float* a) { a[get_global_id(0)] = 0.0f; }
 
-    barrier(CLK_LOCAL_MEM_FENCE);
-    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
-    {
-        if(lid < stride)
-        {
-            loc[lid] += loc[lid + stride];
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-    if(lid == 0)
-    {
-        gid = get_group_id(0);
-        partialSum[gid] = loc[0] + loc[1];
-    }
-}
-
-void kernel FLOAT_copy_vector(global float* from, global float* to)
-{
-    int gid = get_global_id(0);
-    to[gid] = from[gid];
-}
-
-void kernel FLOAT_scale_vector(global float* v, private float f)
-{
-    int gid = get_global_id(0);
-    v[gid] = v[gid] * f;
-}
-
-void kernel FLOAT_add_into_first_vector_second_vector_scaled(global float* a,
-                                                             global const float* b,
-                                                             const private float f)
-{
-    const size_t gid = get_global_id(0);
-    a[gid] = a[gid] + f * b[gid];
-}
-
-void kernel FLOAT_zero_vector(global float* a) { a[get_global_id(0)] = 0.0f; }
-
-void kernel FLOAT_add_into_first_vector_second_vector_scaled_offset(global float* a,
-                                                                    global float* b,
-                                                                    private float f,
-                                                                    private uint offset)
-{
-    uint index = get_global_id(0) + offset;
-    float val = a[index] + f * b[index];
-    a[index] = val;
-}
-
-void kernel
-FLOAT_add_into_first_vector_second_vector_scaled_offset_offset(global float* a,
-                                                               global float* b,
-                                                               private float f,
-                                                               private const ulong offsetA,
-                                                               private const ulong offsetB)
-{
-    const ulong gid = get_global_id(0);
-    const ulong indexA = gid + offsetA;
-    const ulong indexB = gid + offsetB;
-    a[indexA] = a[indexA] + f * b[indexB];
-}
-
-void kernel FLOAT_add_into_first_vector_scaled_second_vector(global float* a,
-                                                             global float* b,
-                                                             private float f)
-{
-    uint gid = get_global_id(0);
-    float val = f * a[gid] + b[gid];
-    a[gid] = val;
-}
-
-void kernel FLOAT_copy_vector_offset(global float* from,
-                                     uint offset_from,
-                                     global float* to,
-                                     uint offset_to)
-{
-    uint gid = get_global_id(0);
-    to[gid + offset_to] += from[gid + offset_from];
-}
-
-void kernel FLOAT_compute_sqrt(global float* v)
-{
-    uint gid = get_global_id(0);
-    v[gid] = sqrt(v[gid]);
-}
-
-void kernel FLOAT_compute_inverse(global float* v)
-{
-    uint gid = get_global_id(0);
-    v[gid] = 1.0 / v[gid];
-}
-
-void kernel FLOAT_multiply_vectors_into_first_vector(global float* a, global float* b)
-{
-    uint gid = get_global_id(0);
-    a[gid] = a[gid] * b[gid];
-}
-
-void kernel FLOAT_substitute_greater_than(global float* X,
-                                          const float minValue,
-                                          const float substitution)
-{
-    uint gid = get_global_id(0);
-    float val = X[gid];
-    if(val > minValue)
-    {
-        X[gid] = substitution;
-    }
-}
-
-void kernel FLOAT_substitute_lower_than(global float* X,
-                                        const float maxValue,
-                                        const float substitution)
-{
-    uint gid = get_global_id(0);
-    float val = X[gid];
-    if(val < maxValue)
-    {
-        X[gid] = substitution;
-    }
-}
-
-void kernel FLOAT_zero_infinity(global float* X)
+void kernel FLOATvector_zero_infinite_values(global float* X)
 {
     uint gid = get_global_id(0);
     float val = X[gid];
@@ -438,14 +286,25 @@ void kernel FLOAT_zero_infinity(global float* X)
     }
 }
 
-void kernel FLOAT_A_multiple_B_equals_C(global float* A, global float* B, global float* C)
+void kernel FLOATvector_scale(global float* v, private float f)
 {
-    uint gid = get_global_id(0);
-    float val = A[gid] * B[gid];
-    C[gid] = val;
+    int gid = get_global_id(0);
+    v[gid] = v[gid] * f;
 }
 
-void kernel FLOAT_invert(global float* X)
+void kernel FLOATvector_sqrt(global float* v)
+{
+    uint gid = get_global_id(0);
+    v[gid] = sqrt(v[gid]);
+}
+
+void kernel FLOATvector_invert(global float* v)
+{
+    uint gid = get_global_id(0);
+    v[gid] = 1.0 / v[gid];
+}
+
+void kernel FLOATvector_invert_except_zero(global float* X)
 {
     uint gid = get_global_id(0);
     float val = X[gid];
@@ -454,3 +313,116 @@ void kernel FLOAT_invert(global float* X)
         X[gid] = 1 / val;
     }
 }
+
+void kernel FLOATvector_substitute_greater_than(global float* X,
+                                                const float minValue,
+                                                const float substitution)
+{
+    uint gid = get_global_id(0);
+    float val = X[gid];
+    if(val > minValue)
+    {
+        X[gid] = substitution;
+    }
+}
+
+void kernel FLOATvector_substitute_lower_than(global float* X,
+                                              const float maxValue,
+                                              const float substitution)
+{
+    uint gid = get_global_id(0);
+    float val = X[gid];
+    if(val < maxValue)
+    {
+        X[gid] = substitution;
+    }
+}
+
+void kernel FLOATvector_copy(global const float* restrict A, global float* restrict B)
+{
+    const size_t gid = get_global_id(0);
+    B[gid] = A[gid];
+}
+
+void kernel FLOATvector_copy_offset(global const float* restrict A,
+                                    global float* restrict B,
+                                    private uint offset)
+{
+    const size_t index = get_global_id(0) + offset;
+    B[index] = A[index];
+}
+
+void kernel FLOATvector_copy_offsets(global const float* restrict A,
+                                     private uint oA,
+                                     global float* restrict B,
+                                     private uint oB)
+{
+    const size_t gid = get_global_id(0);
+    B[gid + oB] = A[gid + oA];
+}
+
+void kernel FLOATvector_A_equals_cB(global float* restrict A,
+                                    global const float* restrict B,
+                                    const private float c)
+{
+    const size_t gid = get_global_id(0);
+    A[gid] += c * B[gid];
+}
+
+void kernel FLOATvector_A_equals_A_plus_cB(global float* restrict A,
+                                           global const float* restrict B,
+                                           const private float c)
+{
+    const size_t gid = get_global_id(0);
+    A[gid] += c * B[gid];
+}
+
+void kernel FLOATvector_A_equals_Ac_plus_B(global float* restrict A, global const float* restrict B, private float c)
+{
+    const size_t gid = get_global_id(0);
+    A[gid] = A[gid] * c + B[gid];
+}
+
+void kernel FLOATvector_A_equals_A_times_B(global float* restrict A, global const float* restrict B)
+{
+    const size_t gid = get_global_id(0);
+    A[gid] = A[gid] * B[gid];
+}
+
+void kernel FLOATvector_C_equals_A_times_B(global const float* restrict A,
+                                           global const float* restrict B,
+                                           global float* restrict C)
+{
+    const size_t gid = get_global_id(0);
+    C[gid] = A[gid] * B[gid];
+}
+
+void kernel FLOATvector_A_equals_A_plus_cB_offset(global float* restrict A,
+                                                  global const float* restrict B,
+                                                  private float c,
+                                                  private uint offset)
+{
+    const size_t index = get_global_id(0) + offset;
+    A[index] += c * B[index];
+}
+
+void kernel FLOATvector_B_equals_A_plus_B_offsets(global const float* restrict A,
+                                                  const uint oA,
+                                                  global float* restrict B,
+                                                  const uint oB)
+{
+    const size_t gid = get_global_id(0);
+    B[gid + oB] += A[gid + oA];
+}
+
+void kernel FLOATvector_A_equals_A_plus_cB_offsets(global float* restrict A,
+                                                   private const uint oA,
+                                                   global const float* restrict B,
+                                                   private const uint oB,
+                                                   private float c)
+{
+    const size_t gid = get_global_id(0);
+    A[gid + oA] += c * B[gid + oB];
+}
+
+//==============================END utils.cl=====================================

@@ -1,5 +1,6 @@
+//==============================backprojector_tt.cl=====================================
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
-float inline backprojectVericalFootprints(global float* projection,
+float inline backprojectVericalFootprints(global const float* projection,
                                           private double footprintX,
                                           private int PX,
                                           private double PY_inc0,
@@ -70,24 +71,25 @@ float inline backprojectVericalFootprints(global float* projection,
  *
  * @return
  */
-void kernel FLOATtta3_backproject(global float* volume,
-                                  global float* projection,
-                                  private uint projectionOffset,
-                                  private double16 CM,
-                                  private double3 sourcePosition,
-                                  private double3 normalToDetector,
-                                  private int3 vdims,
-                                  private double3 voxelSizes,
-                                  private int2 pdims,
-                                  private float scalingFactor)
+void kernel FLOATta3_backproject(global float* restrict volume,
+                                 global const float* restrict projection,
+                                 private uint projectionOffset,
+                                 private double16 CM,
+                                 private double3 sourcePosition,
+                                 private double3 normalToDetector,
+                                 private int3 vdims,
+                                 private double3 voxelSizes,
+                                 private double3 volumeCenter,
+                                 private int2 pdims,
+                                 private float scalingFactor)
 {
     uint i = get_global_id(2);
     uint j = get_global_id(1);
     uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz
-        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
-            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
+                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
+                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     const double3 voxelcorner_xyz = zerocorner_xyz
         + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
     // If all the corners of given voxel points to a common coordinate, then
@@ -126,18 +128,18 @@ void kernel FLOATtta3_backproject(global float* volume,
     double xxplusyy = sqrt(sourceToVoxel_xyz_unit.x * sourceToVoxel_xyz_unit.x
                            + sourceToVoxel_xyz_unit.y * sourceToVoxel_xyz_unit.y);
     sourceToVoxel_xyz_unit = fabs(sourceToVoxel_xyz_unit);
-	//To avoid nan induced by dividing by zero
+    // To avoid nan induced by dividing by zero
     double xpath = xxplusyy * voxelSizes.x * sourceToVoxel_xyz_unit.y;
     double ypath = xxplusyy * voxelSizes.y * sourceToVoxel_xyz_unit.x;
-	double path;
-	if(xpath < ypath)
-	{
-		path = xxplusyy * voxelSizes.x / sourceToVoxel_xyz_unit.x;
-	}else
-	{
-		path = xxplusyy * voxelSizes.y / sourceToVoxel_xyz_unit.y;
-	}
-    const double A3 = path/sqrt(1-sourceToVoxel_xyz_unit.z*sourceToVoxel_xyz_unit.z);
+    double path;
+    if(xpath < ypath)
+    {
+        path = xxplusyy * voxelSizes.x / sourceToVoxel_xyz_unit.x;
+    } else
+    {
+        path = xxplusyy * voxelSizes.y / sourceToVoxel_xyz_unit.y;
+    }
+    const double A3 = path / sqrt(1 - sourceToVoxel_xyz_unit.z * sourceToVoxel_xyz_unit.z);
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
@@ -440,3 +442,4 @@ void kernel FLOATtta3_backproject(global float* volume,
     ADD = ADD * scalingFactor * A3;
     volume[IND] += ADD;
 }
+//==============================END backprojector_tt.cl=====================================

@@ -1,11 +1,14 @@
-void kernel FLOATsidon_backproject(global float* volume,
-                                   global float* projection,
+//==============================backprojector_sidon.cl=====================================
+
+void kernel FLOATsidon_backproject(global float* restrict volume,
+                                   global const float* restrict projection,
                                    private uint projectionOffset,
                                    private double16 ICM,
                                    private double3 sourcePosition,
                                    private double3 normalToDetector,
                                    private int3 vdims,
                                    private double3 voxelSizes,
+                                   private double3 volumeCenter,
                                    private int2 pdims,
                                    private float scalingFactor,
                                    private uint2 raysPerPixel)
@@ -19,9 +22,9 @@ void kernel FLOATsidon_backproject(global float* volume,
     double2 pixelSamplingGap = (double2)(1.0) / convert_double2(raysPerPixel);
     double4 P = { 0.0, 0.0, 1.0, 0.0 },
             V; // V is the point that will be projected to P by extended CM
-    const double3 zerocorner_xyz
-        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
-            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
+                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
+                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     const double3 maxcorner_xyz = -zerocorner_xyz;
     for(uint pi = 0; pi < raysPerPixel.x; pi++)
     {
@@ -232,3 +235,4 @@ void kernel FLOATsidon_backproject(global float* volume,
         }
     }
 }
+//==============================END backprojector_sidon.cl=====================================

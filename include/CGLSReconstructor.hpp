@@ -36,27 +36,11 @@ public:
     CGLSReconstructor(uint32_t pdimx,
                       uint32_t pdimy,
                       uint32_t pdimz,
-                      double pixelSpacingX,
-                      double pixelSpacingY,
                       uint32_t vdimx,
                       uint32_t vdimy,
                       uint32_t vdimz,
-                      double voxelSpacingX,
-                      double voxelSpacingY,
-                      double voxelSpacingZ,
                       uint32_t workGroupSize = 256)
-        : BaseReconstructor(pdimx,
-                            pdimy,
-                            pdimz,
-                            pixelSpacingX,
-                            pixelSpacingY,
-                            vdimx,
-                            vdimy,
-                            vdimz,
-                            voxelSpacingX,
-                            voxelSpacingY,
-                            voxelSpacingZ,
-                            workGroupSize)
+        : BaseReconstructor(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
     {
     }
 
@@ -72,30 +56,21 @@ public:
         }
     }
 
-    virtual int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                            uint32_t maxIterations = 100,
-                            float errCondition = 0.01);
+    virtual int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01);
 
-    int reconstruct_experimental(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                                 uint32_t maxIterations = 100,
-                                 float errCondition = 0.01);
+    int reconstruct_experimental(uint32_t maxIterations = 100, float errCondition = 0.01);
 
-    int reconstructDiagonalPreconditioner(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                                          std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
+    int reconstructDiagonalPreconditioner(std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
                                           uint32_t maxIterations = 100,
                                           float errCondition = 0.01);
 
-    int reconstructDiagonalPreconditioner(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                                          float* invertedpreconditioner,
+    int reconstructDiagonalPreconditioner(float* invertedpreconditioner,
                                           uint32_t maxIterations = 100,
                                           float errCondition = 0.01);
 
-    int reconstructJacobi(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                          uint32_t maxIterations = 100,
-                          float errCondition = 0.01);
+    int reconstructJacobi(uint32_t maxIterations = 100, float errCondition = 0.01);
 
-    void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X,
-                                        std::shared_ptr<io::DenProjectionMatrixReader> matrices);
+    void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
 
 private:
     bool reportProgress = false;

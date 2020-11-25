@@ -1,3 +1,4 @@
+//==============================jacobiPreconditionedBackprojector.cl=====================================
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline backprojectEdgeValues(global float* projection,
                                    private double16 CM,
@@ -90,26 +91,27 @@ float inline backprojectEdgeValues(global float* projection,
  *
  * @return
  */
-void kernel FLOATjacobiPreconditionedCutting_voxel_backproject(global float* volume,
-                                           global float* preconditioner,
-                                           global float* projection,
-                                           private uint projectionOffset,
-                                           private double16 CM,
-                                           private double3 sourcePosition,
-                                           private double3 normalToDetector,
-                                           private int3 vdims,
-                                           private double3 voxelSizes,
-                                           private int2 pdims,
-                                           private float scalingFactor)
+void kernel FLOATjacobiPreconditionedCutting_voxel_backproject(global const float* restrict volume,
+                                                               global const float* restrict preconditioner,
+                                                               global float* projection,
+                                                               private uint projectionOffset,
+                                                               private double16 CM,
+                                                               private double3 sourcePosition,
+                                                               private double3 normalToDetector,
+                                                               private int3 vdims,
+                                                               private double3 voxelSizes,
+                                                               private double3 volumeCenter,
+                                                               private int2 pdims,
+                                                               private float scalingFactor)
 {
     int i = get_global_id(2);
     int j = get_global_id(1);
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     float ADD = 0.0;
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz
-        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
-            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
+                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
+                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     const double3 voxelcorner_xyz = zerocorner_xyz
         + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
     // EXPERIMENTAL ... reconstruct inner circle
@@ -147,8 +149,8 @@ void kernel FLOATjacobiPreconditionedCutting_voxel_backproject(global float* vol
             double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
             double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
             double cosPowThree = cosine * cosine * cosine;
-            float value
-                = preconditioner[IND] * scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+            float value = preconditioner[IND] * scalingFactor
+                / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
             ADD = projection[projectionOffset + cornerProjectionIndex] * value * voxelSizes.x
                 * voxelSizes.y * voxelSizes.z;
             volume[IND] += ADD;
@@ -171,7 +173,8 @@ void kernel FLOATjacobiPreconditionedCutting_voxel_backproject(global float* vol
     double sourceToVoxel_xyz_norm = length(sourceToVoxel_xyz);
     double cosine = dot(normalToDetector, sourceToVoxel_xyz) / sourceToVoxel_xyz_norm;
     double cosPowThree = cosine * cosine * cosine;
-    float value = preconditioner[IND] * scalingFactor / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
+    float value = preconditioner[IND] * scalingFactor
+        / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
     // project the rectangle that lies on the z midline of the voxel on the projector
@@ -310,3 +313,4 @@ void kernel FLOATjacobiPreconditionedCutting_voxel_backproject(global float* vol
     }
     volume[IND] += ADD;
 }
+//==============================END jacobiPreconditionedBackprojector.cl=====================================

@@ -24,9 +24,10 @@
 #include "FUN/LegendrePolynomialsExplicit.hpp"
 #include "FUN/SplineInterpolatedFunction.hpp"
 #include "FUN/StepFunction.hpp"
-#include "GLSQRPerfusionReconstructor.hpp"
 #include "PROG/Program.hpp"
 #include "PROG/RunTimeInfo.hpp"
+#include "Perfusion/CGLSPerfusionReconstructor.hpp"
+#include "Perfusion/GLSQRPerfusionReconstructor.hpp"
 
 using namespace CTL;
 using namespace CTL::util;
@@ -125,7 +126,8 @@ public:
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
     bool force = false;
-
+    bool glsqr = false;
+    std::string initialVectorX0;
     /** Frame Time. (0018, 1063) Nominal time (in msec) per individual frame.
      *
      *The model assumes that there is delay between two consecutive frames of the frame_time.
@@ -134,6 +136,7 @@ public:
      */
     /**Fourier functions basisSize*/
     std::string getVolumeName(uint32_t baseIND);
+    std::string getX0Name(uint32_t baseIND);
 };
 
 std::string Args::getVolumeName(uint32_t baseIND)
@@ -145,6 +148,25 @@ std::string Args::getVolumeName(uint32_t baseIND)
                             baseIND, basisSize);
     }
     std::string f = io::xprintf("%s_reconstructed%d", outputVolumePrefix.c_str(), baseIND);
+    return f;
+}
+
+std::string Args::getX0Name(uint32_t baseIND)
+{
+    std::string err;
+    if(initialVectorX0 == "")
+    {
+        err = io::xprintf("X0 was not initialized");
+        LOGE << err;
+        throw std::runtime_error(err);
+    }
+    if(baseIND >= basisSize)
+    {
+        LOGW << io::xprintf("Constructing %d-th X0 volume name that probably won't be used due to "
+                            "the size of the basis of %d elements.",
+                            baseIND, basisSize);
+    }
+    std::string f = io::xprintf("%s_%d", initialVectorX0.c_str(), baseIND);
     return f;
 }
 
@@ -175,13 +197,18 @@ void Args::defineArguments()
                      "be reversed for backward sweep.")
         ->required()
         ->check(CLI::ExistingFile);
+
+    og_settings->add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
+    og_settings->add_option(
+        "--x0", initialVectorX0,
+        "Pattern of initial vectors x0 in the form PATTERN_${i}, zero by default.");
     cliApp->add_flag("--force", force,
                      "Overwrite output files given by output_volume_pattern if they exist.");
 
     // Reconstruction geometry
     addVolumeSizeArgs();
+    addVolumeCenterArgs();
     addVoxelSizeArgs();
-    addPixelSizeArgs();
     addBasisSpecificationArgs();
     addSettingsArgs();
     addProjectorArgs();
@@ -321,31 +348,82 @@ int main(int argc, char* argv[])
     LOGI << io::xprintf("Dimensions are [%d %d %d]", ARG.volumeSizeX, ARG.volumeSizeY,
                         ARG.volumeSizeZ);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
-    std::shared_ptr<GLSQRPerfusionReconstructor> LSQR
-        = std::make_shared<GLSQRPerfusionReconstructor>(
-            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
-            ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
-            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.CLdebug, ARG.CLitemsPerWorkgroup,
-            ARG.reportKthIteration, startPath, ARG.useSidonProjector);
-    int res = LSQR->initializeOpenCL(ARG.CLplatformID);
-    if(res < 0)
+    // Volume initialization
+
+    bool reportProgress = false;
+    if(ARG.reportKthIteration != 0)
     {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-        LOGE << ERR;
-        io::throwerr(ERR);
+        reportProgress = true;
     }
+    bool X0initialized = ARG.initialVectorX0 != "";
     std::vector<float*> volumes;
     float* volume;
     for(std::size_t basisIND = 0; basisIND != ARG.basisSize; basisIND++)
     {
-        volume = new float[ARG.totalVolumeSize]();
+        if(X0initialized)
+        {
+            volume = new float[ARG.totalVolumeSize];
+            io::readBytesFrom(ARG.getX0Name(basisIND), 6, (uint8_t*)volume,
+                              ARG.totalVolumeSize * 4);
+        } else
+        {
+            volume = new float[ARG.totalVolumeSize]();
+        }
         volumes.push_back(volume);
+    }
+    std::vector<std::shared_ptr<matrix::CameraI>> cameraVector;
+    std::shared_ptr<matrix::CameraI> pm;
+    for(std::size_t k = 0; k != dr->count(); k++)
+    {
+        pm = std::make_shared<matrix::LightProjectionMatrix>(dr->readMatrix(k));
+        cameraVector.emplace_back(pm);
+    }
+
+    std::shared_ptr<BasePerfusionReconstructor> BPR;
+    if(ARG.glsqr)
+    {
+        BPR = std::make_shared<GLSQRPerfusionReconstructor>(
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
+    } else
+    {
+        BPR = std::make_shared<CGLSPerfusionReconstructor>(
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
+    }
+    BPR->setReportingParameters(reportProgress, ARG.reportKthIteration, startPath);
+    if(ARG.useSidonProjector)
+    {
+        BPR->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+    } else if(ARG.useTTProjector)
+    {
+
+        BPR->initializeTTProjector();
+    } else
+    {
+        BPR->initializeCVPProjector(ARG.useExactScaling);
+    }
+    int ecd = BPR->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
+                                    xpath, ARG.CLdebug);
+    if(ecd < 0)
+    {
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    ecd = BPR->problemSetup(projections, basisFunctionsValues, volumes, X0initialized, cameraVector,
+                            ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                            ARG.volumeCenterY, ARG.volumeCenterZ);
+    if(ecd != 0)
+    {
+        std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
     }
     // testing
     //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
-    LSQR->initializeData(projections, basisFunctionsValues, volumes);
-    LSQR->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+    BPR->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
 
     uint16_t buf[3];
     buf[0] = ARG.volumeSizeY;

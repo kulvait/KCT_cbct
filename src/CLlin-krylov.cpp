@@ -24,6 +24,7 @@
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "GLSQRReconstructor.hpp"
+#include "MATRIX/CameraI.hpp"
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/Program.hpp"
 
@@ -187,8 +188,9 @@ void Args::defineArguments()
     addForceArgs();
     // Reconstruction geometry
     addVolumeSizeArgs();
+    addVolumeCenterArgs();
     addVoxelSizeArgs();
-    addPixelSizeArgs();
+    // addPixelSizeArgs();
 
     // Program flow parameters
     addSettingsArgs();
@@ -218,17 +220,13 @@ void Args::defineArguments()
 int main(int argc, char* argv[])
 {
     Program PRG(argc, argv);
-    std::string prgInfo;
+    std::string prgInfo = "OpenCL implementation of CGLS and GLSQR applied on the cone beam CT operator.";
     if(version::MODIFIED_SINCE_COMMIT == true)
     {
-        prgInfo = io::xprintf("OpenCL implementation of CGLS and GLSQR applied on the cone beam CT "
-                              "operator. Dirty commit %s",
-                              version::GIT_COMMIT_ID);
+        prgInfo = io::xprintf("%s Dirty commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
     } else
     {
-        prgInfo = io::xprintf("OpenCL implementation of CGLS and GLSQR applied on the cone beam CT "
-                              "operator. Git commit %s",
-                              version::GIT_COMMIT_ID);
+        prgInfo = io::xprintf("%s Git commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
     }
     Args ARG(argc, argv, prgInfo);
     // Argument parsing
@@ -242,8 +240,15 @@ int main(int argc, char* argv[])
     }
     PRG.startLog(true);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
-    std::shared_ptr<io::DenProjectionMatrixReader> dr
+    std::shared_ptr<io::DenProjectionMatrixReader> projectionMatrixReader
         = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
+    std::vector<std::shared_ptr<matrix::CameraI>> cameraVector;
+    std::shared_ptr<matrix::CameraI> pm;
+    for(std::size_t k = 0; k != projectionMatrixReader->count(); k++)
+    {
+        pm = std::make_shared<matrix::LightProjectionMatrix>(projectionMatrixReader->readMatrix(k));
+        cameraVector.emplace_back(pm);
+    }
     float* projection = new float[ARG.totalProjectionsSize];
     io::readBytesFrom(ARG.inputProjections, 6, (uint8_t*)projection, ARG.totalProjectionsSize * 4);
     float* volume;
@@ -266,12 +271,12 @@ int main(int argc, char* argv[])
     {
         reportProgress = true;
     }
+
     if(!ARG.glsqr)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
-            ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
-            ARG.voxelSizeY, ARG.voxelSizeZ, ARG.CLitemsPerWorkgroup);
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
         cgls->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
@@ -299,22 +304,19 @@ int main(int argc, char* argv[])
             LOGE << ERR;
             throw std::runtime_error(ERR);
         }
-        ecd = cgls->initializeVectors(projection, volume, ARG.initialVectorX0 != "");
+        bool X0initialized = ARG.initialVectorX0 != "";
+        ecd = cgls->problemSetup(projection, volume, X0initialized, cameraVector, ARG.voxelSizeX,
+                           ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
+                           ARG.volumeCenterZ);
         if(ecd != 0)
         {
             std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
             LOGE << ERR;
             throw std::runtime_error(ERR);
         }
-        uint16_t buf[3];
-        buf[0] = ARG.volumeSizeY;
-        buf[1] = ARG.volumeSizeX;
-        buf[2] = ARG.volumeSizeZ;
-        io::createEmptyFile(ARG.outputVolume, 0, true);
-        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
         if(ARG.useJacobiPreconditioning)
         {
-            cgls->reconstructJacobi(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+            cgls->reconstructJacobi(ARG.maxIterationCount, ARG.stoppingRelativeError);
         } else
         {
             if(ARG.diagonalPreconditioner != "")
@@ -323,22 +325,27 @@ int main(int argc, char* argv[])
                 io::readBytesFrom(ARG.diagonalPreconditioner, 6, (uint8_t*)preconditionerVolume,
                                   ARG.totalVolumeSize * 4);
                 cgls->reconstructDiagonalPreconditioner(
-                    dr, preconditionerVolume, ARG.maxIterationCount, ARG.stoppingRelativeError);
+                    preconditionerVolume, ARG.maxIterationCount, ARG.stoppingRelativeError);
                 delete[] preconditionerVolume;
             } else
             {
-                cgls->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+                cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
             }
         }
+        uint16_t buf[3];
+        buf[0] = ARG.volumeSizeY;
+        buf[1] = ARG.volumeSizeX;
+        buf[2] = ARG.volumeSizeZ;
+        io::createEmptyFile(ARG.outputVolume, 0, true);
+        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;
     } else
     {
         std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
-            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
-            ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
-            ARG.voxelSizeY, ARG.voxelSizeZ, ARG.CLitemsPerWorkgroup);
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
         glsqr->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
         if(ARG.useSidonProjector)
         {
@@ -364,7 +371,10 @@ int main(int argc, char* argv[])
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
 
-        ecd = glsqr->initializeVectors(projection, volume);
+        bool X0initialized = ARG.initialVectorX0 != "";
+        ecd = glsqr->problemSetup(projection, volume, X0initialized, cameraVector, ARG.voxelSizeX,
+                           ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
+                           ARG.volumeCenterZ);
         if(ecd != 0)
         {
             std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
@@ -379,10 +389,10 @@ int main(int argc, char* argv[])
         io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
         if(ARG.tikhonovLambda <= 0.0)
         {
-            glsqr->reconstruct(dr, ARG.maxIterationCount, ARG.stoppingRelativeError);
+            glsqr->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
         } else
         {
-            glsqr->reconstructTikhonov(dr, ARG.tikhonovLambda, ARG.maxIterationCount,
+            glsqr->reconstructTikhonov(ARG.tikhonovLambda, ARG.maxIterationCount,
                                        ARG.stoppingRelativeError);
         }
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));

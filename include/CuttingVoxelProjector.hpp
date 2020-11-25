@@ -9,6 +9,7 @@
 #include <limits>
 
 // Internal libraries
+#include "Kniha.hpp"
 #include "MATRIX/LUDoolittleForm.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "MATRIX/SquareMatrix.hpp"
@@ -18,59 +19,50 @@
 
 namespace CTL {
 
-class CuttingVoxelProjector
+class CuttingVoxelProjector : public virtual Kniha
 {
 public:
     /**
      * Class that encapsulates projector and backprojector implementation of Cutting Voxel Projector
      * and other algorithms.
      *
-     * @param voxelSizeX X size of voxel
-     * @param voxelSizeY Y size of voxel
-     * @param voxelSizeZ Z size of voxel
-     * @param pixelSizeX
-     * @param pixelSizeY
-     * @param xpath
-     * @param debug Should debugging be used by suppliing source and -g as options
-     * @param centerVoxelProjector Use center voxel projector istead of cutting voxels.
-     * @param exactProjectionScaling
+     * @param pixelNumX Number of pixels
+     * @param pixelNumY Number of pixels
+     * @param voxelNumX Number of voxels
+     * @param voxelNumY Number of voxels
+     * @param voxelNumZ Number of voxels
      */
-    CuttingVoxelProjector(double voxelSizeX,
-                          double voxelSizeY,
-                          double voxelSizeZ,
-                          double pixelSizeX,
-                          double pixelSizeY,
-                          std::string xpath,
-                          bool debug,
-                          bool centerVoxelProjector,
-                          bool exactProjectionScaling = true)
-        : voxelSizeX(voxelSizeX)
-        , voxelSizeY(voxelSizeY)
-        , voxelSizeZ(voxelSizeZ)
-        , pixelSizeX(pixelSizeX)
-        , pixelSizeY(pixelSizeY)
-        , xpath(xpath)
-        , debug(debug)
-        , centerVoxelProjector(centerVoxelProjector)
-        , exactProjectionScaling(exactProjectionScaling)
+    CuttingVoxelProjector(uint64_t pixelNumX,
+                          uint64_t pixelNumY,
+                          uint64_t voxelNumX,
+                          uint64_t voxelNumY,
+                          uint64_t voxelNumZ)
+        : pixelNumX(pixelNumX)
+        , pixelNumY(pixelNumY)
+        , voxelNumX(voxelNumX)
+        , voxelNumY(voxelNumY)
+        , voxelNumZ(voxelNumZ)
     {
-        voxelSizes = cl_double3({ voxelSizeX, voxelSizeY, voxelSizeZ });
-        pixelSizes = cl_double2({ pixelSizeX, pixelSizeY });
+        pixelNumZ = 1; // Default
+        pdims = cl_int2({ int(pixelNumX), int(pixelNumY) });
+        pdims_uint = cl_uint2({ uint32_t(pixelNumX), uint32_t(pixelNumY) });
+        vdims = cl_int3({ int(voxelNumX), int(voxelNumY), int(voxelNumZ) });
+        totalVoxelNum = voxelNumX * voxelNumY * voxelNumZ;
+        totalVolumeBufferSize = totalVoxelNum * sizeof(float);
+        frameSize = pixelNumX * pixelNumY;
+        timestamp = std::chrono::steady_clock::now();
     }
 
-    /** Initializes OpenCL.
-     *
-     * Initialization is done via C++ layer that works also with OpenCL 1.1.
-     *
-     *
-     * @return
-     * @see [OpenCL C++
-     * manual](https://www.khronos.org/registry/OpenCL/specs/opencl-cplusplus-1.1.pdf)
-     * @see [OpenCL C++
-     * tutorial](http://simpleopencl.blogspot.com/2013/06/tutorial-simple-start-with-opencl-and-c.html)
-     */
-    int initializeOpenCL(uint32_t platformId = 0);
-
+    void initializeCVPProjector(bool useExactScaling);
+    void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
+    void initializeTTProjector();
+    void initializeAllAlgorithms();
+    int problemSetup(double voxelSizeX,
+                     double voxelSizeY,
+                     double voxelSizeZ,
+                     double volumeCenterX,
+                     double volumeCenterY,
+                     double volumeCenterZ);
     /**
      * Initialize volume buffer by given size.
      *
@@ -81,15 +73,26 @@ public:
      *
      * @return
      */
-    int initializeOrUpdateVolumeBuffer(uint32_t volumeSizeX,
-                                       uint32_t volumeSizeY,
-                                       uint32_t volumeSizeZ,
+    int initializeOrUpdateVolumeBuffer(float* volumeArray = nullptr);
+    /**
+     * Initialize volume buffer by given size, updates voxel size of the projector.
+     *
+     * @param volumeSizeX
+     * @param volumeSizeY
+     * @param volumeSizeZ
+     * @param volumeArray If its nullptr, initialize by zero.
+     *
+     * @return
+     */
+    int initializeOrUpdateVolumeBuffer(uint32_t voxelNumX,
+                                       uint32_t voxelNumY,
+                                       uint32_t voxelNumZ,
                                        float* volumeArray = nullptr);
 
     int fillVolumeBufferByConstant(float constant);
 
     /**
-     * Initialize projection buffer by given size.
+     * Initialize projection buffer by given size. With or without updating dimensions
      *
      * @param projectionSizeX
      * @param projectionSizeY
@@ -98,66 +101,33 @@ public:
      *
      * @return
      */
-    int initializeOrUpdateProjectionBuffer(uint32_t projectionSizeX,
-                                           uint32_t projectionSizeY,
-                                           uint32_t projectionSizeZ,
+    int initializeOrUpdateProjectionBuffer(uint32_t pixelNumX,
+                                           uint32_t pixelNumY,
+                                           uint32_t pixelNumZ,
                                            float* projectionArray = nullptr);
+    int initializeOrUpdateProjectionBuffer(uint32_t projectionSizeZ,
+                                           float* projectionArray = nullptr);
+    int initializeOrUpdateProjectionBuffer(float* projectionArray = nullptr);
 
     int fillProjectionBufferByConstant(float constant);
 
-    int project(float* projection,
-                uint32_t pdimx,
-                uint32_t pdimy,
-                matrix::ProjectionMatrix P,
-                float scalingFactor);
-    int projectCos(float* projection,
-                   uint32_t pdimx,
-                   uint32_t pdimy,
-                   matrix::ProjectionMatrix P,
-                   float scalingFactor);
-    int projectorWithoutScaling(float* projection,
-                                uint32_t pdimx,
-                                uint32_t pdimy,
-                                double normalProjectionX,
-                                double normalProjectionY,
-                                double sourceToDetector,
-                                matrix::ProjectionMatrix P);
-    int projectExact(float* projection,
-                     uint32_t pdimx,
-                     uint32_t pdimy,
-                     double normalProjectionX,
-                     double normalProjectionY,
-                     double sourceToDetector,
-                     matrix::ProjectionMatrix P);
-    int projectTA3(float* projection,
-                   uint32_t pdimx,
-                   uint32_t pdimy,
-                   double normalProjectionX,
-                   double normalProjectionY,
-                   double sourceToDetector,
-                   matrix::ProjectionMatrix P);
+    int project(float* projection, std::shared_ptr<matrix::CameraI> pm);
+    int projectCos(float* projection, std::shared_ptr<matrix::CameraI> pm);
+    int projectorWithoutScaling(float* projection, std::shared_ptr<matrix::CameraI> pm);
 
-    int projectSiddon(float* projection,
-                      uint32_t pdimx,
-                      uint32_t pdimy,
-                      matrix::ProjectionMatrix matrix,
-                      float scalingFactor,
-                      uint32_t probesPerEdge);
+    int projectExact(float* projection, std::shared_ptr<matrix::CameraI> pm);
+    int projectTA3(float* projection, std::shared_ptr<matrix::CameraI> pm);
+
+    int projectSidon(float* projection, std::shared_ptr<matrix::CameraI> pm);
 
     double normSquare(float* projection, uint32_t pdimx, uint32_t pdimy);
     double normSquareDifference(float* projection, uint32_t pdimx, uint32_t pdimy);
     int backproject(float* volume,
-                    uint32_t vdimx,
-                    uint32_t vdimy,
-                    uint32_t vdimz,
-                    std::vector<matrix::ProjectionMatrix>& CMS,
+                    std::vector<std::shared_ptr<matrix::CameraI>>& cameraVector,
                     uint64_t baseOffset = 0);
 
     int backproject_minmax(float* volume,
-                           uint32_t vdimx,
-                           uint32_t vdimy,
-                           uint32_t vdimz,
-                           std::vector<matrix::ProjectionMatrix>& CMS,
+                           std::vector<std::shared_ptr<matrix::CameraI>>& cameraVector,
                            uint64_t baseOffset = 0);
 
 private:
@@ -165,28 +135,24 @@ private:
     const cl_double DOUBLEZERO = 0.0;
     float FLOATONE = 1.0f;
     float* volume = nullptr;
-    uint32_t volumeSizeX, volumeSizeY, volumeSizeZ;
-    uint64_t totalVolumeSize, totalVolumeBufferSize;
-    double voxelSizeX, voxelSizeY, voxelSizeZ;
-    double pixelSizeX, pixelSizeY;
-    uint32_t projectionSizeX, projectionSizeY, projectionSizeZ;
-    uint64_t totalProjectionSize, totalProjectionBufferSize;
-    std::string xpath; // Path where the program executes
-    bool debug;
+    uint32_t pixelNumX, pixelNumY, pixelNumZ;
+    uint32_t voxelNumX, voxelNumY, voxelNumZ;
+    uint64_t totalVoxelNum, totalVolumeBufferSize;
+    uint64_t frameSize;
+    uint64_t totalPixelNum, totalProjectionBufferSize;
+
     bool centerVoxelProjector = false;
     cl_int3 vdims;
     cl_int2 pdims;
+    cl_uint2 pdims_uint;
     cl_double3 voxelSizes;
-    cl_double2 pixelSizes;
+    cl_double3 volumeCenter;
     bool useCVPProjector = true;
     bool exactProjectionScaling = true;
     bool useSidonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;
 
-    std::shared_ptr<cl::Device> device = nullptr;
-    std::shared_ptr<cl::Context> context = nullptr;
-    std::shared_ptr<cl::CommandQueue> Q = nullptr;
     std::shared_ptr<cl::Buffer> volumeBuffer = nullptr;
     std::shared_ptr<cl::Buffer> projectionBuffer = nullptr;
     std::shared_ptr<cl::Buffer> tmpBuffer = nullptr;
@@ -194,110 +160,7 @@ private:
     std::vector<cl_double16> invertProjectionMatrices(std::vector<matrix::ProjectionMatrix> CM);
     std::vector<float> computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOAT_CopyVector;
-    int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
-
-    // Projectors
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&>>
-        projector;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&>>
-        projector_ta3;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&,
-                                    cl_uint2&>>
-        projector_sidon;
-    // Backprojectors
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&>>
-        FLOATcutting_voxel_backproject;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&>>
-        FLOATcutting_voxel_minmaxbackproject;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&>>
-        FLOATta3_backproject;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_int3&,
-                                    cl_double3&,
-                                    cl_int2&,
-                                    float&,
-                                    cl_uint2&>>
-        FLOATbackprojector_sidon;
-    // Utils
-    std::shared_ptr<cl::make_kernel<cl::Buffer&,
-                                    unsigned int&,
-                                    cl_double16&,
-                                    cl_double3&,
-                                    cl_double3&,
-                                    cl_uint2&,
-                                    float&>>
-        scalingProjectionsCos;
-    std::shared_ptr<
-        cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&, cl_double2&, double&>>
-        scalingProjectionsExact;
-    std::shared_ptr<
-        cl::make_kernel<cl::Buffer&, unsigned int&, cl_uint2&, cl_double2&, cl_double2&, double&>>
-        scalingBackprojectionsExact;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
-        FLOAT_addIntoFirstVectorSecondVectorScaled;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> NormSquare;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, float&, float&>> SubstituteLowerThan;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, float&, float&>> SubstituteGreaterThan;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&>> ZeroInfinity;
+    std::chrono::time_point<std::chrono::steady_clock> timestamp;
 };
 
 } // namespace CTL

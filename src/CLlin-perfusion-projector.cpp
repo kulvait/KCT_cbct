@@ -9,8 +9,8 @@
 #include "FUN/FourierSeries.hpp"
 #include "FUN/LegendrePolynomialsExplicit.hpp"
 #include "FUN/StepFunction.hpp"
-#include "GLSQRPerfusionReconstructor.hpp"
 #include "PROG/Program.hpp"
+#include "Perfusion/PerfusionOperator.hpp"
 
 using namespace CTL;
 using namespace CTL::util;
@@ -90,7 +90,7 @@ void Args::defineArguments()
         "Expected projection data to compare will be in the format PREFIX${02i}.images. ");
     addVoxelSizeArgs();
     addProjectionSizeArgs();
-    addPixelSizeArgs();
+    addVolumeCenterArgs();
     addBasisSpecificationArgs(false);
 }
 
@@ -229,19 +229,6 @@ int main(int argc, char* argv[])
     LOGI << io::xprintf("Dimensions are [%d %d %d]", ARG.volumeSizeX, ARG.volumeSizeY,
                         ARG.volumeSizeZ);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
-    std::shared_ptr<GLSQRPerfusionReconstructor> LSQR
-        = std::make_shared<GLSQRPerfusionReconstructor>(
-            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.pixelSizeX,
-            ARG.pixelSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.voxelSizeX,
-            ARG.voxelSizeY, ARG.voxelSizeZ, xpath, ARG.debug, ARG.itemsPerWorkgroup,
-            ARG.reportIntermediate, startPath);
-    int res = LSQR->initializeOpenCL(ARG.platformId);
-    if(res < 0)
-    {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.platformId);
-        LOGE << ERR;
-        io::throwerr(ERR);
-    }
     std::vector<float*> volumes;
     float* volume;
     for(std::size_t basisIND = 0; basisIND != ARG.basisSize; basisIND++)
@@ -250,11 +237,48 @@ int main(int argc, char* argv[])
         io::readBytesFrom(ARG.inputVolumes[basisIND], 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
         volumes.push_back(volume);
     }
+    std::vector<std::shared_ptr<matrix::CameraI>> cameraVector;
+    std::shared_ptr<matrix::CameraI> pm;
+    for(std::size_t k = 0; k != dr->count(); k++)
+    {
+        pm = std::make_shared<matrix::LightProjectionMatrix>(dr->readMatrix(k));
+        cameraVector.emplace_back(pm);
+    }
+    PerfusionOperator PO(ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ,
+                         ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
+                         ARG.CLitemsPerWorkgroup);
+    PO.setReportingParameters(true, ARG.reportKthIteration, startPath);
+    if(ARG.useSidonProjector)
+    {
+        PO.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+    } else if(ARG.useTTProjector)
+    {
+
+        PO.initializeTTProjector();
+    } else
+    {
+        PO.initializeCVPProjector(ARG.useExactScaling);
+    }
+    int ecd = PO.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
+                                  xpath, ARG.CLdebug);
+    if(ecd < 0)
+    {
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    ecd = PO.problemSetup(projections, basisFunctionsValues, volumes, true, cameraVector,
+                          ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                          ARG.volumeCenterY, ARG.volumeCenterZ);
+    if(ecd != 0)
+    {
+        std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    PO.project();
     // testing
     //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
-
-    LSQR->initializeData(projections, basisFunctionsValues, volumes);
-    LSQR->projectXtoB(dr);
     uint16_t buf[3];
     buf[0] = ARG.projectionSizeY;
     buf[1] = ARG.projectionSizeX;

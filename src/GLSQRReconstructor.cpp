@@ -2,14 +2,9 @@
 
 namespace CTL {
 
-int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                                    uint32_t maxIterations,
-                                    float errCondition)
+int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
     reportTime("WELCOME TO GLSQR, init in", false, true);
-    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
-    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
-    std::vector<float> scalingFactors = computeScalingFactors(PM);
     uint32_t iteration = 0;
 
     // Initialization
@@ -27,7 +22,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
     // Anything might be supplied here, but we will do standard initialization first
     v_next = getXBuffer(0);
     Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
-    backproject(*b_buf, *v_next, PM, ICM, scalingFactors);
+    backproject(*b_buf, *v_next);
     //    LOGD << io::xprintf("Writing file v_init.den");
     //    writeVolume(*v_next, io::xprintf("v_init.den"));
     double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
@@ -106,7 +101,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
         rho_prev_prev = rho_prev;
         rho_prev = rho_cur;
 
-        backproject(*u_cur, *XZ, PM, ICM, scalingFactors);
+        backproject(*u_cur, *XZ);
         sigma_prev = scalarProductXBuffer_barier_double(*XZ, *v_prev);
         addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
         v_next = v_prev;
@@ -129,8 +124,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
             if(sigma_next > sigma_tol)
             {
-                Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
-                addIntoFirstVectorSecondVectorScaled(*v_next, *XZ, float(1.0 / sigma_next), XDIM);
+                algFLOATvector_A_equals_cB(*v_next, *XZ, float(1.0 / sigma_next), XDIM);
             } else
             {
                 d = 1.0;
@@ -143,8 +137,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
             if(sigma_cur > sigma_tol)
             {
-                Q[0]->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
-                addIntoFirstVectorSecondVectorScaled(*v_cur, *XZ, float(1.0 / sigma_cur), XDIM);
+                algFLOATvector_A_equals_cB(*v_cur, *XZ, float(1.0 / sigma_cur), XDIM);
             } else
             {
                 LOGI << "Ending due to the convergence";
@@ -152,7 +145,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
             }
         }
 
-        project(*v_cur, *BZ, PM, ICM, scalingFactors);
+        project(*v_cur, *BZ);
         tau_prev = scalarProductBBuffer_barier_double(*BZ, *u_prev);
         addIntoFirstVectorSecondVectorScaled(*BZ, *u_prev, float(-tau_prev), BDIM);
         u_next = u_prev;
@@ -164,8 +157,7 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
 
         if(tau_next != 0)
         {
-            Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
-            addIntoFirstVectorSecondVectorScaled(*u_next, *BZ, float(1 / tau_next), BDIM);
+            algFLOATvector_A_equals_cB(*u_next, *BZ, float(1 / tau_next), BDIM);
         }
 
         gamma = s_prev_prev * tau_prev;
@@ -207,16 +199,12 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
     return 0;
 }
 
-int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                                            double lambda,
+int GLSQRReconstructor::reconstructTikhonov(double lambda,
                                             uint32_t maxIterations,
                                             float errCondition)
 {
     reportTime("TIKHONOV GLSQR", false, true);
     // Ke vsem b bufferum je treba pridat jeden x buffer
-    std::vector<matrix::ProjectionMatrix> PM = encodeProjectionMatrices(matrices);
-    std::vector<cl_double16> ICM = inverseProjectionMatrices(PM);
-    std::vector<float> scalingFactors = computeScalingFactors(PM);
     uint32_t iteration = 0;
 
     // Initialization
@@ -235,8 +223,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
     // Anything might be supplied here, but we will do standard initialization first
     v_next = getXBuffer(0);
     Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
-    backproject(*b_buf, *v_next, PM, ICM,
-                scalingFactors); // Backprojection of zero is obviously zero for potential b_buf_x
+    backproject(*b_buf, *v_next); // Backprojection of zero is obviously zero for potential b_buf_x
     double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
     scaleFloatVector(*v_next, float(1.0 / vnextnorm), XDIM);
@@ -321,7 +308,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
         s_prev_prev = s_prev;
         s_prev = s_cur;
 
-        //tmp_buf = w_prev_prev;
+        // tmp_buf = w_prev_prev;
         w_prev_prev = w_prev;
         w_prev = w_cur;
         // w_cur = tmp_buf;
@@ -329,7 +316,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
         rho_prev_prev = rho_prev;
         rho_prev = rho_cur;
 
-        backproject(*u_cur, *XZ, PM, ICM, scalingFactors);
+        backproject(*u_cur, *XZ);
         addIntoFirstVectorSecondVectorScaled(*XZ, *u_cur_x, lambda, XDIM);
         sigma_prev = scalarProductXBuffer_barier_double(*XZ, *v_prev);
         addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
@@ -376,7 +363,7 @@ int GLSQRReconstructor::reconstructTikhonov(std::shared_ptr<io::DenProjectionMat
             }
         }
 
-        project(*v_cur, *BZ, PM, ICM, scalingFactors);
+        project(*v_cur, *BZ);
         copyFloatVector(*v_cur, *BZ_x, XDIM);
         scaleFloatVector(*BZ_x, lambda, XDIM);
         tau_prev = scalarProductBBuffer_barier_double(*BZ, *u_prev);

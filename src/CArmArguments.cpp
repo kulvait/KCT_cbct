@@ -212,6 +212,33 @@ void CArmArguments::addVoxelSizeArgs()
     voz->needs(vox)->needs(voy);
 }
 
+void CArmArguments::addVolumeCenterArgs()
+{
+    using namespace CLI;
+    addGeometryGroup();
+    Option* vox = og_geometry
+                      ->add_option(
+                          "--volume-centerx", volumeCenterX,
+                          io::xprintf("X coordinate of the volume center in mm, defaults to %0.2f.",
+                                      volumeCenterX))
+                      ->check(CLI::Range(-10000.0, 10000.0));
+    Option* voy = og_geometry
+                      ->add_option(
+                          "--volume-centery", volumeCenterY,
+                          io::xprintf("Y coordinate of the volume center in mm, defaults to %0.2f.",
+                                      volumeCenterY))
+                      ->check(CLI::Range(-10000.0, 10000.0));
+    Option* voz = og_geometry
+                      ->add_option(
+                          "--volume-centerz", volumeCenterZ,
+                          io::xprintf("Z coordinate of the volume center in mm, defaults to %0.2f.",
+                                      volumeCenterZ))
+                      ->check(CLI::Range(-10000.0, 10000.0));
+    vox->needs(voy)->needs(voz);
+    voy->needs(vox)->needs(voz);
+    voz->needs(vox)->needs(voy);
+}
+
 void CArmArguments::addPixelSizeArgs()
 {
     using namespace CLI;

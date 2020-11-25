@@ -1,28 +1,4 @@
-/** Atomic float addition.
- *
- * Function from
- * https://streamhpc.com/blog/2016-02-09/atomic-operations-for-floats-in-opencl-improved/.
- *
- *
- * @param source Pointer to the memory to perform atomic operation on.
- * @param operand Float to add.
- */
-inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
-{
-    union
-    {
-        unsigned int u32;
-        float f32;
-    } tmp, adrcatch;
-    tmp.f32 = *adr;
-    do
-    {
-        adrcatch.f32 = tmp.f32;
-        tmp.f32 += v;
-        tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
-    } while(tmp.u32 != adrcatch.u32);
-}
-
+//==============================jacobiPreconditionedProjector.cl=====================================
 /** Projection of a volume point v onto X coordinate on projector.
  * No checks for boundaries.
  *
@@ -390,31 +366,6 @@ inline uint voxelIndex(uint i, uint j, uint k, int3 vdims)
     return i + j * vdims.x + k * vdims.x * vdims.y;
 }
 
-/** Kernel to precompute projection indices to spare some redundancy.
- *
- * @param vertexProjectionIndices
- * @param CM
- * @param voxelSizes
- * @param vdims
- *
- * @return
- */
-void kernel computeProjectionIndices(global int* vertexProjectionIndices,
-                                     private double16 CM,
-                                     double3 voxelSizes,
-                                     int3 vdims,
-                                     int2 pdims)
-{
-    uint i = get_global_id(2);
-    uint j = get_global_id(1);
-    uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
-    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
-                                     -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
-    vertexProjectionIndices[i + j * (vdims.x + 1) + k * (vdims.x + 1) * (vdims.y + 1)]
-        = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
-}
-
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -431,15 +382,16 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
  *
  * @return
  */
-void kernel FLOATjacobiPreconditionedCutting_voxel_project(global float* volume,
-                                                           global float* preconditioner,
-                                                           global float* projection,
+void kernel FLOATjacobiPreconditionedCutting_voxel_project(global const float* restrict volume,
+                                                           global const float* restrict preconditioner,
+                                                           global float* restrict projection,
                                                            private uint projectionOffset,
                                                            private double16 CM,
                                                            private double3 sourcePosition,
                                                            private double3 normalToDetector,
                                                            private int3 vdims,
                                                            private double3 voxelSizes,
+                                                           private double3 volumeCenter,
                                                            private int2 pdims,
                                                            private float scalingFactor)
 {
@@ -447,9 +399,9 @@ void kernel FLOATjacobiPreconditionedCutting_voxel_project(global float* volume,
     uint j = get_global_id(1);
     uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz
-        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
-            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
+                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
+                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     const double3 voxelcorner_xyz = zerocorner_xyz
         + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
     // EXPERIMENTAL ... reconstruct inner circle
@@ -638,3 +590,4 @@ void kernel FLOATjacobiPreconditionedCutting_voxel_project(global float* volume,
         insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor, voxelSizes, pdims);
     }
 }
+//==============================END jacobiPreconditionedProjector.cl=====================================

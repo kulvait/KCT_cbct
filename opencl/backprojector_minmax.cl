@@ -1,34 +1,7 @@
+//==============================backprojector_minmax.cl=====================================
 #ifndef zeroPrecisionTolerance
 #define zeroPrecisionTolerance 1e-10
 #endif
-
-void kernel FLOATrescale_backprojections_exact(global float* projection,
-                                           private const uint projectionOffset,
-                                           private const uint2 pdims,
-                                           private const double2 normalProjection,
-                                           private const double2 pixelSizes,
-                                           private const double sourceToDetector)
-{
-    const uint px = get_global_id(0);
-    const uint py = get_global_id(1);
-    const uint IND = projectionOffset + px + pdims.x * py;
-    const double2 pxD = { px, py };
-    const double2 v2 = (pxD - normalProjection) * pixelSizes;
-    const double3 v = (double3)(v2, sourceToDetector);
-    const double3 halfpiX = { 0.5 * pixelSizes.x, 0.0, 0.0 };
-    const double3 halfpiY = { 0.0, 0.5 * pixelSizes.y, 0.0 };
-    const double3 v_A = v - halfpiX + halfpiY;
-    const double3 v_B = v - halfpiX - halfpiY;
-    const double3 v_C = v + halfpiX - halfpiY;
-    const double3 v_D = v + halfpiX + halfpiY;
-    const double3 n_AB = normalize(cross(v_A, v_B));
-    const double3 n_BC = normalize(cross(v_B, v_C));
-    const double3 n_CD = normalize(cross(v_C, v_D));
-    const double3 n_DA = normalize(cross(v_D, v_A));
-    const double S = acos(-dot(n_AB, n_BC)) + acos(-dot(n_BC, n_CD)) - acos(dot(n_CD, n_DA))
-        - acos(dot(n_DA, n_AB));
-    projection[IND] = projection[IND] * S;
-}
 
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline backprojectMinMaxEdgeValues(global float* projection,
@@ -171,7 +144,6 @@ float inline backprojectMinMaxEdgeValues(global float* projection,
     return ADD;
 }
 
-
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -188,14 +160,15 @@ float inline backprojectMinMaxEdgeValues(global float* projection,
  *
  * @return
  */
-void kernel FLOATcutting_voxel_minmaxbackproject(global float* volume,
-                                                 global float* projection,
+void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
+                                                 global const float* restrict projection,
                                                  private uint projectionOffset,
                                                  private double16 CM,
                                                  private double3 sourcePosition,
                                                  private double3 normalToDetector,
                                                  private int3 vdims,
                                                  private double3 voxelSizes,
+                                                 private double3 volumeCenter,
                                                  private int2 pdims,
                                                  private float globalScalingMultiplier)
 {
@@ -204,9 +177,9 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* volume,
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     float ADD = INFINITY;
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz
-        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
-            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
+                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
+                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     const double3 voxelcorner_xyz = zerocorner_xyz
         + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
     const uint IND = voxelIndex(i, j, k, vdims);
@@ -384,8 +357,9 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* volume,
         if(max_PX <= min_PX) // These indices are in the admissible range
         {
             min_PX = convert_int_rtn(0.5 * (pxx_min + pxx_max) + 0.5);
-            ADD = backprojectMinMaxEdgeValues(&projection[projectionOffset], CM, (vx10 + vx01) / 2.0,
-                                             min_PX, scalingFactor, voxelSizes, pdims);
+            ADD = backprojectMinMaxEdgeValues(&projection[projectionOffset], CM,
+                                              (vx10 + vx01) / 2.0, min_PX, scalingFactor,
+                                              voxelSizes, pdims);
             volume[IND] = min(ADD, volume[IND]);
         } else
         {
@@ -410,7 +384,7 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* volume,
                 scaledCutArea = scalingFactor * lastRectangleSectionRelativeArea;
                 intermediateValue
                     = backprojectMinMaxEdgeValues(&projection[projectionOffset], CM, lastInt, I,
-                                                 scaledCutArea, voxelSizes, pdims);
+                                                  scaledCutArea, voxelSizes, pdims);
                 ADD = min(intermediateValue, ADD);
             }
             for(I = I + 1; I < I_STOP; I++)
@@ -449,3 +423,4 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* volume,
         }
     }
 }
+//==============================END File/backprojector_minmax.cl==================================

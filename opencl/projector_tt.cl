@@ -1,3 +1,4 @@
+//==============================projector_tt.cl=====================================
 /**
  * Calculates the integral from a to b over the linear function vith a value 0 at 0 and 1 at
  * intervalLength.
@@ -91,24 +92,25 @@ void inline insertVericalFootprints(global float* projection,
  *
  */
 
-void kernel FLOATtta3_project(global float* volume,
-                              global float* projection,
-                              private uint projectionOffset,
-                              private double16 CM,
-                              private double3 sourcePosition,
-                              private double3 normalToDetector,
-                              private int3 vdims,
-                              private double3 voxelSizes,
-                              private int2 pdims,
-                              private float scalingFactor)
+void kernel FLOATta3_project(global const float* restrict volume,
+                             global const float* projection,
+                             private uint projectionOffset,
+                             private double16 CM,
+                             private double3 sourcePosition,
+                             private double3 normalToDetector,
+                             private int3 vdims,
+                             private double3 voxelSizes,
+                             private double3 volumeCenter,
+                             private int2 pdims,
+                             private float scalingFactor)
 {
     uint i = get_global_id(2);
     uint j = get_global_id(1);
     uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz
-        = { -0.5 * (double)vdims.x * voxelSizes.x, -0.5 * (double)vdims.y * voxelSizes.y,
-            -0.5 * (double)vdims.z * voxelSizes.z }; // -convert_double3(vdims) / 2.0;
+    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
+                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
+                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     const double3 voxelcorner_xyz = zerocorner_xyz
         + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
     // If all the corners of given voxel points to a common coordinate, then
@@ -462,3 +464,4 @@ void kernel FLOATtta3_project(global float* volume,
         }
     }
 }
+//==============================END projector_tt.cl=====================================

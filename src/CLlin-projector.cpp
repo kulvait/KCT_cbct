@@ -13,6 +13,7 @@
 
 // External libraries
 #include "CLI/CLI.hpp" //Command line parser
+#include "gitversion/version.h"
 
 // Internal libraries
 #include "CArmArguments.hpp"
@@ -24,6 +25,7 @@
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/ArgumentsFramespec.hpp"
 #include "PROG/Program.hpp"
+#include "MATRIX/LightProjectionMatrix.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
 using namespace CTL;
@@ -132,7 +134,7 @@ void Args::defineArguments()
         "If the parameter is specified, then we also compute the norm of the right hand "
         "side from the projected vector.");
     addProjectionSizeArgs();
-    addPixelSizeArgs();
+    addVolumeCenterArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
 }
@@ -141,7 +143,15 @@ int main(int argc, char* argv[])
 {
     using namespace CTL::util;
     Program PRG(argc, argv);
-    Args ARG(argc, argv, "OpenCL implementation of the voxel cutting projector.");
+    std::string prgInfo = "OpenCL implementation of the cutting voxel projector.";
+    if(version::MODIFIED_SINCE_COMMIT == true)
+    {
+        prgInfo = io::xprintf("%s Dirty commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
+    } else
+    {
+        prgInfo = io::xprintf("%s Git commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
+    }
+    Args ARG(argc, argv, prgInfo);
     int parseResult = ARG.parse();
     if(parseResult > 0)
     {
@@ -156,22 +166,37 @@ int main(int argc, char* argv[])
         = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
 
     // Construct projector and initialize OpenCL
-    std::shared_ptr<CuttingVoxelProjector> cvp = std::make_shared<CuttingVoxelProjector>(
-        ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.pixelSizeX, ARG.pixelSizeY, xpath,
-        ARG.CLdebug, ARG.useCenterVoxelProjector, ARG.useExactScaling);
-    int res = cvp->initializeOpenCL(ARG.CLplatformID);
-    if(res < 0)
+    CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX,
+                              ARG.volumeSizeY, ARG.voxelSizeZ);
+    CVP.initializeAllAlgorithms();
+    if(ARG.useSidonProjector)
+    {
+        CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+    } else if(ARG.useTTProjector)
+    {
+
+        CVP.initializeTTProjector();
+    } else
+    {
+        CVP.initializeCVPProjector(ARG.useExactScaling);
+    }
+    int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
+                                   xpath, ARG.CLdebug);
+    if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
         LOGE << ERR;
-        io::throwerr(ERR);
+        throw std::runtime_error(ERR);
     }
+    CVP.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                     ARG.volumeCenterY, ARG.volumeCenterZ);
     // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", ARG.frames.size());
     // End parsing arguments
     float* volume = new float[ARG.totalVolumeSize];
     io::readBytesFrom(ARG.inputVolume, 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
-    cvp->initializeOrUpdateVolumeBuffer(ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, volume);
+    CVP.initializeOrUpdateVolumeBuffer(ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, volume);
+    CVP.initializeOrUpdateProjectionBuffer(ARG.projectionSizeX, ARG.projectionSizeY, 1);
     uint32_t projectionElementsCount = ARG.projectionSizeX * ARG.projectionSizeY;
     float* projection = new float[projectionElementsCount]();
     uint16_t buf[3];
@@ -188,63 +213,35 @@ int main(int argc, char* argv[])
         LOGD << io::xprintf("Initialize RHS");
         dpr = std::make_shared<io::DenFrame2DReader<float>>(ARG.rightHandSide);
     }
-    double xoveryspacing = ARG.pixelSizeX / ARG.pixelSizeY;
-    double yoverxspacing = ARG.pixelSizeY / ARG.pixelSizeX;
     for(int f : ARG.frames)
     {
-        matrix::ProjectionMatrix pm = dr->readMatrix(f);
-
-        double x1, x2, y1, y2;
-        std::array<double, 3> sourcePosition = pm.sourcePosition();
-        std::array<double, 3> normalToDetector = pm.normalToDetector();
-        std::array<double, 3> tangentToDetector = pm.tangentToDetectorYDirection();
-        pm.project(sourcePosition[0] - normalToDetector[0], sourcePosition[1] - normalToDetector[1],
-                   sourcePosition[2] - normalToDetector[2], &x1, &y1);
-        pm.project(sourcePosition[0] - normalToDetector[0] + tangentToDetector[0],
-                   sourcePosition[1] - normalToDetector[1] + tangentToDetector[1],
-                   sourcePosition[2] - normalToDetector[2] + tangentToDetector[2], &x2, &y2);
-        double scalingFactor
-            = (x1 - x2) * (x1 - x2) * xoveryspacing + (y1 - y2) * (y1 - y2) * yoverxspacing;
+        using namespace CTL::matrix;
+        std::shared_ptr<CameraI> P = std::make_shared<LightProjectionMatrix>(dr->readMatrix(f));
         if(ARG.useSidonProjector)
         {
-            cvp->projectSiddon(projection, ARG.projectionSizeX, ARG.projectionSizeY, pm,
-                               scalingFactor, ARG.probesPerEdge);
+            CVP.projectSidon(projection, P);
         } else if(ARG.useTTProjector)
         {
-            double sourceToDetector
-                = std::sqrt((x1 - x2) * (x1 - x2) * ARG.pixelSizeX * ARG.pixelSizeX
-                            + (y1 - y2) * (y1 - y2) * ARG.pixelSizeY * ARG.pixelSizeY);
-            cvp->projectTA3(projection, ARG.projectionSizeX, ARG.projectionSizeY, x1, y1,
-                            sourceToDetector, pm);
+            CVP.projectTA3(projection, P);
         } else
         {
             if(ARG.useCosScaling)
             {
-                cvp->projectCos(projection, ARG.projectionSizeX, ARG.projectionSizeY, pm,
-                                scalingFactor);
+                CVP.projectCos(projection, P);
             } else if(ARG.useNoScaling)
             {
-
-                double sourceToDetector
-                    = std::sqrt((x1 - x2) * (x1 - x2) * ARG.pixelSizeX * ARG.pixelSizeX
-                                + (y1 - y2) * (y1 - y2) * ARG.pixelSizeY * ARG.pixelSizeY);
-                cvp->projectorWithoutScaling(projection, ARG.projectionSizeX, ARG.projectionSizeY,
-                                             x1, y1, sourceToDetector, pm);
+                CVP.projectorWithoutScaling(projection, P);
             } else
             {
-                double sourceToDetector
-                    = std::sqrt((x1 - x2) * (x1 - x2) * ARG.pixelSizeX * ARG.pixelSizeX
-                                + (y1 - y2) * (y1 - y2) * ARG.pixelSizeY * ARG.pixelSizeY);
-                cvp->projectExact(projection, ARG.projectionSizeX, ARG.projectionSizeY, x1, y1,
-                                  sourceToDetector, pm);
+                CVP.projectExact(projection, P);
             }
         }
         if(dpr != nullptr)
         {
             std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(f);
-            normSquare += cvp->normSquare((float*)fr->getDataPointer(), ARG.projectionSizeX,
+            normSquare += CVP.normSquare((float*)fr->getDataPointer(), ARG.projectionSizeX,
                                           ARG.projectionSizeY);
-            normSquareDifference += cvp->normSquareDifference(
+            normSquareDifference += CVP.normSquareDifference(
                 (float*)fr->getDataPointer(), ARG.projectionSizeX, ARG.projectionSizeY);
         }
         io::appendBytes(ARG.outputProjection, (uint8_t*)projection,

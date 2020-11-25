@@ -19,43 +19,17 @@
 
 namespace CTL {
 
-class GLSQRReconstructor :public BaseReconstructor
+class GLSQRReconstructor : public BaseReconstructor
 {
 public:
-    /**
-     * Initialize Cutting Voxel Projector
-     *
-     * @param volume Pointer to volume file
-     * @param vdimx Volume x dimension
-     * @param vdimy Volume y dimension
-     * @param vdimz Volume z dimension
-     * @param xpath Path of cl kernel files
-     * @param debug Should debugging be used by suppliing source and -g as options
-     */
     GLSQRReconstructor(uint32_t pdimx,
                        uint32_t pdimy,
                        uint32_t pdimz,
-                       double pixelSpacingX,
-                       double pixelSpacingY,
                        uint32_t vdimx,
                        uint32_t vdimy,
                        uint32_t vdimz,
-                       double voxelSpacingX,
-                       double voxelSpacingY,
-                       double voxelSpacingZ,
                        uint32_t workGroupSize = 256)
-        : BaseReconstructor(pdimx,
-                            pdimy,
-                            pdimz,
-                            pixelSpacingX,
-                            pixelSpacingY,
-                            vdimx,
-                            vdimy,
-                            vdimz,
-                            voxelSpacingX,
-                            voxelSpacingY,
-                            voxelSpacingZ,
-                            workGroupSize)
+        : BaseReconstructor(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
     {
     }
 
@@ -71,13 +45,8 @@ public:
         }
     }
 
-    virtual int reconstruct(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                            uint32_t maxIterations = 100,
-                            float errCondition = 0.01);
-    int reconstructTikhonov(std::shared_ptr<io::DenProjectionMatrixReader> matrices,
-                            double lambda,
-                            uint32_t maxIterations = 100,
-                            float errCondition = 0.01);
+    virtual int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01);
+    int reconstructTikhonov(double lambda, uint32_t maxIterations = 100, float errCondition = 0.01);
 
 private:
     bool reportProgress = false;
