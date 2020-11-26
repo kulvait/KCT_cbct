@@ -8,6 +8,7 @@
 #include <chrono>
 #include <ctime>
 #include <iostream>
+#include <functional>
 
 // Internal libraries
 #include "DEN/DenProjectionMatrixReader.hpp"
