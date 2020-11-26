@@ -39,6 +39,17 @@ public:
         pdims_uint = cl_uint2({ pdimx, pdimy });
         vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
         timestamp = std::chrono::steady_clock::now();
+        if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
+        {
+            localRange = cl::NDRange(1, 16, 16);
+        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 64)
+        {
+            localRange = cl::NDRange(1, 8, 8);
+        } else
+        {
+            localRange = cl::NDRange(1, 1, 1);
+        }
+        localRange = cl::NDRange(1, 16, 16);
     }
 
     void initializeCVPProjector(bool useExactScaling);
@@ -74,6 +85,10 @@ public:
     static std::vector<std::shared_ptr<CameraI>>
     encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
 
+    void setReportingParameters(bool verbose,
+                                uint32_t reportKthIteration = 0,
+                                std::string progressPrefixPath = "");
+
 protected:
     const cl_float FLOATZERO = 0.0;
     const cl_double DOUBLEZERO = 0.0;
@@ -105,26 +120,17 @@ protected:
 
     // Class functions
     int initializeVectors(float* projection, float* volume, bool volumeContainsX0);
-    void setTimestamp(bool finishCommandQueue);
-    std::chrono::milliseconds millisecondsFromTimestamp(bool setNewTimestamp);
-    void reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp);
     void writeVolume(cl::Buffer& X, std::string path);
     void writeProjections(cl::Buffer& B, std::string path);
     std::vector<cl_double16> inverseProjectionMatrices();
 
+    // Printing and reporting
+    void setTimestamp(bool finishCommandQueue);
+    std::chrono::milliseconds millisecondsFromTimestamp(bool setNewTimestamp);
+    std::string printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp);
+    void reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp);
+
     // Functions to manipulate with buffers
-/*
-    float normBBuffer_barier(cl::Buffer& B);
-    float normXBuffer_barier(cl::Buffer& X);
-    float normBBuffer_frame(cl::Buffer& B);
-    float normXBuffer_frame(cl::Buffer& X);
-    double normBBuffer_barier_double(cl::Buffer& B);
-    double normXBuffer_barier_double(cl::Buffer& X);
-    double normBBuffer_frame_double(cl::Buffer& B);
-    double normXBuffer_frame_double(cl::Buffer& X);
-    double scalarProductBBuffer_barier_double(cl::Buffer& A, cl::Buffer& B);
-    double scalarProductXBuffer_barier_double(cl::Buffer& A, cl::Buffer& B);
-*/
     int multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size);
     int vectorA_multiple_B_equals_C(cl::Buffer& A, cl::Buffer& B, cl::Buffer& C, uint64_t size);
     int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
@@ -138,6 +144,7 @@ protected:
     int invertFloatVector(cl::Buffer& X, unsigned int size);
     std::vector<float> computeScalingFactors();
 
+    cl::NDRange localRange;
     /**
      * Backprojection X = AT(B)
      *
@@ -171,6 +178,10 @@ protected:
     std::vector<std::shared_ptr<cl::Buffer>> x_buffers, tmp_x_buffers;
     std::vector<std::shared_ptr<cl::Buffer>> b_buffers, tmp_b_buffers;
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
+
+    bool verbose = false;
+    std::string progressPrefixPath = "";
+    uint32_t reportKthIteration = 0;
 };
 
 } // namespace CTL

@@ -4,7 +4,7 @@ namespace CTL {
 
 int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
-    reportTime("WELCOME TO GLSQR, init in", false, true);
+    LOGD << printTime("WELCOME TO GLSQR, init in", false, true);
     uint32_t iteration = 0;
 
     // Initialization
@@ -203,7 +203,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
                                             uint32_t maxIterations,
                                             float errCondition)
 {
-    reportTime("TIKHONOV GLSQR", false, true);
+    LOGD << printTime("TIKHONOV GLSQR", false, true);
     // Ke vsem b bufferum je treba pridat jeden x buffer
     uint32_t iteration = 0;
 

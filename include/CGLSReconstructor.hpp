@@ -44,18 +44,6 @@ public:
     {
     }
 
-    void setReportingParameters(bool reportProgress,
-                                std::string progressPrefixPath,
-                                uint32_t reportKthIteration)
-    {
-        this->reportProgress = reportProgress;
-        if(reportProgress)
-        {
-            this->progressPrefixPath = progressPrefixPath;
-            this->reportKthIteration = reportKthIteration;
-        }
-    }
-
     virtual int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01);
 
     int reconstruct_experimental(uint32_t maxIterations = 100, float errCondition = 0.01);
@@ -72,10 +60,6 @@ public:
 
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
 
-private:
-    bool reportProgress = false;
-    std::string progressPrefixPath = "";
-    uint32_t reportKthIteration = 0;
 };
 
 } // namespace CTL

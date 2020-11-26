@@ -163,6 +163,7 @@ public:
     std::string inputProjections;
     std::string diagonalPreconditioner;
     bool glsqr = false;
+	bool verbose = true;
 };
 
 /**Argument parsing
@@ -197,6 +198,7 @@ void Args::defineArguments()
     addCLSettingsArgs();
     addProjectorArgs();
 
+    cliApp->add_flag("--verbose,!--no-verbose", verbose, "Verbose print, defaults to true.");
     CLI::Option* glsqr_cli
         = og_settings->add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
 
@@ -220,7 +222,8 @@ void Args::defineArguments()
 int main(int argc, char* argv[])
 {
     Program PRG(argc, argv);
-    std::string prgInfo = "OpenCL implementation of CGLS and GLSQR applied on the cone beam CT operator.";
+    std::string prgInfo
+        = "OpenCL implementation of CGLS and GLSQR applied on the cone beam CT operator.";
     if(version::MODIFIED_SINCE_COMMIT == true)
     {
         prgInfo = io::xprintf("%s Dirty commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
@@ -266,18 +269,13 @@ int main(int argc, char* argv[])
     bname = bname.substr(0, bname.find_last_of("."));
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
-    bool reportProgress = false;
-    if(ARG.reportKthIteration != 0)
-    {
-        reportProgress = true;
-    }
 
     if(!ARG.glsqr)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
             ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
-        cgls->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
+        cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
         if(ARG.useSidonProjector)
@@ -306,8 +304,8 @@ int main(int argc, char* argv[])
         }
         bool X0initialized = ARG.initialVectorX0 != "";
         ecd = cgls->problemSetup(projection, volume, X0initialized, cameraVector, ARG.voxelSizeX,
-                           ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
-                           ARG.volumeCenterZ);
+                                 ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                                 ARG.volumeCenterY, ARG.volumeCenterZ);
         if(ecd != 0)
         {
             std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
@@ -324,8 +322,8 @@ int main(int argc, char* argv[])
                 float* preconditionerVolume = new float[ARG.totalVolumeSize];
                 io::readBytesFrom(ARG.diagonalPreconditioner, 6, (uint8_t*)preconditionerVolume,
                                   ARG.totalVolumeSize * 4);
-                cgls->reconstructDiagonalPreconditioner(
-                    preconditionerVolume, ARG.maxIterationCount, ARG.stoppingRelativeError);
+                cgls->reconstructDiagonalPreconditioner(preconditionerVolume, ARG.maxIterationCount,
+                                                        ARG.stoppingRelativeError);
                 delete[] preconditionerVolume;
             } else
             {
@@ -346,7 +344,7 @@ int main(int argc, char* argv[])
         std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
             ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
-        glsqr->setReportingParameters(reportProgress, startPath, ARG.reportKthIteration);
+        glsqr->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
         if(ARG.useSidonProjector)
         {
             glsqr->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -373,8 +371,8 @@ int main(int argc, char* argv[])
 
         bool X0initialized = ARG.initialVectorX0 != "";
         ecd = glsqr->problemSetup(projection, volume, X0initialized, cameraVector, ARG.voxelSizeX,
-                           ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
-                           ARG.volumeCenterZ);
+                                  ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                                  ARG.volumeCenterY, ARG.volumeCenterZ);
         if(ecd != 0)
         {
             std::string ERR = io::xprintf("OpenCL buffers initialization failed.");

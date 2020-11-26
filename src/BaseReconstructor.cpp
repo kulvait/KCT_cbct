@@ -410,12 +410,14 @@ int BaseReconstructor::multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer&
     return 0;
 }
 
+
 int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     copyFloatVector(B, *tmp_b_buf, BDIM);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
@@ -474,7 +476,8 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
@@ -630,6 +633,17 @@ std::chrono::milliseconds BaseReconstructor::millisecondsFromTimestamp(bool setN
     return ms;
 }
 
+std::string
+BaseReconstructor::printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+{
+    if(finishCommandQueue)
+    {
+        Q[0]->finish();
+    }
+    auto duration = millisecondsFromTimestamp(setNewTimestamp);
+    return io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
+}
+
 void BaseReconstructor::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
 {
     if(finishCommandQueue)
@@ -637,7 +651,19 @@ void BaseReconstructor::reportTime(std::string msg, bool finishCommandQueue, boo
         Q[0]->finish();
     }
     auto duration = millisecondsFromTimestamp(setNewTimestamp);
-    LOGD << io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
+    if(verbose)
+    {
+        LOGD << io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
+    }
+}
+
+void BaseReconstructor::setReportingParameters(bool verbose,
+                                               uint32_t reportKthIteration,
+                                               std::string progressPrefixPath)
+{
+    this->verbose = verbose;
+    this->reportKthIteration = reportKthIteration;
+    this->progressPrefixPath = progressPrefixPath;
 }
 
 double BaseReconstructor::adjointProductTest()

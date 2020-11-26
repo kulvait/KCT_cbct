@@ -12,12 +12,12 @@ namespace CTL {
 double AlgorithmsBarierBuffers::normXBuffer_frame_double(cl::Buffer& X)
 {
     double sum;
+    cl::EnqueueArgs eargs0(*Q[0], cl::NDRange(vdimz));
+    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
     uint32_t framesize = vdimx * vdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(vdimz));
-    (*vector_NormSquarePartial)(eargs1, X, *tmp_x_red1, framesize).wait();
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
+    (*vector_NormSquarePartial)(eargs0, X, *tmp_x_red1, framesize);
     unsigned int arg = vdimz;
-    (*vector_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
+    (*vector_SumPartial)(eargs1, *tmp_x_red1, *tmp_x_red2, arg);
     Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -34,10 +34,10 @@ double AlgorithmsBarierBuffers::normBBuffer_frame_double(cl::Buffer& B)
     double sum;
     uint32_t framesize = pdimx * pdimy;
     cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
-    (*vector_NormSquarePartial)(eargs1, B, *tmp_b_red1, framesize).wait();
+    (*vector_NormSquarePartial)(eargs1, B, *tmp_b_red1, framesize);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     unsigned int arg = pdimz;
-    (*vector_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
+    (*vector_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg);
     Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -54,13 +54,12 @@ double AlgorithmsBarierBuffers::normXBuffer_barier_double(cl::Buffer& X)
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_NormSquarePartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM).wait();
+    (*vector_NormSquarePartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1)
-        .wait();
+    (*vector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
+    (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -77,13 +76,12 @@ double AlgorithmsBarierBuffers::normBBuffer_barier_double(cl::Buffer& B)
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_NormSquarePartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM).wait();
+    (*vector_NormSquarePartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1)
-        .wait();
+    (*vector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
+    (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -102,13 +100,12 @@ double AlgorithmsBarierBuffers::scalarProductXBuffer_barier_double(cl::Buffer& A
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_x_red1, localsize, XDIM).wait();
+    (*vector_ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1)
-        .wait();
+    (*vector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
+    (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -127,13 +124,12 @@ double AlgorithmsBarierBuffers::scalarProductBBuffer_barier_double(cl::Buffer& A
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_b_red1, localsize, BDIM).wait();
+    (*vector_ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1)
-        .wait();
+    (*vector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
+    (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -150,10 +146,10 @@ float AlgorithmsBarierBuffers::normXBuffer_frame(cl::Buffer& X)
     float sum;
     uint32_t framesize = vdimx * vdimy;
     cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(vdimz));
-    (*FLOATvector_NormSquarePartial)(eargs1, X, *tmp_x_red1, framesize).wait();
+    (*FLOATvector_NormSquarePartial)(eargs1, X, *tmp_x_red1, framesize);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     unsigned int arg = vdimz;
-    (*FLOATvector_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg).wait();
+    (*FLOATvector_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg);
     Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -170,10 +166,10 @@ float AlgorithmsBarierBuffers::normBBuffer_frame(cl::Buffer& B)
     float sum;
     uint32_t framesize = pdimx * pdimy;
     cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
-    (*FLOATvector_NormSquarePartial)(eargs1, B, *tmp_b_red1, framesize).wait();
+    (*FLOATvector_NormSquarePartial)(eargs1, B, *tmp_b_red1, framesize);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     unsigned int arg = pdimz;
-    (*FLOATvector_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg).wait();
+    (*FLOATvector_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg);
     Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -191,13 +187,13 @@ float AlgorithmsBarierBuffers::normXBuffer_barier(cl::Buffer& X)
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_NormSquarePartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM).wait();
+    (*FLOATvector_NormSquarePartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1)
-        .wait();
+    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize,
+                                     XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2).wait();
+    (*FLOATvector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -214,13 +210,13 @@ float AlgorithmsBarierBuffers::normBBuffer_barier(cl::Buffer& B)
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_NormSquarePartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM).wait();
+    (*FLOATvector_NormSquarePartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1)
-        .wait();
+    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize,
+                                     BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2).wait();
+    (*FLOATvector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }

@@ -4,8 +4,7 @@ namespace CTL {
 
 int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
-    bool blockingReport = false;
-    reportTime("WELCOME TO CGLS, init", blockingReport, true);
+    LOGD << printTime("WELCOME TO CGLS, init", false, true);
     uint32_t iteration = 1;
 
     // Initialization
@@ -21,35 +20,28 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     std::shared_ptr<cl::Buffer> discrepancy_bbuf, AdirectionVector_bbuf; // B buffers
     discrepancy_bbuf = getBBuffer(0);
     AdirectionVector_bbuf = getBBuffer(1);
-
-    // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
-    // c_0 is filled by b
-    // v_0=w_0=BACKPROJECT(c_0)
-    // writeProjections(*discrepancy_bbuf, io::xprintf("/tmp/cgls/c_0.den"));
-    copyFloatVector(*b_buf, *discrepancy_bbuf, BDIM); // discrepancy_bbuf stores initial discrepancy
+    // discrepancy_bbuf stores initial discrepancy
+    algFLOATvector_copy(*b_buf, *discrepancy_bbuf, BDIM);
     if(useVolumeAsInitialX0)
     {
-        setTimestamp(blockingReport);
         project(*x_buf, *AdirectionVector_bbuf);
-        reportTime("Projection x0", blockingReport, true);
-        addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -1.0, BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -1.0f, BDIM);
+        reportTime("Projection x0", false, true);
     } else
     {
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     }
-    setTimestamp(blockingReport);
     backproject(*discrepancy_bbuf, *residualVector_xbuf);
-    reportTime("Backprojection 0", blockingReport, true);
-    copyFloatVector(*residualVector_xbuf, *directionVector_xbuf, XDIM);
+    algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
     residualNorm2_old = normXBuffer_barier_double(*residualVector_xbuf);
+    reportTime("Backprojection 0", false, true);
     NR0 = std::sqrt(residualNorm2_old);
-    setTimestamp(blockingReport);
     project(*directionVector_xbuf, *AdirectionVector_bbuf);
-    reportTime("Projection 1", blockingReport, true);
     AdirectionNorm2 = normBBuffer_barier_double(*AdirectionVector_bbuf);
+    reportTime("Projection 1", false, true);
     alpha = residualNorm2_old / AdirectionNorm2;
-    addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
-    addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
+    algFLOATvector_A_equals_A_plus_cB(*x_buf, *directionVector_xbuf, alpha, XDIM);
+    algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
     norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
     while(norm / NB0 > errCondition && iteration < maxIterations)
     {
@@ -63,42 +55,35 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         // DEBUG
         if(iteration % 10 == 0)
         {
-            setTimestamp(blockingReport);
             project(*x_buf, *discrepancy_bbuf);
-            reportTime(io::xprintf("Reothrogonalization projection %d", iteration), blockingReport,
-                       true);
-            addIntoFirstVectorScaledSecondVector(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
+            algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
             double norm2 = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
-
+            reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
             LOGE << io::xprintf(
                 "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
                 "loss of orthogonality %f%%.",
                 iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
         }
         // DEBUG
-        setTimestamp(blockingReport);
         backproject(*discrepancy_bbuf, *residualVector_xbuf);
-        reportTime(io::xprintf("Backprojection %d", iteration), blockingReport, true);
         residualNorm2_now = normXBuffer_barier_double(*residualVector_xbuf);
+        reportTime(io::xprintf("Backprojection %d", iteration), false, true);
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
         LOGE << io::xprintf("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
                             "that is %0.3f%% of |AT(Ax0-b)|.",
                             iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
-        addIntoFirstVectorScaledSecondVector(*directionVector_xbuf, *residualVector_xbuf, beta,
-                                             XDIM);
+        algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
         residualNorm2_old = residualNorm2_now;
-        setTimestamp(blockingReport);
         project(*directionVector_xbuf, *AdirectionVector_bbuf);
-        reportTime(io::xprintf("Projection %d", iteration), blockingReport, true);
         AdirectionNorm2 = normBBuffer_barier_double(*AdirectionVector_bbuf);
+        reportTime(io::xprintf("Projection %d", iteration), false, true);
         alpha = residualNorm2_old / AdirectionNorm2;
-        addIntoFirstVectorSecondVectorScaled(*x_buf, *directionVector_xbuf, alpha, XDIM);
-        addIntoFirstVectorSecondVectorScaled(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha,
-                                             BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*x_buf, *directionVector_xbuf, alpha, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
         norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
     }
     LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
@@ -250,7 +235,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     c_buf = getBBuffer(0);
     d_buf = getBBuffer(1);
     reportTime("CGLS INIT", false, true);
-    if(reportProgress)
+    if(verbose)
     {
         // writeProjections(*b_buf, io::xprintf("%sb.den", progressPrefixPath.c_str()));
         // writeVolume(*x_buf, io::xprintf("%sx_0.den", progressPrefixPath.c_str()));
@@ -308,7 +293,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     }
     // Experimental
     reportTime("v_0 backprojection", false, true);
-    if(reportProgress)
+    if(verbose)
     {
         // writeVolume(*v_buf, io::xprintf("%sv_0.den", progressPrefixPath.c_str()));
     }
@@ -325,7 +310,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     // EXPERIMENTAL
     copyFloatVector(*v_proj, *w_proj, pdimx * pdimy);
     // EXPERIMENTAL
-    if(reportProgress)
+    if(verbose)
     {
         // writeVolume(*w_buf, io::xprintf("%sw_0.den", progressPrefixPath.c_str()));
     }
@@ -337,7 +322,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     }
     // Experimental
     reportTime("d_0 projection", false, true);
-    if(reportProgress)
+    if(verbose)
     {
         // writeProjections(*d_buf, io::xprintf("%sd_0.den", progressPrefixPath.c_str()));
     }
@@ -353,12 +338,12 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         // EXPERIMENTAL
         addIntoFirstVectorSecondVectorScaled(*x_proj, *w_proj, alpha, pdimx * pdimy);
         // EXPERIMENTAL
-        if(reportProgress)
+        if(verbose)
         {
             writeVolume(*x_buf, io::xprintf("%sx_%d.den", progressPrefixPath.c_str(), iteration));
         }
         addIntoFirstVectorSecondVectorScaled(*c_buf, *d_buf, -alpha, BDIM);
-        if(reportProgress)
+        if(verbose)
         {
             //    writeProjections(*c_buf,
             //                     io::xprintf("%sc_%d.den", progressPrefixPath.c_str(),
@@ -374,7 +359,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         // Experimental
         reportTime(io::xprintf("v_%d backprojection", iteration), false, true);
 
-        if(reportProgress)
+        if(verbose)
         {
             //    writeVolume(*v_buf, io::xprintf("%sv_%d.den", progressPrefixPath.c_str(),
             //    iteration));
@@ -394,7 +379,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         // EXPERIMENTAL
         addIntoFirstVectorScaledSecondVector(*w_proj, *v_proj, beta, pdimx * pdimy);
         // EXPERIMENTAL
-        if(reportProgress)
+        if(verbose)
         {
             //    writeVolume(*w_buf, io::xprintf("%sw_%d.den", progressPrefixPath.c_str(),
             //    iteration));
@@ -408,7 +393,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         }
         // EXPERIMENTAL
         reportTime(io::xprintf("d_%d projection", iteration), false, true);
-        if(reportProgress)
+        if(verbose)
         {
             //    writeProjections(*d_buf,
             //                     io::xprintf("%sd_%d.den", progressPrefixPath.c_str(),
