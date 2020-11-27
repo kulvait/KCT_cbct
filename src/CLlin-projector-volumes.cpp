@@ -119,6 +119,7 @@ int Args::postParse()
             return -1;
         }
     }
+    parsePlatformString();
     return 0;
 }
 
@@ -209,7 +210,7 @@ int main(int argc, char* argv[])
     // End parsing arguments
     float* volume = new float[ARG.totalVoxelNum];
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.voxelNumX,
-                              ARG.voxelNumY, ARG.voxelSizeZ);
+                              ARG.voxelNumY, ARG.voxelNumZ);
     CVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {

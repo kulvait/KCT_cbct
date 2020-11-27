@@ -26,30 +26,30 @@ public:
      * Class that encapsulates projector and backprojector implementation of Cutting Voxel Projector
      * and other algorithms.
      *
-     * @param pixelNumX Number of pixels
-     * @param pixelNumY Number of pixels
-     * @param voxelNumX Number of voxels
-     * @param voxelNumY Number of voxels
-     * @param voxelNumZ Number of voxels
+     * @param pdimx Number of pixels
+     * @param pdimy Number of pixels
+     * @param vdimx Number of voxels
+     * @param vdimy Number of voxels
+     * @param vdimz Number of voxels
      */
-    CuttingVoxelProjector(uint64_t pixelNumX,
-                          uint64_t pixelNumY,
-                          uint64_t voxelNumX,
-                          uint64_t voxelNumY,
-                          uint64_t voxelNumZ)
-        : pixelNumX(pixelNumX)
-        , pixelNumY(pixelNumY)
-        , voxelNumX(voxelNumX)
-        , voxelNumY(voxelNumY)
-        , voxelNumZ(voxelNumZ)
+    CuttingVoxelProjector(uint64_t pdimx,
+                          uint64_t pdimy,
+                          uint64_t vdimx,
+                          uint64_t vdimy,
+                          uint64_t vdimz)
+        : pdimx(pdimx)
+        , pdimy(pdimy)
+        , vdimx(vdimx)
+        , vdimy(vdimy)
+        , vdimz(vdimz)
     {
-        pixelNumZ = 1; // Default
-        pdims = cl_int2({ int(pixelNumX), int(pixelNumY) });
-        pdims_uint = cl_uint2({ uint32_t(pixelNumX), uint32_t(pixelNumY) });
-        vdims = cl_int3({ int(voxelNumX), int(voxelNumY), int(voxelNumZ) });
-        totalVoxelNum = voxelNumX * voxelNumY * voxelNumZ;
+        pdimz = 1; // Default
+        pdims = cl_int2({ int(pdimx), int(pdimy) });
+        pdims_uint = cl_uint2({ uint32_t(pdimx), uint32_t(pdimy) });
+        vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
+        totalVoxelNum = vdimx * vdimy * vdimz;
         totalVolumeBufferSize = totalVoxelNum * sizeof(float);
-        frameSize = pixelNumX * pixelNumY;
+        frameSize = pdimx * pdimy;
         timestamp = std::chrono::steady_clock::now();
     }
 
@@ -84,9 +84,9 @@ public:
      *
      * @return
      */
-    int initializeOrUpdateVolumeBuffer(uint32_t voxelNumX,
-                                       uint32_t voxelNumY,
-                                       uint32_t voxelNumZ,
+    int initializeOrUpdateVolumeBuffer(uint32_t vdimx,
+                                       uint32_t vdimy,
+                                       uint32_t vdimz,
                                        float* volumeArray = nullptr);
 
     int fillVolumeBufferByConstant(float constant);
@@ -101,9 +101,9 @@ public:
      *
      * @return
      */
-    int initializeOrUpdateProjectionBuffer(uint32_t pixelNumX,
-                                           uint32_t pixelNumY,
-                                           uint32_t pixelNumZ,
+    int initializeOrUpdateProjectionBuffer(uint32_t pdimx,
+                                           uint32_t pdimy,
+                                           uint32_t pdimz,
                                            float* projectionArray = nullptr);
     int initializeOrUpdateProjectionBuffer(uint32_t projectionSizeZ,
                                            float* projectionArray = nullptr);
@@ -135,8 +135,8 @@ private:
     const cl_double DOUBLEZERO = 0.0;
     float FLOATONE = 1.0f;
     float* volume = nullptr;
-    uint32_t pixelNumX, pixelNumY, pixelNumZ;
-    uint32_t voxelNumX, voxelNumY, voxelNumZ;
+    uint32_t pdimx, pdimy, pdimz;
+    uint32_t vdimx, vdimy, vdimz;
     uint64_t totalVoxelNum, totalVolumeBufferSize;
     uint64_t frameSize;
     uint64_t totalPixelNum, totalProjectionBufferSize;
