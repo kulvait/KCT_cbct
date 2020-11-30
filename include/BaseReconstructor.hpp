@@ -44,7 +44,7 @@ public:
             localRange = cl::NDRange(1, 8, 8);
         } else
         {
-            localRange = cl::NDRange(1, 1, 1);
+            localRange = cl::NDRange();
         }
     }
 

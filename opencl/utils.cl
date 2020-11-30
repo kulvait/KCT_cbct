@@ -366,7 +366,7 @@ void kernel FLOATvector_A_equals_cB(global float* restrict A,
                                     const private float c)
 {
     const size_t gid = get_global_id(0);
-    A[gid] += c * B[gid];
+    A[gid] = c * B[gid];
 }
 
 void kernel FLOATvector_A_equals_A_plus_cB(global float* restrict A,
