@@ -659,46 +659,6 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                                        private int2 pdims,
                                        private float scalingFactor)
 {
-    /*
-        const uint groupSize = 32;
-        const size_t mxi = get_global_size(2);
-        const size_t mxj = get_global_size(1);
-        const size_t mxk = get_global_size(0);
-        const uint groupCounti = (mxi + groupSize - 1) / groupSize;
-        const uint groupCountj = (mxj + groupSize - 1) / groupSize;
-        const uint groupCountk = (mxk + groupSize - 1) / groupSize;
-        const size_t ii = get_global_id(2);
-        const size_t ij = get_global_id(1);
-        const size_t ik = get_global_id(0);
-        uint ai, aj, ak, bi, bj, bk;
-        ai = ii % groupCounti;
-        aj = ij % groupCountj;
-        ak = ik % groupCountk;
-        bi = ii / groupCounti;
-        bj = ij / groupCountj;
-        bk = ik / groupCountk;
-        uint i = groupSize * ai + bi;
-        uint j = groupSize * aj + bj;
-        uint k = groupSize * ak + bk;
-        if(i >= mxi)
-        {
-            int off = (mxi - 1) % groupSize;
-            int excess = bi - off;
-            i = groupSize * (groupCounti - excess) - 1;
-        }
-        if(j >= mxj)
-        {
-            int off = (mxj - 1) % groupSize;
-            int excess = bj - off;
-            j = groupSize * (groupCountj - excess) - 1;
-        }
-        if(k >= mxk)
-        {
-            int off = (mxk - 1) % groupSize;
-            int excess = bk - off;
-            k = groupSize * (groupCountk - excess) - 1;
-        }
-    */
     uint i = get_global_id(2);
     uint j = get_global_id(1);
     uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
@@ -896,33 +856,6 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
 
             min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + 0.5);
             max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
-            // DEBUG START
-            /*
-           if(i == 2 && j == 1 && k == 0)
-            {
-                AtomicAdd_g_f(&projection[0], min_PX);
-                AtomicAdd_g_f(&projection[1], max_PX);
-                AtomicAdd_g_f(&projection[2], pxx_min);
-                AtomicAdd_g_f(&projection[3], pxx_max);
-                AtomicAdd_g_f(&projection[4], *PX_ccw[0]);
-                AtomicAdd_g_f(&projection[5], *PX_ccw[1]);
-                AtomicAdd_g_f(&projection[6], *PX_ccw[2]);
-                AtomicAdd_g_f(&projection[7], *PX_ccw[3]);
-                AtomicAdd_g_f(&projection[8], (*(V_ccw[0]))[0]);
-                AtomicAdd_g_f(&projection[9], (*(V_ccw[0]))[1]);
-                AtomicAdd_g_f(&projection[10], (*(V_ccw[0]))[2]);
-                AtomicAdd_g_f(&projection[11], (*(V_ccw[1]))[0]);
-                AtomicAdd_g_f(&projection[12], (*(V_ccw[1]))[1]);
-                AtomicAdd_g_f(&projection[13], (*(V_ccw[1]))[2]);
-                AtomicAdd_g_f(&projection[14], (*(V_ccw[2]))[0]);
-                AtomicAdd_g_f(&projection[15], (*(V_ccw[2]))[1]);
-                AtomicAdd_g_f(&projection[16], (*(V_ccw[2]))[2]);
-                AtomicAdd_g_f(&projection[17], (*(V_ccw[3]))[0]);
-                AtomicAdd_g_f(&projection[18], (*(V_ccw[3]))[1]);
-                AtomicAdd_g_f(&projection[19], (*(V_ccw[3]))[2]);
-            }
-            */
-            // DEBUG
             if(max_PX >= 0 && min_PX < pdims.x)
             {
                 if(max_PX <= min_PX) // These indices are in the admissible range
@@ -948,74 +881,6 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                     lastSectionSize = exactIntersectionPoints(
                         ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], PX_ccw[0],
                         PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
-                    // DEBUG START
-                    //                    if(i == 1 && j == 1 && k == 0)
-                    //                    {
-                    //                        AtomicAdd_g_f(&projection[20], lastInt[0]);
-                    //                        AtomicAdd_g_f(&projection[21], lastInt[1]);
-                    //                        AtomicAdd_g_f(&projection[22], lastInt[2]);
-                    //                        double XXX = 319.0 + 0.5;
-                    //                        AtomicAdd_g_f(&projection[23], XXX);
-                    //                        if(XXX < (*PX_ccw[1]))
-                    //                        {
-                    //                            AtomicAdd_g_f(&projection[24], 1.0);
-                    //                        } else
-                    //                        {
-                    //                            AtomicAdd_g_f(&projection[24], -1.0);
-                    //                        }
-                    //                        if(XXX < (*PX_ccw[2]))
-                    //                        {
-                    //                            AtomicAdd_g_f(&projection[25], 1.0);
-                    //                        } else
-                    //                        {
-                    //                            AtomicAdd_g_f(&projection[25], -1.0);
-                    //                        }
-                    //                        double p, q, tmp, totalweight;
-                    //                        double3 v_cw, v_ccw, shift;
-                    //                        double3 Fvector = CM.s012 - XXX * CM.s89a;
-                    //                        double Fconstant = CM.s3 - XXX * CM.sb;
-                    //                        double3 v0, v1, v2, v3;
-                    //                        v0 = *V_ccw[0];
-                    //                        v1 = *V_ccw[1];
-                    //                        v2 = *V_ccw[2];
-                    //                        v3 = *V_ccw[3];
-                    //                        double FproductA = dot(v1, Fvector);
-                    //                        double FproductB = dot(v2, Fvector);
-                    //                        double3 centroid;
-                    //                        p = (FproductA + Fconstant) / (FproductA - FproductB);
-                    //                        v_ccw = (v1) * (1.0 - p) + (v2)*p;
-                    //                        AtomicAdd_g_f(&projection[26], p);
-                    //                        if(XXX < (*PX_ccw[3]))
-                    //                        {
-                    //                            AtomicAdd_g_f(&projection[27], 1.0);
-                    //                            q = (dot(v0, Fvector) + Fconstant)
-                    //                                / (dot(v0, Fvector) - dot(v3, Fvector));
-                    //                            v_cw = (v0) * (1.0 - q) + (v3)*q;
-                    //                            centroid = ((v1) + v_cw + (q / (p + q)) * (v0) +
-                    //                            (p / (p + q)) * v_ccw)
-                    //                                / 3.0;
-                    //                            AtomicAdd_g_f(&projection[28], p / (p + q));
-                    //                            AtomicAdd_g_f(&projection[28], v_ccw[0] * v_ccw[1]
-                    //                            * v_ccw[2]); AtomicAdd_g_f(&projection[28],
-                    //                            v_cw[0] * v_cw[1] * v_cw[2]);
-                    //                            AtomicAdd_g_f(&projection[28], v_ccw[2]);
-                    //                        } else
-                    //                        {
-                    //                            AtomicAdd_g_f(&projection[27], -1.0);
-                    //                            q = (dot(v3, Fvector) + Fconstant) / (dot(v3,
-                    //                            Fvector) - FproductB); v_cw = (v3) * (1.0 - q) +
-                    //                            (v2)*q; tmp = (1.0 - p) * (1.0 - q) * 0.5;
-                    //                            totalweight = 1.0 - tmp;
-                    //                            centroid = (((v0) + (v2)) / 2 - tmp * (v_ccw +
-                    //                            v_cw + (v2)) / 3.0)
-                    //                                / totalweight;
-                    //                            AtomicAdd_g_f(&projection[28], totalweight);
-                    //                        }
-                    //                        AtomicAdd_g_f(&projection[28], centroid[0]);
-                    //                        AtomicAdd_g_f(&projection[28], centroid[1]);
-                    //                        AtomicAdd_g_f(&projection[28], centroid[2]);
-                    //                    }
-                    // DEBUG
 
                     if(I >= 0)
                     {
@@ -1024,17 +889,6 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                         // voxelSizes, pdims);
                         exactEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
                                         voxelSizes, pdims);
-                        // DEBUG
-                        /*
-                                        if(isnan(lastInt[0]) && projection[0] == 0.0)
-                                        {
-                                            AtomicAdd_g_f(&projection[0], i);
-                                            AtomicAdd_g_f(&projection[1], j);
-                                            AtomicAdd_g_f(&projection[2], k);
-                                            return;
-                                        }
-                */
-                        // ENDDEBUG
                     }
                     for(I = I + 1; I < I_STOP; I++)
                     {
@@ -1050,17 +904,6 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                                         voxelSizes, pdims);
                         lastSectionSize = nextSectionSize;
                         lastInt = nextInt;
-                        // DEBUG
-                        /*
-                                                if(isnan(Int[0]) && projection[0] == 0.0)
-                                                {
-                                                    AtomicAdd_g_f(&projection[0], i);
-                                                    AtomicAdd_g_f(&projection[1], j);
-                                                    AtomicAdd_g_f(&projection[2], k);
-                                                    return;
-                                                }
-                        */
-                        // ENDDEBUG
                     }
                     if(I_STOP < pdims.x)
                     {
@@ -1072,17 +915,6 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                         // voxelSizes, pdims);
                         exactEdgeValues(&projection[projectionOffset], CM, Int, I, factor,
                                         voxelSizes, pdims);
-                        // DEBUG
-                        /*
-                                                if(isnan(Int[0]) && projection[0] == 0.0)
-                                                {
-                                                    AtomicAdd_g_f(&projection[0], i);
-                                                    AtomicAdd_g_f(&projection[1], j);
-                                                    AtomicAdd_g_f(&projection[2], k);
-                                                    return;
-                                                }
-                        */
-                        // ENDDEBUG
                     }
                 }
             }

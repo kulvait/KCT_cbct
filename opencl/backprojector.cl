@@ -227,46 +227,6 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
                                            private int2 pdims,
                                            private float scalingFactor)
 {
-    /*
-        const uint groupSize = 32;
-        const size_t mxi = get_global_size(2);
-        const size_t mxj = get_global_size(1);
-        const size_t mxk = get_global_size(0);
-        const uint groupCounti = (mxi + groupSize - 1) / groupSize;
-        const uint groupCountj = (mxj + groupSize - 1) / groupSize;
-        const uint groupCountk = (mxk + groupSize - 1) / groupSize;
-        const size_t ii = get_global_id(2);
-        const size_t ij = get_global_id(1);
-        const size_t ik = get_global_id(0);
-        uint ai, aj, ak, bi, bj, bk;
-        ai = ii % groupCounti;
-        aj = ij % groupCountj;
-        ak = ik % groupCountk;
-        bi = ii / groupCounti;
-        bj = ij / groupCountj;
-        bk = ik / groupCountk;
-        uint i = groupSize * ai + bi;
-        uint j = groupSize * aj + bj;
-        uint k = groupSize * ak + bk;
-        if(i >= mxi)
-        {
-            int off = (mxi - 1) % groupSize;
-            int excess = bi - off;
-            i = groupSize * (groupCounti - excess) - 1;
-        }
-        if(j >= mxj)
-        {
-            int off = (mxj - 1) % groupSize;
-            int excess = bj - off;
-            j = groupSize * (groupCountj - excess) - 1;
-        }
-        if(k >= mxk)
-        {
-            int off = (mxk - 1) % groupSize;
-            int excess = bk - off;
-            k = groupSize * (groupCountk - excess) - 1;
-        }
-    */
     int i = get_global_id(2);
     int j = get_global_id(1);
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
