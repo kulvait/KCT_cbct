@@ -4,7 +4,7 @@
 #endif
 
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
-float inline backprojectMinMaxEdgeValues(global float* projection,
+float inline backprojectMinMaxEdgeValues(global const float* projection,
                                          private double16 CM,
                                          private double3 v,
                                          private int PX,

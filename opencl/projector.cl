@@ -86,6 +86,121 @@ int projectionIndex(private double16 CM, private double3 v, int2 pdims)
         return -1;
     }
 }
+/// insertEdgeValues(factor, V, P, projection, pdims);
+void inline exactEdgeValues0(global float* projection,
+                             private double16 CM,
+                             private double3 v,
+                             private int PX,
+                             private double value,
+                             private double3 voxelSizes,
+                             private int2 pdims)
+{
+    const double3 distanceToEdge = (double3)(0.0, 0.0, 0.5 * voxelSizes.s2);
+    const double3 v_up = v + distanceToEdge;
+    const double3 v_down = v - distanceToEdge;
+    // const double3 v_diff = v_down - v_up;
+    const double negativeEdgeLength = -voxelSizes.s2;
+    const double PY_up = projectY0(CM, v_up);
+    const double PY_down = projectY0(CM, v_down);
+    const int PJ_up = convert_int_rtn(PY_up + 0.5);
+    const int PJ_down = convert_int_rtn(PY_down + 0.5);
+    double lambda;
+    double lastLambda = 0.0;
+    double leastLambda;
+    double3 Fvector;
+    int PJ_max;
+    if(PJ_down < PJ_up)
+    {
+        if(PJ_up >= 0 && PJ_down < pdims.y)
+        {
+            int J;
+            if(PJ_down < 0)
+            {
+                J = 0;
+                Fvector = CM.s456 + 0.5 * CM.s89a;
+                // lastLambda = (dot(v_down, Fvector) + CM.s7 + 0.5 * CM.sb) / (dot(v_diff,
+                // Fvector));
+                lastLambda = dot(v_down, Fvector) / (negativeEdgeLength * Fvector.s2);
+            } else
+            {
+                J = PJ_down;
+                Fvector = CM.s456 - (J - 0.5) * CM.s89a;
+            }
+            if(PJ_up >= pdims.y)
+            {
+                PJ_max = pdims.y - 1;
+                double3 Qvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;
+                // leastLambda = (dot(v_down, Qvector) + CM.s7 - ((double)PJ_max + 0.5) * CM.sb)
+                //    / (dot(v_diff, Qvector));
+                leastLambda = dot(v_down, Qvector) / (negativeEdgeLength * Qvector.s2);
+            } else
+            {
+                PJ_max = PJ_up;
+                leastLambda = 1.0;
+            }
+            for(; J < PJ_max; J++)
+            {
+                Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
+                lambda = dot(v_down, Fvector) / (negativeEdgeLength * Fvector.s2);
+                AtomicAdd_g_f(&projection[PX + pdims.x * J],
+                              (lambda - lastLambda)
+                                  * value); // Atomic version of projection[ind] += value;
+                lastLambda = lambda;
+            }
+            // PJ_max
+            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_max],
+                          (leastLambda - lastLambda)
+                              * value); // Atomic version of projection[ind] += value;
+        }
+    } else if(PJ_down > PJ_up)
+    {
+        if(PJ_down >= 0 && PJ_up < pdims.y)
+        {
+            // We will count with negative value of lambda by dividing by dot(v_diff, Fvector)
+            // instead of dot(-v_diff, Fvector)  Because valuePerUnit is negative the value (lambda
+            // - lastLambda)*valuePerUnit will be positive
+            // lambda here measures negative distance from v_up to a given intersection point
+            int J;
+            if(PJ_up < 0)
+            {
+                J = 0;
+                Fvector = CM.s456 + 0.5 * CM.s89a;
+                lastLambda = dot(v_up, Fvector) / (negativeEdgeLength * Fvector.s2);
+            } else
+            {
+                J = PJ_up;
+                Fvector = CM.s456 - (J - 0.5) * CM.s89a;
+            }
+            if(PJ_down >= pdims.y)
+            {
+                PJ_max = pdims.y - 1;
+                double3 Qvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;
+                leastLambda = dot(v_up, Qvector) / (negativeEdgeLength * Qvector.s2);
+            } else
+            {
+                PJ_max = PJ_down;
+                leastLambda = -1.0;
+            }
+            for(; J < PJ_max; J++)
+            {
+                Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
+                lambda = dot(v_up, Fvector) / (negativeEdgeLength * Fvector.s2);
+                AtomicAdd_g_f(&projection[PX + pdims.x * J],
+                              (lastLambda - lambda)
+                                  * value); // Atomic version of projection[ind] += value;
+                lastLambda = lambda;
+            }
+            // PJ_max
+            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_max],
+                          (lastLambda - leastLambda)
+                              * value); // Atomic version of projection[ind] += value;
+        }
+    } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
+    {
+        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+                      value); // Atomic version of projection[ind] += value;
+    }
+}
 
 /// insertEdgeValues(factor, V, P, projection, pdims);
 void inline exactEdgeValues(global float* projection,
@@ -349,7 +464,7 @@ inline double exactIntersectionPoints(const double PX,
                                       double3* centroid)
 {
     double p, q, tmp, totalweight;
-    double3 v_cw, v_ccw, shift;
+    double3 v_cw, v_ccw;
     const double3 Fvector = CM.s012 - PX * CM.s89a;
     const double Fconstant = CM.s3 - PX * CM.sb;
     double FproductA, FproductB;
@@ -434,6 +549,347 @@ inline double exactIntersectionPoints(const double PX,
     }
 }
 
+__constant double onethird = 1.0 / 3.0;
+__constant double twothirds = 2.0 / 3.0;
+__constant double onesixth = 1.0 / 6.0;
+
+inline double exactIntersectionPoints0_extended(const double PX,
+                                                const double3* v0,
+                                                const double3* v1,
+                                                const double3* v2,
+                                                const double3* v3,
+                                                const double3 vd1,
+                                                const double3 vd3,
+                                                const double* PX_ccw0,
+                                                const double* PX_ccw1,
+                                                const double* PX_ccw2,
+                                                const double* PX_ccw3,
+                                                const double16 CM,
+                                                double3* centroid)
+{
+    const double3 Fvector = CM.s012 - PX * CM.s89a;
+    // const double3 vd1 = (*v1) - (*v0);
+    // const double3 vd3 = (*v3) - (*v0);
+    double Fproduct, FproductVD;
+    double p, q;
+    double A, w, wcomplement;
+    if(PX < (*PX_ccw1))
+    {
+        Fproduct = -dot(*v0, Fvector);
+        FproductVD = dot(vd1, Fvector); // VD1
+        p = Fproduct / FproductVD; // v0+p*(v1-v0)
+        if(PX < (*PX_ccw3))
+        {
+            q = Fproduct / dot(vd3, Fvector);
+            (*centroid) = (*v0) + (onethird * p) * vd1 + (onethird * q) * vd3;
+            return 0.5 * p * q;
+        } else if(PX < (*PX_ccw2))
+        {
+            q = -dot(*v3, Fvector) / FproductVD;
+            A = 0.5 * (p + q);
+            if(A != 0.0) // Due to rounding errors equality might happen producing nan
+            {
+                w = p / A;
+                //(*centroid) = (*v0)
+                //    + mad(p, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-q, w, q) / 3.0) * (vd1)
+                //    + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd3);
+                //(*centroid) = (*v0) + (p * (2.0 / 3.0 - w / 6.0) + q * (1 - w) / 3.0) * (vd1)
+                //    + (2.0 / 3.0 - w / 6.0) * (vd3);
+                wcomplement = twothirds - onesixth * w;
+                (*centroid) = (*v0) + (p * wcomplement + onethird * q * (1.0 - w)) * (vd1)
+                    + wcomplement * (vd3);
+            } else
+            {
+                (*centroid) = (*v0);
+            }
+            return A;
+        } else
+        {
+            p = 1.0 - p;
+            q = -dot(*v1, Fvector) / dot(vd3, Fvector);
+            A = 1.0 - 0.5 * p * q;
+            // w = 1.0 / A;
+            //(*centroid) = (*v0) - mad(0.5, w, mad(p, -w, p) / 3.0) * vd1
+            //    + mad(0.5, w, mad(q, -w, q) / 3.0) * vd3;
+            //(*centroid) = (*v1) - (0.5 * w + (p * (1 - w)) / 3.0) * vd1
+            //    + (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
+            w = 0.5 / A;
+            wcomplement = twothirds * (0.5 - w);
+            (*centroid) = (*v1) - (w + p * wcomplement) * vd1 + (w + q * wcomplement) * vd3;
+            return A;
+        }
+    } else if(PX < (*PX_ccw2))
+    {
+        Fproduct = dot(*v2, Fvector);
+        FproductVD = dot(vd3, Fvector);
+        p = Fproduct / FproductVD; // V2 + p * (V1-V2)
+        if(PX < (*PX_ccw3))
+        {
+            p = 1.0 - p; // V1 + p * (V2-V1)
+            q = -dot(*v0, Fvector) / FproductVD; // V0 + q (V3-V0)
+            A = 0.5 * (p + q);
+            if(A != 0.0) // Due to rounding errors equality might happen producing nan
+            {
+                w = p / A;
+                //(*centroid) = (*v0)
+                //    + mad(q, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-p, w, p) / 3.0) * (vd3)
+                //    + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd1);
+                //(*centroid) = (*v0) + (q * (2.0 / 3.0 - w / 6.0) + p * (1 - w) / 3.0) * (vd3)
+                //    + (2.0 / 3.0 - w / 6.0) * (vd1);
+                wcomplement = twothirds - onesixth * w;
+                (*centroid) = (*v0) + (q * wcomplement + onethird * p * (1.0 - w)) * (vd3)
+                    + wcomplement * (vd1);
+            } else
+            {
+                (*centroid) = (*v0);
+            }
+            return A;
+        } else
+        {
+            q = Fproduct / dot(vd1, Fvector); // v2+q(v3-v2)
+            A = 1.0 - 0.5 * p * q;
+            // w = 1.0 / A;
+            //(*centroid) = (*v2) - mad(0.5, w, mad(q, -w, q) / 3.0) * vd1
+            //    - mad(0.5, w, mad(p, -w, p) / 3.0) * vd3;
+            //(*centroid) = (*v2) - (0.5 * w + (q * (1 - w)) / 3.0) * vd1
+            //    - (0.5 * w + (p * (1 - w)) / 3.0) * vd3;
+            w = 0.5 / A;
+            wcomplement = twothirds * (0.5 - w);
+            (*centroid) = (*v2) - (w + q * wcomplement) * vd1 - (w + p * wcomplement) * vd3;
+            return A;
+        }
+    } else if(PX >= *PX_ccw3)
+    {
+        (*centroid) = 0.5*((*v0) + (*v2));
+        return 1.0;
+
+    } else
+    {
+        Fproduct = dot(*v3, Fvector);
+        p = Fproduct / dot(vd3, Fvector);
+        q = -Fproduct / dot(vd1, Fvector);
+        A = 1.0 - 0.5 * p * q;
+        // w = 1.0 / A;
+        //(*centroid) = (*v3) + mad(0.5, w, mad(q, -w, q) / 3.0) * vd1
+        //    - mad(0.5, w, mad(p, -w, p) / 3.0) * vd3;
+        //(*centroid)
+        //    = (*v3) + (0.5 * w + (p * (1 - w)) / 3.0) * vd1 - (0.5 * w + (q * (1 - w)) / 3.0) *
+        //    vd3;
+        w = 0.5 / A;
+        wcomplement = twothirds * (0.5 - w);
+        (*centroid) = (*v3) + (w + p * wcomplement) * vd1 - (w + q * wcomplement) * vd3;
+        return A;
+    }
+}
+
+inline double exactIntersectionPoints0(const double PX,
+                                       const double3* v0,
+                                       const double3* v1,
+                                       const double3* v2,
+                                       const double3* v3,
+                                       const double* PX_ccw0,
+                                       const double* PX_ccw1,
+                                       const double* PX_ccw2,
+                                       const double* PX_ccw3,
+                                       const double16 CM,
+                                       double3* centroid)
+{
+    const double3 Fvector = CM.s012 - PX * CM.s89a;
+    const double3 vd1 = (*v1) - (*v0);
+    const double3 vd3 = (*v3) - (*v0);
+    double Fproduct, FproductVD;
+    double p, q;
+    double A, w, wcomplement;
+    if(PX < (*PX_ccw1))
+    {
+        Fproduct = -dot(*v0, Fvector);
+        FproductVD = dot(vd1, Fvector); // VD1
+        p = Fproduct / FproductVD;
+        if(PX < (*PX_ccw3))
+        {
+            q = Fproduct / dot(vd3, Fvector);
+            (*centroid) = (*v0) + (p / 3.0) * vd1 + (q / 3.0) * vd3;
+            return 0.5 * p * q;
+        } else if(PX < (*PX_ccw2))
+        {
+            q = -dot(*v3, Fvector) / FproductVD;
+            A = 0.5 * (p + q);
+            if(A != 0.0) // Due to rounding errors equality might happen producing nan
+            {
+                w = p / A;
+                //    (*centroid) = (*v0)
+                //        + mad(p, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-q, w, q) / 3.0) * (vd1)
+                //        + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd3);
+                (*centroid) = (*v0) + (p * (2.0 / 3.0 - w / 6.0) + q * (1 - w) / 3.0) * (vd1)
+                    + (2.0 / 3.0 - w / 6.0) * (vd3);
+            } else
+            {
+                (*centroid) = (*v0);
+            }
+            return A;
+        } else
+        {
+            p = 1.0 - p;
+            q = -dot(*v1, Fvector) / dot(vd3, Fvector);
+            A = 1.0 - 0.5 * p * q;
+            w = 1.0 / A;
+            //(*centroid) = (*v0) - mad(0.5, w, mad(p, -w, p) / 3.0) * vd1
+            //    + mad(0.5, w, mad(q, -w, q) / 3.0) * vd3;
+            (*centroid) = (*v1) - (0.5 * w + (p * (1 - w)) / 3.0) * vd1
+                + (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
+            return A;
+        }
+    } else if(PX < (*PX_ccw2))
+    {
+        Fproduct = dot(*v2, Fvector);
+        FproductVD = dot(vd3, Fvector);
+        p = Fproduct / FproductVD; // V2 + p * (V1-V2)
+        if(PX < (*PX_ccw3))
+        {
+            p = 1.0 - p; // V1 + p * (V2-V1)
+            q = -dot(*v0, Fvector) / FproductVD; // V0 + q (V3-V0)
+            A = 0.5 * (p + q);
+            if(A != 0.0) // Due to rounding errors equality might happen producing nan
+            {
+                w = p / A;
+                //(*centroid) = (*v0)
+                //    + mad(q, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-p, w, p) / 3.0) * (vd3)
+                //    + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd1);
+                (*centroid) = (*v0) + (q * (2.0 / 3.0 - w / 6.0) + p * (1 - w) / 3.0) * (vd3)
+                    + (2.0 / 3.0 - w / 6.0) * (vd1);
+            } else
+            {
+                (*centroid) = (*v0);
+            }
+            return A;
+        } else
+        {
+            q = Fproduct / dot(vd1, Fvector); // v2+q(v3-v2)
+            A = 1.0 - 0.5 * p * q;
+            w = 1.0 / A;
+            //(*centroid) = (*v2) - mad(0.5, w, mad(q, -w, q) / 3.0) * vd1
+            //    - mad(0.5, w, mad(p, -w, p) / 3.0) * vd3;
+            (*centroid) = (*v2) - (0.5 * w + (q * (1 - w)) / 3.0) * vd1
+                - (0.5 * w + (p * (1 - w)) / 3.0) * vd3;
+            return A;
+        }
+    } else if(PX >= *PX_ccw3)
+    {
+        (*centroid) = ((*v0) + (*v2)) / 2.0;
+        return 1.0;
+
+    } else
+    {
+        Fproduct = dot(*v3, Fvector);
+        p = Fproduct / dot(vd3, Fvector);
+        q = -Fproduct / dot(vd1, Fvector);
+        A = 1.0 - 0.5 * p * q;
+        w = 1.0 / A;
+        //(*centroid) = (*v3) + mad(0.5, w, mad(q, -w, q) / 3.0) * vd1
+        //    - mad(0.5, w, mad(p, -w, p) / 3.0) * vd3;
+        (*centroid)
+            = (*v3) + (0.5 * w + (p * (1 - w)) / 3.0) * vd1 - (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
+        return A;
+    }
+}
+
+inline double exactIntersectionPoints0_stable743(const double PX,
+                                                 const double3* v0,
+                                                 const double3* v1,
+                                                 const double3* v2,
+                                                 const double3* v3,
+                                                 const double* PX_ccw0,
+                                                 const double* PX_ccw1,
+                                                 const double* PX_ccw2,
+                                                 const double* PX_ccw3,
+                                                 const double16 CM,
+                                                 double3* centroid)
+{
+    double p, q, tmp, totalweight;
+    double3 v_cw, v_ccw, shift;
+    const double3 Fvector = CM.s012 - PX * CM.s89a;
+    double FproductA, FproductB;
+    if(PX < (*PX_ccw1))
+    {
+        FproductA = dot(*v0, Fvector);
+        FproductB = dot(*v1, Fvector);
+        p = FproductA / (FproductA - FproductB);
+        v_ccw = (*v0) * (1.0 - p) + (*v1) * p;
+        if(PX < (*PX_ccw3))
+        {
+            q = FproductA / (FproductA - dot(*v3, Fvector));
+            // v_cw = (*v0) * (1.0 - q) + (*v3) * q;
+            (*centroid) = ((3.0 - p - q) * (*v0) + p * (*v1) + q * (*v3)) / 3.0;
+            return p * q * 0.5;
+        } else if(PX < (*PX_ccw2))
+        {
+            q = dot(*v3, Fvector) / (dot(*v3, Fvector) - dot(*v2, Fvector));
+            v_cw = (*v3) * (1.0 - q) + (*v2) * q;
+            if(p + q != 0.0) // Due to rounding errors equality might happen producing nan
+            {
+                (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_ccw) / 3.0;
+                return (p + q) * 0.5;
+            } else
+            {
+                (*centroid) = (*v0);
+                return 0.0;
+            }
+        } else
+        {
+            q = dot(*v2, Fvector) / (dot(*v2, Fvector) - FproductB);
+            v_cw = (*v2) * (1.0 - q) + (*v1) * q;
+            tmp = (1.0 - p) * (1.0 - q) * 0.5;
+            totalweight = 1 - tmp;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v1)) / 3.0) / totalweight;
+            return totalweight;
+        }
+    } else if(PX < (*PX_ccw2))
+    {
+        FproductA = dot(*v1, Fvector);
+        FproductB = dot(*v2, Fvector);
+        p = FproductA / (FproductA - FproductB);
+        v_ccw = (*v1) * (1.0 - p) + (*v2) * p;
+        if(PX < (*PX_ccw3))
+        {
+            q = dot(*v0, Fvector) / (dot(*v0, Fvector) - dot(*v3, Fvector));
+            v_cw = (*v0) * (1.0 - q) + (*v3) * q;
+            if(p + q != 0.0) // Due to rounding errors equality might happen producing nan
+            {
+                (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_ccw) / 3.0;
+                return (p + q) * 0.5;
+            } else
+            {
+                (*centroid) = (*v0);
+                return 0.0;
+            }
+        } else
+        {
+            q = dot(*v3, Fvector) / (dot(*v3, Fvector) - FproductB);
+            v_cw = (*v3) * (1.0 - q) + (*v2) * q;
+            tmp = (1.0 - p) * (1.0 - q) * 0.5;
+            totalweight = 1.0 - tmp;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v2)) / 3.0) / totalweight;
+            return totalweight;
+        }
+    } else if(PX >= *PX_ccw3)
+    {
+        (*centroid) = ((*v0) + (*v2)) / 2;
+        return 1.0;
+
+    } else
+    {
+        FproductA = dot(*v3, Fvector);
+        p = FproductA / (FproductA - dot(*v2, Fvector));
+        v_ccw = (*v3) * (1.0 - p) + (*v2) * p;
+        q = FproductA / (FproductA - dot(*v0, Fvector));
+        v_cw = (*v3) * (1.0 - q) + (*v0) * q;
+        tmp = p * q * 0.5;
+        totalweight = 1.0 - tmp;
+        (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_ccw + v_cw + (*v3)) / 3.0) / totalweight;
+        return totalweight;
+    }
+}
+
 /**
  * Let v0,v1,v2,v3 and v0,v3,v2,v1 be a piecewise lines that maps on detector on values PX_ccw0,
  * PX_ccw1, PX_ccw2, PX_ccw3. Find a two parametrization factors that maps to a PX on these
@@ -470,7 +926,7 @@ inline double findIntersectionPoints(const double PX,
                                      double3* centroid)
 {
     double p, q, tmp, totalweight;
-    double3 v_cw, v_ccw, shift;
+    double3 v_cw, v_ccw;
     if(PX <= (*PX_ccw1))
     {
         p = intersectionXTime(PX, *PX_ccw0, *PX_ccw1);
@@ -631,7 +1087,6 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
         = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
 }
 
-
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -648,7 +1103,7 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
  *
  */
 void kernel FLOATcutting_voxel_project(global const float* restrict volume,
-                                       global const float* projection,
+                                       global float* projection,
                                        private uint projectionOffset,
                                        private double16 CM,
                                        private double3 sourcePosition,
@@ -662,18 +1117,14 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     uint i = get_global_id(2);
     uint j = get_global_id(1);
     uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
-
-    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
-                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
-                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
-    const double3 voxelcorner_xyz = zerocorner_xyz
-        + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
     const uint IND = voxelIndex(i, j, k, vdims);
-    const float voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
     const float voxelValue = volume[IND];
-    const double3 voxelcenter_xyz
-        = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
+    const float voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
+    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
+    const double3 zerocorner_xyz
+        = volumeCenter - sourcePosition - 0.5 * convert_double3(vdims) * voxelSizes;
+    const double3 voxelcorner_xyz = zerocorner_xyz + (IND_ijk * voxelSizes);
+    const double3 voxelcenter_xyz = voxelcorner_xyz + voxelSizes * 0.5;
     if(voxelValue != 0.0)
     {
         // EXPERIMENTAL ... reconstruct inner circle
@@ -685,42 +1136,40 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         // EXPERIMENTAL ... reconstruct inner circle
         // If all the corners of given voxel points to a common coordinate, then compute the value
         // based on the center
-        int cornerProjectionIndex = projectionIndex(CM, voxelcorner_xyz, pdims);
+        int cornerProjectionIndex = projectionIndex0(CM, voxelcorner_xyz, pdims);
         if(cornerProjectionIndex
-               == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0),
-                                  pdims)
+               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0),
+                                   pdims)
            && cornerProjectionIndex
-               == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.0),
-                                  pdims)
+               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.0),
+                                   pdims)
            && cornerProjectionIndex
-               == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 1.0),
-                                  pdims)
+               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 1.0),
+                                   pdims)
            && cornerProjectionIndex
-               == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 1.0),
-                                  pdims)
+               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 1.0),
+                                   pdims)
            && cornerProjectionIndex
-               == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.0),
-                                  pdims)
+               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.0),
+                                   pdims)
            && cornerProjectionIndex
-               == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.0),
-                                  pdims)
+               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.0),
+                                   pdims)
            && cornerProjectionIndex
-               == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 1.0),
-                                  pdims)) // When all projections are the same
+               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 1.0),
+                                   pdims)) // When all projections are the same
         {
             if(cornerProjectionIndex != -1)
             {
-                double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-                double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
+                double sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
                 float value = voxelValue * voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2;
                 AtomicAdd_g_f(&projection[projectionOffset + cornerProjectionIndex],
                               value); // Atomic version of projection[ind] += value;
             }
         } else
         {
-            double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-            double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
-            float value = voxelValue * scalingFactor * voxelVolume / sourceToVoxel_xyz_norm2;
+            double sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
+            float value = voxelValue * voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2;
             // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any
             // z_1, z_2  This assumption is restricted to the voxel edges, where it holds very
             // accurately  We project the rectangle that lies on the z midline of the voxel on the
@@ -731,10 +1180,10 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             vx01 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.5);
             vx10 = voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.5);
             vx11 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.5);
-            px00 = projectX(CM, vx00);
-            px01 = projectX(CM, vx01);
-            px10 = projectX(CM, vx10);
-            px11 = projectX(CM, vx11);
+            px00 = projectX0(CM, vx00);
+            px01 = projectX0(CM, vx01);
+            px10 = projectX0(CM, vx10);
+            px11 = projectX0(CM, vx11);
             // We now figure out the vertex that projects to minimum and maximum px
             double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
             int max_PX,
@@ -853,6 +1302,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 PX_ccw[2] = &px01;
                 PX_ccw[3] = &px11;
             }
+            double3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
+            double3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
 
             min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + 0.5);
             max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
@@ -864,8 +1315,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                     // insertEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2,
                     // min_PX, value,
                     //                 voxelSizes, pdims);
-                    exactEdgeValues(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX,
-                                    value, voxelSizes, pdims);
+                    exactEdgeValues0(&projection[projectionOffset], CM, (vx00 + vx11) / 2, min_PX,
+                                     value, voxelSizes, pdims);
                 } else
                 {
 
@@ -878,30 +1329,30 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                     // Section of the square that corresponds to the indices < i
                     // CCW and CW coordinates of the last intersection on the lines specified by the
                     // points in V_ccw
-                    lastSectionSize = exactIntersectionPoints(
-                        ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], PX_ccw[0],
-                        PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
+                    lastSectionSize = exactIntersectionPoints0_extended(
+                        ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
+                        PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
 
                     if(I >= 0)
                     {
                         factor = value * lastSectionSize;
                         // insertEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
                         // voxelSizes, pdims);
-                        exactEdgeValues(&projection[projectionOffset], CM, lastInt, I, factor,
-                                        voxelSizes, pdims);
+                        exactEdgeValues0(&projection[projectionOffset], CM, lastInt, I, factor,
+                                         voxelSizes, pdims);
                     }
                     for(I = I + 1; I < I_STOP; I++)
                     {
-                        nextSectionSize = exactIntersectionPoints(
-                            ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], PX_ccw[0],
-                            PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
+                        nextSectionSize = exactIntersectionPoints0_extended(
+                            ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
+                            PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
                         polygonSize = nextSectionSize - lastSectionSize;
                         Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
                         factor = value * polygonSize;
                         // insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor,
                         // voxelSizes, pdims);
-                        exactEdgeValues(&projection[projectionOffset], CM, Int, I, factor,
-                                        voxelSizes, pdims);
+                        exactEdgeValues0(&projection[projectionOffset], CM, Int, I, factor,
+                                         voxelSizes, pdims);
                         lastSectionSize = nextSectionSize;
                         lastInt = nextInt;
                     }
@@ -913,8 +1364,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                         factor = value * polygonSize;
                         // insertEdgeValues(&projection[projectionOffset], CM, Int, I, factor,
                         // voxelSizes, pdims);
-                        exactEdgeValues(&projection[projectionOffset], CM, Int, I, factor,
-                                        voxelSizes, pdims);
+                        exactEdgeValues0(&projection[projectionOffset], CM, Int, I, factor,
+                                         voxelSizes, pdims);
                     }
                 }
             }

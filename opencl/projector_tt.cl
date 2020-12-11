@@ -93,7 +93,7 @@ void inline insertVericalFootprints(global float* projection,
  */
 
 void kernel FLOATta3_project(global const float* restrict volume,
-                             global const float* projection,
+                             global float* projection,
                              private uint projectionOffset,
                              private double16 CM,
                              private double3 sourcePosition,
