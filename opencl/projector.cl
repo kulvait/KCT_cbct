@@ -630,7 +630,7 @@ inline double exactIntersectionPoints0_extended(const double PX,
             A = 0.5 * (p + q);
             if(A != 0.0) // Due to rounding errors equality might happen producing nan
             {
-                w = p / A;
+                w = q / A;
                 //(*centroid) = (*v0)
                 //    + mad(q, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-p, w, p) / 3.0) * (vd3)
                 //    + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd1);
@@ -704,7 +704,7 @@ inline double exactIntersectionPoints0(const double PX,
     {
         Fproduct = -dot(*v0, Fvector);
         FproductVD = dot(vd1, Fvector); // VD1
-        p = Fproduct / FproductVD;
+        p = Fproduct / FproductVD;//v0+p*(v1-v0)
         if(PX < (*PX_ccw3))
         {
             q = Fproduct / dot(vd3, Fvector);
@@ -751,7 +751,7 @@ inline double exactIntersectionPoints0(const double PX,
             A = 0.5 * (p + q);
             if(A != 0.0) // Due to rounding errors equality might happen producing nan
             {
-                w = p / A;
+                w = q / A;
                 //(*centroid) = (*v0)
                 //    + mad(q, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-p, w, p) / 3.0) * (vd3)
                 //    + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd1);
