@@ -53,7 +53,7 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
                         io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
         }
         // DEBUG
-        if(iteration % 10 == 0)
+        if(iteration % 1000 == 0)
         {
             project(*x_buf, *discrepancy_bbuf);
             algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
