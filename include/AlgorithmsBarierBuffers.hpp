@@ -98,6 +98,8 @@ protected:
     float normXBuffer_barier(cl::Buffer& X);
     float normBBuffer_frame(cl::Buffer& B);
     float normXBuffer_frame(cl::Buffer& X);
+    double sumBBuffer_barier_double(cl::Buffer& B);
+    double sumXBuffer_barier_double(cl::Buffer& X);
     double normBBuffer_barier_double(cl::Buffer& B);
     double normXBuffer_barier_double(cl::Buffer& X);
     double normBBuffer_frame_double(cl::Buffer& B);

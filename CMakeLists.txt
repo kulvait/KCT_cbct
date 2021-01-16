@@ -175,7 +175,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 
-SET(CLLINCGLS_SOURCES src/CLlin-krylov.cpp src/Kniha.cpp src/AlgorithmsBarierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp)
+SET(CLLINCGLS_SOURCES src/CLlin-krylov.cpp src/Kniha.cpp src/AlgorithmsBarierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp)
 add_executable(CLlin-krylov ${CLLINCGLS_SOURCES})
 set_target_properties(
     CLlin-krylov
