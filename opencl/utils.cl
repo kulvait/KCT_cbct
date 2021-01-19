@@ -16,7 +16,9 @@ void kernel FLOATvector_NormSquarePartial(global const float* restrict x,
     normSquare[gid] = sum;
 }
 
-void kernel FLOATvector_SumPartial(global const float* restrict x, global float* restrict sumPartial, private uint frameLen)
+void kernel FLOATvector_SumPartial(global const float* restrict x,
+                                   global float* restrict sumPartial,
+                                   private uint frameLen)
 {
     uint gid = get_global_id(0);
     uint start = gid * frameLen;
@@ -29,6 +31,23 @@ void kernel FLOATvector_SumPartial(global const float* restrict x, global float*
         sum += val;
     }
     sumPartial[gid] = sum;
+}
+
+void kernel FLOATvector_MaxPartial(global const float* restrict x,
+                                   global float* restrict partialResults,
+                                   private uint frameLen)
+{
+    uint gid = get_global_id(0);
+    uint start = gid * frameLen;
+    uint end = start + frameLen;
+    float maxVal = x[start];
+    float val;
+    for(int i = start; i < end; i++)
+    {
+        val = x[i];
+        maxVal = max(val, maxVal);
+    }
+    partialResults[gid] = maxVal;
 }
 
 // Code based on
@@ -107,6 +126,44 @@ void kernel FLOATvector_SumPartial_barier(global const float* restrict x,
     }
 }
 
+// Code based on
+// https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
+// Evidently gs must be multiple of ls and for this code to work ls must be 2^n
+void kernel FLOATvector_MaxPartial_barier(global const float* restrict x,
+                                          global float* restrict partialResult,
+                                          local float* localx,
+                                          private uint vecLength)
+{
+    uint gid = get_global_id(0);
+    uint gs = get_global_size(0);
+    uint lid = get_local_id(0);
+    uint ls = get_local_size(0);
+    float val;
+    if(gid < vecLength)
+    {
+        val = x[gid];
+    } else
+    {
+        val = 0.0f;
+    }
+    localx[lid] = val;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    {
+        if(lid < stride)
+        {
+            localx[lid] = max(localx[lid], localx[lid + stride]);
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    if(lid == 0)
+    {
+        gid = get_group_id(0);
+        partialResult[gid] = max(localx[0], localx[1]);
+    }
+}
+
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -149,7 +206,9 @@ void kernel vector_NormSquarePartial(global const float* restrict x,
  *
  * @return
  */
-void kernel vector_SumPartial(global const double* restrict x, global double* restrict sumPartial, private uint frameLen)
+void kernel vector_SumPartial(global const double* restrict x,
+                              global double* restrict sumPartial,
+                              private uint frameLen)
 {
     uint gid = get_global_id(0);
     uint start = gid * frameLen;
@@ -377,7 +436,9 @@ void kernel FLOATvector_A_equals_A_plus_cB(global float* restrict A,
     A[gid] += c * B[gid];
 }
 
-void kernel FLOATvector_A_equals_Ac_plus_B(global float* restrict A, global const float* restrict B, private float c)
+void kernel FLOATvector_A_equals_Ac_plus_B(global float* restrict A,
+                                           global const float* restrict B,
+                                           private float c)
 {
     const size_t gid = get_global_id(0);
     A[gid] = A[gid] * c + B[gid];

@@ -7,8 +7,8 @@
 #include <CL/cl.hpp>
 #include <chrono>
 #include <ctime>
-#include <iostream>
 #include <functional>
+#include <iostream>
 
 // Internal libraries
 #include "DEN/DenProjectionMatrixReader.hpp"
@@ -278,10 +278,14 @@ protected:
         FLOATvector_NormSquarePartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         FLOATvector_SumPartial;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
+        FLOATvector_MaxPartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         FLOATvector_NormSquarePartial_barier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         FLOATvector_SumPartial_barier;
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+        FLOATvector_MaxPartial_barier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         vector_NormSquarePartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> vector_SumPartial;
@@ -298,8 +302,7 @@ protected:
     int algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking = false);
     // FLOATvector_zero_infinite_values
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_zero_infinite_values;
-    int
-    algFLOATvector_zero_infinite_values(cl::Buffer& A, uint64_t size, bool blocking = false);
+    int algFLOATvector_zero_infinite_values(cl::Buffer& A, uint64_t size, bool blocking = false);
     // FLOATvector_scale
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOATvector_scale;
     int algFLOATvector_scale(cl::Buffer& A, float c, uint64_t size, bool blocking = false);
@@ -310,9 +313,15 @@ protected:
     // FLOATvector_invert_except_zero
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_invert_except_zero;
     int algFLOATvector_invert_except_zero(cl::Buffer& A, uint64_t size, bool blocking = false);
+    // FLOATvector_substitute_greater_than
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&, float&>>
         FLOATvector_substitute_greater_than;
+    int algFLOATvector_substitute_greater_than(
+        cl::Buffer& A, float maxValue, float substitution, uint64_t size, bool blocking = false);
+    // FLOATvector_substitute_lower_than
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&, float&>> FLOATvector_substitute_lower_than;
+    int algFLOATvector_substitute_lower_than(
+        cl::Buffer& A, float minValue, float substitution, uint64_t size, bool blocking = false);
     // FLOATvector_copy
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOATvector_copy;
     int algFLOATvector_copy(cl::Buffer& A, cl::Buffer& B, uint64_t size, bool blocking = false);

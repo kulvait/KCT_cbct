@@ -15,6 +15,7 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling)
         CLINCLUDEinclude();
         CLINCLUDEprojector();
         CLINCLUDEbackprojector();
+        CLINCLUDEbackprojector_minmax();
         CLINCLUDErescaleProjections();
     } else
     {
@@ -467,6 +468,63 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
             (*FLOATcutting_voxel_backproject)(eargs, X, *tmp_b_buf, offset, CM, SOURCEPOSITION,
                                               NORMALTODETECTOR, vdims, voxelSizes, volumeCenter,
                                               pdims, FLOATONE);
+        }
+    }
+    return 0;
+}
+
+int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
+{
+    Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
+    unsigned int frameSize = pdimx * pdimy;
+    copyFloatVector(B, *tmp_b_buf, BDIM);
+    // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRange);
+    cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
+    cl_double16 CM;
+    cl_double16 ICM;
+    cl_double3 SOURCEPOSITION, NORMALTODETECTOR;
+    cl_double2 NORMALPROJECTION;
+    cl_double2 VIRTUALPIXELSIZES;
+    double VIRTUALDETECTORDISTANCE = 1.0;
+    std::shared_ptr<CameraI> P;
+    std::array<double, 2> focalLength;
+    float scalingFactor;
+    unsigned int offset;
+    for(std::size_t i = 0; i != pdimz; i++)
+    {
+        P = cameraVector[i];
+        focalLength = P->focalLength();
+        // Kernel parameters
+        scalingFactor = focalLength[0] * focalLength[1];
+        P->projectionMatrixAsVector12((double*)&CM);
+        P->inverseProjectionMatrixAsVector16((double*)&ICM);
+        P->normalToDetector((double*)&NORMALTODETECTOR);
+        P->principalRayProjection((double*)&NORMALPROJECTION);
+        P->sourcePosition((double*)&SOURCEPOSITION);
+        VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
+        offset = i * frameSize;
+        if(useSidonProjector)
+        {
+            throw std::runtime_error("Minmax backprojector not implemented for Sidon projector.");
+        } else if(useTTProjector)
+        {
+            throw std::runtime_error("Minmax backprojector not implemented for TT projector.");
+        } else
+        {
+            if(exactProjectionScaling)
+            {
+                (*FLOATrescale_projections_exact)(eargs2, *tmp_b_buf, offset, pdims_uint,
+                                                  NORMALPROJECTION, VIRTUALPIXELSIZES,
+                                                  VIRTUALDETECTORDISTANCE);
+            } else
+            {
+                (*FLOATrescale_projections_cos)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
+                                                NORMALTODETECTOR, pdims_uint, scalingFactor);
+            }
+            (*FLOATcutting_voxel_minmaxbackproject)(eargs, X, *tmp_b_buf, offset, CM,
+                                                    SOURCEPOSITION, NORMALTODETECTOR, vdims,
+                                                    voxelSizes, volumeCenter, pdims, FLOATONE);
         }
     }
     return 0;

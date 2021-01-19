@@ -182,12 +182,13 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
         backproject(*discrepancy_bbuf, *residualVector_xbuf);
         vectorA_multiple_B_equals_C(*residualVector_xbuf, *invertedpreconditioner_xbuf,
                                     *preconditionedResidualVector_xbuf, XDIM);
-        writeVolume(
-            *residualVector_xbuf,
-            io::xprintf("%sresidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(), iteration));
-        writeVolume(*preconditionedResidualVector_xbuf,
-                    io::xprintf("%spreconditionedResidualVector_xbuf_it%02d.den",
-                                progressPrefixPath.c_str(), iteration));
+        //        writeVolume(
+        //            *residualVector_xbuf,
+        //            io::xprintf("%sresidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(),
+        //            iteration));
+        //        writeVolume(*preconditionedResidualVector_xbuf,
+        //                    io::xprintf("%spreconditionedResidualVector_xbuf_it%02d.den",
+        //                                progressPrefixPath.c_str(), iteration));
         reportTime(io::xprintf("Backprojection %d", iteration), blockingReport, true);
         residualNorm2_now = scalarProductXBuffer_barier_double(*residualVector_xbuf,
                                                                *preconditionedResidualVector_xbuf);
@@ -419,11 +420,19 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
 
 int CGLSReconstructor::reconstructJacobi(uint32_t maxIterations, float errCondition)
 {
+    bool minmaxfiltering = true;
     std::shared_ptr<cl::Buffer> preconditioner_xbuf; // X buffers
-    allocateXBuffers(4);
+    allocateXBuffers(4 + minmaxfiltering);
     preconditioner_xbuf = getXBuffer(3);
     precomputeJacobiPreconditioner(preconditioner_xbuf);
     invertFloatVector(*preconditioner_xbuf, XDIM);
+    if(minmaxfiltering)
+    {
+        std::shared_ptr<cl::Buffer> minmax_xbuf = getXBuffer(4);
+        backproject_minmax(*b_buf, *minmax_xbuf);
+        writeVolume(*minmax_xbuf, io::xprintf("%sx_minmax.den", progressPrefixPath.c_str()));
+        algFLOATvector_A_equals_A_times_B(*preconditioner_xbuf, *minmax_xbuf, XDIM);
+    }
     LOGD << io::xprintf("Writing file %s_preconditioner.inv", progressPrefixPath.c_str());
     writeVolume(*preconditioner_xbuf,
                 io::xprintf("%sx_preconditioner.inv", progressPrefixPath.c_str()));

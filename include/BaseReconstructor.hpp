@@ -151,6 +151,7 @@ protected:
      * @return 0 on success
      */
     int backproject(cl::Buffer& B, cl::Buffer& X);
+    int backproject_minmax(cl::Buffer& B, cl::Buffer& X);
 
     /**
      * Projection B = A (X)

@@ -332,6 +332,15 @@ void Kniha::CLINCLUDEutils()
             ptr01 = std::make_shared<std::remove_reference<decltype(*ptr01)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
+        {
+            auto& ptr = FLOATvector_MaxPartial;
+            str = "FLOATvector_MaxPartial";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            }
+        }
         auto& ptr02 = FLOATvector_NormSquarePartial_barier;
         str = "FLOATvector_NormSquarePartial_barier";
         if(ptr02 == nullptr)
@@ -346,6 +355,15 @@ void Kniha::CLINCLUDEutils()
             ptr03 = std::make_shared<std::remove_reference<decltype(*ptr03)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
+        {
+            auto& ptr = FLOATvector_MaxPartial_barier;
+            str = "FLOATvector_MaxPartial_barier";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            }
+        }
         auto& ptr04 = vector_NormSquarePartial;
         str = "vector_NormSquarePartial";
         if(ptr04 == nullptr)
@@ -423,14 +441,14 @@ void Kniha::CLINCLUDEutils()
             ptr14 = std::make_shared<std::remove_reference<decltype(*ptr14)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
-        auto& ptr15 = vector_SumPartial;
+        auto& ptr15 = FLOATvector_substitute_greater_than;
         str = "FLOATvector_substitute_greater_than";
         if(ptr15 == nullptr)
         {
             ptr15 = std::make_shared<std::remove_reference<decltype(*ptr15)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
-        auto& ptr16 = vector_SumPartial;
+        auto& ptr16 = FLOATvector_substitute_lower_than;
         str = "FLOATvector_substitute_lower_than";
         if(ptr16 == nullptr)
         {
@@ -626,9 +644,7 @@ int Kniha::algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking)
     }
     return 0;
 }
-int Kniha::algFLOATvector_zero_infinite_values(cl::Buffer& A,
-                                               uint64_t size,
-                                               bool blocking)
+int Kniha::algFLOATvector_zero_infinite_values(cl::Buffer& A, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_zero_infinite_values)(eargs, A);
@@ -649,12 +665,12 @@ int Kniha::algFLOATvector_scale(cl::Buffer& A, float c, uint64_t size, bool bloc
     return 0;
 }
 int Kniha::algFLOATvector_A_equals_A_plus_cB_offsets(cl::Buffer& A,
-                                              unsigned int oA,
-                                              cl::Buffer& B,
-                                              unsigned int oB,
-                                              float c,
-                                              uint64_t size,
-                                              bool blocking)
+                                                     unsigned int oA,
+                                                     cl::Buffer& B,
+                                                     unsigned int oB,
+                                                     float c,
+                                                     uint64_t size,
+                                                     bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_plus_cB_offsets)(eargs, A, oA, B, oB, c);
@@ -664,12 +680,8 @@ int Kniha::algFLOATvector_A_equals_A_plus_cB_offsets(cl::Buffer& A,
     }
     return 0;
 }
-int Kniha::algFLOATvector_B_equals_A_plus_B_offsets(cl::Buffer& A,
-                                                                      unsigned int oA,
-                                                                      cl::Buffer& B,
-                                                                      unsigned int oB,
-                                                                      uint64_t size,
-                                                                      bool blocking)
+int Kniha::algFLOATvector_B_equals_A_plus_B_offsets(
+    cl::Buffer& A, unsigned int oA, cl::Buffer& B, unsigned int oB, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_B_equals_A_plus_B_offsets)(eargs, A, oA, B, oB);
@@ -689,9 +701,7 @@ int Kniha::algFLOATvector_invert(cl::Buffer& A, uint64_t size, bool blocking)
     }
     return 0;
 }
-int Kniha::algFLOATvector_invert_except_zero(cl::Buffer& A,
-                                                       uint64_t size,
-                                                       bool blocking)
+int Kniha::algFLOATvector_invert_except_zero(cl::Buffer& A, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_invert_except_zero)(eargs, A);
@@ -701,10 +711,32 @@ int Kniha::algFLOATvector_invert_except_zero(cl::Buffer& A,
     }
     return 0;
 }
+int Kniha::algFLOATvector_substitute_greater_than(
+    cl::Buffer& A, float maxValue, float substitution, uint64_t size, bool blocking)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
+    auto exe = (*FLOATvector_substitute_greater_than)(eargs, A, maxValue, substitution);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+int Kniha::algFLOATvector_substitute_lower_than(
+    cl::Buffer& A, float minValue, float substitution, uint64_t size, bool blocking)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
+    auto exe = (*FLOATvector_substitute_lower_than)(eargs, A, minValue, substitution);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
 int Kniha::algFLOATvector_A_equals_A_times_B(cl::Buffer& A,
-                                                               cl::Buffer& B,
-                                                               uint64_t size,
-                                                               bool blocking)
+                                             cl::Buffer& B,
+                                             uint64_t size,
+                                             bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_times_B)(eargs, A, B);

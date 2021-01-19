@@ -45,6 +45,7 @@ public:
     }
 
     virtual int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01);
+    int reconstruct_sirt(uint32_t maxIterations = 100, float errCondition = 0.01);
 
     void setup(double alpha = 1.99);
 

@@ -19,7 +19,6 @@
 // Internal libraries
 #include "CArmArguments.hpp"
 #include "CGLSReconstructor.hpp"
-#include "PSIRTReconstructor.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
@@ -28,6 +27,7 @@
 #include "MATRIX/CameraI.hpp"
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/Program.hpp"
+#include "PSIRTReconstructor.hpp"
 
 using namespace CTL;
 using namespace CTL::util;
@@ -165,6 +165,7 @@ public:
     std::string diagonalPreconditioner;
     bool glsqr = false;
     bool psirt = false;
+    bool sirt = false;
     bool verbose = true;
 };
 
@@ -209,8 +210,10 @@ void Args::defineArguments()
                                            "Tikhonov regularization parameter.")
                               ->check(CLI::Range(0.0, 5000.0));
     tl_cli->needs(glsqr_cli);
-    og_settings->add_flag("--psirt", glsqr,
+    og_settings->add_flag("--psirt", psirt,
                           "Perform PSIRT instead of CGLS, note its not Krylov method.");
+    og_settings->add_flag("--sirt", sirt,
+                          "Perform SIRT instead of CGLS, note its not Krylov method.");
 
     og_settings->add_option("--x0", initialVectorX0, "Specify x0 vector, zero by default.");
     CLI::Option* dpc = og_settings->add_option(
@@ -274,7 +277,7 @@ int main(int argc, char* argv[])
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
 
-    if(!ARG.glsqr && !ARG.psirt)
+    if(!ARG.glsqr && !ARG.psirt && !ARG.sirt)
     {
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
@@ -440,7 +443,7 @@ int main(int argc, char* argv[])
             LOGE << ERR;
             throw std::runtime_error(ERR);
         }
-	psirt->setup(1.99); //10.1109/TMI.2008.923696
+        psirt->setup(1.99); // 10.1109/TMI.2008.923696
         uint16_t buf[3];
         buf[0] = ARG.volumeSizeY;
         buf[1] = ARG.volumeSizeX;
@@ -450,6 +453,63 @@ int main(int argc, char* argv[])
         if(ARG.tikhonovLambda <= 0.0)
         {
             psirt->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
+        } else
+        {
+            throw std::runtime_error("Tikhonov stabilization is not implemented for PSIRT!");
+        }
+        io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
+        delete[] volume;
+        delete[] projection;
+    } else if(ARG.sirt)
+    {
+        std::shared_ptr<PSIRTReconstructor> psirt = std::make_shared<PSIRTReconstructor>(
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
+        psirt->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+        if(ARG.useSidonProjector)
+        {
+            psirt->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        } else if(ARG.useTTProjector)
+        {
+
+            psirt->initializeTTProjector();
+        } else
+        {
+            psirt->initializeCVPProjector(ARG.useExactScaling);
+        }
+        int ecd = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                          ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+        if(ecd < 0)
+        {
+            std::string ERR
+                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
+        float* volume = new float[ARG.totalVolumeSize]();
+        // testing
+        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
+
+        bool X0initialized = ARG.initialVectorX0 != "";
+        ecd = psirt->problemSetup(projection, volume, X0initialized, cameraVector, ARG.voxelSizeX,
+                                  ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                                  ARG.volumeCenterY, ARG.volumeCenterZ);
+        if(ecd != 0)
+        {
+            std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
+        psirt->setup(1.00); // 10.1109/TMI.2008.923696
+        uint16_t buf[3];
+        buf[0] = ARG.volumeSizeY;
+        buf[1] = ARG.volumeSizeX;
+        buf[2] = ARG.volumeSizeZ;
+        io::createEmptyFile(ARG.outputVolume, 0, true);
+        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
+        if(ARG.tikhonovLambda <= 0.0)
+        {
+            psirt->reconstruct_sirt(ARG.maxIterationCount, ARG.stoppingRelativeError);
         } else
         {
             throw std::runtime_error("Tikhonov stabilization is not implemented for PSIRT!");
