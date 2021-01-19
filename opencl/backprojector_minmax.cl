@@ -157,6 +157,7 @@ float inline backprojectMinMaxEdgeValues(global const float* projection,
  * @param voxelSizes Lengths of the voxel edges.
  * @param pdims Dimensions of the projection.
  * @param scalingFactor Scale the results by this factor.
+ * @param dummy Parameter not to SEGFAULT Intel.
  *
  * @return
  */
@@ -170,7 +171,8 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
                                                  private double3 voxelSizes,
                                                  private double3 volumeCenter,
                                                  private int2 pdims,
-                                                 private float globalScalingMultiplier)
+                                                 private float globalScalingMultiplier,
+												 private int2 dummy)
 {
     int i = get_global_id(2);
     int j = get_global_id(1);

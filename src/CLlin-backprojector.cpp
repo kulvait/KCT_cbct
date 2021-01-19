@@ -207,6 +207,8 @@ int main(int argc, char* argv[])
         LOGE << ERR;
         throw std::runtime_error(ERR);
     }
+    CVP.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                     ARG.volumeCenterY, ARG.volumeCenterZ);
     // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", ARG.frames.size());
     // End parsing arguments

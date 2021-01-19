@@ -56,6 +56,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     std::vector<std::string> clFilesXpath;
     for(std::string f : CLFiles)
     {
+        LOGD << io::xprintf("Including file %s", f.c_str());
         clFilesXpath.push_back(io::xprintf("%s/%s", xpath.c_str(), f.c_str()));
     }
     io::concatenateTextFiles(clFile, true, clFilesXpath);
@@ -552,6 +553,40 @@ void Kniha::insertCLFile(std::string f)
     {
         CLFiles.emplace_back(f);
     }
+}
+
+int Kniha::algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
+                                                   cl::Buffer& projection,
+                                                   unsigned int& projectionOffset,
+                                                   cl_double16& CM,
+                                                   cl_double3& sourcePosition,
+                                                   cl_double3& normalToDetector,
+                                                   cl_int3& vdims,
+                                                   cl_double3& voxelSizes,
+                                                   cl_double3& volumeCenter,
+                                                   cl_int2& pdims,
+                                                   float globalScalingMultiplier,
+                                                   cl::NDRange& globalRange,
+                                                   std::shared_ptr<cl::NDRange> localRange,
+                                                   bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    cl_int2 dummy;
+    auto exe = (*FLOATcutting_voxel_minmaxbackproject)(
+        *eargs, volume, projection, projectionOffset, CM, sourcePosition, normalToDetector, vdims,
+        voxelSizes, volumeCenter, pdims, globalScalingMultiplier, dummy);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
 }
 
 int Kniha::algFLOATvector_copy(cl::Buffer& A, cl::Buffer& B, uint64_t size, bool blocking)

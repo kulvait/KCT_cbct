@@ -475,10 +475,11 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
 
 int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
 {
-    Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(X, std::numeric_limits<float>::infinity(), 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     copyFloatVector(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::NDRange voxelRange(vdimz, vdimy, vdimx);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
@@ -522,9 +523,9 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
                 (*FLOATrescale_projections_cos)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
                                                 NORMALTODETECTOR, pdims_uint, scalingFactor);
             }
-            (*FLOATcutting_voxel_minmaxbackproject)(eargs, X, *tmp_b_buf, offset, CM,
+            algFLOATcutting_voxel_minmaxbackproject( X, *tmp_b_buf, offset, CM,
                                                     SOURCEPOSITION, NORMALTODETECTOR, vdims,
-                                                    voxelSizes, volumeCenter, pdims, FLOATONE);
+                                                    voxelSizes, volumeCenter, pdims, FLOATONE, voxelRange);
         }
     }
     return 0;

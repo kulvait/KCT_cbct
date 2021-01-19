@@ -103,7 +103,7 @@ protected:
                                     float&>>
         FLOATcutting_voxel_backproject;
 
-    // backprojector_minmax.cl
+    // backprojector_minmax.cl last is the dummy parameter not to segfault on Intel when debuging
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
@@ -114,8 +114,23 @@ protected:
                                     cl_double3&,
                                     cl_double3&,
                                     cl_int2&,
-                                    float&>>
+                                    float&,
+                                    cl_int2&>>
         FLOATcutting_voxel_minmaxbackproject;
+    int algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
+                                                cl::Buffer& projection,
+                                                unsigned int& projectionOffset,
+                                                cl_double16& CM,
+                                                cl_double3& sourcePosition,
+                                                cl_double3& normalToDetector,
+                                                cl_int3& vdims,
+                                                cl_double3& voxelSizes,
+                                                cl_double3& volumeCenter,
+                                                cl_int2& pdims,
+                                                float globalScalingMultiplier,
+                                                cl::NDRange& globalRange,
+                                                std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                                bool blocking = false);
 
     // backprojector_sidon.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,

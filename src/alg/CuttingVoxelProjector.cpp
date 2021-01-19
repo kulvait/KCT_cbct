@@ -166,8 +166,7 @@ int CuttingVoxelProjector::initializeOrUpdateVolumeBuffer(uint32_t vdimx,
 int CuttingVoxelProjector::initializeOrUpdateProjectionBuffer(uint32_t projectionSizeZ,
                                                               float* projectionArray)
 {
-    return initializeOrUpdateProjectionBuffer(pdimx, pdimy, projectionSizeZ,
-                                              projectionArray);
+    return initializeOrUpdateProjectionBuffer(pdimx, pdimy, projectionSizeZ, projectionArray);
 }
 int CuttingVoxelProjector::initializeOrUpdateProjectionBuffer(float* projectionArray)
 {
@@ -669,7 +668,7 @@ int CuttingVoxelProjector::backproject_minmax(
         LOGI << "Projection from reduced set of angles";
     }
     initializeOrUpdateVolumeBuffer();
-    fillVolumeBufferByConstant(0.0f);
+    fillVolumeBufferByConstant(std::numeric_limits<float>::infinity());
     if(tmpBuffer == nullptr || totalProjectionBufferSize > tmpBuffer_size)
     {
         tmpBuffer = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
@@ -677,6 +676,7 @@ int CuttingVoxelProjector::backproject_minmax(
         tmpBuffer_size = totalProjectionBufferSize;
     }
     algFLOATvector_copy(*projectionBuffer, *tmpBuffer, totalPixelNum);
+    cl::NDRange voxelRange(vdimz, vdimy, vdimx);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
@@ -703,9 +703,14 @@ int CuttingVoxelProjector::backproject_minmax(
         offset = baseOffset + i * frameSize;
         (*FLOATrescale_projections_exact)(eargs2, *tmpBuffer, offset, pdims_uint, NORMALPROJECTION,
                                           VIRTUALPIXELSIZES, VIRTUALDETECTORDISTANCE);
+/*
         (*FLOATcutting_voxel_minmaxbackproject)(eargs, *volumeBuffer, *tmpBuffer, offset, CM,
                                                 SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
-                                                volumeCenter, pdims, FLOATONE);
+                                                volumeCenter, pdims, FLOATONE);*/
+
+        algFLOATcutting_voxel_minmaxbackproject(*volumeBuffer, *tmpBuffer, offset, CM,
+                                                SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                                volumeCenter, pdims, FLOATONE, voxelRange);
     }
     algFLOATvector_zero_infinite_values(*volumeBuffer, totalVoxelNum);
     cl_int err = Q[0]->enqueueReadBuffer(*volumeBuffer, CL_TRUE, 0, totalVolumeBufferSize, volume);
