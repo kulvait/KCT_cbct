@@ -6,8 +6,7 @@ void PSIRTReconstructor::setup(double alpha) { this->alpha = alpha; }
 
 int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
-    bool boxconditions = true;
-    bool minmaxfiltering = true;
+    bool boxconditions = false;
     LOGD << printTime("WELCOME TO PSIRT, init", false, true);
     uint32_t iteration = 0;
 
@@ -25,16 +24,14 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     project(*ones_xbuf, *rowsums_bbuf);
     // Ones used to store col sums
     backproject(*discrepancy_bbuf, *ones_xbuf);
-    if(minmaxfiltering)
-    {
-        backproject_minmax(*b_buf, *update_xbuf);
-        algFLOATvector_substitute_greater_than(*update_xbuf, 0.0, 1.0, XDIM);
-        project(*update_xbuf, *rowsums_bbuf);
-    }
     double A1norm = maxXBuffer_barier_float(*ones_xbuf);
-    double A2norm = std::sqrt(normBBuffer_barier_double(*rowsums_bbuf));
+    // double A2norm = std::sqrt(normBBuffer_barier_double(*rowsums_bbuf));
     // double p = 0.001 * BDIM / A1norm;
-    double p = 1.0 / A1norm;
+    double p = 1.0 / A1norm; // In 10.1109/TMI.2008.923696 authors probably mistakedly call the
+                             // ||A||_1 what should be the largest col sum of A as they claim
+                             // Since the largest row sum of AT in turn equals the largest column
+                             // sum of A and thus the 1-norm of A. Tried here with
+                             // ||A||_1 without success
     if(!useVolumeAsInitialX0)
     {
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
@@ -45,7 +42,7 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
     norm = NB0;
     LOGI << io::xprintf("||b||=%f, p=%f, A1norm=%f", NB0, p, A1norm);
-    LOGI << io::xprintf("||b||=%f, p=%f, A2norm=%f", NB0, p, A2norm);
+    // LOGI << io::xprintf("||b||=%f, p=%f, A2norm=%f", NB0, p, A2norm);
 
     while(norm / NB0 > errCondition && iteration < maxIterations)
     {
