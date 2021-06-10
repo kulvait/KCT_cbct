@@ -260,7 +260,12 @@ int main(int argc, char* argv[])
         cameraVector.emplace_back(pm);
     }
     float* projection = new float[ARG.totalProjectionsSize];
-    io::readBytesFrom(ARG.inputProjections, 6, (uint8_t*)projection, ARG.totalProjectionsSize * 4);
+    io::DenFrame2DReader<float> inputProjectionsReader(ARG.inputProjections);
+    uint64_t projectionFrameSize = ARG.projectionSizeX * ARG.projectionSizeY;
+    for(uint32_t z = 0; z != ARG.projectionSizeZ; z++)
+    {
+        inputProjectionsReader.readFrameIntoBuffer(z, projection + (z * projectionFrameSize), false);
+    }
     float* volume;
     if(ARG.initialVectorX0 != "")
     {

@@ -60,12 +60,12 @@ float inline backprojectExactEdgeValues0(global const float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = dot(v_down, Fvector) / (negativeEdgeLength * Fvector.s2);
-                ADD += projection[PX + pdims.x * J] * (lambda - lastLambda) * value;
+                ADD += projection[PX * pdims.y + J] * (lambda - lastLambda) * value;
                 // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            ADD += projection[PX + pdims.x * PJ_max] * (leastLambda - lastLambda)
+            ADD += projection[PX * pdims.y + PJ_max] * (leastLambda - lastLambda)
                 * value; // Atomic version of projection[ind] += value;
         }
     } else if(PJ_down > PJ_up)
@@ -101,17 +101,17 @@ float inline backprojectExactEdgeValues0(global const float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = dot(v_up, Fvector) / (negativeEdgeLength * Fvector.s2);
-                ADD += projection[PX + pdims.x * J] * (lastLambda - lambda)
+                ADD += projection[PX * pdims.y + J] * (lastLambda - lambda)
                     * value; // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            ADD += projection[PX + pdims.x * PJ_max] * (lastLambda - leastLambda)
+            ADD += projection[PX * pdims.y + PJ_max] * (lastLambda - leastLambda)
                 * value; // Atomic version of projection[ind] += value;
         }
     } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
     {
-        ADD += projection[PX + pdims.x * PJ_down]
+        ADD += projection[PX * pdims.y + PJ_down]
             * value; // Atomic version of projection[ind] += value;
     }
     return ADD;
@@ -177,12 +177,12 @@ float inline backprojectExactEdgeValues(global const float* projection,
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_down, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
                     / (negativeEdgeLength * Fvector.s2);
-                ADD += projection[PX + pdims.x * J] * (lambda - lastLambda) * value;
+                ADD += projection[PX * pdims.y + J] * (lambda - lastLambda) * value;
                 // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            ADD += projection[PX + pdims.x * PJ_max] * (leastLambda - lastLambda)
+            ADD += projection[PX * pdims.y + PJ_max] * (leastLambda - lastLambda)
                 * value; // Atomic version of projection[ind] += value;
         }
     } else if(PJ_down > PJ_up)
@@ -221,17 +221,17 @@ float inline backprojectExactEdgeValues(global const float* projection,
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_up, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
                     / (negativeEdgeLength * Fvector.s2);
-                ADD += projection[PX + pdims.x * J] * (lastLambda - lambda)
+                ADD += projection[PX * pdims.y + J] * (lastLambda - lambda)
                     * value; // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            ADD += projection[PX + pdims.x * PJ_max] * (lastLambda - leastLambda)
+            ADD += projection[PX * pdims.y + PJ_max] * (lastLambda - leastLambda)
                 * value; // Atomic version of projection[ind] += value;
         }
     } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
     {
-        ADD += projection[PX + pdims.x * PJ_down]
+        ADD += projection[PX * pdims.y + PJ_down]
             * value; // Atomic version of projection[ind] += value;
     }
     return ADD;
@@ -275,7 +275,7 @@ float inline backprojectEdgeValues(global float* projection,
     if(PJ_down == PJ_up)
     {
         factor = value;
-        ADD = projection[PX + pdims.x * PJ_down] * factor;
+        ADD = projection[PX * pdims.y + PJ_down] * factor;
         return ADD;
     }
     float stepSize
@@ -287,7 +287,7 @@ float inline backprojectEdgeValues(global float* projection,
         double nextGridY;
         nextGridY = (double)PJ_down + 0.5;
         factor = (nextGridY - PY_down) * stepSize;
-        ADD = projection[PX + pdims.x * PJ_down] * factor;
+        ADD = projection[PX * pdims.y + PJ_down] * factor;
         j = PJ_down + 1;
     } else
     {
@@ -299,7 +299,7 @@ float inline backprojectEdgeValues(global float* projection,
         double prevGridY;
         prevGridY = (double)PJ_up - 0.5;
         factor = (PY_up - prevGridY) * stepSize;
-        ADD += projection[PX + pdims.x * PJ_up] * factor;
+        ADD += projection[PX * pdims.y + PJ_up] * factor;
         j_STOP = PJ_up;
     } else
     {
@@ -307,7 +307,7 @@ float inline backprojectEdgeValues(global float* projection,
     }
     for(; j < j_STOP; j++)
     {
-        ADD += projection[PX + pdims.x * j] * stepSize;
+        ADD += projection[PX * pdims.y + j] * stepSize;
     }
     // Add part that maps to PJ_up
     return ADD;

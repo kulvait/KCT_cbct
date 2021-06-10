@@ -8,7 +8,7 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
     bool boxconditions = false;
     LOGD << printTime("WELCOME TO PSIRT, init", false, true);
-    uint32_t iteration = 0;
+    int iteration = 0;
 
     // Initialization
     allocateBBuffers(2);
@@ -41,21 +41,22 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     double norm, normupdate, normx;
     double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
     norm = NB0;
-    LOGI << io::xprintf("||b||=%f, p=%f, A1norm=%f", NB0, p, A1norm);
+    LOGI << io::xprintf("||b||=%f, p=%f, A1norm=%f, alpha=%f", NB0, p, A1norm, alpha);
     // LOGI << io::xprintf("||b||=%f, p=%f, A2norm=%f", NB0, p, A2norm);
 
-    while(norm / NB0 > errCondition && iteration < maxIterations)
+    while(norm / NB0 > errCondition && iteration - 1 < int(maxIterations))
     {
-        iteration++;
         project(*x_buf, *discrepancy_bbuf);
         algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
         norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
         LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
                             iteration, norm, 100.0 * norm / NB0);
+        iteration++;
         algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *invrowsums_bbuf, BDIM);
         backproject(*discrepancy_bbuf, *update_xbuf);
         if(iteration == 1)
         {
+            LOGD << "Scaling in the first iteration";
             algFLOATvector_scale(*update_xbuf, p, XDIM);
         } else
         {

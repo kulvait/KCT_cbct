@@ -80,7 +80,7 @@ int projectionIndex(private double16 CM, private double3 v, int2 pdims)
     ind.y = convert_int_rtn(coord.y + 0.5);
     if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
     {
-        return ind.x + pdims.x * ind.y;
+        return ind.x * pdims.y + ind.y;
     } else
     {
         return -1;
@@ -142,13 +142,13 @@ void inline exactEdgeValues0(global float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = dot(v_down, Fvector) / (negativeEdgeLength * Fvector.s2);
-                AtomicAdd_g_f(&projection[PX + pdims.x * J],
+                AtomicAdd_g_f(&projection[PX * pdims.y + J],
                               (lambda - lastLambda)
                                   * value); // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_max],
+            AtomicAdd_g_f(&projection[PX * pdims.y + PJ_max],
                           (leastLambda - lastLambda)
                               * value); // Atomic version of projection[ind] += value;
         }
@@ -185,19 +185,19 @@ void inline exactEdgeValues0(global float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = dot(v_up, Fvector) / (negativeEdgeLength * Fvector.s2);
-                AtomicAdd_g_f(&projection[PX + pdims.x * J],
+                AtomicAdd_g_f(&projection[PX * pdims.y + J],
                               (lastLambda - lambda)
                                   * value); // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_max],
+            AtomicAdd_g_f(&projection[PX * pdims.y + PJ_max],
                           (lastLambda - leastLambda)
                               * value); // Atomic version of projection[ind] += value;
         }
     } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
     {
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
                       value); // Atomic version of projection[ind] += value;
     }
 }
@@ -261,13 +261,13 @@ void inline exactEdgeValues(global float* projection,
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_down, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
                     / (negativeEdgeLength * Fvector.s2);
-                AtomicAdd_g_f(&projection[PX + pdims.x * J],
+                AtomicAdd_g_f(&projection[PX * pdims.y + J],
                               (lambda - lastLambda)
                                   * value); // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_max],
+            AtomicAdd_g_f(&projection[PX * pdims.y + PJ_max],
                           (leastLambda - lastLambda)
                               * value); // Atomic version of projection[ind] += value;
         }
@@ -307,19 +307,19 @@ void inline exactEdgeValues(global float* projection,
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_up, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
                     / (negativeEdgeLength * Fvector.s2);
-                AtomicAdd_g_f(&projection[PX + pdims.x * J],
+                AtomicAdd_g_f(&projection[PX * pdims.y + J],
                               (lastLambda - lambda)
                                   * value); // Atomic version of projection[ind] += value;
                 lastLambda = lambda;
             }
             // PJ_max
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_max],
+            AtomicAdd_g_f(&projection[PX * pdims.y + PJ_max],
                           (lastLambda - leastLambda)
                               * value); // Atomic version of projection[ind] += value;
         }
     } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
     {
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
                       value); // Atomic version of projection[ind] += value;
     }
 }
@@ -359,7 +359,7 @@ void inline insertEdgeValues(global float* projection,
     }
     if(PJ_down == PJ_up)
     {
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
                       value); // Atomic version of projection[ind] += value;
         return;
     }
@@ -375,7 +375,7 @@ void inline insertEdgeValues(global float* projection,
         // double nextGridY;
         // nextGridY = (double)PJ_down + 0.5;
         // factor = (nextGridY - PY_down) * stepSize * value;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
                       ((double)PJ_down + 0.5 - PY_down)
                           * stepSize); // Atomic version of projection[ind] += value;
         j = PJ_down + 1;
@@ -389,7 +389,7 @@ void inline insertEdgeValues(global float* projection,
         // double prevGridY;
         // prevGridY = (double)PJ_up - 0.5;
         // factor = (PY_up - prevGridY) * stepSize * value;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_up],
                       (PY_up - ((double)PJ_up - 0.5))
                           * stepSize); // Atomic version of projection[ind] += value;
         j_STOP = PJ_up;
@@ -399,7 +399,7 @@ void inline insertEdgeValues(global float* projection,
     }
     for(; j < j_STOP; j++)
     {
-        AtomicAdd_g_f(&projection[PX + pdims.x * j],
+        AtomicAdd_g_f(&projection[PX * pdims.y + j],
                       stepSize); // Atomic version of projection[ind] += value;
     }
 }
@@ -660,7 +660,7 @@ inline double exactIntersectionPoints0_extended(const double PX,
         }
     } else if(PX >= *PX_ccw3)
     {
-        (*centroid) = 0.5*((*v0) + (*v2));
+        (*centroid) = 0.5 * ((*v0) + (*v2));
         return 1.0;
 
     } else
@@ -704,7 +704,7 @@ inline double exactIntersectionPoints0(const double PX,
     {
         Fproduct = -dot(*v0, Fvector);
         FproductVD = dot(vd1, Fvector); // VD1
-        p = Fproduct / FproductVD;//v0+p*(v1-v0)
+        p = Fproduct / FproductVD; // v0+p*(v1-v0)
         if(PX < (*PX_ccw3))
         {
             q = Fproduct / dot(vd3, Fvector);

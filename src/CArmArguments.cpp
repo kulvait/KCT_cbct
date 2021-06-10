@@ -465,8 +465,8 @@ void CArmArguments::addSidonProjectorArgs()
     CLI::Option* optPPE;
     optValue = (useSidonProjector ? "true" : "false");
     optSid = og_projectortypesettings->add_flag(
-        "--sidon", useSidonProjector,
-        io::xprintf("Use sidon projector and backprojector pair instead of "
+        "--siddon", useSidonProjector,
+        io::xprintf("Use Siddon projector and backprojector pair instead of "
                     "cuting voxel projector, defaults to %s.",
                     optValue.c_str()));
     optPPE = og_projectorsettings

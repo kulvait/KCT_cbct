@@ -18,14 +18,15 @@
 // Internal libraries
 #include "CArmArguments.hpp"
 #include "CuttingVoxelProjector.hpp"
+#include "DEN/DenAsyncFrame2DWritter.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
+#include "MATRIX/LightProjectionMatrix.hpp"
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/ArgumentsFramespec.hpp"
 #include "PROG/Program.hpp"
-#include "MATRIX/LightProjectionMatrix.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
 using namespace CTL;
@@ -213,8 +214,11 @@ int main(int argc, char* argv[])
         LOGD << io::xprintf("Initialize RHS");
         dpr = std::make_shared<io::DenFrame2DReader<float>>(ARG.rightHandSide);
     }
-    for(int f : ARG.frames)
+    io::DenAsyncFrame2DWritter<float> projectionWritter(ARG.outputProjection, ARG.projectionSizeX,
+                                                        ARG.projectionSizeY, ARG.frames.size());
+    for(uint32_t i = 0; i != ARG.frames.size(); i++)
     {
+        uint32_t f = ARG.frames[i];
         using namespace CTL::matrix;
         std::shared_ptr<CameraI> P = std::make_shared<LightProjectionMatrix>(dr->readMatrix(f));
         if(ARG.useSidonProjector)
@@ -240,12 +244,14 @@ int main(int argc, char* argv[])
         {
             std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(f);
             normSquare += CVP.normSquare((float*)fr->getDataPointer(), ARG.projectionSizeX,
-                                          ARG.projectionSizeY);
+                                         ARG.projectionSizeY);
             normSquareDifference += CVP.normSquareDifference(
                 (float*)fr->getDataPointer(), ARG.projectionSizeX, ARG.projectionSizeY);
         }
-        io::appendBytes(ARG.outputProjection, (uint8_t*)projection,
-                        projectionElementsCount * sizeof(float));
+        io::BufferedFrame2D<float> transposedFrame(projection, ARG.projectionSizeY,
+                                                   ARG.projectionSizeX);
+        std::shared_ptr<io::Frame2DI<float>> frame = transposedFrame.transposed();
+        projectionWritter.writeFrame(*frame, i);
         std::fill_n(projection, projectionElementsCount, float(0.0));
     }
     delete[] volume;

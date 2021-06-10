@@ -63,7 +63,7 @@ inline int projectionIndex0(private const double16 CM, private const double3 v0,
     IND.y = convert_int_rtn(PRJ.y + 0.5);
     if(IND.x >= 0 && IND.y >= 0 && IND.x < pdims.x && IND.y < pdims.y)
     {   
-        return IND.x + pdims.x * IND.y;
+        return IND.x * pdims.y + IND.y;
     } else
     {   
         return -1; 
