@@ -21,7 +21,7 @@ void kernel FLOATrescale_projections_cos(global float* projection,
 {
     uint px = get_global_id(0);
     uint py = get_global_id(1);
-    const uint IND = projectionOffset + px + pdims.x * py;
+    const uint IND = projectionOffset + px * pdims.y + py;
     const double4 P = { (double)px, (double)py, 1.0, 0.0 };
     double4 V; // Point that will be projected to P by CM
 
@@ -68,7 +68,7 @@ void kernel FLOATrescale_projections_exact(global float* projection,
 {
     const uint px = get_global_id(0);
     const uint py = get_global_id(1);
-    const uint IND = projectionOffset + px + pdims.x * py;
+    const uint IND = projectionOffset + px * pdims.y + py;
     const double2 pxD = { px, py };
     const double2 v2 = (pxD - normalProjection) * pixelSizes;
     const double3 v = (double3)(v2, sourceToDetector);
