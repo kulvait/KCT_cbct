@@ -60,13 +60,11 @@ float inline backprojectExactEdgeValues0(global const float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = dot(v_down, Fvector) / (negativeEdgeLength * Fvector.s2);
-                ADD += projection[PX * pdims.y + J] * (lambda - lastLambda) * value;
-                // Atomic version of projection[ind] += value;
+                ADD += projection[PX * pdims.y + J] * (lambda - lastLambda);
                 lastLambda = lambda;
             }
             // PJ_max
-            ADD += projection[PX * pdims.y + PJ_max] * (leastLambda - lastLambda)
-                * value; // Atomic version of projection[ind] += value;
+            ADD += projection[PX * pdims.y + PJ_max] * (leastLambda - lastLambda);
         }
     } else if(PJ_down > PJ_up)
     {
@@ -101,20 +99,17 @@ float inline backprojectExactEdgeValues0(global const float* projection,
             {
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = dot(v_up, Fvector) / (negativeEdgeLength * Fvector.s2);
-                ADD += projection[PX * pdims.y + J] * (lastLambda - lambda)
-                    * value; // Atomic version of projection[ind] += value;
+                ADD += projection[PX * pdims.y + J] * (lastLambda - lambda);
                 lastLambda = lambda;
             }
             // PJ_max
-            ADD += projection[PX * pdims.y + PJ_max] * (lastLambda - leastLambda)
-                * value; // Atomic version of projection[ind] += value;
+            ADD += projection[PX * pdims.y + PJ_max] * (lastLambda - leastLambda);
         }
     } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
     {
-        ADD += projection[PX * pdims.y + PJ_down]
-            * value; // Atomic version of projection[ind] += value;
+        ADD += projection[PX * pdims.y + PJ_down];
     }
-    return ADD;
+    return ADD * value;//Scaling by value is performed at the end
 }
 
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
@@ -341,9 +336,9 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
                                            private int2 pdims,
                                            private float scalingFactor)
 {
-    uint i = get_global_id(2);
+    uint i = get_global_id(0);
     uint j = get_global_id(1);
-    uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
+    uint k = get_global_id(2); // This is more effective from the perspective of atomic colisions
     const uint IND = voxelIndex(i, j, k, vdims);
     float ADD = 0.0;
     const float voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;

@@ -39,12 +39,20 @@ public:
         pdims_uint = cl_uint2({ pdimx, pdimy });
         vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
         timestamp = std::chrono::steady_clock::now();
+        if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
+        {
+            localRangeProjection = cl::NDRange(4, 64, 1);
+            localRangeBackprojection = cl::NDRange(1, 8, 8);
+            localRangeBackprojection = cl::NDRange(8, 8, 4);
+        } else
         if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 64)
         {
-            localRange = cl::NDRange(1, 8, 8);
+            localRangeProjection = cl::NDRange(1, 256, 1);
+            localRangeBackprojection = cl::NDRange(1, 8, 8);
         } else
         {
-            localRange = cl::NDRange();
+            localRangeProjection = cl::NDRange();
+            localRangeBackprojection = cl::NDRange();
         }
     }
 
@@ -140,7 +148,8 @@ protected:
     int invertFloatVector(cl::Buffer& X, unsigned int size);
     std::vector<float> computeScalingFactors();
 
-    cl::NDRange localRange;
+    cl::NDRange localRangeProjection;
+    cl::NDRange localRangeBackprojection;
     /**
      * Backprojection X = AT(B)
      *
