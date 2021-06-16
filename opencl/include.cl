@@ -1,4 +1,13 @@
 //==============================include.cl=====================================
+#ifndef RELAXED
+//#define RELAXED
+#endif
+
+#define PROJECTX0(CM, v0) dot(v0, CM.s012) / dot(v0, CM.s89a);
+
+#define PROJECTY0(CM, v0) dot(v0, CM.s456) / dot(v0, CM.s89a);
+
+
 /** Atomic float addition.
  *
  * Function from
@@ -62,12 +71,33 @@ inline int projectionIndex0(private const double16 CM, private const double3 v0,
     IND.x = convert_int_rtn(PRJ.x + 0.5);
     IND.y = convert_int_rtn(PRJ.y + 0.5);
     if(IND.x >= 0 && IND.y >= 0 && IND.x < pdims.x && IND.y < pdims.y)
-    {   
+    {
         return IND.x * pdims.y + IND.y;
     } else
-    {   
-        return -1; 
-    }   
+    {
+        return -1;
+    }
+}
+
+inline int projectionIndexF0(private const float16 CMF, private const float3 v0, int2 const pdims)
+{
+    float PRZ;
+    float2 PRJ;
+    int2 IND;
+    PRZ = dot(v0, CMF.s89a);
+    PRJ.x = dot(v0, CMF.s012);
+    PRJ.y = dot(v0, CMF.s456);
+    PRJ /= PRZ; // Scalar widening
+                // https://www.informit.com/articles/article.aspx?p=1732873&seqNum=10
+    IND.x = convert_int_rtn(PRJ.x + 0.5);
+    IND.y = convert_int_rtn(PRJ.y + 0.5);
+    if(IND.x >= 0 && IND.y >= 0 && IND.x < pdims.x && IND.y < pdims.y)
+    {
+        return IND.x * pdims.y + IND.y;
+    } else
+    {
+        return -1;
+    }
 }
 
 /** Projection of a volume point v0 onto X coordinate on projector.
@@ -77,7 +107,7 @@ inline int projectionIndex0(private const double16 CM, private const double3 v0,
  * @param v0 Volume point in source based coordinates
  * @param PX_out Output
  */
-inline double projectX0(private const double16 CM, private const double3 v0) 
+inline double projectX0(private const double16 CM, private const double3 v0)
 {
     return dot(v0, CM.s012) / dot(v0, CM.s89a);
 }
@@ -89,10 +119,9 @@ inline double projectX0(private const double16 CM, private const double3 v0)
  * @param v0 Volume point in source based coordinates
  * @param PY_out Output
  */
-inline double projectY0(private const double16 CM, private const double3 v0) 
+inline double projectY0(private const double16 CM, private const double3 v0)
 {
     return dot(v0, CM.s456) / dot(v0, CM.s89a);
 }
-
 
 //==============================END include.cl=====================================
