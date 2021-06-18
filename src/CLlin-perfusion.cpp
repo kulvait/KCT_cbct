@@ -212,6 +212,8 @@ void Args::defineArguments()
     addBasisSpecificationArgs();
     addSettingsArgs();
     addProjectorArgs();
+    addCLSettingsArgs();
+    addRelaxedArg();
 
     // Specification of the basis of the volume data, each voxel is approximated as v_i(t) =  sum
     // v_i^j b_j(t).
@@ -404,7 +406,7 @@ int main(int argc, char* argv[])
         BPR->initializeCVPProjector(ARG.useExactScaling);
     }
     int ecd = BPR->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
-                                    xpath, ARG.CLdebug);
+                                    xpath, ARG.CLdebug, ARG.CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);

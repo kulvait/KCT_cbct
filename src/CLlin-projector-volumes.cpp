@@ -152,6 +152,7 @@ void Args::defineArguments()
     addVolumeCenterArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
+    addRelaxedArg();
 
     cliApp->add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
     cliApp->add_option(
@@ -224,7 +225,7 @@ int main(int argc, char* argv[])
         CVP.initializeCVPProjector(ARG.useExactScaling);
     }
     int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
-                                   xpath, ARG.CLdebug);
+                                   xpath, ARG.CLdebug, ARG.CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);

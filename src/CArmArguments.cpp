@@ -498,4 +498,37 @@ void CArmArguments::addProjectorArgs()
     addSidonProjectorArgs();
 }
 
+void CArmArguments::addProjectorLocalNDRangeArgs()
+{
+    addCLSettingsGroup();
+    std::string defaultValue = io::xprintf("NDRange(%d, %d, %d)", projectorLocalNDRange[0],
+                                           projectorLocalNDRange[1], projectorLocalNDRange[2]);
+    opt_cl_projectorlocalrange = og_cl_settings->add_option(
+        "--projector-local-range", projectorLocalNDRange,
+        io::xprintf("Specify local NDRange for projector, (0,0,1) is a special value to guess, (0,0,0) means NDRange(), defaults to %s.",
+                    defaultValue.c_str()));
+    opt_cl_projectorlocalrange->expected(3);
+}
+void CArmArguments::addBackprojectorLocalNDRangeArgs()
+{
+    addCLSettingsGroup();
+    std::string defaultValue
+        = io::xprintf("NDRange(%d, %d, %d)", backprojectorLocalNDRange[0],
+                      backprojectorLocalNDRange[1], backprojectorLocalNDRange[2]);
+    opt_cl_backprojectorlocalrange = og_cl_settings->add_option(
+        "--backprojector-local-range", backprojectorLocalNDRange,
+        io::xprintf("Specify local NDRange for backprojector, (0,0,1) is a special value to guess, (0,0,0) means NDRange(), defaults to %s.",
+                    defaultValue.c_str()));
+    opt_cl_backprojectorlocalrange->expected(3);
+}
+void CArmArguments::addRelaxedArg()
+{
+    addCLSettingsGroup();
+    std::string defaultValue = (CLrelaxed ? "true" : "false");
+    og_cl_settings->add_flag(
+        "--relaxed,!--no-relaxed", CLrelaxed,
+        io::xprintf("OpenCL define RELAXED, defaults to %s.",
+                    defaultValue.c_str()));
+}
+
 } // namespace CTL::util

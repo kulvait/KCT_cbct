@@ -156,6 +156,7 @@ void Args::defineArguments()
     addPixelSizeArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
+    addRelaxedArg();
 }
 
 int main(int argc, char* argv[])
@@ -200,7 +201,7 @@ int main(int argc, char* argv[])
         CVP.initializeCVPProjector(ARG.useExactScaling);
     }
     int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
-                                   xpath, ARG.CLdebug);
+                                   xpath, ARG.CLdebug, ARG.CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);

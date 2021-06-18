@@ -199,6 +199,9 @@ void Args::defineArguments()
     // Program flow parameters
     addSettingsArgs();
     addCLSettingsArgs();
+    addProjectorLocalNDRangeArgs();
+    addBackprojectorLocalNDRangeArgs();
+    addRelaxedArg();
     addProjectorArgs();
 
     cliApp->add_flag("--verbose,!--no-verbose", verbose, "Verbose print, defaults to true.");
@@ -264,7 +267,8 @@ int main(int argc, char* argv[])
     uint64_t projectionFrameSize = ARG.projectionSizeX * ARG.projectionSizeY;
     for(uint32_t z = 0; z != ARG.projectionSizeZ; z++)
     {
-        inputProjectionsReader.readFrameIntoBuffer(z, projection + (z * projectionFrameSize), false);
+        inputProjectionsReader.readFrameIntoBuffer(z, projection + (z * projectionFrameSize),
+                                                   false);
     }
     float* volume;
     if(ARG.initialVectorX0 != "")
@@ -284,9 +288,16 @@ int main(int argc, char* argv[])
 
     if(!ARG.glsqr && !ARG.psirt && !ARG.sirt)
     {
+        cl::NDRange projectorLocalNDRange
+            = cl::NDRange(ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1],
+                          ARG.projectorLocalNDRange[2]);
+        cl::NDRange backprojectorLocalNDRange
+            = cl::NDRange(ARG.backprojectorLocalNDRange[0], ARG.backprojectorLocalNDRange[1],
+                          ARG.backprojectorLocalNDRange[2]);
         std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
-            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
+            backprojectorLocalNDRange);
         cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
@@ -306,7 +317,7 @@ int main(int argc, char* argv[])
             cgls->useJacobiVectorCLCode();
         }
         int ecd = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
         if(ecd < 0)
         {
             std::string ERR
@@ -368,8 +379,9 @@ int main(int argc, char* argv[])
         {
             glsqr->initializeCVPProjector(ARG.useExactScaling);
         }
-        int ecd = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                          ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+        int ecd
+            = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
+                                      xpath, ARG.CLdebug, ARG.CLrelaxed);
         if(ecd < 0)
         {
             std::string ERR
@@ -425,8 +437,9 @@ int main(int argc, char* argv[])
         {
             psirt->initializeCVPProjector(ARG.useExactScaling);
         }
-        int ecd = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                          ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+        int ecd
+            = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
+                                      xpath, ARG.CLdebug, ARG.CLrelaxed);
         if(ecd < 0)
         {
             std::string ERR
@@ -482,8 +495,9 @@ int main(int argc, char* argv[])
         {
             psirt->initializeCVPProjector(ARG.useExactScaling);
         }
-        int ecd = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                          ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug);
+        int ecd
+            = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
+                                      xpath, ARG.CLdebug, ARG.CLrelaxed);
         if(ecd < 0)
         {
             std::string ERR

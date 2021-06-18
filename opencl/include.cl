@@ -1,8 +1,4 @@
 //==============================include.cl=====================================
-#ifndef RELAXED
-//#define RELAXED
-#endif
-
 #define PROJECTX0(CM, v0) dot(v0, CM.s012) / dot(v0, CM.s89a);
 
 #define PROJECTY0(CM, v0) dot(v0, CM.s456) / dot(v0, CM.s89a);

@@ -56,6 +56,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
     util::RunTimeInfo rti;
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
+    bool CLrelaxed = false;
     uint32_t itemsPerWorkgroup = 256;
     std::string startPath = "";
     uint64_t totalVolumeSize
@@ -66,7 +67,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
     glsqr->initializeCVPProjector(true);
-    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
@@ -120,6 +121,7 @@ TEST_CASE("PerfusionOperator AdjointDotProduct TEST", "[adjointop][cuttingvox][N
     util::RunTimeInfo rti;
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
+    bool CLrelaxed = false;
     uint32_t itemsPerWorkgroup = 256;
     std::string startPath = "";
     uint64_t totalVolumeSize
@@ -195,7 +197,7 @@ TEST_CASE("PerfusionOperator AdjointDotProduct TEST", "[adjointop][cuttingvox][N
                          volumeSizeY, volumeSizeZ, itemsPerWorkgroup);
     PO.setReportingParameters(true);
     PO.initializeCVPProjector(useExactScaling);
-    int ecd = PO.initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
+    int ecd = PO.initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
@@ -240,6 +242,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TA3 projector TEST", "[adjointop
     util::RunTimeInfo rti;
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
+    bool CLrelaxed = false;
     uint32_t itemsPerWorkgroup = 256;
     std::string startPath = "";
     uint64_t totalVolumeSize
@@ -251,7 +254,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TA3 projector TEST", "[adjointop
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
     glsqr->initializeTTProjector();
-    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
@@ -303,6 +306,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TA3 projector TEST",
     util::RunTimeInfo rti;
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
+    bool CLrelaxed = false;
     uint32_t itemsPerWorkgroup = 256;
     std::string startPath = "";
     uint64_t totalVolumeSize
@@ -378,7 +382,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TA3 projector TEST",
                          volumeSizeY, volumeSizeZ, itemsPerWorkgroup);
     PO.setReportingParameters(true);
     PO.initializeTTProjector();
-    int ecd = PO.initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
+    int ecd = PO.initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
@@ -423,6 +427,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
     util::RunTimeInfo rti;
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
+    bool CLrelaxed = false;
     uint32_t itemsPerWorkgroup = 256;
     std::string startPath = "";
     uint64_t totalVolumeSize
@@ -434,7 +439,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
     glsqr->initializeSidonProjector(1, 1);
-    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
@@ -486,6 +491,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST",
     util::RunTimeInfo rti;
     std::string xpath = rti.getExecutableDirectoryPath(); // build dir
     bool debug = false;
+    bool CLrelaxed = false;
     uint32_t itemsPerWorkgroup = 256;
     std::string startPath = "";
     uint64_t totalVolumeSize
@@ -561,7 +567,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST",
                          volumeSizeY, volumeSizeZ, itemsPerWorkgroup);
     PO.setReportingParameters(true);
     PO.initializeSidonProjector(1, 1);
-    int ecd = PO.initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug);
+    int ecd = PO.initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);

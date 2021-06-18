@@ -58,7 +58,10 @@ public:
     std::string CLplatformString = "";
     uint32_t CLplatformID = 0;
     std::vector<uint32_t> CLdeviceIDs;
+    std::vector<uint32_t> backprojectorLocalNDRange = { 0, 0, 1 };
+    std::vector<uint32_t> projectorLocalNDRange = { 0, 0, 1 };
     bool CLdebug = false;
+    bool CLrelaxed = false;
     uint32_t CLitemsPerWorkgroup = 256;
 
     void parsePlatformString(bool verbose = false);
@@ -84,6 +87,9 @@ protected:
     void addCLSettingsGroup();
     void addSettingsArgs();
     void addCLSettingsArgs();
+    void addProjectorLocalNDRangeArgs();
+    void addBackprojectorLocalNDRangeArgs();
+    void addRelaxedArg();
 
     // Projector setup
     void addProjectorSettingsGroups();
@@ -98,5 +104,8 @@ protected:
     CLI::Option_group* og_projectorsettings = nullptr;
     CLI::Option_group* og_projectortypesettings = nullptr;
     CLI::Option_group* og_cl_settings = nullptr;
+
+    CLI::Option* opt_cl_backprojectorlocalrange = nullptr;
+    CLI::Option* opt_cl_projectorlocalrange = nullptr;
 };
 } // namespace CTL::util

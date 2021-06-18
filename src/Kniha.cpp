@@ -7,7 +7,8 @@ int Kniha::initializeOpenCL(uint32_t platformId,
                             uint32_t* deviceIds,
                             uint32_t deviceIdsLength,
                             std::string xpath,
-                            bool debug)
+                            bool debug,
+                            bool relaxed)
 {
     if(openCLInitialized)
     {
@@ -62,14 +63,24 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     io::concatenateTextFiles(clFile, true, clFilesXpath);
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
-    std::string options = "";
+    std::vector<std::string> optstrings;
+    if(relaxed)
+    {
+        optstrings.emplace_back("-DRELAXED");
+    }
     if(debug)
     {
-        options = io::xprintf("-g -s \"%s\"", clFile.c_str());
+        optstrings.emplace_back(io::xprintf("-g -s \"%s\"", clFile.c_str()));
     } else
     {
-        options = "-Werror";
+        optstrings.emplace_back("-Werror");
     }
+    // Join operation
+    std::string options
+        = std::accumulate(std::begin(optstrings), std::end(optstrings), std::string(""),
+                          [](const std::string& A, const std::string& B) {
+                              return B.empty() ? A : (A.empty() ? B : A + " " + B);
+                          });
     LOGI << io::xprintf("Building file %s with options : %s", clFile.c_str(), options.c_str());
     if(program.build(devices, options.c_str()) != CL_SUCCESS)
     {

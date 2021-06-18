@@ -1264,7 +1264,7 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
  *
  */
 void kernel FLOATcutting_voxel_project(global const float* restrict volume,
-                                       global float* projection,
+                                       global float* restrict projection,
                                        private uint projectionOffset,
                                        private double16 CM,
                                        private double3 sourcePosition,

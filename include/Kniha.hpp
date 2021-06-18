@@ -9,6 +9,7 @@
 #include <ctime>
 #include <functional>
 #include <iostream>
+#include <numeric>
 
 // Internal libraries
 #include "DEN/DenProjectionMatrixReader.hpp"
@@ -41,7 +42,8 @@ public:
                          uint32_t* deviceIds,
                          uint32_t deviceIdsLength,
                          std::string xpath,
-                         bool debug);
+                         bool debug,
+                         bool relaxed);
 
     bool isOpenCLInitialized() { return openCLInitialized; }
 

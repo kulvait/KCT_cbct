@@ -39,8 +39,18 @@ public:
                       uint32_t vdimx,
                       uint32_t vdimy,
                       uint32_t vdimz,
-                      uint32_t workGroupSize = 256)
-        : BaseReconstructor(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
+                      uint32_t workGroupSize = 256,
+                      cl::NDRange projectorLocalNDRange = cl::NDRange(),
+                      cl::NDRange backprojectorLocalNDRange = cl::NDRange())
+        : BaseReconstructor(pdimx,
+                            pdimy,
+                            pdimz,
+                            vdimx,
+                            vdimy,
+                            vdimz,
+                            workGroupSize,
+                            projectorLocalNDRange,
+                            backprojectorLocalNDRange)
     {
     }
 
@@ -59,7 +69,6 @@ public:
     int reconstructJacobi(uint32_t maxIterations = 100, float errCondition = 0.01);
 
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
-
 };
 
 } // namespace CTL

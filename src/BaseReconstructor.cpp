@@ -419,7 +419,7 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
     copyFloatVector(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     //cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRangeBackprojection);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz), localRangeBackprojection);
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz), backprojectorLocalNDRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
@@ -481,7 +481,7 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
     copyFloatVector(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::NDRange voxelRange(vdimz, vdimy, vdimx);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRangeBackprojection);
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), backprojectorLocalNDRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
@@ -537,7 +537,7 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRangeProjection);
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), projectorLocalNDRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
