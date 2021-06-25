@@ -10,7 +10,7 @@
 #include <iostream>
 
 // Internal libraries
-#include "AlgorithmsBarierBuffers.hpp"
+#include "AlgorithmsBarrierBuffers.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "OPENCL/OpenCLManager.hpp"
@@ -20,7 +20,7 @@
 
 namespace CTL {
 
-class BasePerfusionReconstructor : public virtual Kniha, public AlgorithmsBarierBuffers
+class BasePerfusionReconstructor : public virtual Kniha, public AlgorithmsBarrierBuffers
 {
 public:
     /**
@@ -40,7 +40,7 @@ public:
                                uint32_t vdimy,
                                uint32_t vdimz,
                                uint32_t workGroupSize = 256)
-        : AlgorithmsBarierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
+        : AlgorithmsBarrierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
     {
         pdims = cl_int2({ int(pdimx), int(pdimy) });
         pdims_uint = cl_uint2({ pdimx, pdimy });
@@ -145,11 +145,11 @@ protected:
     std::vector<cl_double16> ICM16Vector;
     std::vector<float> scalingFactorVector;
 
-    double normBBuffer_barier_double(std::vector<std::shared_ptr<cl::Buffer>>& B);
-    double normXBuffer_barier_double(std::vector<std::shared_ptr<cl::Buffer>>& X);
-    double scalarProductXBuffer_barier_double(std::vector<std::shared_ptr<cl::Buffer>>& A,
+    double normBBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& B);
+    double normXBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& X);
+    double scalarProductXBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& A,
                                               std::vector<std::shared_ptr<cl::Buffer>>& B);
-    double scalarProductBBuffer_barier_double(std::vector<std::shared_ptr<cl::Buffer>>& A,
+    double scalarProductBBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& A,
                                               std::vector<std::shared_ptr<cl::Buffer>>& B);
     int scaleFloatVector(std::vector<std::shared_ptr<cl::Buffer>>& A, float c, unsigned int size);
     void setTimepoint();

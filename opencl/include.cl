@@ -1,7 +1,33 @@
 //==============================include.cl=====================================
-#define PROJECTX0(CM, v0) dot(v0, CM.s012) / dot(v0, CM.s89a);
+#ifdef RELAXED
+typedef float REAL;
+typedef float3 REAL3;
+typedef float16 REAL16;
+//__constant float ONE=1.0f;
+//__constant float HALF=0.5f;
+//__constant float ZERO=0.0f;
+#define ONE 1.0f
+#define HALF 0.5f
+#define ZERO 0.0f
+#define convert_REAL3(x) convert_float3(x)
+#else
+typedef double REAL;
+typedef double3 REAL3;
+typedef double16 REAL16;
+//__constant double ONE=1.0;
+//__constant double HALF=0.5;
+//__constant double ZERO=0.0f;
+#define ONE 1.0
+#define HALF 0.5
+#define ZERO 0.0
+#define convert_REAL3(x) convert_double3(x)
+#endif
 
-#define PROJECTY0(CM, v0) dot(v0, CM.s456) / dot(v0, CM.s89a);
+#define PROJECTX0(CM, v0) dot(v0, CM.s012) / dot(v0, CM.s89a)
+
+#define PROJECTY0(CM, v0) dot(v0, CM.s456) / dot(v0, CM.s89a)
+
+#define INDEX(f) convert_int_rtn(f + HALF)
 
 
 /** Atomic float addition.
@@ -26,6 +52,22 @@ inline void AtomicAdd_g_f(volatile __global float* adr, const float v)
         adrcatch.f32 = tmp.f32;
         tmp.f32 += v;
         tmp.u32 = atomic_cmpxchg((volatile __global unsigned int*)adr, adrcatch.u32, tmp.u32);
+    } while(tmp.u32 != adrcatch.u32);
+}
+
+inline void AtomicAdd_l_f(volatile __local float* adr, const float v)
+{
+    union
+    {
+        unsigned int u32;
+        float f32;
+    } tmp, adrcatch;
+    tmp.f32 = *adr;
+    do
+    {
+        adrcatch.f32 = tmp.f32;
+        tmp.f32 += v;
+        tmp.u32 = atomic_cmpxchg((volatile __local unsigned int*)adr, adrcatch.u32, tmp.u32);
     } while(tmp.u32 != adrcatch.u32);
 }
 

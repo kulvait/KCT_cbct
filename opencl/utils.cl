@@ -53,10 +53,10 @@ void kernel FLOATvector_MaxPartial(global const float* restrict x,
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel FLOATvector_NormSquarePartial_barier(global const float* restrict x,
-                                                 global float* restrict normSquare,
-                                                 local float* localx,
-                                                 private uint vecLength)
+void kernel FLOATvector_NormSquarePartial_barrier(global const float* restrict x,
+                                                  global float* restrict normSquare,
+                                                  local float* localx,
+                                                  private uint vecLength)
 {
     uint gid = get_global_id(0);
     uint gs = get_global_size(0);
@@ -91,10 +91,10 @@ void kernel FLOATvector_NormSquarePartial_barier(global const float* restrict x,
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel FLOATvector_SumPartial_barier(global const float* restrict x,
-                                          global float* restrict partialSum,
-                                          local float* loc,
-                                          private uint vecLength)
+void kernel FLOATvector_SumPartial_barrier(global const float* restrict x,
+                                           global float* restrict partialSum,
+                                           local float* loc,
+                                           private uint vecLength)
 {
     uint gid = get_global_id(0);
     uint gs = get_global_size(0);
@@ -129,10 +129,10 @@ void kernel FLOATvector_SumPartial_barier(global const float* restrict x,
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel FLOATvector_MaxPartial_barier(global const float* restrict x,
-                                          global float* restrict partialResult,
-                                          local float* localx,
-                                          private uint vecLength)
+void kernel FLOATvector_MaxPartial_barrier(global const float* restrict x,
+                                           global float* restrict partialResult,
+                                           local float* localx,
+                                           private uint vecLength)
 {
     uint gid = get_global_id(0);
     uint gs = get_global_size(0);
@@ -224,10 +224,10 @@ void kernel vector_SumPartial(global const double* restrict x,
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel vector_NormSquarePartial_barier(global const float* restrict x,
-                                            global double* restrict normSquare,
-                                            local double* localx,
-                                            private uint vecLength)
+void kernel vector_NormSquarePartial_barrier(global const float* restrict x,
+                                             global double* restrict normSquare,
+                                             local double* localx,
+                                             private uint vecLength)
 {
     uint gid = get_global_id(0);
     uint gs = get_global_size(0);
@@ -262,10 +262,10 @@ void kernel vector_NormSquarePartial_barier(global const float* restrict x,
 // Want to use it in second line where I am loading doubles into it
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
-void kernel vector_SumPartial_barier(global const double* restrict x,
-                                     global double* restrict partialSum,
-                                     local double* loc,
-                                     private uint vecLength)
+void kernel vector_SumPartial_barrier(global const double* restrict x,
+                                      global double* restrict partialSum,
+                                      local double* loc,
+                                      private uint vecLength)
 {
     uint gid = get_global_id(0);
     uint gs = get_global_size(0);
@@ -297,11 +297,11 @@ void kernel vector_SumPartial_barier(global const double* restrict x,
     }
 }
 
-void kernel vector_ScalarProductPartial_barier(global const float* restrict a,
-                                               global const float* restrict b,
-                                               global double* restrict product,
-                                               local double* localx,
-                                               private uint vecLength)
+void kernel vector_ScalarProductPartial_barrier(global const float* restrict a,
+                                                global const float* restrict b,
+                                                global double* restrict product,
+                                                local double* localx,
+                                                private uint vecLength)
 {
     uint gid = get_global_id(0);
     uint gs = get_global_size(0);

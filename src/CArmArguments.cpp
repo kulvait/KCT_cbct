@@ -405,6 +405,7 @@ void CArmArguments::addCuttingVoxelProjectorArgs(bool includeNoScaling)
     CLI::Option* optExactScaling;
     CLI::Option* optCosScaling;
     CLI::Option* optWithoutScaling;
+    CLI::Option* optBarier;
     optValue = (useCVPProjector ? "true" : "false");
     optCVP = og_projectortypesettings->add_flag(
         "--cvp", useCVPProjector,
@@ -443,6 +444,11 @@ void CArmArguments::addCuttingVoxelProjectorArgs(bool includeNoScaling)
                         optValue.c_str()));
     }
     optExactScaling->needs(optCVP);
+    optValue = (useBarrierCalls ? "true" : "false");
+    optBarier = og_projectorsettings->add_flag(
+        "--barrier,!--no-barrier", useBarrierCalls,
+        io::xprintf("Use barrier calls for CVP, defaults to %s.", optValue.c_str()));
+    optBarier->needs(optCVP);
 }
 
 void CArmArguments::addTTProjectorArgs()
@@ -505,7 +511,8 @@ void CArmArguments::addProjectorLocalNDRangeArgs()
                                            projectorLocalNDRange[1], projectorLocalNDRange[2]);
     opt_cl_projectorlocalrange = og_cl_settings->add_option(
         "--projector-local-range", projectorLocalNDRange,
-        io::xprintf("Specify local NDRange for projector, (0,0,1) is a special value to guess, (0,0,0) means NDRange(), defaults to %s.",
+        io::xprintf("Specify local NDRange for projector, (0,0,1) is a special value to guess, "
+                    "(0,0,0) means NDRange(), defaults to %s.",
                     defaultValue.c_str()));
     opt_cl_projectorlocalrange->expected(3);
 }
@@ -517,7 +524,8 @@ void CArmArguments::addBackprojectorLocalNDRangeArgs()
                       backprojectorLocalNDRange[1], backprojectorLocalNDRange[2]);
     opt_cl_backprojectorlocalrange = og_cl_settings->add_option(
         "--backprojector-local-range", backprojectorLocalNDRange,
-        io::xprintf("Specify local NDRange for backprojector, (0,0,1) is a special value to guess, (0,0,0) means NDRange(), defaults to %s.",
+        io::xprintf("Specify local NDRange for backprojector, (0,0,1) is a special value to guess, "
+                    "(0,0,0) means NDRange(), defaults to %s.",
                     defaultValue.c_str()));
     opt_cl_backprojectorlocalrange->expected(3);
 }
@@ -527,8 +535,7 @@ void CArmArguments::addRelaxedArg()
     std::string defaultValue = (CLrelaxed ? "true" : "false");
     og_cl_settings->add_flag(
         "--relaxed,!--no-relaxed", CLrelaxed,
-        io::xprintf("OpenCL define RELAXED, defaults to %s.",
-                    defaultValue.c_str()));
+        io::xprintf("OpenCL define RELAXED, defaults to %s.", defaultValue.c_str()));
 }
 
 } // namespace CTL::util

@@ -8,7 +8,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     uint32_t iteration = 0;
 
     // Initialization
-    double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
+    double NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
     LOGI << io::xprintf("||b||=%f", NB0);
     std::shared_ptr<cl::Buffer> u_prev, u_cur, u_next;
     std::shared_ptr<cl::Buffer> v_prev, v_cur, v_next;
@@ -25,7 +25,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     backproject(*b_buf, *v_next);
     //    LOGD << io::xprintf("Writing file v_init.den");
     //    writeVolume(*v_next, io::xprintf("v_init.den"));
-    double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
+    double vnextnorm = std::sqrt(normXBuffer_barrier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
     scaleFloatVector(*v_next, float(1.0 / vnextnorm), XDIM);
     bool initializedByScaledBackprojectedRightSide = true;
@@ -102,7 +102,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         rho_prev = rho_cur;
 
         backproject(*u_cur, *XZ);
-        sigma_prev = scalarProductXBuffer_barier_double(*XZ, *v_prev);
+        sigma_prev = scalarProductXBuffer_barrier_double(*XZ, *v_prev);
         addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
         v_next = v_prev;
         LOGI << io::xprintf("sigma_prev=%f", sigma_prev);
@@ -110,10 +110,10 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         if(d == 0.0)
         {
             LOGI << "d=0.0";
-            sigma_cur = scalarProductXBuffer_barier_double(*XZ, *v_cur);
+            sigma_cur = scalarProductXBuffer_barrier_double(*XZ, *v_cur);
             addIntoFirstVectorSecondVectorScaled(*XZ, *v_cur, float(-sigma_cur), XDIM);
 
-            sigma_next = std::sqrt(normXBuffer_barier_double(*XZ));
+            sigma_next = std::sqrt(normXBuffer_barrier_double(*XZ));
             LOGI << io::xprintf("sigma_next=%f", sigma_next);
 
             if(initializedByScaledBackprojectedRightSide)
@@ -132,7 +132,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         } else
         {
             LOGI << "d=1.0";
-            sigma_cur = std::sqrt(normXBuffer_barier_double(*XZ));
+            sigma_cur = std::sqrt(normXBuffer_barrier_double(*XZ));
             LOGI << io::xprintf("sigma_cur=%f", sigma_cur);
 
             if(sigma_cur > sigma_tol)
@@ -146,13 +146,13 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         }
 
         project(*v_cur, *BZ);
-        tau_prev = scalarProductBBuffer_barier_double(*BZ, *u_prev);
+        tau_prev = scalarProductBBuffer_barrier_double(*BZ, *u_prev);
         addIntoFirstVectorSecondVectorScaled(*BZ, *u_prev, float(-tau_prev), BDIM);
         u_next = u_prev;
 
-        tau_cur = scalarProductBBuffer_barier_double(*BZ, *u_cur);
+        tau_cur = scalarProductBBuffer_barrier_double(*BZ, *u_cur);
         addIntoFirstVectorSecondVectorScaled(*BZ, *u_cur, float(-tau_cur), BDIM);
-        tau_next = std::sqrt(normBBuffer_barier_double(*BZ));
+        tau_next = std::sqrt(normBBuffer_barrier_double(*BZ));
         LOGE << io::xprintf("tau_prev=%f, tau_cur=%f, tau_next=%f", tau_prev, tau_cur, tau_next);
 
         if(tau_next != 0)
@@ -208,7 +208,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
     uint32_t iteration = 0;
 
     // Initialization
-    double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
+    double NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
     LOGI << io::xprintf("||b||=%f", NB0);
     std::shared_ptr<cl::Buffer> u_prev, u_cur, u_next;
     std::shared_ptr<cl::Buffer> v_prev, v_cur, v_next;
@@ -224,7 +224,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
     v_next = getXBuffer(0);
     Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
     backproject(*b_buf, *v_next); // Backprojection of zero is obviously zero for potential b_buf_x
-    double vnextnorm = std::sqrt(normXBuffer_barier_double(*v_next));
+    double vnextnorm = std::sqrt(normXBuffer_barrier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
     scaleFloatVector(*v_next, float(1.0 / vnextnorm), XDIM);
     bool initializedByScaledBackprojectedRightSide = true;
@@ -318,7 +318,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
 
         backproject(*u_cur, *XZ);
         addIntoFirstVectorSecondVectorScaled(*XZ, *u_cur_x, lambda, XDIM);
-        sigma_prev = scalarProductXBuffer_barier_double(*XZ, *v_prev);
+        sigma_prev = scalarProductXBuffer_barrier_double(*XZ, *v_prev);
         addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
         v_next = v_prev; // We don't need the buffer v_pref anymore
         LOGI << io::xprintf("sigma_prev=%f", sigma_prev);
@@ -326,10 +326,10 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         if(d == 0.0)
         {
             LOGI << "d=0.0";
-            sigma_cur = scalarProductXBuffer_barier_double(*XZ, *v_cur);
+            sigma_cur = scalarProductXBuffer_barrier_double(*XZ, *v_cur);
             addIntoFirstVectorSecondVectorScaled(*XZ, *v_cur, float(-sigma_cur), XDIM);
 
-            sigma_next = std::sqrt(normXBuffer_barier_double(*XZ));
+            sigma_next = std::sqrt(normXBuffer_barrier_double(*XZ));
             LOGI << io::xprintf("sigma_next=%f", sigma_next);
 
             if(initializedByScaledBackprojectedRightSide)
@@ -349,7 +349,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         } else
         {
             LOGI << "d=1.0";
-            sigma_cur = std::sqrt(normXBuffer_barier_double(*XZ));
+            sigma_cur = std::sqrt(normXBuffer_barrier_double(*XZ));
             LOGI << io::xprintf("sigma_cur=%f", sigma_cur);
 
             if(sigma_cur > sigma_tol)
@@ -366,18 +366,18 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         project(*v_cur, *BZ);
         copyFloatVector(*v_cur, *BZ_x, XDIM);
         scaleFloatVector(*BZ_x, lambda, XDIM);
-        tau_prev = scalarProductBBuffer_barier_double(*BZ, *u_prev);
-        tau_prev += scalarProductXBuffer_barier_double(*BZ_x, *u_prev_x);
+        tau_prev = scalarProductBBuffer_barrier_double(*BZ, *u_prev);
+        tau_prev += scalarProductXBuffer_barrier_double(*BZ_x, *u_prev_x);
         addIntoFirstVectorSecondVectorScaled(*BZ, *u_prev, float(-tau_prev), BDIM);
         addIntoFirstVectorSecondVectorScaled(*BZ_x, *u_prev_x, float(-tau_prev), XDIM);
         u_next = u_prev;
         u_next_x = u_prev_x;
 
-        tau_cur = scalarProductBBuffer_barier_double(*BZ, *u_cur);
-        tau_cur += scalarProductXBuffer_barier_double(*BZ_x, *u_cur_x);
+        tau_cur = scalarProductBBuffer_barrier_double(*BZ, *u_cur);
+        tau_cur += scalarProductXBuffer_barrier_double(*BZ_x, *u_cur_x);
         addIntoFirstVectorSecondVectorScaled(*BZ, *u_cur, float(-tau_cur), BDIM);
         addIntoFirstVectorSecondVectorScaled(*BZ_x, *u_cur_x, float(-tau_cur), XDIM);
-        tau_next = std::sqrt(normBBuffer_barier_double(*BZ) + normXBuffer_barier_double(*BZ_x));
+        tau_next = std::sqrt(normBBuffer_barrier_double(*BZ) + normXBuffer_barrier_double(*BZ_x));
         LOGE << io::xprintf("tau_prev=%f, tau_cur=%f, tau_next=%f", tau_prev, tau_cur, tau_next);
 
         if(tau_next != 0)

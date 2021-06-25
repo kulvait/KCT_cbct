@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
         CVP.initializeTTProjector();
     } else
     {
-        CVP.initializeCVPProjector(ARG.useExactScaling);
+        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls);
     }
     int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
                                    xpath, ARG.CLdebug, ARG.CLrelaxed);

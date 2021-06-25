@@ -15,6 +15,7 @@ std::string basedir(); // Defined in main file so that it will be accessible to 
 uint32_t CLplatformID = 1;
 // uint32_t CLplatformID = 0;
 uint32_t CLdeviceID = 0;
+bool CVPBarierImplementation = false;
 
 void findFirstPlatform()
 {
@@ -66,7 +67,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
-    glsqr->initializeCVPProjector(true);
+    glsqr->initializeCVPProjector(true, CVPBarierImplementation);
     int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {

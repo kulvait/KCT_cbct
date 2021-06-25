@@ -263,6 +263,20 @@ void Kniha::CLINCLUDEprojector()
     });
 }
 
+void Kniha::CLINCLUDEprojector_cvp_barrier()
+{
+    insertCLFile("opencl/projector_cvp_barrier.cl");
+    callbacks.emplace_back([this](cl::Program program) {
+        auto& ptr = FLOATcutting_voxel_project_barrier;
+        std::string str = "FLOATcutting_voxel_project_barrier";
+        if(ptr == nullptr)
+        {
+            ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                cl::Kernel(program, str.c_str()));
+        };
+    });
+}
+
 void Kniha::CLINCLUDEprojector_old()
 {
     insertCLFile("opencl/projector_old.cl");
@@ -353,23 +367,23 @@ void Kniha::CLINCLUDEutils()
                     cl::Kernel(program, str.c_str()));
             }
         }
-        auto& ptr02 = FLOATvector_NormSquarePartial_barier;
-        str = "FLOATvector_NormSquarePartial_barier";
+        auto& ptr02 = FLOATvector_NormSquarePartial_barrier;
+        str = "FLOATvector_NormSquarePartial_barrier";
         if(ptr02 == nullptr)
         {
             ptr02 = std::make_shared<std::remove_reference<decltype(*ptr02)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
-        auto& ptr03 = FLOATvector_SumPartial_barier;
-        str = "FLOATvector_SumPartial_barier";
+        auto& ptr03 = FLOATvector_SumPartial_barrier;
+        str = "FLOATvector_SumPartial_barrier";
         if(ptr03 == nullptr)
         {
             ptr03 = std::make_shared<std::remove_reference<decltype(*ptr03)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
         {
-            auto& ptr = FLOATvector_MaxPartial_barier;
-            str = "FLOATvector_MaxPartial_barier";
+            auto& ptr = FLOATvector_MaxPartial_barrier;
+            str = "FLOATvector_MaxPartial_barrier";
             if(ptr == nullptr)
             {
                 ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -390,22 +404,22 @@ void Kniha::CLINCLUDEutils()
             ptr05 = std::make_shared<std::remove_reference<decltype(*ptr05)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
-        auto& ptr06 = vector_NormSquarePartial_barier;
-        str = "vector_NormSquarePartial_barier";
+        auto& ptr06 = vector_NormSquarePartial_barrier;
+        str = "vector_NormSquarePartial_barrier";
         if(ptr06 == nullptr)
         {
             ptr06 = std::make_shared<std::remove_reference<decltype(*ptr06)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
-        auto& ptr07 = vector_SumPartial_barier;
-        str = "vector_SumPartial_barier";
+        auto& ptr07 = vector_SumPartial_barrier;
+        str = "vector_SumPartial_barrier";
         if(ptr07 == nullptr)
         {
             ptr07 = std::make_shared<std::remove_reference<decltype(*ptr07)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
-        auto& ptr08 = vector_ScalarProductPartial_barier;
-        str = "vector_ScalarProductPartial_barier";
+        auto& ptr08 = vector_ScalarProductPartial_barrier;
+        str = "vector_ScalarProductPartial_barrier";
         if(ptr08 == nullptr)
         {
             ptr08 = std::make_shared<std::remove_reference<decltype(*ptr08)>::type>(
@@ -593,6 +607,39 @@ int Kniha::algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
     auto exe = (*FLOATcutting_voxel_minmaxbackproject)(
         *eargs, volume, projection, projectionOffset, CM, sourcePosition, normalToDetector, vdims,
         voxelSizes, volumeCenter, pdims, globalScalingMultiplier, dummy);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
+                                                cl::Buffer& projection,
+                                                unsigned int& projectionOffset,
+                                                cl_double16& CM,
+                                                cl_double3& sourcePosition,
+                                                cl_double3& normalToDetector,
+                                                cl_int3& vdims,
+                                                cl_double3& voxelSizes,
+                                                cl_double3& volumeCenter,
+                                                cl_int2& pdims,
+                                                float globalScalingMultiplier,
+                                                cl::NDRange& globalRange,
+                                                std::shared_ptr<cl::NDRange> localRange,
+                                                bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto exe = (*FLOATcutting_voxel_project_barrier)(
+        *eargs, volume, projection, projectionOffset, CM, sourcePosition, normalToDetector, vdims,
+        voxelSizes, volumeCenter, pdims, globalScalingMultiplier);
     if(blocking)
     {
         exe.wait();

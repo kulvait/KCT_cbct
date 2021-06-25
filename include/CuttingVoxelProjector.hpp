@@ -53,7 +53,7 @@ public:
         timestamp = std::chrono::steady_clock::now();
     }
 
-    void initializeCVPProjector(bool useExactScaling);
+    void initializeCVPProjector(bool useExactScaling, bool useBarrierImplementation);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
     void initializeAllAlgorithms();
@@ -149,6 +149,7 @@ private:
     cl_double3 volumeCenter;
     bool useCVPProjector = true;
     bool exactProjectionScaling = true;
+	bool useBarrierImplementation = false;
     bool useSidonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;

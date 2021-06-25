@@ -22,10 +22,10 @@
 using namespace CTL::matrix;
 namespace CTL {
 
-class AlgorithmsBarierBuffers : public virtual Kniha
+class AlgorithmsBarrierBuffers : public virtual Kniha
 {
 public:
-    AlgorithmsBarierBuffers(uint32_t pdimx,
+    AlgorithmsBarrierBuffers(uint32_t pdimx,
                             uint32_t pdimy,
                             uint32_t pdimz,
                             uint32_t vdimx,
@@ -94,20 +94,20 @@ protected:
     bool algorithmsBuffersInitialized = false;
 
     // Functions to manipulate with buffers
-    float normBBuffer_barier(cl::Buffer& B);
-    float normXBuffer_barier(cl::Buffer& X);
+    float normBBuffer_barrier(cl::Buffer& B);
+    float normXBuffer_barrier(cl::Buffer& X);
     float normBBuffer_frame(cl::Buffer& B);
     float normXBuffer_frame(cl::Buffer& X);
-    float sumBBuffer_barier_float(cl::Buffer& B);
-    float sumXBuffer_barier_float(cl::Buffer& X);
-    float maxBBuffer_barier_float(cl::Buffer& B);
-    float maxXBuffer_barier_float(cl::Buffer& X);
-    double normBBuffer_barier_double(cl::Buffer& B);
-    double normXBuffer_barier_double(cl::Buffer& X);
+    float sumBBuffer_barrier_float(cl::Buffer& B);
+    float sumXBuffer_barrier_float(cl::Buffer& X);
+    float maxBBuffer_barrier_float(cl::Buffer& B);
+    float maxXBuffer_barrier_float(cl::Buffer& X);
+    double normBBuffer_barrier_double(cl::Buffer& B);
+    double normXBuffer_barrier_double(cl::Buffer& X);
     double normBBuffer_frame_double(cl::Buffer& B);
     double normXBuffer_frame_double(cl::Buffer& X);
-    double scalarProductBBuffer_barier_double(cl::Buffer& A, cl::Buffer& B);
-    double scalarProductXBuffer_barier_double(cl::Buffer& A, cl::Buffer& B);
+    double scalarProductBBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B);
+    double scalarProductXBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B);
 
     /**
      * Copy given float vector into the buffer. The buffer must have appropriate size.

@@ -10,7 +10,7 @@ int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
     uint32_t iteration = 0;
 
     // Initialization
-    double NB0 = std::sqrt(normBBuffer_barier_double(b_buf));
+    double NB0 = std::sqrt(normBBuffer_barrier_double(b_buf));
     LOGI << io::xprintf("||b||=%f", NB0);
     std::vector<std::shared_ptr<cl::Buffer>> u_prev, u_cur, u_next;
     std::vector<std::shared_ptr<cl::Buffer>> v_prev, v_cur, v_next;
@@ -28,7 +28,7 @@ int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
     backproject(b_buf, v_next);
     //    LOGD << io::xprintf("Writing file v_init.den");
     //    writeVolume(*v_next, io::xprintf("v_init.den"));
-    double vnextnorm = std::sqrt(normXBuffer_barier_double(v_next));
+    double vnextnorm = std::sqrt(normXBuffer_barrier_double(v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
     scaleFloatVector(v_next, float(1.0 / vnextnorm), XDIM);
     bool initializedByScaledBackprojectedRightSide = true;
@@ -105,7 +105,7 @@ int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
         rho_prev = rho_cur;
 
         backproject(u_cur, XZ);
-        sigma_prev = scalarProductXBuffer_barier_double(XZ, v_prev);
+        sigma_prev = scalarProductXBuffer_barrier_double(XZ, v_prev);
         addIntoFirstVectorSecondVectorScaled(XZ, v_prev, float(-sigma_prev), XDIM);
         v_next = v_prev;
         LOGI << io::xprintf("sigma_prev=%f", sigma_prev);
@@ -113,10 +113,10 @@ int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
         if(d == 0.0)
         {
             LOGI << "d=0.0";
-            sigma_cur = scalarProductXBuffer_barier_double(XZ, v_cur);
+            sigma_cur = scalarProductXBuffer_barrier_double(XZ, v_cur);
             addIntoFirstVectorSecondVectorScaled(XZ, v_cur, float(-sigma_cur), XDIM);
 
-            sigma_next = std::sqrt(normXBuffer_barier_double(XZ));
+            sigma_next = std::sqrt(normXBuffer_barrier_double(XZ));
             LOGI << io::xprintf("sigma_next=%f", sigma_next);
 
             if(initializedByScaledBackprojectedRightSide)
@@ -135,7 +135,7 @@ int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
         } else
         {
             LOGI << "d=1.0";
-            sigma_cur = std::sqrt(normXBuffer_barier_double(XZ));
+            sigma_cur = std::sqrt(normXBuffer_barrier_double(XZ));
             LOGI << io::xprintf("sigma_cur=%f", sigma_cur);
 
             if(sigma_cur > sigma_tol)
@@ -149,13 +149,13 @@ int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
         }
 
         project(v_cur, BZ);
-        tau_prev = scalarProductBBuffer_barier_double(BZ, u_prev);
+        tau_prev = scalarProductBBuffer_barrier_double(BZ, u_prev);
         addIntoFirstVectorSecondVectorScaled(BZ, u_prev, float(-tau_prev), BDIM);
         u_next = u_prev;
 
-        tau_cur = scalarProductBBuffer_barier_double(BZ, u_cur);
+        tau_cur = scalarProductBBuffer_barrier_double(BZ, u_cur);
         addIntoFirstVectorSecondVectorScaled(BZ, u_cur, float(-tau_cur), BDIM);
-        tau_next = std::sqrt(normBBuffer_barier_double(BZ));
+        tau_next = std::sqrt(normBBuffer_barrier_double(BZ));
         LOGE << io::xprintf("tau_prev=%f, tau_cur=%f, tau_next=%f", tau_prev, tau_cur, tau_next);
 
         if(tau_next != 0)

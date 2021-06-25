@@ -11,7 +11,7 @@ int CGLSPerfusionReconstructor::reconstruct(uint32_t maxIterations,
 
     // Initialization
     double norm, residualNorm2_old, residualNorm2_now, AdirectionNorm2, alpha, beta;
-    double NB0 = std::sqrt(normBBuffer_barier_double(b_buf));
+    double NB0 = std::sqrt(normBBuffer_barrier_double(b_buf));
     double NR0, NX;
     LOGI << io::xprintf("||b||=%f", NB0);
     std::vector<std::shared_ptr<cl::Buffer>> directionVector_xbuf, residualVector_xbuf; // X buffers
@@ -42,16 +42,16 @@ int CGLSPerfusionReconstructor::reconstruct(uint32_t maxIterations,
     backproject(discrepancy_bbuf, residualVector_xbuf);
     reportTime("Backprojection 0", blocking, true);
     copyFloatVector(residualVector_xbuf, directionVector_xbuf, XDIM);
-    residualNorm2_old = normXBuffer_barier_double(residualVector_xbuf);
+    residualNorm2_old = normXBuffer_barrier_double(residualVector_xbuf);
     NR0 = std::sqrt(residualNorm2_old);
     setTimestamp(blocking);
     project(directionVector_xbuf, AdirectionVector_bbuf);
     reportTime("Projection 1", blocking, true);
-    AdirectionNorm2 = normBBuffer_barier_double(AdirectionVector_bbuf);
+    AdirectionNorm2 = normBBuffer_barrier_double(AdirectionVector_bbuf);
     alpha = residualNorm2_old / AdirectionNorm2;
     addIntoFirstVectorSecondVectorScaled(x_buf, directionVector_xbuf, alpha, XDIM);
     addIntoFirstVectorSecondVectorScaled(discrepancy_bbuf, AdirectionVector_bbuf, -alpha, BDIM);
-    norm = std::sqrt(normBBuffer_barier_double(discrepancy_bbuf));
+    norm = std::sqrt(normBBuffer_barrier_double(discrepancy_bbuf));
     while(norm / NB0 > errCondition && iteration < maxIterations)
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
@@ -68,7 +68,7 @@ int CGLSPerfusionReconstructor::reconstruct(uint32_t maxIterations,
             project(x_buf, discrepancy_bbuf);
             reportTime(io::xprintf("Reothrogonalization projection %d", iteration), blocking, true);
             addIntoFirstVectorScaledSecondVector(discrepancy_bbuf, b_buf, -1.0, BDIM);
-            double norm2 = std::sqrt(normBBuffer_barier_double(discrepancy_bbuf));
+            double norm2 = std::sqrt(normBBuffer_barrier_double(discrepancy_bbuf));
 
             LOGE << io::xprintf(
                 "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
@@ -79,7 +79,7 @@ int CGLSPerfusionReconstructor::reconstruct(uint32_t maxIterations,
         setTimestamp(blocking);
         backproject(discrepancy_bbuf, residualVector_xbuf);
         reportTime(io::xprintf("Backprojection %d", iteration), blocking, true);
-        residualNorm2_now = normXBuffer_barier_double(residualVector_xbuf);
+        residualNorm2_now = normXBuffer_barrier_double(residualVector_xbuf);
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
@@ -93,11 +93,11 @@ int CGLSPerfusionReconstructor::reconstruct(uint32_t maxIterations,
         setTimestamp(blocking);
         project(directionVector_xbuf, AdirectionVector_bbuf);
         reportTime(io::xprintf("Projection %d", iteration), blocking, true);
-        AdirectionNorm2 = normBBuffer_barier_double(AdirectionVector_bbuf);
+        AdirectionNorm2 = normBBuffer_barrier_double(AdirectionVector_bbuf);
         alpha = residualNorm2_old / AdirectionNorm2;
         addIntoFirstVectorSecondVectorScaled(x_buf, directionVector_xbuf, alpha, XDIM);
         addIntoFirstVectorSecondVectorScaled(discrepancy_bbuf, AdirectionVector_bbuf, -alpha, BDIM);
-        norm = std::sqrt(normBBuffer_barier_double(discrepancy_bbuf));
+        norm = std::sqrt(normBBuffer_barrier_double(discrepancy_bbuf));
     }
     LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
                         norm, 100.0 * norm / NB0);

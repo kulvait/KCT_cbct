@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
-project(CTRegression)
+project(CBCT)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 set(CMAKE_INSTALL_PREFIX $ENV{HOME}/bin)
 set(CMAKE_CXX_STANDARD 14)#Supported values are 98, 11 and 14.
@@ -31,7 +31,6 @@ include_directories(${CMAKE_SOURCE_DIR}/submodules/CLI11/include)
 #Thread pool management lib ctpl from https://github.com/vit-vit/ctpl include
 include_directories(${CMAKE_SOURCE_DIR}/submodules/ctpl)
 find_package (Threads)#include pthreads
-
 
 #Matplotlibcpp include
 include_directories(${CMAKE_SOURCE_DIR}/submodules/matplotlib-cpp)
@@ -91,6 +90,41 @@ add_custom_target(formatWebkit
 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 #####################START PROGRAM DEFS##################################
+#CL files
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl opencl/backprojector_minmax.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl opencl/backprojector_sidon.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl opencl/backprojector_tt.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/include.cl opencl/include.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl opencl/jacobiPreconditionedBackprojector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl opencl/jacobiPreconditionedProjector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl opencl/precomputeJacobiPreconditioner.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_cvp_barrier.cl opencl/projector_cvp_barrier.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_old.cl opencl/projector_old.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl opencl/projector_sidon.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl opencl/projector_tt.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl opencl/rescaleProjections.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/include.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_cvp_barrier.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_old.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+
+
 SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
 add_executable(CLlin-projector ${CLLINPROJECTOR_SOURCES})
 set_target_properties(
@@ -175,7 +209,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
 
 
-SET(CLLINCGLS_SOURCES src/CLlin-krylov.cpp src/Kniha.cpp src/AlgorithmsBarierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp)
+SET(CLLINCGLS_SOURCES src/CLlin-krylov.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp)
 add_executable(CLlin-krylov ${CLLINCGLS_SOURCES})
 set_target_properties(
     CLlin-krylov
@@ -192,37 +226,7 @@ target_include_directories(CLlin-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(CLlin-krylov PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_git_version_init(CLlin-krylov)
 install (TARGETS CLlin-krylov RUNTIME DESTINATION .)
-#CL files
-configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector.cl opencl/backprojector.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl opencl/backprojector_minmax.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl opencl/backprojector_sidon.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl opencl/backprojector_tt.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/include.cl opencl/include.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl opencl/jacobiPreconditionedBackprojector.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl opencl/jacobiPreconditionedProjector.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl opencl/precomputeJacobiPreconditioner.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/projector.cl opencl/projector.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_old.cl opencl/projector_old.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl opencl/projector_sidon.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl opencl/projector_tt.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl opencl/rescaleProjections.cl COPYONLY)
-configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/include.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_old.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION opencl)
-install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+
 
 
 SET(CLLINJACOBIGLSQR_SOURCES src/JacobiGLSQRReconstructor.cpp src/CLlin-jacobiglsqr.cpp)
@@ -250,7 +254,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl DESTIN
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl DESTINATION opencl)
 
-SET(CLLINPERFUSION_SOURCES src/CLlin-perfusion.cpp src/Kniha.cpp src/AlgorithmsBarierBuffers.cpp src/Perfusion/BasePerfusionReconstructor.cpp src/Perfusion/CGLSPerfusionReconstructor.cpp src/Perfusion/GLSQRPerfusionReconstructor.cpp src/CArmArguments.cpp)
+SET(CLLINPERFUSION_SOURCES src/CLlin-perfusion.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/Perfusion/BasePerfusionReconstructor.cpp src/Perfusion/CGLSPerfusionReconstructor.cpp src/Perfusion/GLSQRPerfusionReconstructor.cpp src/CArmArguments.cpp)
 add_executable(CLlin-perfusion ${CLLINPERFUSION_SOURCES})
 set_target_properties(
     CLlin-perfusion
@@ -276,7 +280,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 
-SET(CLLINPERFUSIONPROJECTOR_SOURCES src/CLlin-perfusion-projector.cpp src/CArmArguments.cpp src/Kniha.cpp src/AlgorithmsBarierBuffers.cpp src/Perfusion/BasePerfusionReconstructor.cpp src/Perfusion/PerfusionOperator.cpp)
+SET(CLLINPERFUSIONPROJECTOR_SOURCES src/CLlin-perfusion-projector.cpp src/CArmArguments.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/Perfusion/BasePerfusionReconstructor.cpp src/Perfusion/PerfusionOperator.cpp)
 add_executable(CLlin-perfusion-projector ${CLLINPERFUSIONPROJECTOR_SOURCES})
 set_target_properties(
     CLlin-perfusion-projector
@@ -408,7 +412,7 @@ install (TARGETS volprojector RUNTIME DESTINATION .)
 include_directories(${CMAKE_SOURCE_DIR}/tests)
 add_library(Catch INTERFACE)
 target_include_directories(Catch INTERFACE ${CMAKE_SOURCE_DIR}/submodules/Catch2/single_include/catch2)
-FILE( GLOB TST_SRC ${CMAKE_SOURCE_DIR}/tests/*.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/Perfusion/BasePerfusionReconstructor.cpp src/Perfusion/GLSQRPerfusionReconstructor.cpp src/BaseReconstructor.cpp src/Kniha.cpp src/AlgorithmsBarierBuffers.cpp)
+FILE( GLOB TST_SRC ${CMAKE_SOURCE_DIR}/tests/*.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/Perfusion/BasePerfusionReconstructor.cpp src/Perfusion/GLSQRPerfusionReconstructor.cpp src/BaseReconstructor.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp)
 add_executable(test_all ${TST_SRC})
 target_link_libraries(test_all Catch)
 target_link_libraries(test_all ctiol)

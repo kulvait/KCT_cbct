@@ -3,6 +3,74 @@
 #define zeroPrecisionTolerance 1e-10
 #endif
 
+#define ONETHIRDF 0.33333333f
+#define TWOTHIRDSF 0.66666666f
+#define ONESIXTHF 0.16666667f
+
+//#define DROPINCOMPLETEVOXELS
+
+#define EDGEMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                     \
+    if(PJ_max >= pdims.y)                                                                          \
+    {                                                                                              \
+        PJ_max = pdims.y - 1;                                                                      \
+        Fvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;                                              \
+        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
+    } else                                                                                         \
+    {                                                                                              \
+        leastLambda = 1.0;                                                                         \
+    }                                                                                              \
+    if(PJ_min < 0)                                                                                 \
+    {                                                                                              \
+        J = 0;                                                                                     \
+        Fvector = CM.s456 + 0.5 * CM.s89a;                                                         \
+        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                     \
+    } else                                                                                         \
+    {                                                                                              \
+        J = PJ_min;                                                                                \
+        Fvector = CM.s456 - (J - 0.5) * CM.s89a;                                                   \
+    }                                                                                              \
+    for(; J < PJ_max; J++)                                                                         \
+    {                                                                                              \
+        Fvector -= CM.s89a;                                                                        \
+        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                         \
+        AtomicAdd_g_f(&projection[J], (lambda - lastLambda) * value);                              \
+        lastLambda = lambda;                                                                       \
+    }                                                                                              \
+    AtomicAdd_g_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
+
+#define EDGEMINMAXP(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                    \
+    if(PJ_max >= pdims.y)                                                                          \
+    {                                                                                              \
+        PJ_max = pdims.y - 1;                                                                      \
+        Fvector = CM.s456 - (PJ_max + 0.5f) * CM.s89a;                                             \
+        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
+    } else                                                                                         \
+    {                                                                                              \
+        leastLambda = 1.0f;                                                                        \
+    }                                                                                              \
+    if(PJ_min < 0)                                                                                 \
+    {                                                                                              \
+        J = 0;                                                                                     \
+        Fvector = CM.s456 + 0.5f * CM.s89a;                                                        \
+        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                     \
+    } else                                                                                         \
+    {                                                                                              \
+        J = PJ_min;                                                                                \
+        Fvector = CM.s456 - (J - 0.5f) * CM.s89a;                                                  \
+    }                                                                                              \
+    for(; J < PJ_max; J++)                                                                         \
+    {                                                                                              \
+        Fvector -= CM.s89a;                                                                        \
+        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                         \
+        AtomicAdd_g_f(&projection[J], (lambda - lastLambda) * value);                              \
+        lastLambda = lambda;                                                                       \
+    }                                                                                              \
+    AtomicAdd_g_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
+
+__constant double onethird = 1.0 / 3.0;
+__constant double twothirds = 2.0 / 3.0;
+__constant double onesixth = 1.0 / 6.0;
+
 /** Projection of a volume point v onto X coordinate on projector.
  * No checks for boundaries.
  *
@@ -87,63 +155,6 @@ int projectionIndex(private double16 CM, private double3 v, int2 pdims)
     }
 }
 
-#define EDGEMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                     \
-    if(PJ_max >= pdims.y)                                                                          \
-    {                                                                                              \
-        PJ_max = pdims.y - 1;                                                                      \
-        Fvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;                                              \
-        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
-    } else                                                                                         \
-    {                                                                                              \
-        leastLambda = 1.0;                                                                         \
-    }                                                                                              \
-    if(PJ_min < 0)                                                                                 \
-    {                                                                                              \
-        J = 0;                                                                                     \
-        Fvector = CM.s456 + 0.5 * CM.s89a;                                                         \
-        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                     \
-    } else                                                                                         \
-    {                                                                                              \
-        J = PJ_min;                                                                                \
-        Fvector = CM.s456 - (J - 0.5) * CM.s89a;                                                   \
-    }                                                                                              \
-    for(; J < PJ_max; J++)                                                                         \
-    {                                                                                              \
-        Fvector -= CM.s89a;                                                                        \
-        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                         \
-        AtomicAdd_g_f(&projection[J], (lambda - lastLambda) * value);                              \
-        lastLambda = lambda;                                                                       \
-    }                                                                                              \
-    AtomicAdd_g_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
-
-#define EDGEMINMAXP(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                    \
-    if(PJ_max >= pdims.y)                                                                          \
-    {                                                                                              \
-        PJ_max = pdims.y - 1;                                                                      \
-        Fvector = CM.s456 - (PJ_max + 0.5f) * CM.s89a;                                             \
-        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
-    } else                                                                                         \
-    {                                                                                              \
-        leastLambda = 1.0f;                                                                        \
-    }                                                                                              \
-    if(PJ_min < 0)                                                                                 \
-    {                                                                                              \
-        J = 0;                                                                                     \
-        Fvector = CM.s456 + 0.5f * CM.s89a;                                                        \
-        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                     \
-    } else                                                                                         \
-    {                                                                                              \
-        J = PJ_min;                                                                                \
-        Fvector = CM.s456 - (J - 0.5f) * CM.s89a;                                                  \
-    }                                                                                              \
-    for(; J < PJ_max; J++)                                                                         \
-    {                                                                                              \
-        Fvector -= CM.s89a;                                                                        \
-        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                         \
-        AtomicAdd_g_f(&projection[J], (lambda - lastLambda) * value);                              \
-        lastLambda = lambda;                                                                       \
-    }                                                                                              \
-    AtomicAdd_g_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
 
 /// insertEdgeValues(factor, V, P, projection, pdims);
 void inline exactEdgeValues0(global float* projection,
@@ -172,13 +183,21 @@ void inline exactEdgeValues0(global float* projection,
     int PJ_max;
     if(PJ_up < PJ_down)
     {
+#ifdef DROPINCOMPLETEVOXELS
+        if(PJ_up >= 0 && PJ_down < pdims.y)
+#else
         if(PJ_down >= 0 && PJ_up < pdims.y)
+#endif
         {
             EDGEMINMAX(PJ_up, PJ_down, v_up, voxelSizes.s2);
         }
     } else if(PJ_down < PJ_up)
     {
+#ifdef DROPINCOMPLETEVOXELS
+        if(PJ_down >= 0 && PJ_up < pdims.y)
+#else
         if(PJ_up >= 0 && PJ_down < pdims.y)
+#endif
         {
             EDGEMINMAX(PJ_down, PJ_up, v_down, -voxelSizes.s2);
         }
@@ -577,9 +596,6 @@ inline double exactIntersectionPoints(const double PX,
     }
 }
 
-__constant double onethird = 1.0 / 3.0;
-__constant double twothirds = 2.0 / 3.0;
-__constant double onesixth = 1.0 / 6.0;
 
 inline double exactIntersectionPoints0_extended(const double PX,
                                                 const double3* v0,
@@ -710,9 +726,6 @@ inline double exactIntersectionPoints0_extended(const double PX,
     }
 }
 
-#define ONETHIRDF 0.33333333f
-#define TWOTHIRDSF 0.66666666f
-#define ONESIXTHF 0.16666667f
 
 inline float exactIntersectionPointsF0_extended(const float PX,
                                                 const float3* v0,
@@ -1330,11 +1343,20 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         = volumeCenter - sourcePosition - 0.5 * convert_double3(vdims) * voxelSizes;
     const double3 voxelcorner_xyz = zerocorner_xyz + (IND_ijk * voxelSizes);
     const double3 voxelcenter_xyz = voxelcorner_xyz + voxelSizes * 0.5;
-    int cornerProjectionIndex = projectionIndex0(CM, voxelcorner_xyz, pdims);
-    if(voxelValue == 0.0f)
+    ///* Consider this instead in further versions
+    if(voxelValue == 0.0)
     {
         return;
     }
+#ifdef DROPINCOMPLETEVOXELS
+    int centerProjectionIndex = projectionIndex0(CM, voxelcenter_xyz, pdims);
+    if(centerProjectionIndex == -1 || voxelValue == 0.0)
+    {
+        return;
+    }
+#else
+    //*/
+    int cornerProjectionIndex = projectionIndex0(CM, voxelcorner_xyz, pdims);
     if(cornerProjectionIndex == -1)
     {
         if(projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0), pdims)
@@ -1356,6 +1378,7 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             return;
         }
     }
+#endif
     // EXPERIMENTAL ... reconstruct inner circle
     /*   const double3 pixcoords = zerocorner_xyz + voxelSizes * (IND_ijk + (double3)(0.5, 0.5,
        0.5)); if(sqrt(pixcoords.x * pixcoords.x + pixcoords.y * pixcoords.y) > 110.0)
@@ -1533,6 +1556,12 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             double lastSectionSize, nextSectionSize, polygonSize;
             double3 lastInt, nextInt, Int;
             double factor;
+#endif
+#ifdef DROPINCOMPLETEVOXELS
+            if(min_PX < 0 || max_PX >= pdims.x)
+            {
+                return;
+            }
 #endif
             int I = max(-1, min_PX);
             int I_STOP = min(max_PX, pdims.x);

@@ -383,12 +383,12 @@ std::vector<std::shared_ptr<cl::Buffer>> BasePerfusionReconstructor::getTmpBBuff
  * @return square Euclidean norm
  */
 double
-BasePerfusionReconstructor::normBBuffer_barier_double(std::vector<std::shared_ptr<cl::Buffer>>& B)
+BasePerfusionReconstructor::normBBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& B)
 { // Use workGroupSize that is private constant default to 256
     double sum = 0.0;
     for(std::size_t i = 0; i != B.size(); i++)
     {
-        sum += AlgorithmsBarierBuffers::normBBuffer_barier_double(*B[i]);
+        sum += AlgorithmsBarrierBuffers::normBBuffer_barrier_double(*B[i]);
     }
     return sum;
 }
@@ -401,17 +401,17 @@ BasePerfusionReconstructor::normBBuffer_barier_double(std::vector<std::shared_pt
  * @return
  */
 double
-BasePerfusionReconstructor::normXBuffer_barier_double(std::vector<std::shared_ptr<cl::Buffer>>& X)
+BasePerfusionReconstructor::normXBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& X)
 {
     double sum = 0.0;
     for(std::size_t i = 0; i != X.size(); i++)
     {
-        sum += AlgorithmsBarierBuffers::normXBuffer_barier_double(*X[i]);
+        sum += AlgorithmsBarrierBuffers::normXBuffer_barrier_double(*X[i]);
     }
     return sum;
 }
 
-double BasePerfusionReconstructor::scalarProductXBuffer_barier_double(
+double BasePerfusionReconstructor::scalarProductXBuffer_barrier_double(
     std::vector<std::shared_ptr<cl::Buffer>>& A, std::vector<std::shared_ptr<cl::Buffer>>& B)
 {
     if(A.size() != B.size())
@@ -423,12 +423,12 @@ double BasePerfusionReconstructor::scalarProductXBuffer_barier_double(
     double sum = 0.0;
     for(std::size_t i = 0; i != A.size(); i++)
     {
-        sum += AlgorithmsBarierBuffers::scalarProductXBuffer_barier_double(*A[i], *B[i]);
+        sum += AlgorithmsBarrierBuffers::scalarProductXBuffer_barrier_double(*A[i], *B[i]);
     }
     return sum;
 }
 
-double BasePerfusionReconstructor::scalarProductBBuffer_barier_double(
+double BasePerfusionReconstructor::scalarProductBBuffer_barrier_double(
     std::vector<std::shared_ptr<cl::Buffer>>& A, std::vector<std::shared_ptr<cl::Buffer>>& B)
 {
     if(A.size() != B.size())
@@ -440,7 +440,7 @@ double BasePerfusionReconstructor::scalarProductBBuffer_barier_double(
     double sum = 0.0;
     for(std::size_t i = 0; i != A.size(); i++)
     {
-        sum += AlgorithmsBarierBuffers::scalarProductBBuffer_barier_double(*A[i], *B[i]);
+        sum += AlgorithmsBarrierBuffers::scalarProductBBuffer_barrier_double(*A[i], *B[i]);
     }
     return sum;
 }
@@ -830,8 +830,8 @@ double BasePerfusionReconstructor::adjointProductTest()
     ba_buf = getBBuffers(0);
     project(x_buf, ba_buf);
     backproject(b_buf, xa_buf);
-    double bdotAx = scalarProductBBuffer_barier_double(b_buf, ba_buf);
-    double ATbdotx = scalarProductXBuffer_barier_double(x_buf, xa_buf);
+    double bdotAx = scalarProductBBuffer_barrier_double(b_buf, ba_buf);
+    double ATbdotx = scalarProductXBuffer_barrier_double(x_buf, xa_buf);
     return (bdotAx / ATbdotx);
 }
 

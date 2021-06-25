@@ -172,52 +172,47 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
                                                  private double3 volumeCenter,
                                                  private int2 pdims,
                                                  private float globalScalingMultiplier,
-												 private int2 dummy)
+                                                 private int2 dummy)
 {
     int i = get_global_id(2);
     int j = get_global_id(1);
     int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
     float ADD = INFINITY;
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
-                                     volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
-                                     volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
-    const double3 voxelcorner_xyz = zerocorner_xyz
-        + (IND_ijk * voxelSizes); // Using widening and vector multiplication operations
+    const double3 zerocorner_xyz
+        = volumeCenter - sourcePosition - 0.5 * convert_double3(vdims) * voxelSizes;
+    const double3 voxelcorner_xyz = zerocorner_xyz + (IND_ijk * voxelSizes);
+    const double3 voxelcenter_xyz = voxelcorner_xyz + 0.5 * voxelSizes;
     const uint IND = voxelIndex(i, j, k, vdims);
-    const double3 voxelcenter_xyz
-        = voxelcorner_xyz + voxelSizes * 0.5; // Using widening and vector multiplication operations
     const float voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
-    int cornerProjectionIndex = projectionIndex(CM, voxelcorner_xyz, pdims);
+    int cornerProjectionIndex = projectionIndex0(CM, voxelcorner_xyz, pdims);
     float scalingFactor;
     if(cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0), pdims)
+           == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0), pdims)
        && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.0), pdims)
+           == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.0), pdims)
        && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 1.0), pdims)
+           == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 1.0), pdims)
        && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 1.0), pdims)
+           == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 1.0), pdims)
        && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.0), pdims)
+           == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.0), pdims)
        && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.0), pdims)
+           == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.0), pdims)
        && cornerProjectionIndex
-           == projectionIndex(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 1.0),
-                              pdims)) // When all projections are the same
+           == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 1.0),
+                               pdims)) // When all projections are the same
     {
         if(cornerProjectionIndex != -1)
         {
-            double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-            double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
+            double sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
             scalingFactor = globalScalingMultiplier * voxelVolume / sourceToVoxel_xyz_norm2;
             ADD = projection[projectionOffset + cornerProjectionIndex] / scalingFactor;
             volume[IND] = min(ADD, volume[IND]);
         }
         return;
     }
-    double3 sourceToVoxel_xyz = voxelcenter_xyz - sourcePosition;
-    double sourceToVoxel_xyz_norm2 = dot(sourceToVoxel_xyz, sourceToVoxel_xyz);
+    double sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
     scalingFactor = globalScalingMultiplier * voxelVolume / sourceToVoxel_xyz_norm2;
     // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
     // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
@@ -228,10 +223,10 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
     vx01 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.5);
     vx10 = voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.5);
     vx11 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.5);
-    px00 = projectX(CM, vx00);
-    px01 = projectX(CM, vx01);
-    px10 = projectX(CM, vx10);
-    px11 = projectX(CM, vx11);
+    px00 = projectX0(CM, vx00);
+    px01 = projectX0(CM, vx01);
+    px10 = projectX0(CM, vx10);
+    px11 = projectX0(CM, vx11);
     // We now figure out the vertex that projects to minimum and maximum px
     double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
     int max_PX,
@@ -355,6 +350,8 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
     max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
     if(max_PX >= 0 && min_PX < pdims.x)
     {
+        double3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
+        double3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
         float intermediateValue;
         if(max_PX <= min_PX) // These indices are in the admissible range
         {
@@ -378,9 +375,9 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
             //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2],
             //    V_ccw[3],
             //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
-            lastRectangleSectionRelativeArea
-                = exactIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3],
-                                          PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
+            lastRectangleSectionRelativeArea = exactIntersectionPoints0_extended(
+                ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
+                PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
             if(I >= 0)
             {
                 scaledCutArea = scalingFactor * lastRectangleSectionRelativeArea;
@@ -396,9 +393,9 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
                 //    V_ccw[3],
                 //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3],
                 //                             &nextInt);
-                nextRectangleSectionRelativeArea = exactIntersectionPoints(
-                    ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], PX_ccw[0], PX_ccw[1],
-                    PX_ccw[2], PX_ccw[3], CM, &nextInt);
+                nextRectangleSectionRelativeArea = exactIntersectionPoints0_extended(
+                    ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
+                    PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
                 relativeCutArea
                     = nextRectangleSectionRelativeArea - lastRectangleSectionRelativeArea;
                 Int = (nextRectangleSectionRelativeArea * nextInt

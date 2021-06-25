@@ -1,4 +1,4 @@
-#include "AlgorithmsBarierBuffers.hpp"
+#include "AlgorithmsBarrierBuffers.hpp"
 
 namespace CTL {
 
@@ -9,7 +9,7 @@ namespace CTL {
  *
  * @return
  */
-double AlgorithmsBarierBuffers::normXBuffer_frame_double(cl::Buffer& X)
+double AlgorithmsBarrierBuffers::normXBuffer_frame_double(cl::Buffer& X)
 {
     double sum;
     cl::EnqueueArgs eargs0(*Q[0], cl::NDRange(vdimz));
@@ -29,7 +29,7 @@ double AlgorithmsBarierBuffers::normXBuffer_frame_double(cl::Buffer& X)
  *
  * @return
  */
-double AlgorithmsBarierBuffers::normBBuffer_frame_double(cl::Buffer& B)
+double AlgorithmsBarrierBuffers::normBBuffer_frame_double(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     double sum;
     uint32_t framesize = pdimx * pdimy;
@@ -49,30 +49,30 @@ double AlgorithmsBarierBuffers::normBBuffer_frame_double(cl::Buffer& B)
  *
  * @return
  */
-float AlgorithmsBarierBuffers::sumXBuffer_barier_float(cl::Buffer& X)
+float AlgorithmsBarrierBuffers::sumXBuffer_barrier_float(cl::Buffer& X)
 {
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_SumPartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
+    (*FLOATvector_SumPartial_barrier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
+    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOATvector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
-float AlgorithmsBarierBuffers::maxXBuffer_barier_float(cl::Buffer& X)
+float AlgorithmsBarrierBuffers::maxXBuffer_barrier_float(cl::Buffer& X)
 {
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_MaxPartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
+    (*FLOATvector_MaxPartial_barrier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_MaxPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
+    (*FLOATvector_MaxPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOATvector_MaxPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
@@ -86,15 +86,15 @@ float AlgorithmsBarierBuffers::maxXBuffer_barier_float(cl::Buffer& X)
  *
  * @return
  */
-double AlgorithmsBarierBuffers::normXBuffer_barier_double(cl::Buffer& X)
+double AlgorithmsBarrierBuffers::normXBuffer_barrier_double(cl::Buffer& X)
 {
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_NormSquarePartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
+    (*vector_NormSquarePartial_barrier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
+    (*vector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
@@ -108,30 +108,30 @@ double AlgorithmsBarierBuffers::normXBuffer_barier_double(cl::Buffer& X)
  *
  * @return
  */
-float AlgorithmsBarierBuffers::sumBBuffer_barier_float(cl::Buffer& B)
+float AlgorithmsBarrierBuffers::sumBBuffer_barrier_float(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_SumPartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
+    (*FLOATvector_SumPartial_barrier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
+    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOATvector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
-float AlgorithmsBarierBuffers::maxBBuffer_barier_float(cl::Buffer& B)
+float AlgorithmsBarrierBuffers::maxBBuffer_barrier_float(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_MaxPartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
+    (*FLOATvector_MaxPartial_barrier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_MaxPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
+    (*FLOATvector_MaxPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOATvector_MaxPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
@@ -145,15 +145,15 @@ float AlgorithmsBarierBuffers::maxBBuffer_barier_float(cl::Buffer& B)
  *
  * @return
  */
-double AlgorithmsBarierBuffers::normBBuffer_barier_double(cl::Buffer& B)
+double AlgorithmsBarrierBuffers::normBBuffer_barrier_double(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_NormSquarePartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
+    (*vector_NormSquarePartial_barrier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
+    (*vector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
@@ -168,16 +168,16 @@ double AlgorithmsBarierBuffers::normBBuffer_barier_double(cl::Buffer& B)
  *
  * @return
  */
-double AlgorithmsBarierBuffers::scalarProductXBuffer_barier_double(cl::Buffer& A, cl::Buffer& B)
+double AlgorithmsBarrierBuffers::scalarProductXBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B)
 {
 
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_x_red1, localsize, XDIM);
+    (*vector_ScalarProductPartial_barrier)(eargs_red1, A, B, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
+    (*vector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
@@ -192,16 +192,16 @@ double AlgorithmsBarierBuffers::scalarProductXBuffer_barier_double(cl::Buffer& A
  *
  * @return
  */
-double AlgorithmsBarierBuffers::scalarProductBBuffer_barier_double(cl::Buffer& A, cl::Buffer& B)
+double AlgorithmsBarrierBuffers::scalarProductBBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B)
 {
 
     double sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_ScalarProductPartial_barier)(eargs_red1, A, B, *tmp_b_red1, localsize, BDIM);
+    (*vector_ScalarProductPartial_barrier)(eargs_red1, A, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
+    (*vector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
@@ -215,7 +215,7 @@ double AlgorithmsBarierBuffers::scalarProductBBuffer_barier_double(cl::Buffer& A
  *
  * @return
  */
-float AlgorithmsBarierBuffers::normXBuffer_frame(cl::Buffer& X)
+float AlgorithmsBarrierBuffers::normXBuffer_frame(cl::Buffer& X)
 {
     float sum;
     uint32_t framesize = vdimx * vdimy;
@@ -235,7 +235,7 @@ float AlgorithmsBarierBuffers::normXBuffer_frame(cl::Buffer& X)
  *
  * @return
  */
-float AlgorithmsBarierBuffers::normBBuffer_frame(cl::Buffer& B)
+float AlgorithmsBarrierBuffers::normBBuffer_frame(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     float sum;
     uint32_t framesize = pdimx * pdimy;
@@ -255,16 +255,16 @@ float AlgorithmsBarierBuffers::normBBuffer_frame(cl::Buffer& B)
  *
  * @return
  */
-float AlgorithmsBarierBuffers::normXBuffer_barier(cl::Buffer& X)
+float AlgorithmsBarrierBuffers::normXBuffer_barrier(cl::Buffer& X)
 {
 
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(XDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_NormSquarePartial_barier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
+    (*FLOATvector_NormSquarePartial_barrier)(eargs_red1, X, *tmp_x_red1, localsize, XDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize,
+    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize,
                                      XDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOATvector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
@@ -279,15 +279,15 @@ float AlgorithmsBarierBuffers::normXBuffer_barier(cl::Buffer& X)
  *
  * @return
  */
-float AlgorithmsBarierBuffers::normBBuffer_barier(cl::Buffer& B)
+float AlgorithmsBarrierBuffers::normBBuffer_barrier(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     float sum;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(BDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_NormSquarePartial_barier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
+    (*FLOATvector_NormSquarePartial_barrier)(eargs_red1, B, *tmp_b_red1, localsize, BDIM);
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize,
+    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize,
                                      BDIM_REDUCED1);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
     (*FLOATvector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
@@ -304,7 +304,7 @@ float AlgorithmsBarierBuffers::normBBuffer_barier(cl::Buffer& B)
  *
  * @return
  */
-int AlgorithmsBarierBuffers::vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size)
+int AlgorithmsBarrierBuffers::vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size)
 {
     cl_int err = CL_SUCCESS;
     std::string e;
@@ -334,7 +334,7 @@ int AlgorithmsBarierBuffers::vectorIntoBuffer(cl::Buffer X, float* v, std::size_
     return 0;
 }
 
-int AlgorithmsBarierBuffers::initializeAlgorithmsBuffers()
+int AlgorithmsBarrierBuffers::initializeAlgorithmsBuffers()
 {
     cl_int err;
     if(algorithmsBuffersInitialized)

@@ -1,10 +1,12 @@
 #include "CuttingVoxelProjector.hpp"
 
 namespace CTL {
-void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling)
+void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling,
+                                                   bool useBarrierImplementation)
 {
     if(!isOpenCLInitialized())
     {
+        this->useBarrierImplementation = useBarrierImplementation;
         useCVPProjector = true;
         exactProjectionScaling = useExactScaling;
         useSidonProjector = false;
@@ -12,7 +14,13 @@ void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling)
         useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector();
+        if(useBarrierImplementation)
+        {
+            CLINCLUDEprojector_cvp_barrier();
+        } else
+        {
+            CLINCLUDEprojector();
+        }
         CLINCLUDEbackprojector();
         CLINCLUDErescaleProjections();
     } else
@@ -434,9 +442,20 @@ int CuttingVoxelProjector::projectExact(float* projection, std::shared_ptr<matri
     P->sourcePosition((double*)&SOURCEPOSITION);
     VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
     offset = 0;
-    (*FLOATcutting_voxel_project)(eargs, *volumeBuffer, *projectionBuffer, offset, CM,
-                                  SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes, volumeCenter,
-                                  pdims, FLOATONE);
+    if(useBarrierImplementation)
+    {
+
+        cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz));
+        (*FLOATcutting_voxel_project_barrier)(eargs, *volumeBuffer, *projectionBuffer, offset, CM,
+                                              SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                              volumeCenter, pdims, FLOATONE);
+
+    } else
+    {
+        (*FLOATcutting_voxel_project)(eargs, *volumeBuffer, *projectionBuffer, offset, CM,
+                                      SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                      volumeCenter, pdims, FLOATONE);
+    }
     (*FLOATrescale_projections_exact)(eargs2, *projectionBuffer, offset, pdims_uint,
                                       NORMALPROJECTION, VIRTUALPIXELSIZES, VIRTUALDETECTORDISTANCE);
     cl_int err = Q[0]->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0,
@@ -693,7 +712,7 @@ int CuttingVoxelProjector::backproject_minmax(
         P = cameraVector[i];
         focalLength = P->focalLength();
         // Kernel parameters
-        //scalingFactor = focalLength[0] * focalLength[1];
+        // scalingFactor = focalLength[0] * focalLength[1];
         P->projectionMatrixAsVector12((double*)&CM);
         P->inverseProjectionMatrixAsVector16((double*)&ICM);
         P->normalToDetector((double*)&NORMALTODETECTOR);
@@ -703,10 +722,10 @@ int CuttingVoxelProjector::backproject_minmax(
         offset = baseOffset + i * frameSize;
         (*FLOATrescale_projections_exact)(eargs2, *tmpBuffer, offset, pdims_uint, NORMALPROJECTION,
                                           VIRTUALPIXELSIZES, VIRTUALDETECTORDISTANCE);
-/*
-        (*FLOATcutting_voxel_minmaxbackproject)(eargs, *volumeBuffer, *tmpBuffer, offset, CM,
-                                                SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
-                                                volumeCenter, pdims, FLOATONE);*/
+        /*
+                (*FLOATcutting_voxel_minmaxbackproject)(eargs, *volumeBuffer, *tmpBuffer, offset,
+           CM, SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims, FLOATONE);
+         */
 
         algFLOATcutting_voxel_minmaxbackproject(*volumeBuffer, *tmpBuffer, offset, CM,
                                                 SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,

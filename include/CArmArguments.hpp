@@ -50,6 +50,7 @@ public:
     bool useExactScaling = true;
     bool useCosScaling = false;
     bool useNoScaling = false;
+    bool useBarrierCalls = false;
     bool useCenterVoxelProjector = false;
     bool useSidonProjector = false;
     uint32_t probesPerEdge = 1;

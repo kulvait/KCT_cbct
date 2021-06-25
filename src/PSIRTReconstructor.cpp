@@ -24,8 +24,8 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     project(*ones_xbuf, *rowsums_bbuf);
     // Ones used to store col sums
     backproject(*discrepancy_bbuf, *ones_xbuf);
-    double A1norm = maxXBuffer_barier_float(*ones_xbuf);
-    // double A2norm = std::sqrt(normBBuffer_barier_double(*rowsums_bbuf));
+    double A1norm = maxXBuffer_barrier_float(*ones_xbuf);
+    // double A2norm = std::sqrt(normBBuffer_barrier_double(*rowsums_bbuf));
     // double p = 0.001 * BDIM / A1norm;
     double p = 1.0 / A1norm; // In 10.1109/TMI.2008.923696 authors probably mistakedly call the
                              // ||A||_1 what should be the largest col sum of A as they claim
@@ -39,7 +39,7 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     algFLOATvector_invert_except_zero(*rowsums_bbuf, BDIM);
     invrowsums_bbuf = rowsums_bbuf;
     double norm, normupdate, normx;
-    double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
+    double NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
     norm = NB0;
     LOGI << io::xprintf("||b||=%f, p=%f, A1norm=%f, alpha=%f", NB0, p, A1norm, alpha);
     // LOGI << io::xprintf("||b||=%f, p=%f, A2norm=%f", NB0, p, A2norm);
@@ -48,7 +48,7 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     {
         project(*x_buf, *discrepancy_bbuf);
         algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
-        norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
+        norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
         LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
                             iteration, norm, 100.0 * norm / NB0);
         iteration++;
@@ -62,8 +62,8 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         {
             algFLOATvector_scale(*update_xbuf, alpha * p, XDIM);
         }
-        normupdate = std::sqrt(normXBuffer_barier_double(*update_xbuf));
-        normx = std::sqrt(normXBuffer_barier_double(*x_buf));
+        normupdate = std::sqrt(normXBuffer_barrier_double(*update_xbuf));
+        normx = std::sqrt(normXBuffer_barrier_double(*x_buf));
         algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, 1.0, XDIM);
         if(boxconditions)
         {
@@ -114,22 +114,22 @@ int PSIRTReconstructor::reconstruct_sirt(uint32_t maxIterations, float errCondit
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     }
     double norm, normupdate, normx;
-    double NB0 = std::sqrt(normBBuffer_barier_double(*b_buf));
+    double NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
     norm = NB0;
     while(norm / NB0 > errCondition && iteration < maxIterations)
     {
         iteration++;
         project(*x_buf, *discrepancy_bbuf);
         algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
-        norm = std::sqrt(normBBuffer_barier_double(*discrepancy_bbuf));
+        norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
         LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
                             iteration, norm, 100.0 * norm / NB0);
         algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *invrowsums_bbuf, BDIM);
         backproject(*discrepancy_bbuf, *update_xbuf);
         algFLOATvector_A_equals_A_times_B(*update_xbuf, *invcolsums_xbuf, XDIM);
         algFLOATvector_scale(*update_xbuf, alpha, XDIM);
-        normupdate = std::sqrt(normXBuffer_barier_double(*update_xbuf));
-        normx = std::sqrt(normXBuffer_barier_double(*x_buf));
+        normupdate = std::sqrt(normXBuffer_barrier_double(*update_xbuf));
+        normx = std::sqrt(normXBuffer_barrier_double(*x_buf));
         algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, 1.0, XDIM);
         if(boxconditions)
         {

@@ -2,18 +2,25 @@
 
 namespace CTL {
 
-void BaseReconstructor::initializeCVPProjector(bool useExactScaling)
+void BaseReconstructor::initializeCVPProjector(bool useExactScaling, bool useBarrierCalls)
 {
     if(!isOpenCLInitialized())
     {
         useCVPProjector = true;
         exactProjectionScaling = useExactScaling;
+        this->CVPBarrierImplementation = useBarrierCalls;
         useSidonProjector = false;
         pixelGranularity = { 1, 1 };
         useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector();
+        if(useBarrierCalls)
+        {
+            CLINCLUDEprojector_cvp_barrier();
+        } else
+        {
+            CLINCLUDEprojector();
+        }
         CLINCLUDEbackprojector();
         CLINCLUDEbackprojector_minmax();
         CLINCLUDErescaleProjections();
@@ -411,14 +418,13 @@ int BaseReconstructor::multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer&
     return 0;
 }
 
-
 int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     copyFloatVector(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
-    //cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRangeBackprojection);
+    // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRangeBackprojection);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz), backprojectorLocalNDRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
@@ -476,7 +482,8 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
 
 int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
 {
-    Q[0]->enqueueFillBuffer<cl_float>(X, std::numeric_limits<float>::infinity(), 0, XDIM * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(X, std::numeric_limits<float>::infinity(), 0,
+                                      XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
     copyFloatVector(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
@@ -524,9 +531,9 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
                 (*FLOATrescale_projections_cos)(eargs2, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
                                                 NORMALTODETECTOR, pdims_uint, scalingFactor);
             }
-            algFLOATcutting_voxel_minmaxbackproject( X, *tmp_b_buf, offset, CM,
-                                                    SOURCEPOSITION, NORMALTODETECTOR, vdims,
-                                                    voxelSizes, volumeCenter, pdims, FLOATONE, voxelRange);
+            algFLOATcutting_voxel_minmaxbackproject(X, *tmp_b_buf, offset, CM, SOURCEPOSITION,
+                                                    NORMALTODETECTOR, vdims, voxelSizes,
+                                                    volumeCenter, pdims, FLOATONE, voxelRange);
         }
     }
     return 0;
@@ -538,6 +545,8 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
     unsigned int frameSize = pdimx * pdimy;
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), projectorLocalNDRange);
+    cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
+    std::shared_ptr<cl::NDRange> barrierLocalRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
@@ -573,8 +582,17 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
                                 voxelSizes, volumeCenter, pdims, FLOATONE);
         } else
         {
-            (*FLOATcutting_voxel_project)(eargs, X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR,
-                                          vdims, voxelSizes, volumeCenter, pdims, FLOATONE);
+            if(CVPBarrierImplementation)
+            {
+                algFLOATcutting_voxel_project_barrier(
+                    X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                    volumeCenter, pdims, FLOATONE, barrierGlobalRange, barrierLocalRange, false);
+            } else
+            {
+                (*FLOATcutting_voxel_project)(eargs, X, B, offset, CM, SOURCEPOSITION,
+                                              NORMALTODETECTOR, vdims, voxelSizes, volumeCenter,
+                                              pdims, FLOATONE);
+            }
             if(exactProjectionScaling)
             {
                 (*FLOATrescale_projections_exact)(eargs2, B, offset, pdims_uint, NORMALPROJECTION,
@@ -736,8 +754,8 @@ double BaseReconstructor::adjointProductTest()
     ba_buf = getBBuffer(0);
     project(*x_buf, *ba_buf);
     backproject(*b_buf, *xa_buf);
-    double bdotAx = scalarProductBBuffer_barier_double(*b_buf, *ba_buf);
-    double ATbdotx = scalarProductXBuffer_barier_double(*x_buf, *xa_buf);
+    double bdotAx = scalarProductBBuffer_barrier_double(*b_buf, *ba_buf);
+    double ATbdotx = scalarProductXBuffer_barrier_double(*x_buf, *xa_buf);
     return (bdotAx / ATbdotx);
 }
 

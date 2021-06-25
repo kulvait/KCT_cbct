@@ -10,7 +10,7 @@
 #include <iostream>
 
 // Internal libraries
-#include "AlgorithmsBarierBuffers.hpp"
+#include "AlgorithmsBarrierBuffers.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "Kniha.hpp"
 #include "MATRIX/LightProjectionMatrix.hpp"
@@ -23,7 +23,7 @@
 using namespace CTL::matrix;
 namespace CTL {
 
-class BaseReconstructor : public virtual Kniha, public AlgorithmsBarierBuffers
+class BaseReconstructor : public virtual Kniha, public AlgorithmsBarrierBuffers
 {
 public:
     cl::NDRange guessProjectionLocalNDRange()
@@ -405,7 +405,7 @@ public:
                       uint32_t workGroupSize = 256,
                       cl::NDRange projectorLocalNDRange = cl::NDRange(),
                       cl::NDRange backprojectorLocalNDRange = cl::NDRange())
-        : AlgorithmsBarierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
+        : AlgorithmsBarrierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
     {
         pdims = cl_int2({ int(pdimx), int(pdimy) });
         pdims_uint = cl_uint2({ pdimx, pdimy });
@@ -482,7 +482,7 @@ public:
         }
     }
 
-    void initializeCVPProjector(bool useExactScaling);
+    void initializeCVPProjector(bool useExactScaling, bool barrierVariant);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
 
@@ -541,6 +541,7 @@ protected:
     // Variables for projectors and openCL initialization
     bool useCVPProjector = true;
     bool exactProjectionScaling = true;
+    bool CVPBarrierImplementation = false;
     bool useSidonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;

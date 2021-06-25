@@ -57,6 +57,7 @@ public:
     void CLINCLUDEjacobiPreconditionedProjector();
     void CLINCLUDEprecomputeJacobiPreconditioner();
     void CLINCLUDEprojector();
+    void CLINCLUDEprojector_cvp_barrier();
     void CLINCLUDEprojector_old();
     void CLINCLUDEprojector_sidon();
     void CLINCLUDEprojector_tt();
@@ -233,6 +234,34 @@ protected:
                                     float&>>
         FLOATcutting_voxel_project;
 
+    // projector_cvp_barrier.cl
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned int&,
+                                    cl_double16&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOATcutting_voxel_project_barrier;
+    int algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
+                                             cl::Buffer& projection,
+                                             unsigned int& projectionOffset,
+                                             cl_double16& CM,
+                                             cl_double3& sourcePosition,
+                                             cl_double3& normalToDetector,
+                                             cl_int3& vdims,
+                                             cl_double3& voxelSizes,
+                                             cl_double3& volumeCenter,
+                                             cl_int2& pdims,
+                                             float globalScalingMultiplier,
+                                             cl::NDRange& globalRange,
+                                             std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                             bool blocking = false);
+
     // projector_old.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
@@ -298,22 +327,22 @@ protected:
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         FLOATvector_MaxPartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
-        FLOATvector_NormSquarePartial_barier;
+        FLOATvector_NormSquarePartial_barrier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
-        FLOATvector_SumPartial_barier;
+        FLOATvector_SumPartial_barrier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
-        FLOATvector_MaxPartial_barier;
+        FLOATvector_MaxPartial_barrier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         vector_NormSquarePartial;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> vector_SumPartial;
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
-        vector_NormSquarePartial_barier;
+        vector_NormSquarePartial_barrier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
-        vector_SumPartial_barier;
+        vector_SumPartial_barrier;
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
-        vector_ScalarProductPartial_barier;
+        vector_ScalarProductPartial_barrier;
     // FLOATvector_zero
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_zero;
     int algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking = false);
