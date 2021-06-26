@@ -1020,6 +1020,9 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             projectorLocalRange[5] = Jrange;
             projectorLocalRange[6]
                 = projectorLocalRange[0]; // Where current local array has start IRange
+
+            // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5 .. PJMAX-PJMIN, 6
+            // CurrentPISTART
             mappedLocalRange = ILocalRange * Jrange;
             CML.s0123 = CM.s0123 - projectorLocalRange[0] * CM.s89ab;
             CML.s4567 = CM.s4567 - projectorLocalRange[2] * CM.s89ab;
@@ -1043,366 +1046,347 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     do
     {
         barrier(CLK_LOCAL_MEM_FENCE); // Cutting voxel projector
+                                      // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5
+                                      // .. PJMAX-PJMIN, 6 CurrentPISTART
         startIRange = projectorLocalRange[6];
         // printf("i,j,k=%d,%d,%d", i, j, k);
         // Start CVP
-        if(offAxisPosition) // Needed because its not solved otherwise
-            if(!fullyOffProjectorPosition)
+        if(!fullyOffProjectorPosition)
+        {
+            const uint IND = voxelIndex(i, j, k, vdims);
+            const float voxelValue = volume[IND];
+            const int2 Lpdims = { projectorLocalRange[4], projectorLocalRange[5] };
+            bool dropVoxel = false;
+            if(voxelValue == 0.0f)
             {
-                const uint IND = voxelIndex(i, j, k, vdims);
-                const float voxelValue = volume[IND];
-                const int2 Lpdims = { projectorLocalRange[4], projectorLocalRange[6] };
-                bool dropVoxel = false;
-                if(voxelValue == 0.0f)
+                dropVoxel = true;
+            }
+#ifdef DROPINCOMPLETEVOXELS
+            if(partlyOffProjectorPosition)
+            {
+                int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
+                int yindex = INDEX(PROJECTY0(CM, voxelcenter_xyz));
+                if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)
                 {
                     dropVoxel = true;
                 }
-#ifdef DROPINCOMPLETEVOXELS
-                if(partlyOffProjectorPosition)
-                {
-                    int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
-                    int yindex = INDEX(PROJECTY0(CM, voxelcenter_xyz));
-                    if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)
-                    {
-                        dropVoxel = true;
-                    }
-                }
+            }
 #endif
-                if(offAxisPosition)
+            if(offAxisPosition)
+            {
+                int Imax = INDEX(PROJECTX0(CM, voxelcenter_xyz + positiveShift[0]));
+                int Imin = INDEX(PROJECTX0(CM, voxelcenter_xyz - positiveShift[0]));
+                int Jmax = INDEX(PROJECTY0(CM, voxelcenter_xyz + positiveShift[1]));
+                int Jmin = INDEX(PROJECTY0(CM, voxelcenter_xyz - positiveShift[1]));
+                if(Imax < 0 || Jmax < 0 || Imin >= pdims.x || Jmin >= pdims.y)
                 {
-                    int Imax = INDEX(PROJECTX0(CM, voxelcenter_xyz + positiveShift[0]));
-                    int Imin = INDEX(PROJECTX0(CM, voxelcenter_xyz - positiveShift[0]));
-                    int Jmax = INDEX(PROJECTY0(CM, voxelcenter_xyz + positiveShift[1]));
-                    int Jmin = INDEX(PROJECTY0(CM, voxelcenter_xyz - positiveShift[1]));
-                    if(Imax < 0 || Jmax < 0 || Imin >= pdims.x || Jmin >= pdims.y)
-                    {
-                        dropVoxel = true;
-                    }
-                    if(cornerWorkItem && voxelValue)
-                    {
-                        /*
+                    dropVoxel = true;
+                }
+                if(cornerWorkItem && voxelValue)
+                {
+                    /*
 printf("(i,j,k)=(%d,%d,%d) value=%f Irange=[%d,%d] Jrange=[%d,%d].\n", i, j,
-       k, voxelValue, Imin, Imax, Jmin, Jmax);*/
-                        // Debug
-                        int id, iu, jd, ju;
-                        getVoxelRanges(voxelcorner_xyz, voxelSizes, CM, &id, &iu, &jd, &ju);
-                        if(Imin != id || Imax != iu || Jmin != jd || Jmax != ju)
-                        {
-                            printf("Error %d %d %d is I[%d, %d] J[%d, %d]", i, j, k, id, iu, jd,
-                                   ju);
-                        }
-                        /*
+   k, voxelValue, Imin, Imax, Jmin, Jmax);*/
+                    // Debug
+                    int id, iu, jd, ju;
+                    getVoxelRanges(voxelcorner_xyz, voxelSizes, CM, &id, &iu, &jd, &ju);
+                    if(Imin != id || Imax != iu || Jmin != jd || Jmax != ju)
+                    {
+                        printf("Error %d %d %d is I[%d, %d] J[%d, %d]", i, j, k, id, iu, jd, ju);
+                    }
+                    /*
 getVoxelRanges(voxelcorner_xyz, voxelSizes, CML, &id, &iu, &jd, &ju);
 printf("Local %d %d %d is I[%d, %d] J[%d, %d]\n", i, j, k, id, iu, jd, ju);
 printf("Global %d %d %d is I[%d, %d] J[%d, %d]\n", i, j, k,
-       projectorLocalRange[0], projectorLocalRange[1],
-       projectorLocalRange[2], projectorLocalRange[3]);
+   projectorLocalRange[0], projectorLocalRange[1],
+   projectorLocalRange[2], projectorLocalRange[3]);
 */
-                        // Debug
-                    }
+                    // Debug
                 }
-                if(!dropVoxel)
-                {
-                    const REAL voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
-                    REAL sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
+            }
+            if(!dropVoxel)
+            {
+                const REAL voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
+                REAL sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
 #ifdef RELAXED
-                    float value
-                        = (voxelValue * voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2);
+                float value = (voxelValue * voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2);
 #else
-                    float value = (float)(voxelValue * voxelVolume * scalingFactor
-                                          / sourceToVoxel_xyz_norm2);
+                float value
+                    = (float)(voxelValue * voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2);
 #endif
 
-                    // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2)
-                    // for any z_1, z_2  This assumption is restricted to the voxel edges, where it
-                    // holds very accurately  We project the rectangle that lies on the z midline of
-                    // the voxel on the projector
-                    REAL px00, px01, px10, px11;
-                    REAL3 vx00, vx01, vx10, vx11;
-                    vx00 = voxelcorner_xyz + voxelSizes * (REAL3)(ZERO, ZERO, HALF);
-                    vx01 = voxelcorner_xyz + voxelSizes * (REAL3)(ONE, ZERO, HALF);
-                    vx10 = voxelcorner_xyz + voxelSizes * (REAL3)(ZERO, ONE, HALF);
-                    vx11 = voxelcorner_xyz + voxelSizes * (REAL3)(ONE, ONE, HALF);
-                    px00 = PROJECTX0(CML, vx00);
-                    px01 = PROJECTX0(CML, vx01);
-                    px10 = PROJECTX0(CML, vx10);
-                    px11 = PROJECTX0(CML, vx11);
-                    // printf("X projections are %f, %f, %f, %f", px00, px01, px10, px11);
-                    // We now figure out the vertex that projects to minimum and maximum px
-                    REAL pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
-                    int max_PX,
-                        min_PX; // Pixel to which are the voxels with minimum and maximum values are
-                                // projected
-                    // pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
-                    // pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
-                    REAL3* V_ccw[4]; // Point in which minimum is achieved and counter clock wise
-                                     // points
-                    // from the minimum voxel
-                    REAL* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise
-                                     // points
-                    // from the minimum voxel
-                    if(offAxisPosition)
+                // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2)
+                // for any z_1, z_2  This assumption is restricted to the voxel edges, where it
+                // holds very accurately  We project the rectangle that lies on the z midline of
+                // the voxel on the projector
+                REAL px00, px10, px01, px11;
+                REAL3 vx00, vx10, vx01, vx11;
+                vx00 = voxelcorner_xyz + voxelSizes * (REAL3)(ZERO, ZERO, HALF);
+                vx10 = voxelcorner_xyz + voxelSizes * (REAL3)(ONE, ZERO, HALF);
+                vx01 = voxelcorner_xyz + voxelSizes * (REAL3)(ZERO, ONE, HALF);
+                vx11 = voxelcorner_xyz + voxelSizes * (REAL3)(ONE, ONE, HALF);
+                px00 = PROJECTX0(CML, vx00);
+                px10 = PROJECTX0(CML, vx10);
+                px01 = PROJECTX0(CML, vx01);
+                px11 = PROJECTX0(CML, vx11);
+                // printf("X projections are %f, %f, %f, %f", px00, px10, px01, px11);
+                // We now figure out the vertex that projects to minimum and maximum px
+                REAL pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
+                int max_PX,
+                    min_PX; // Pixel to which are the voxels with minimum and maximum values are
+                            // projected
+                // pxx_min = fmin(fmin(px00, px10), fmin(px01, px11));
+                // pxx_max = fmax(fmax(px00, px10), fmax(px01, px11));
+                REAL3* V_ccw[4]; // Point in which minimum is achieved and counter clock wise
+                                 // points
+                // from the minimum voxel
+                REAL* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise
+                                 // points
+                // from the minimum voxel
+                if(offAxisPosition)
+                {
+                    if(positiveShift[0].s0 > 0)
                     {
-                        if(positiveShift[0].s0 > 0)
+                        if(positiveShift[0].s1 > 0)
                         {
-                            if(positiveShift[0].s1 > 0)
-                            {
-                                pxx_min = px11;
-                                pxx_max = px00;
-                                V_ccw[0] = &vx11;
-                                V_ccw[1] = &vx10;
-                                V_ccw[2] = &vx00;
-                                V_ccw[3] = &vx01;
-                                PX_ccw[0] = &px11;
-                                PX_ccw[1] = &px10;
-                                PX_ccw[2] = &px00;
-                                PX_ccw[3] = &px01;
-                            } else
-                            {
-                                pxx_min = px01;
-                                pxx_max = px10;
-                                V_ccw[0] = &vx01;
-                                V_ccw[1] = &vx11;
-                                V_ccw[2] = &vx10;
-                                V_ccw[3] = &vx00;
-                                PX_ccw[0] = &px01;
-                                PX_ccw[1] = &px11;
-                                PX_ccw[2] = &px10;
-                                PX_ccw[3] = &px00;
-                            }
+                            pxx_max = px11;
+                            pxx_min = px00;
+                            V_ccw[0] = &vx00;
+                            V_ccw[1] = &vx10;
+                            V_ccw[2] = &vx11;
+                            V_ccw[3] = &vx01;
+                            PX_ccw[0] = &px00;
+                            PX_ccw[1] = &px10;
+                            PX_ccw[2] = &px11;
+                            PX_ccw[3] = &px01;
                         } else
                         {
-                            if(positiveShift[0].s1 > 0)
-                            {
-                                pxx_min = px10;
-                                pxx_max = px01;
-                                V_ccw[0] = &vx10;
-                                V_ccw[1] = &vx00;
-                                V_ccw[2] = &vx01;
-                                V_ccw[3] = &vx11;
-                                PX_ccw[0] = &px10;
-                                PX_ccw[1] = &px00;
-                                PX_ccw[2] = &px01;
-                                PX_ccw[3] = &px11;
-                            } else
-                            {
-                                // 00
-                                pxx_min = px00;
-                                V_ccw[0] = &vx00;
-                                V_ccw[1] = &vx01;
-                                V_ccw[2] = &vx11;
-                                V_ccw[3] = &vx10;
-                                PX_ccw[0] = &px00;
-                                PX_ccw[1] = &px01;
-                                PX_ccw[2] = &px11;
-                                PX_ccw[3] = &px10;
-                                pxx_max = px11;
-                            }
+                            pxx_max = px10;
+                            pxx_min = px01;
+                            V_ccw[0] = &vx01;
+                            V_ccw[1] = &vx00;
+                            V_ccw[2] = &vx10;
+                            V_ccw[3] = &vx11;
+                            PX_ccw[0] = &px01;
+                            PX_ccw[1] = &px00;
+                            PX_ccw[2] = &px10;
+                            PX_ccw[3] = &px11;
                         }
                     } else
                     {
+                        if(positiveShift[0].s1 > 0)
+                        {
+                            pxx_max = px01;
+                            pxx_min = px10;
+                            V_ccw[0] = &vx10;
+                            V_ccw[1] = &vx11;
+                            V_ccw[2] = &vx01;
+                            V_ccw[3] = &vx00;
+                            PX_ccw[0] = &px10;
+                            PX_ccw[1] = &px11;
+                            PX_ccw[2] = &px01;
+                            PX_ccw[3] = &px00;
+                        } else
+                        {
+                            pxx_max = px00;
+                            pxx_min = px11;
+                            V_ccw[0] = &vx11;
+                            V_ccw[1] = &vx01;
+                            V_ccw[2] = &vx00;
+                            V_ccw[3] = &vx10;
+                            PX_ccw[0] = &px11;
+                            PX_ccw[1] = &px01;
+                            PX_ccw[2] = &px00;
+                            PX_ccw[3] = &px10;
+                        }
+                    }
+                } else
+                {
+                    if(px00 < px10)
+                    {
                         if(px00 < px01)
                         {
-                            if(px00 < px10)
+                            pxx_min = px00;
+                            V_ccw[0] = &vx00;
+                            V_ccw[1] = &vx10;
+                            V_ccw[2] = &vx11;
+                            V_ccw[3] = &vx01;
+                            PX_ccw[0] = &px00;
+                            PX_ccw[1] = &px10;
+                            PX_ccw[2] = &px11;
+                            PX_ccw[3] = &px01;
+                            if(px01 > px11)
                             {
-                                pxx_min = px00;
-                                V_ccw[0] = &vx00;
-                                V_ccw[1] = &vx01;
-                                V_ccw[2] = &vx11;
-                                V_ccw[3] = &vx10;
-                                PX_ccw[0] = &px00;
-                                PX_ccw[1] = &px01;
-                                PX_ccw[2] = &px11;
-                                PX_ccw[3] = &px10;
-                                if(px10 > px11)
-                                {
-                                    pxx_max = px10;
-                                } else if(px01 > px11)
-                                {
-                                    pxx_max = px01;
-                                } else
-                                {
-                                    pxx_max = px11;
-                                }
-                            } else if(px10 < px11)
+                                pxx_max = px01;
+                            } else if(px10 > px11)
                             {
-                                pxx_min = px10;
-                                V_ccw[0] = &vx10;
-                                V_ccw[1] = &vx00;
-                                V_ccw[2] = &vx01;
-                                V_ccw[3] = &vx11;
-                                PX_ccw[0] = &px10;
-                                PX_ccw[1] = &px00;
-                                PX_ccw[2] = &px01;
-                                PX_ccw[3] = &px11;
-                                if(px01 > px11)
-                                {
-                                    pxx_max = px01;
-                                } else
-                                {
-                                    pxx_max = px11;
-                                }
+                                pxx_max = px10;
                             } else
                             {
-                                pxx_min = px11;
-                                pxx_max = px01;
-                                V_ccw[0] = &vx11;
-                                V_ccw[1] = &vx10;
-                                V_ccw[2] = &vx00;
-                                V_ccw[3] = &vx01;
-                                PX_ccw[0] = &px11;
-                                PX_ccw[1] = &px10;
-                                PX_ccw[2] = &px00;
-                                PX_ccw[3] = &px01;
+                                pxx_max = px11;
                             }
-
                         } else if(px01 < px11)
                         {
                             pxx_min = px01;
                             V_ccw[0] = &vx01;
-                            V_ccw[1] = &vx11;
+                            V_ccw[1] = &vx00;
                             V_ccw[2] = &vx10;
-                            V_ccw[3] = &vx00;
+                            V_ccw[3] = &vx11;
                             PX_ccw[0] = &px01;
-                            PX_ccw[1] = &px11;
+                            PX_ccw[1] = &px00;
                             PX_ccw[2] = &px10;
-                            PX_ccw[3] = &px00;
-                            if(px00 > px10)
+                            PX_ccw[3] = &px11;
+                            if(px10 > px11)
                             {
-                                pxx_max = px00;
-                            } else if(px11 > px10)
+                                pxx_max = px10;
+                            } else
                             {
                                 pxx_max = px11;
-                            } else
-                            {
-                                pxx_max = px10;
                             }
-                        } else if(px11 < px10)
+                        } else
                         {
                             pxx_min = px11;
+                            pxx_max = px10;
                             V_ccw[0] = &vx11;
-                            V_ccw[1] = &vx10;
+                            V_ccw[1] = &vx01;
                             V_ccw[2] = &vx00;
-                            V_ccw[3] = &vx01;
+                            V_ccw[3] = &vx10;
                             PX_ccw[0] = &px11;
-                            PX_ccw[1] = &px10;
+                            PX_ccw[1] = &px01;
                             PX_ccw[2] = &px00;
-                            PX_ccw[3] = &px01;
-                            if(px00 > px10)
-                            {
-                                pxx_max = px00;
-                            } else
-                            {
-                                pxx_max = px10;
-                            }
-                        } else
-                        {
-                            pxx_min = px10;
-                            pxx_max = px00;
-                            V_ccw[0] = &vx10;
-                            V_ccw[1] = &vx00;
-                            V_ccw[2] = &vx01;
-                            V_ccw[3] = &vx11;
-                            PX_ccw[0] = &px10;
-                            PX_ccw[1] = &px00;
-                            PX_ccw[2] = &px01;
-                            PX_ccw[3] = &px11;
+                            PX_ccw[3] = &px10;
                         }
-                    }
-                    min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + HALF);
-                    max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + HALF);
-                    if(max_PX >= 0 && min_PX < Lpdims.x)
+
+                    } else if(px10 < px11)
                     {
-                        REAL3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
-                        REAL3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
-                        if(max_PX <= min_PX) // These indices are in the admissible range
+                        pxx_min = px10;
+                        V_ccw[0] = &vx10;
+                        V_ccw[1] = &vx11;
+                        V_ccw[2] = &vx01;
+                        V_ccw[3] = &vx00;
+                        PX_ccw[0] = &px10;
+                        PX_ccw[1] = &px11;
+                        PX_ccw[2] = &px01;
+                        PX_ccw[3] = &px00;
+                        if(px00 > px01)
                         {
-#ifdef RELAXED
-                            min_PX = convert_int_rtn(0.5f * (pxx_min + pxx_max) + 0.5f);
-                            exactEdgeValuesF0(&projection[projectionOffset], CM,
-                                              (vx00 + vx11) / 2.0f, min_PX, value, voxelSizes,
-                                              pdims);
-#else
-                            min_PX = convert_int_rtn(0.5 * (pxx_min + pxx_max) + 0.5);
-                            exactEdgeValues0(&projection[projectionOffset], CM, (vx00 + vx11) / 2.0,
-                                             min_PX, value, voxelSizes, pdims);
-#endif
+                            pxx_max = px00;
+                        } else if(px11 > px01)
+                        {
+                            pxx_max = px11;
                         } else
                         {
+                            pxx_max = px01;
+                        }
+                    } else if(px11 < px01)
+                    {
+                        pxx_min = px11;
+                        V_ccw[0] = &vx11;
+                        V_ccw[1] = &vx01;
+                        V_ccw[2] = &vx00;
+                        V_ccw[3] = &vx10;
+                        PX_ccw[0] = &px11;
+                        PX_ccw[1] = &px01;
+                        PX_ccw[2] = &px00;
+                        PX_ccw[3] = &px10;
+                        if(px00 > px01)
+                        {
+                            pxx_max = px00;
+                        } else
+                        {
+                            pxx_max = px01;
+                        }
+                    } else
+                    {
+                        pxx_min = px01;
+                        pxx_max = px00;
+                        V_ccw[0] = &vx01;
+                        V_ccw[1] = &vx00;
+                        V_ccw[2] = &vx10;
+                        V_ccw[3] = &vx11;
+                        PX_ccw[0] = &px01;
+                        PX_ccw[1] = &px00;
+                        PX_ccw[2] = &px10;
+                        PX_ccw[3] = &px11;
+                    }
+                }
+                min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + HALF);
+                max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + HALF);
+                if(max_PX >= 0 && min_PX < Lpdims.x)
+                {
+                    REAL3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
+                    REAL3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
+                    if(max_PX <= min_PX) // These indices are in the admissible range
+                    {
+                        min_PX = convert_int_rtn(HALF * (pxx_min + pxx_max) + HALF);
+                        localEdgeValues0(localProjection, CML, HALF * (vx00 + vx11), min_PX, value,
+                                         voxelSizes, Lpdims);
+                    } else
+                    {
+                        REAL lastSectionSize, nextSectionSize, polygonSize;
+                        REAL3 lastInt, nextInt, Int;
+                        REAL factor;
+                        int I = max(-1, min_PX);
+                        int I_STOP = min(max_PX, pdims.x);
+                        // Section of the square that corresponds to the indices < i
+                        // CCW and CW coordinates of the last intersection on the lines
+                        // specified by the points in V_ccw
 #ifdef RELAXED
-                            float lastSectionSize, nextSectionSize, polygonSize;
-                            float3 lastInt, nextInt, Int;
-                            float factor;
+                        lastSectionSize = exactIntersectionPointsF0_extended(
+                            ((float)I) + 0.5f, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
+                            PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CML, &lastInt);
 #else
-                            double lastSectionSize, nextSectionSize, polygonSize;
-                            double3 lastInt, nextInt, Int;
-                            double factor;
+                        lastSectionSize = exactIntersectionPoints0_extended(
+                            ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
+                            PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CML, &lastInt);
 #endif
-                            int I = max(-1, min_PX);
-                            int I_STOP = min(max_PX, pdims.x);
-                            // Section of the square that corresponds to the indices < i
-                            // CCW and CW coordinates of the last intersection on the lines
-                            // specified by the points in V_ccw
+                        if(I >= 0)
+                        {
+                            factor = value * lastSectionSize;
+                            // insertEdgeValues(&projection[projectionOffset], CM, lastInt, I,
+                            // factor, voxelSizes, pdims);
+                            //                                printf("lastInt=(%f, %f, %f),
+                            //                                I=%d, factor=%f\n", lastInt.x,
+                            //                                lastInt.y, lastInt.z, I, factor);
+                            localEdgeValues0(localProjection, CML, lastInt, I, factor, voxelSizes,
+                                             Lpdims);
+                        }
+                        for(I = I + 1; I < I_STOP; I++)
+                        {
 #ifdef RELAXED
-                            lastSectionSize = exactIntersectionPointsF0_extended(
+                            nextSectionSize = exactIntersectionPointsF0_extended(
                                 ((float)I) + 0.5f, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
-                                PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
+                                PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CML, &nextInt);
 #else
-                            lastSectionSize = exactIntersectionPoints0_extended(
+                            nextSectionSize = exactIntersectionPoints0_extended(
                                 ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
-                                PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
+                                PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CML, &nextInt);
 #endif
-                            if(I >= 0)
-                            {
-                                factor = value * lastSectionSize;
-                                // insertEdgeValues(&projection[projectionOffset], CM, lastInt, I,
-                                // factor, voxelSizes, pdims);
-                                localEdgeValues0(localProjection, CML, lastInt, I, factor,
-                                                 voxelSizes, Lpdims);
-                            }
-                            for(I = I + 1; I < I_STOP; I++)
-                            {
-#ifdef RELAXED
-                                nextSectionSize = exactIntersectionPointsF0_extended(
-                                    ((float)I) + 0.5f, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1,
-                                    vd3, PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
-#else
-                                nextSectionSize = exactIntersectionPoints0_extended(
-                                    ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1,
-                                    vd3, PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
-#endif
-                                polygonSize = nextSectionSize - lastSectionSize;
-                                Int = (nextSectionSize * nextInt - lastSectionSize * lastInt)
-                                    / polygonSize;
-                                factor = value * polygonSize;
-                                localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
-                                                 Lpdims);
-                                lastSectionSize = nextSectionSize;
-                                lastInt = nextInt;
-                            }
-                            if(I_STOP < pdims.x)
-                            {
-#ifdef RELAXED
-                                polygonSize = 1.0f - lastSectionSize;
-                                Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5f - lastSectionSize * lastInt)
-                                    / polygonSize;
-                                factor = value * polygonSize;
-                                localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
-                                                 Lpdims);
-#else
-                                polygonSize = 1.0 - lastSectionSize;
-                                Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt)
-                                    / polygonSize;
-                                factor = value * polygonSize;
-                                localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
-                                                 Lpdims);
-#endif
-                            }
+                            polygonSize = nextSectionSize - lastSectionSize;
+                            Int = (nextSectionSize * nextInt - lastSectionSize * lastInt)
+                                / polygonSize;
+                            factor = value * polygonSize;
+                            localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
+                                             Lpdims);
+                            lastSectionSize = nextSectionSize;
+                            lastInt = nextInt;
+                        }
+                        if(I_STOP < pdims.x)
+                        {
+                            polygonSize = ONE - lastSectionSize;
+                            Int = ((*V_ccw[0] + *V_ccw[2]) * HALF - lastSectionSize * lastInt)
+                                / polygonSize;
+                            factor = value * polygonSize;
+                            localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
+                                             Lpdims);
                         }
                     }
                 }
             }
+        }
         // End CVP
+        // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5 .. PJMAX-PJMIN, 6
+        // CurrentPISTART
         startIRange += projectorLocalRange[4];
         barrier(CLK_LOCAL_MEM_FENCE); // Local to global copy
         if(cornerWorkItem && !fullyOffProjectorPosition)
@@ -1432,12 +1416,18 @@ printf("Global %d %d %d is I[%d, %d] J[%d, %d]\n", i, j, k,
                                globalIndex, LI, LJ, projectorLocalRange[6] + LI,
                                projectorLocalRange[2] + LJ);
                     }
+                    /*
+printf("(%d, %d, %d) globalIndex %d LI=%d, LJ=%d, I=%d, J=%d!\n", i, j, k,
+       globalIndex, LI, LJ, projectorLocalRange[6] + LI,
+       projectorLocalRange[2] + LJ);*/
                     AtomicAdd_g_f(projection + globalIndex, localProjection[localIndex]);
                     localIndex++;
                     globalIndex++;
                 }
                 globalIndex += globalIndexIncrement;
             }
+            // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. PIMAX-PIMIN, 5 .. PJMAX-PJMIN, 6
+            // CurrentPISTART
             projectorLocalRange[6] += projectorLocalRange[4];
             if(projectorLocalRange[6] < projectorLocalRange[1])
             {
