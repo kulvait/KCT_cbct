@@ -615,19 +615,19 @@ int Kniha::algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
 }
 
 int Kniha::algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
-                                                cl::Buffer& projection,
-                                                unsigned int& projectionOffset,
-                                                cl_double16& CM,
-                                                cl_double3& sourcePosition,
-                                                cl_double3& normalToDetector,
-                                                cl_int3& vdims,
-                                                cl_double3& voxelSizes,
-                                                cl_double3& volumeCenter,
-                                                cl_int2& pdims,
-                                                float globalScalingMultiplier,
-                                                cl::NDRange& globalRange,
-                                                std::shared_ptr<cl::NDRange> localRange,
-                                                bool blocking)
+                                                 cl::Buffer& projection,
+                                                 unsigned int& projectionOffset,
+                                                 cl_double16& CM,
+                                                 cl_double3& sourcePosition,
+                                                 cl_double3& normalToDetector,
+                                                 cl_int3& vdims,
+                                                 cl_double3& voxelSizes,
+                                                 cl_double3& volumeCenter,
+                                                 cl_int2& pdims,
+                                                 float globalScalingMultiplier,
+                                                 cl::NDRange& globalRange,
+                                                 std::shared_ptr<cl::NDRange> localRange,
+                                                 bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
     if(localRange != nullptr)

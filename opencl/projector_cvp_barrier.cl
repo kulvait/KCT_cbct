@@ -784,8 +784,8 @@ inline uint voxelIndex(uint i, uint j, uint k, int3 vdims)
     return i + j * vdims.x + k * vdims.x * vdims.y;
 }
 
-//#define  Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA
-#define LOCALARRAYSIZE 10560 // 22 full columns of 480 elements each
+//#define  Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
+#define LOCALARRAYSIZE 7680 // 16 full columns of 480 elements each
 
 /** Kernel to precompute projection indices to spare some redundancy.
  *
@@ -812,6 +812,38 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
         = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
 }
 
+inline void
+getVoxelRanges(REAL3 v, REAL3 e, REAL16 CM, int* I_min, int* I_max, int* J_min, int* J_max)
+{
+    int IND1 = INDEX(PROJECTX0(CM, v)); // 000
+    int JND1 = INDEX(PROJECTY0(CM, v)); // 000
+    v.z += e.z;
+    int IND2 = INDEX(PROJECTX0(CM, v)); // 001
+    int JND2 = INDEX(PROJECTY0(CM, v)); // 001
+    v.y += e.y;
+    int IND3 = INDEX(PROJECTX0(CM, v)); // 011
+    int JND3 = INDEX(PROJECTY0(CM, v)); // 011
+    v.z -= e.z;
+    int IND4 = INDEX(PROJECTX0(CM, v)); // 010
+    int JND4 = INDEX(PROJECTY0(CM, v)); // 010
+    v.x += e.x;
+    int IND5 = INDEX(PROJECTX0(CM, v)); // 110
+    int JND5 = INDEX(PROJECTY0(CM, v)); // 110
+    v.y -= e.y;
+    int IND6 = INDEX(PROJECTX0(CM, v)); // 100
+    int JND6 = INDEX(PROJECTY0(CM, v)); // 100
+    v.z += e.z;
+    int IND7 = INDEX(PROJECTX0(CM, v)); // 101
+    int JND7 = INDEX(PROJECTY0(CM, v)); // 101
+    v.y += e.y;
+    int IND8 = INDEX(PROJECTX0(CM, v)); // 111
+    int JND8 = INDEX(PROJECTY0(CM, v)); // 111
+    *I_min = min(min(min(IND1, IND2), min(IND3, IND4)), min(min(IND5, IND6), min(IND7, IND8)));
+    *I_max = max(max(max(IND1, IND2), max(IND3, IND4)), max(max(IND5, IND6), max(IND7, IND8)));
+    *J_min = min(min(min(JND1, JND2), min(JND3, JND4)), min(min(JND5, JND6), min(JND7, JND8)));
+    *J_max = max(max(max(JND1, JND2), max(JND3, JND4)), max(max(JND5, JND6), max(JND7, JND8)));
+}
+
 /** Project given volume using cutting voxel projector.
  *
  *
@@ -830,12 +862,12 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
 void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volume,
                                                global float* restrict projection,
                                                private uint projectionOffset,
-                                               private double16 CM,
-                                               private double3 sourcePosition,
-                                               private double3 normalToDetector,
+                                               private double16 _CM,
+                                               private double3 _sourcePosition,
+                                               private double3 _normalToDetector,
                                                private int3 vdims,
-                                               private double3 voxelSizes,
-                                               private double3 volumeCenter,
+                                               private double3 _voxelSizes,
+                                               private double3 _volumeCenter,
                                                private int2 pdims,
                                                private float scalingFactor)
 {
@@ -845,67 +877,57 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     uint li = get_local_id(0);
     uint lj = get_local_id(1);
     uint lk = get_local_id(2);
-    uint lis = get_local_size(0);
-    uint ljs = get_local_size(1);
-    uint lks = get_local_size(2);
     projection += projectionOffset;
     bool cornerWorkItem = false;
     uint mappedLocalRange, Jrange, ILocalRange; // Memory used only in cornerWorkItem
-    __local bool
-        offAxisPosition[1]; // If true, position of local cuboid is such that the direction
-                            // of the increase/decrease of the X/Y projection indices is the
-                            // same on colinear edges
-    __local bool partlyOffProjectorPosition[1]; // If true, some vertices of the local cuboid are
-                                                // projected outside the projector
-    __local bool fullyOffProjectorPosition[1]; // If true, all vertices are mapped outside projector
-    __local REAL3 positiveShift[2];
-    __local uint projectorLocalRange[7]; //
-    __local REAL16 CML[1];
-    __local float localProjection[LOCALARRAYSIZE];
+    local bool offAxisPosition; // If true, position of local cuboid is such that the direction
+                                // of the increase/decrease of the X/Y projection indices is
+                                // the same on colinear edges
+    local bool partlyOffProjectorPosition; // If true, some vertices of the local cuboid are
+                                           // projected outside the projector
+    local bool fullyOffProjectorPosition; // If true, shall end the execution
+    local REAL16 CML;
+    local REAL3 positiveShift[2];
+    local int projectorLocalRange[7]; //
+    local float localProjection[LOCALARRAYSIZE];
 
+//_normalToDetector is not used in this implementation
 #ifdef RELAXED
-    const float16 CMF = convert_float16(CM);
-    const float3 sourcePositionF = convert_float3(sourcePosition);
-    const float3 volumeCenterF = convert_float3(volumeCenter);
-    const float3 voxelSizesF = convert_float3(voxelSizes);
-    const float3 halfLocalSizes
-        = { 0.5f * lis * vdims.x, 0.5f * ljs * vdims.y, 0.5f * lks * vdims.z };
+    const float16 CM = convert_float16(_CM);
+    const float3 sourcePosition = convert_float3(_sourcePosition);
+    const float3 voxelSizes = convert_float3(_voxelSizes);
+    const float3 volumeCenter = convert_float3(_volumeCenter);
 #else
-#define CMF CM
-#define voxelSizesF voxelSizes
-#define volumeCenterF volumeCenter
-#define sourcePositionF sourcePosition
-    const double3 halfLocalSizes
-        = { 0.5 * lis * vdims.x, 0.5 * ljs * vdims.y, 0.5 * lks * vdims.z };
+#define CM _CM
+#define sourcePosition _sourcePosition
+#define voxelSizes _voxelSizes
+#define volumeCenter _volumeCenter
 #endif
     const REAL3 zerocorner_xyz
-        = volumeCenterF - sourcePositionF - HALF * convert_REAL3(vdims) * voxelSizesF;
+        = volumeCenter - sourcePosition - HALF * convert_REAL3(vdims) * voxelSizes;
     const REAL3 IND_ijk = { (REAL)(i), (REAL)(j), (REAL)(k) };
-    const REAL3 voxelcorner_xyz = zerocorner_xyz + (IND_ijk * voxelSizesF);
-    const REAL3 voxelcenter_xyz = voxelcorner_xyz + HALF * voxelSizesF;
+    const REAL3 voxelcorner_xyz = zerocorner_xyz + (IND_ijk * voxelSizes);
+    const REAL3 voxelcenter_xyz = voxelcorner_xyz + HALF * voxelSizes;
     if(li == 0 && lj == 0 && lk == 0) // Get dimension
     {
+        uint lis = get_local_size(0);
+        uint ljs = get_local_size(1);
+        uint lks = get_local_size(2);
+        const REAL3 halfLocalSizes
+            = { HALF * lis * voxelSizes.x, HALF * ljs * voxelSizes.y, HALF * lks * voxelSizes.z };
         cornerWorkItem = true;
-#ifdef RELAXED
-        const float3 IND_local_ijk
-            = { (float)(i) + 0.5f * lis, (float)(j) + 0.5f * ljs,
-                (float)(k) + 0.5f * lks }; // Index of the center of the local cube
-        const float3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizesF);
-#else
-        const double3 IND_local_ijk
-            = { (double)(i) + 0.5 * lis, (double)(j) + 0.5 * ljs,
-                (double)(k) + 0.5 * lks }; // Index of the center of the local cube
-        const double3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizes);
-#endif
-        positiveShift[0] = voxelSizesF * HALF; // X direction
-        positiveShift[1] = voxelSizesF * HALF; // Y direction
+        const REAL3 IND_local_ijk = { i + HALF * lis, j + HALF * ljs, k + HALF * lks };
+        const REAL3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizes);
+        positiveShift[0] = voxelSizes * HALF; // X direction
+        positiveShift[1] = voxelSizes * HALF; // Y direction
         int PILocalMin, PILocalMax, PJLocalMin, PJLocalMax;
         if(all(fabs(voxelcenter_local_xyz) > halfLocalSizes)) // Increase or decrease of the value
                                                               // will be preserved on colinear edges
         {
-            offAxisPosition[0] = true;
-            const REAL3 CMX_CROSS = cross(CMF.s012, CMF.s89a);
-            const REAL3 CMY_CROSS = cross(CMF.s456, CMF.s89a);
+            // printf("TRUE i,j,k=(%d, %d, %d) %d %d %d\n", i, j, k, lis, ljs, lks);
+            offAxisPosition = true;
+            const REAL3 CMX_CROSS = cross(CM.s012, CM.s89a);
+            const REAL3 CMY_CROSS = cross(CM.s456, CM.s89a);
             if(voxelcenter_local_xyz.y * CMX_CROSS.z - voxelcenter_local_xyz.z * CMX_CROSS.y < 0)
             {
                 positiveShift[0].x *= -1.0;
@@ -930,85 +952,102 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             {
                 positiveShift[1].z *= -1.0;
             }
-            REAL3 minLocalVX = voxelcenter_local_xyz - positiveShift[0];
-            REAL3 maxLocalVX = voxelcenter_local_xyz + positiveShift[0];
-            REAL3 minLocalVY = voxelcenter_local_xyz - positiveShift[1];
-            REAL3 maxLocalVY = voxelcenter_local_xyz + positiveShift[1];
-            float PXLocalMin = PROJECTX0(CMF, minLocalVX);
-            float PXLocalMax = PROJECTX0(CMF, maxLocalVX);
-            float PYLocalMin = PROJECTY0(CMF, minLocalVY);
-            float PYLocalMax = PROJECTY0(CMF, maxLocalVY);
+            REAL3 localVoxelSizes = (REAL3)(lis, ljs, lks);
+            REAL3 localPositiveShift = positiveShift[0] * localVoxelSizes;
+            REAL3 minLocalVX = voxelcenter_local_xyz - localPositiveShift;
+            REAL3 maxLocalVX = voxelcenter_local_xyz + localPositiveShift;
+            localPositiveShift = positiveShift[1] * localVoxelSizes;
+            REAL3 minLocalVY = voxelcenter_local_xyz - localPositiveShift;
+            REAL3 maxLocalVY = voxelcenter_local_xyz + localPositiveShift;
+            float PXLocalMin = PROJECTX0(CM, minLocalVX);
+            float PXLocalMax = PROJECTX0(CM, maxLocalVX);
+            float PYLocalMin = PROJECTY0(CM, minLocalVY);
+            float PYLocalMax = PROJECTY0(CM, maxLocalVY);
             PILocalMin = INDEX(PXLocalMin);
             PILocalMax = INDEX(PXLocalMax);
             PJLocalMin = INDEX(PYLocalMin);
             PJLocalMax = INDEX(PYLocalMax);
         } else
         {
-            offAxisPosition[0] = false;
-            // TOREMOVE
-            PILocalMin = -1;
-            PILocalMax = -1;
-            PJLocalMin = -1;
-            PJLocalMax = -1;
-            // TOREMOVE
+            // printf("FALSE i,j,k=(%d, %d, %d) %d %d %d\n", i, j, k, lis, ljs, lks);
+            // printf("voxelcenter_local_xyz=[%f, %f, %f], halfLocalSizes=[%f, %f, %f]",
+            //       voxelcenter_local_xyz.s0, voxelcenter_local_xyz.s1, voxelcenter_local_xyz.s2,
+            //       halfLocalSizes.s0, halfLocalSizes.s1, halfLocalSizes.s2);
+            offAxisPosition = false;
+            getVoxelRanges(voxelcenter_local_xyz - halfLocalSizes, 2 * halfLocalSizes, CM,
+                           &PILocalMin, &PILocalMax, &PJLocalMin, &PJLocalMax);
         }
+        // printf("i,j,k=(%d, %d, %d) localSizes=(%d %d %d), PIRANGE=[%d %d] PJRANGE=[%d %d]\n", i,
+        // j,
+        //       k, lis, ljs, lks, PILocalMin, PILocalMax, PJLocalMin, PJLocalMax);
         if(PILocalMax < 0 || PILocalMin >= pdims.x || PJLocalMax < 0 || PJLocalMin >= pdims.y)
         {
-            fullyOffProjectorPosition[0] = true;
-            partlyOffProjectorPosition[0] = true;
+            fullyOffProjectorPosition = true;
+            partlyOffProjectorPosition = true;
         } else if(PILocalMin < 0 || PILocalMax >= pdims.x || PJLocalMin < 0
                   || PJLocalMax >= pdims.y)
         {
-            fullyOffProjectorPosition[0] = false;
-            partlyOffProjectorPosition[0] = true;
+            fullyOffProjectorPosition = false;
+            partlyOffProjectorPosition = true;
             projectorLocalRange[0] = max(0, PILocalMin);
             projectorLocalRange[1] = min(pdims.x - 1, PILocalMax);
             projectorLocalRange[2] = max(0, PJLocalMin);
             projectorLocalRange[3] = min(pdims.y - 1, PJLocalMax);
         } else
         {
-            fullyOffProjectorPosition[0] = false;
-            partlyOffProjectorPosition[0] = false;
+            fullyOffProjectorPosition = false;
+            partlyOffProjectorPosition = false;
             projectorLocalRange[0] = PILocalMin;
             projectorLocalRange[1] = PILocalMax;
             projectorLocalRange[2] = PJLocalMin;
             projectorLocalRange[3] = PJLocalMax;
         }
         // Prepare local memory
-        if(offAxisPosition[0] == false) // Needed because its not solved otherwise
-            if(!fullyOffProjectorPosition[0])
+        if(!fullyOffProjectorPosition)
+        {
+            uint Irange = projectorLocalRange[1] - projectorLocalRange[0];
+            uint Jrange = projectorLocalRange[3] - projectorLocalRange[2];
+            uint FullLocalRange = Irange * Jrange;
+            uint ILocalRange;
+            if(FullLocalRange <= LOCALARRAYSIZE)
             {
-                uint Irange = projectorLocalRange[1] - projectorLocalRange[0];
-                uint Jrange = projectorLocalRange[3] - projectorLocalRange[2];
-                uint FullLocalRange = Irange * Jrange;
-                uint ILocalRange;
-                if(FullLocalRange <= LOCALARRAYSIZE)
-                {
-                    ILocalRange = Irange; // How many columns fits to local memory
-                } else
-                {
-                    ILocalRange = LOCALARRAYSIZE / Jrange;
-                }
-                projectorLocalRange[4] = ILocalRange;
-                projectorLocalRange[5] = Jrange;
-                projectorLocalRange[6]
-                    = projectorLocalRange[0]; // Where current local array has start IRange
-                mappedLocalRange = ILocalRange * Jrange;
-                CML[0].s0123 = CMF.s0123 + projectorLocalRange[0] * CMF.s89ab;
-                CML[0].s4567 = CMF.s4567 + projectorLocalRange[2] * CMF.s89ab;
-                CML[0].s89ab = CMF.s89ab;
-                for(int i = 0; i != mappedLocalRange; i++)
-                {
-                    localProjection[i] = 0.0f;
-                }
+                ILocalRange = Irange; // How many columns fits to local memory
+            } else
+            {
+                ILocalRange = LOCALARRAYSIZE / Jrange;
             }
+            projectorLocalRange[4] = ILocalRange;
+            projectorLocalRange[5] = Jrange;
+            projectorLocalRange[6]
+                = projectorLocalRange[0]; // Where current local array has start IRange
+            mappedLocalRange = ILocalRange * Jrange;
+            CML.s0123 = CM.s0123 - projectorLocalRange[0] * CM.s89ab;
+            CML.s4567 = CM.s4567 - projectorLocalRange[2] * CM.s89ab;
+            CML.s89ab = CM.s89ab;
+            for(int i = 0; i != mappedLocalRange; i++)
+            {
+                localProjection[i] = 0.0f;
+            }
+        } else
+        {
+            projectorLocalRange[0] = 0;
+            projectorLocalRange[1] = -1;
+            projectorLocalRange[2] = 0;
+            projectorLocalRange[3] = 0;
+            projectorLocalRange[4] = 0;
+            projectorLocalRange[5] = 0;
+            projectorLocalRange[6] = 0;
+        }
     }
+    int startIRange;
     do
     {
         barrier(CLK_LOCAL_MEM_FENCE); // Cutting voxel projector
+        startIRange = projectorLocalRange[6];
+        // printf("i,j,k=%d,%d,%d", i, j, k);
         // Start CVP
-        if(offAxisPosition[0] == false) // Needed because its not solved otherwise
-            if(!fullyOffProjectorPosition[0])
+        if(offAxisPosition) // Needed because its not solved otherwise
+            if(!fullyOffProjectorPosition)
             {
                 const uint IND = voxelIndex(i, j, k, vdims);
                 const float voxelValue = volume[IND];
@@ -1019,25 +1058,47 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
                     dropVoxel = true;
                 }
 #ifdef DROPINCOMPLETEVOXELS
-                if(partlyOffProjectorPosition[0])
+                if(partlyOffProjectorPosition)
                 {
-                    int xindex = INDEX(PROJECTX0(CMF, voxelcenter_xyz));
-                    int yindex = INDEX(PROJECTY0(CMF, voxelcenter_xyz));
+                    int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
+                    int yindex = INDEX(PROJECTY0(CM, voxelcenter_xyz));
                     if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)
                     {
                         dropVoxel = true;
                     }
                 }
 #endif
-                if(offAxisPosition[0])
+                if(offAxisPosition)
                 {
-                    int Imax = INDEX(PROJECTX0(CMF, voxelcenter_xyz + positiveShift[0]));
-                    int Imin = INDEX(PROJECTX0(CMF, voxelcenter_xyz - positiveShift[0]));
-                    int Jmax = INDEX(PROJECTY0(CMF, voxelcenter_xyz + positiveShift[1]));
-                    int Jmin = INDEX(PROJECTY0(CMF, voxelcenter_xyz - positiveShift[1]));
+                    int Imax = INDEX(PROJECTX0(CM, voxelcenter_xyz + positiveShift[0]));
+                    int Imin = INDEX(PROJECTX0(CM, voxelcenter_xyz - positiveShift[0]));
+                    int Jmax = INDEX(PROJECTY0(CM, voxelcenter_xyz + positiveShift[1]));
+                    int Jmin = INDEX(PROJECTY0(CM, voxelcenter_xyz - positiveShift[1]));
                     if(Imax < 0 || Jmax < 0 || Imin >= pdims.x || Jmin >= pdims.y)
                     {
                         dropVoxel = true;
+                    }
+                    if(cornerWorkItem && voxelValue)
+                    {
+                        /*
+printf("(i,j,k)=(%d,%d,%d) value=%f Irange=[%d,%d] Jrange=[%d,%d].\n", i, j,
+       k, voxelValue, Imin, Imax, Jmin, Jmax);*/
+                        // Debug
+                        int id, iu, jd, ju;
+                        getVoxelRanges(voxelcorner_xyz, voxelSizes, CM, &id, &iu, &jd, &ju);
+                        if(Imin != id || Imax != iu || Jmin != jd || Jmax != ju)
+                        {
+                            printf("Error %d %d %d is I[%d, %d] J[%d, %d]", i, j, k, id, iu, jd,
+                                   ju);
+                        }
+                        /*
+getVoxelRanges(voxelcorner_xyz, voxelSizes, CML, &id, &iu, &jd, &ju);
+printf("Local %d %d %d is I[%d, %d] J[%d, %d]\n", i, j, k, id, iu, jd, ju);
+printf("Global %d %d %d is I[%d, %d] J[%d, %d]\n", i, j, k,
+       projectorLocalRange[0], projectorLocalRange[1],
+       projectorLocalRange[2], projectorLocalRange[3]);
+*/
+                        // Debug
                     }
                 }
                 if(!dropVoxel)
@@ -1058,14 +1119,15 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
                     // the voxel on the projector
                     REAL px00, px01, px10, px11;
                     REAL3 vx00, vx01, vx10, vx11;
-                    vx00 = voxelcorner_xyz + voxelSizesF * (REAL3)(ZERO, ZERO, HALF);
-                    vx01 = voxelcorner_xyz + voxelSizesF * (REAL3)(ONE, ZERO, HALF);
-                    vx10 = voxelcorner_xyz + voxelSizesF * (REAL3)(ZERO, ONE, HALF);
-                    vx11 = voxelcorner_xyz + voxelSizesF * (REAL3)(ONE, ONE, HALF);
-                    px00 = PROJECTX0(CML[0], vx00);
-                    px01 = PROJECTX0(CML[0], vx01);
-                    px10 = PROJECTX0(CML[0], vx10);
-                    px11 = PROJECTX0(CML[0], vx11);
+                    vx00 = voxelcorner_xyz + voxelSizes * (REAL3)(ZERO, ZERO, HALF);
+                    vx01 = voxelcorner_xyz + voxelSizes * (REAL3)(ONE, ZERO, HALF);
+                    vx10 = voxelcorner_xyz + voxelSizes * (REAL3)(ZERO, ONE, HALF);
+                    vx11 = voxelcorner_xyz + voxelSizes * (REAL3)(ONE, ONE, HALF);
+                    px00 = PROJECTX0(CML, vx00);
+                    px01 = PROJECTX0(CML, vx01);
+                    px10 = PROJECTX0(CML, vx10);
+                    px11 = PROJECTX0(CML, vx11);
+                    // printf("X projections are %f, %f, %f, %f", px00, px01, px10, px11);
                     // We now figure out the vertex that projects to minimum and maximum px
                     REAL pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
                     int max_PX,
@@ -1079,7 +1141,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
                     REAL* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise
                                      // points
                     // from the minimum voxel
-                    if(offAxisPosition[0])
+                    if(offAxisPosition)
                     {
                         if(positiveShift[0].s0 > 0)
                         {
@@ -1257,8 +1319,8 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
                         {
 #ifdef RELAXED
                             min_PX = convert_int_rtn(0.5f * (pxx_min + pxx_max) + 0.5f);
-                            exactEdgeValuesF0(&projection[projectionOffset], CMF,
-                                              (vx00 + vx11) / 2.0f, min_PX, value, voxelSizesF,
+                            exactEdgeValuesF0(&projection[projectionOffset], CM,
+                                              (vx00 + vx11) / 2.0f, min_PX, value, voxelSizes,
                                               pdims);
 #else
                             min_PX = convert_int_rtn(0.5 * (pxx_min + pxx_max) + 0.5);
@@ -1284,7 +1346,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
 #ifdef RELAXED
                             lastSectionSize = exactIntersectionPointsF0_extended(
                                 ((float)I) + 0.5f, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
-                                PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CMF, &lastInt);
+                                PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
 #else
                             lastSectionSize = exactIntersectionPoints0_extended(
                                 ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
@@ -1295,20 +1357,15 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
                                 factor = value * lastSectionSize;
                                 // insertEdgeValues(&projection[projectionOffset], CM, lastInt, I,
                                 // factor, voxelSizes, pdims);
-#ifdef RELAXED
-                                exactEdgeValuesF0(&projection[projectionOffset], CMF, lastInt, I,
-                                                  factor, voxelSizesF, pdims);
-#else
-                                exactEdgeValues0(&projection[projectionOffset], CM, lastInt, I,
-                                                 factor, voxelSizes, pdims);
-#endif
+                                localEdgeValues0(localProjection, CML, lastInt, I, factor,
+                                                 voxelSizes, Lpdims);
                             }
                             for(I = I + 1; I < I_STOP; I++)
                             {
 #ifdef RELAXED
                                 nextSectionSize = exactIntersectionPointsF0_extended(
                                     ((float)I) + 0.5f, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1,
-                                    vd3, PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CMF, &nextInt);
+                                    vd3, PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
 #else
                                 nextSectionSize = exactIntersectionPoints0_extended(
                                     ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1,
@@ -1318,13 +1375,8 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
                                 Int = (nextSectionSize * nextInt - lastSectionSize * lastInt)
                                     / polygonSize;
                                 factor = value * polygonSize;
-#ifdef RELAXED
-                                exactEdgeValuesF0(&projection[projectionOffset], CMF, Int, I,
-                                                  factor, voxelSizesF, pdims);
-#else
-                                exactEdgeValues0(&projection[projectionOffset], CM, Int, I, factor,
-                                                 voxelSizes, pdims);
-#endif
+                                localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
+                                                 Lpdims);
                                 lastSectionSize = nextSectionSize;
                                 lastInt = nextInt;
                             }
@@ -1335,67 +1387,78 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
                                 Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5f - lastSectionSize * lastInt)
                                     / polygonSize;
                                 factor = value * polygonSize;
-                                exactEdgeValuesF0(&projection[projectionOffset], CMF, Int, I,
-                                                  factor, voxelSizesF, pdims);
+                                localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
+                                                 Lpdims);
 #else
                                 polygonSize = 1.0 - lastSectionSize;
                                 Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt)
                                     / polygonSize;
                                 factor = value * polygonSize;
-                                localEdgeValues0(localProjection, CML[0], Int, I, factor,
-                                                 voxelSizes, Lpdims);
+                                localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes,
+                                                 Lpdims);
 #endif
                             }
                         }
                     }
                 }
-                // End CVP
             }
-        if(offAxisPosition[0] == false) // Needed because its not solved otherwise
-            if(cornerWorkItem)
-            {
-                projectorLocalRange[6] += projectorLocalRange[4];
-            }
+        // End CVP
+        startIRange += projectorLocalRange[4];
         barrier(CLK_LOCAL_MEM_FENCE); // Local to global copy
-        if(offAxisPosition[0] == false) // Needed because its not solved otherwise
-            if(cornerWorkItem)
+        if(cornerWorkItem && !fullyOffProjectorPosition)
+        {
+            CML.s0123 = CML.s0123 - projectorLocalRange[4] * CML.s89ab;
+            uint globalIndex = projectorLocalRange[6] * pdims.y + projectorLocalRange[2];
+            uint globalIndexIncrement = pdims.y - projectorLocalRange[5];
+            uint localIndex = 0;
+
+            for(int LI = 0; LI != projectorLocalRange[4]; LI++)
             {
-                CML[0].s0123 = CML[0].s0123 + projectorLocalRange[4] * CMF.s89ab;
-                if(!fullyOffProjectorPosition[0])
+                for(int LJ = 0; LJ != projectorLocalRange[5]; LJ++)
                 {
-                    uint globalIndex = projectorLocalRange[6] * pdims.y + projectorLocalRange[2];
-                    uint globalIndexIncrement = pdims.y - projectorLocalRange[5];
-                    uint localIndex = 0;
-                    for(int LI = 0; LI != projectorLocalRange[4]; LI++)
+                    //                    localIndex = LI * projectorLocalRange[5] + LJ;
+                    //                    globalIndex
+                    //                        = (projectorLocalRange[6] + LI) * pdims.y +
+                    //                        projectorLocalRange[2] + LJ;
+                    //            printf("Local index %d global %d\n", localIndex, globalIndex);
+                    if(localIndex >= mappedLocalRange)
                     {
-                        for(int LJ = 0; LJ != projectorLocalRange[5]; LJ++)
-                        {
-                            //                    localIndex = LI * projectorLocalRange[5] + LJ;
-                            //                    globalIndex
-                            //                        = (projectorLocalRange[6] + LI) * pdims.y +
-                            //                        projectorLocalRange[2] + LJ;
-                            AtomicAdd_g_f(projection + globalIndex, localProjection[localIndex]);
-                            localIndex++;
-                            globalIndex++;
-                        }
-                        globalIndex += globalIndexIncrement;
+                        printf("Out of range localIndex %d LI=%d, LJ=%d, I=%d, J=%d!\n", localIndex,
+                               LI, LJ, projectorLocalRange[6] + LI, projectorLocalRange[2] + LJ);
                     }
-                    if(projectorLocalRange[6] < projectorLocalRange[1])
+                    if(globalIndex >= pdims.y * pdims.x)
                     {
-                        if(projectorLocalRange[1] - projectorLocalRange[6] < ILocalRange)
-                        {
-                            ILocalRange = projectorLocalRange[1] - projectorLocalRange[6];
-                            projectorLocalRange[4] = ILocalRange;
-                        }
-                        mappedLocalRange = ILocalRange * Jrange;
-                        for(int i = 0; i != mappedLocalRange; i++)
-                        {
-                            localProjection[i] = 0.0f;
-                        }
+                        printf("Out of range globalIndex %d LI=%d, LJ=%d, I=%d, J=%d!\n",
+                               globalIndex, LI, LJ, projectorLocalRange[6] + LI,
+                               projectorLocalRange[2] + LJ);
                     }
+                    AtomicAdd_g_f(projection + globalIndex, localProjection[localIndex]);
+                    localIndex++;
+                    globalIndex++;
+                }
+                globalIndex += globalIndexIncrement;
+            }
+            projectorLocalRange[6] += projectorLocalRange[4];
+            if(projectorLocalRange[6] < projectorLocalRange[1])
+            {
+                if(projectorLocalRange[1] - projectorLocalRange[6] < ILocalRange)
+                {
+                    ILocalRange = projectorLocalRange[1] - projectorLocalRange[6];
+                    projectorLocalRange[4] = ILocalRange;
+                }
+                mappedLocalRange = ILocalRange * Jrange;
+                for(int i = 0; i != mappedLocalRange; i++)
+                {
+                    localProjection[i] = 0.0f;
                 }
             }
-
-    } while(projectorLocalRange[6] < projectorLocalRange[1]);
+        }
+        /*
+if(startIRange < projectorLocalRange[1])
+{
+    printf("ijk=(%d,%d,%d), startIRange %d projectorLocalRange[1] %d\n", i, j, k,
+           startIRange, projectorLocalRange[1]);
+}*/
+    } while(startIRange < projectorLocalRange[1]);
 }
 //==============================END projector_cvp_barrier.cl=====================================

@@ -425,6 +425,7 @@ int CuttingVoxelProjector::projectExact(float* projection, std::shared_ptr<matri
     fillProjectionBufferByConstant(0.0f);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
+    cl::EnqueueArgs eargs3(*Q[0], cl::NDRange(vdimx, vdimy, vdimz), cl::NDRange(16,16,2));
     cl_double16 CM;
     cl_double16 ICM;
     cl_double3 SOURCEPOSITION, NORMALTODETECTOR;
@@ -444,9 +445,8 @@ int CuttingVoxelProjector::projectExact(float* projection, std::shared_ptr<matri
     offset = 0;
     if(useBarrierImplementation)
     {
-
-        cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz));
-        (*FLOATcutting_voxel_project_barrier)(eargs, *volumeBuffer, *projectionBuffer, offset, CM,
+	LOGI << io::xprintf("Barrier!");
+        (*FLOATcutting_voxel_project_barrier)(eargs3, *volumeBuffer, *projectionBuffer, offset, CM,
                                               SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
                                               volumeCenter, pdims, FLOATONE);
 

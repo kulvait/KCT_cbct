@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
     // Construct projector and initialize OpenCL
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX,
                               ARG.volumeSizeY, ARG.voxelSizeZ);
-    CVP.initializeAllAlgorithms();
+    //CVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {
         CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
