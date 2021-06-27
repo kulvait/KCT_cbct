@@ -921,7 +921,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
         positiveShift[0] = voxelSizes * HALF; // X direction
         positiveShift[1] = voxelSizes * HALF; // Y direction
         int PILocalMin, PILocalMax, PJLocalMin, PJLocalMax;
-        if(all(fabs(voxelcenter_local_xyz) > halfLocalSizes)) // Increase or decrease of the value
+        if(all(fabs(voxelcenter_local_xyz) > halfLocalSizes + (REAL3)(zeroPrecisionTolerance, zeroPrecisionTolerance, zeroPrecisionTolerance))) // Increase or decrease of the value
                                                               // will be preserved on colinear edges
         {
             // printf("TRUE i,j,k=(%d, %d, %d) %d %d %d\n", i, j, k, lis, ljs, lks);
@@ -936,10 +936,11 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             {
                 positiveShift[0].y *= -1.0;
             }
-            if(voxelcenter_local_xyz.x * CMX_CROSS.y - voxelcenter_local_xyz.y * CMX_CROSS.z < 0)
+            if(voxelcenter_local_xyz.x * CMX_CROSS.y - voxelcenter_local_xyz.y * CMX_CROSS.x < 0)
             {
                 positiveShift[0].z *= -1.0;
             }
+
             if(voxelcenter_local_xyz.y * CMY_CROSS.z - voxelcenter_local_xyz.z * CMY_CROSS.y < 0)
             {
                 positiveShift[1].x *= -1.0;
@@ -948,7 +949,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             {
                 positiveShift[1].y *= -1.0;
             }
-            if(voxelcenter_local_xyz.x * CMY_CROSS.y - voxelcenter_local_xyz.y * CMY_CROSS.z < 0)
+            if(voxelcenter_local_xyz.x * CMY_CROSS.y - voxelcenter_local_xyz.y * CMY_CROSS.x < 0)
             {
                 positiveShift[1].z *= -1.0;
             }
@@ -990,17 +991,17 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             fullyOffProjectorPosition = false;
             partlyOffProjectorPosition = true;
             projectorLocalRange[0] = max(0, PILocalMin);
-            projectorLocalRange[1] = min(pdims.x - 1, PILocalMax);
+            projectorLocalRange[1] = min(pdims.x, PILocalMax + 1);
             projectorLocalRange[2] = max(0, PJLocalMin);
-            projectorLocalRange[3] = min(pdims.y - 1, PJLocalMax);
+            projectorLocalRange[3] = min(pdims.y, PJLocalMax + 1);
         } else
         {
             fullyOffProjectorPosition = false;
             partlyOffProjectorPosition = false;
             projectorLocalRange[0] = PILocalMin;
-            projectorLocalRange[1] = PILocalMax;
+            projectorLocalRange[1] = PILocalMax+1;
             projectorLocalRange[2] = PJLocalMin;
-            projectorLocalRange[3] = PJLocalMax;
+            projectorLocalRange[3] = PJLocalMax+1;
         }
         // Prepare local memory
         if(!fullyOffProjectorPosition)
@@ -1092,7 +1093,25 @@ printf("(i,j,k)=(%d,%d,%d) value=%f Irange=[%d,%d] Jrange=[%d,%d].\n", i, j,
                     getVoxelRanges(voxelcorner_xyz, voxelSizes, CM, &id, &iu, &jd, &ju);
                     if(Imin != id || Imax != iu || Jmin != jd || Jmax != ju)
                     {
-                        printf("Error %d %d %d is I[%d, %d] J[%d, %d]", i, j, k, id, iu, jd, ju);
+                        uint lis = get_local_size(0);
+                        uint ljs = get_local_size(1);
+                        uint lks = get_local_size(2);
+                        printf("Error %d %d %d (x,y,z)=[%f, %f, %f] is Imax[%d, %d] I[%d, %d] Jmax "
+                               "[%d %d] J[%d, %d]\n",
+                               i, j, k, voxelcenter_xyz.x, voxelcenter_xyz.y, voxelcenter_xyz.z,
+                               Imin, Imax, id, iu, Jmin, Jmax, jd, ju);
+                        printf("Local (li,lj,lk) = [%d, %d, %d] lis, ljs, lks = [%d, %d, %d]", li,
+                               lj, lk, lis, ljs, lks);
+                        printf("Positive shift Y %f %f %f\n", positiveShift[1].x,
+                               positiveShift[1].y, positiveShift[1].z);
+                        printf("%f", PROJECTY0(CM, voxelcenter_xyz + positiveShift[1]));
+                        positiveShift[1].x *= -1;
+                        printf("x %f", PROJECTY0(CM, voxelcenter_xyz + positiveShift[1]));
+                        positiveShift[1].y *= -1;
+                        printf("xy %f", PROJECTY0(CM, voxelcenter_xyz + positiveShift[1]));
+                        positiveShift[1].x *= -1;
+                        printf("y %f", PROJECTY0(CM, voxelcenter_xyz + positiveShift[1]));
+                        positiveShift[1].y *= -1;
                     }
                     /*
 getVoxelRanges(voxelcorner_xyz, voxelSizes, CML, &id, &iu, &jd, &ju);
@@ -1327,7 +1346,7 @@ printf("Global %d %d %d is I[%d, %d] J[%d, %d]\n", i, j, k,
                         REAL3 lastInt, nextInt, Int;
                         REAL factor;
                         int I = max(-1, min_PX);
-                        int I_STOP = min(max_PX, pdims.x);
+                        int I_STOP = min(max_PX, Lpdims.x);
                         // Section of the square that corresponds to the indices < i
                         // CCW and CW coordinates of the last intersection on the lines
                         // specified by the points in V_ccw
