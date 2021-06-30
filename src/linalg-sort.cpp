@@ -83,7 +83,7 @@ int Args::parseArguments(int argc, char* argv[])
                 return 1;
             }
         }
-    } catch(const CLI::CallForHelp e)
+    } catch(const CLI::CallForHelp& e)
     {
         app.exit(e); // Prints help message
         return 1;
