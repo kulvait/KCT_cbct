@@ -59,7 +59,7 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
             algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
             double norm2 = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
             reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
-            LOGE << io::xprintf(
+            LOGI << io::xprintf_red(
                 "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
                 "loss of orthogonality %f%%.",
                 iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
@@ -71,7 +71,7 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
-        LOGE << io::xprintf("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
+        LOGI << io::xprintf_red("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
                             "that is %0.3f%% of |AT(Ax0-b)|.",
                             iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
         algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
@@ -86,7 +86,7 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
     }
-    LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
+    LOGI << io::xprintf_red("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
                         norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
@@ -172,7 +172,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
             addIntoFirstVectorScaledSecondVector(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
             double norm2 = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
 
-            LOGE << io::xprintf(
+            LOGI << io::xprintf_red(
                 "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
                 "loss of orthogonality %f%%.",
                 iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
@@ -199,7 +199,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
         // DEBUG
         NX = std::sqrt(normXBuffer_barrier_double(*residualVector_xbuf));
         // DEBUG
-        LOGE << io::xprintf("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
+        LOGI << io::xprintf_red("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
                             "that is %0.3f%% of |AT(Ax0-b)|.",
                             iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
         addIntoFirstVectorScaledSecondVector(*directionVector_xbuf,
@@ -217,7 +217,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
                                              BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
     }
-    LOGE << io::xprintf("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
+    LOGI << io::xprintf_red("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
                         norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
@@ -403,7 +403,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         dnorm2_old = normBBuffer_barrier_double(*d_buf);
 
         norm = std::sqrt(normBBuffer_barrier_double(*tmp_b_buf));
-        LOGE << io::xprintf("After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
+        LOGI << io::xprintf_red("After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
                             iteration, norm, 100.0 * norm / NB0);
     }
     // Optionally write even more converged solution
@@ -475,7 +475,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(float* invertedprecondi
     preconditioner_xbuf = getXBuffer(3);
     vectorIntoBuffer(*preconditioner_xbuf, invertedpreconditioner, XDIM);
     double norm = std::sqrt(normXBuffer_barrier_double(*preconditioner_xbuf));
-    LOGE << "Norm " << norm;
+    LOGI << io::xprintf_red("Norm %f", norm);
     reconstructDiagonalPreconditioner(preconditioner_xbuf, maxIterations, errCondition);
     return 0;
 }
