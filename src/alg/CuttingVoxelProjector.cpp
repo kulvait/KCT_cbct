@@ -1,12 +1,39 @@
 #include "CuttingVoxelProjector.hpp"
 
 namespace CTL {
+cl::NDRange CuttingVoxelProjector::guessProjectionLocalNDRange(bool barrierCalls)
+{
+    cl::NDRange projectorLocalNDRange;
+    if(barrierCalls)
+    {
+
+        if(vdimx % 64 == 0 && vdimy % 4 == 0)
+        {
+            projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
+        } else
+        {
+            projectorLocalNDRange = cl::NDRange();
+        }
+    } else
+    {
+        if(vdimz % 4 == 0 && vdimy % 64 == 0)
+        {
+            projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
+        } else
+        {
+            projectorLocalNDRange = cl::NDRange();
+        }
+    }
+    return projectorLocalNDRange;
+}
+
 void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling,
-                                                   bool useBarrierImplementation)
+                                                   bool useBarrierCalls,
+                                                   uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())
     {
-        this->useBarrierImplementation = useBarrierImplementation;
+        this->useBarrierImplementation = useBarrierCalls;
         useCVPProjector = true;
         exactProjectionScaling = useExactScaling;
         useSidonProjector = false;
@@ -14,8 +41,10 @@ void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling,
         useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        if(useBarrierImplementation)
+        if(useBarrierCalls)
         {
+            addOptString(io::xprintf("-DLOCALARRAYSIZE=%d", LOCALARRAYSIZE));
+            this->LOCALARRAYSIZE = LOCALARRAYSIZE;
             CLINCLUDEprojector_cvp_barrier();
         } else
         {
@@ -425,7 +454,9 @@ int CuttingVoxelProjector::projectExact(float* projection, std::shared_ptr<matri
     fillProjectionBufferByConstant(0.0f);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
-    cl::EnqueueArgs eargs3(*Q[0], cl::NDRange(vdimx, vdimy, vdimz), cl::NDRange(16,16,2));
+    cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
+    std::shared_ptr<cl::NDRange> barrierLocalRange
+        = std::make_shared<cl::NDRange>(projectorLocalNDRangeBarrier);
     cl_double16 CM;
     cl_double16 ICM;
     cl_double3 SOURCEPOSITION, NORMALTODETECTOR;
@@ -445,10 +476,10 @@ int CuttingVoxelProjector::projectExact(float* projection, std::shared_ptr<matri
     offset = 0;
     if(useBarrierImplementation)
     {
-	LOGI << io::xprintf("Barrier!");
-        (*FLOATcutting_voxel_project_barrier)(eargs3, *volumeBuffer, *projectionBuffer, offset, CM,
+        algFLOATcutting_voxel_project_barrier(*volumeBuffer, *projectionBuffer, offset, CM,
                                               SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
-                                              volumeCenter, pdims, FLOATONE);
+                                              volumeCenter, pdims, FLOATONE, this->LOCALARRAYSIZE,
+                                              barrierGlobalRange, barrierLocalRange, false);
 
     } else
     {

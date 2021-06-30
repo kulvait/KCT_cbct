@@ -310,7 +310,8 @@ int main(int argc, char* argv[])
             cgls->initializeTTProjector();
         } else
         {
-            cgls->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls);
+            cgls->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
+                                         ARG.barrierArraySize);
         }
         if(ARG.useJacobiPreconditioning)
         {
@@ -377,7 +378,8 @@ int main(int argc, char* argv[])
             glsqr->initializeTTProjector();
         } else
         {
-            glsqr->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls);
+            glsqr->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
+                                         ARG.barrierArraySize);
         }
         int ecd
             = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
@@ -435,7 +437,8 @@ int main(int argc, char* argv[])
             psirt->initializeTTProjector();
         } else
         {
-            psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls);
+            psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
+                                         ARG.barrierArraySize);
         }
         int ecd
             = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
@@ -493,7 +496,8 @@ int main(int argc, char* argv[])
             psirt->initializeTTProjector();
         } else
         {
-            psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls);
+            psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
+                                         ARG.barrierArraySize);
         }
         int ecd
             = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),

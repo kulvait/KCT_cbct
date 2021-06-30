@@ -1,4 +1,4 @@
-//#pragma OPENCL EXTENSION cl_intel_printf : enable ... it is not neccessarry
+//#pragma OPENCL EXTENSION cl_amd_printf : enable
 //==============================utils.cl=====================================
 void kernel FLOATvector_NormSquarePartial(global const float* restrict x,
                                           global float* restrict normSquare,

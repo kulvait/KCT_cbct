@@ -26,188 +26,201 @@ namespace CTL {
 class BaseReconstructor : public virtual Kniha, public AlgorithmsBarrierBuffers
 {
 public:
-    cl::NDRange guessProjectionLocalNDRange()
+    cl::NDRange guessProjectionLocalNDRange(bool barrierCalls)
     {
         cl::NDRange projectorLocalNDRange;
-        if(vdimz % 4 == 0 && vdimy % 64 == 0 && workGroupSize >= 256)
+        if(barrierCalls)
         {
-            projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
+
+            if(vdimx % 64 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+            {
+                projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
+            } else
+            {
+                projectorLocalNDRange = cl::NDRange();
+            }
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            if(vdimz % 4 == 0 && vdimy % 64 == 0 && workGroupSize >= 256)
+            {
+                projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
+            } else
+            {
+                projectorLocalNDRange = cl::NDRange();
+            }
+            /*
+                        // ZYX
+                        localRangeProjection = cl::NDRange(4, 64, 1); // 23.23 RELAXED
+                        localRangeProjection = cl::NDRange(); // 27.58 RELAXED
+                        localRangeProjection = cl::NDRange(256, 1, 1); // 31.4 RELAXED
+                        localRangeProjection = cl::NDRange(1, 256, 1); // 42.27 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 256); // 42.52 RELAXED
+                        localRangeProjection = cl::NDRange(128, 2, 1); // 27.52 RELAXED
+                        localRangeProjection = cl::NDRange(128, 1, 2); // 38.1 RELAXED
+                        localRangeProjection = cl::NDRange(2, 128, 1); // 24.53 RELAXED
+                        localRangeProjection = cl::NDRange(1, 128, 2); // 30.5 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 128); // 36.17 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 128); // 26.57 RELAXED
+                        localRangeProjection = cl::NDRange(64, 4, 1); // 33.59 RELAXED
+                        localRangeProjection = cl::NDRange(64, 1, 4); // 30.79 RELAXED
+                        localRangeProjection = cl::NDRange(4, 64, 1); // 23.29 RELAXED
+                        localRangeProjection = cl::NDRange(1, 64, 4); // 31.22 RELAXED
+                        localRangeProjection = cl::NDRange(4, 1, 64); // 25.24 RELAXED
+                        localRangeProjection = cl::NDRange(1, 4, 64); // 43.15 RELAXED
+                        localRangeProjection = cl::NDRange(64, 2, 2); // 42.27 RELAXED
+                        localRangeProjection = cl::NDRange(2, 64, 2); // 26.31 RELAXED
+                        localRangeProjection = cl::NDRange(2, 2, 64); // 30.83 RELAXED
+                        localRangeProjection = cl::NDRange(1, 16, 16); // 42.28 RELAXED
+                        localRangeProjection = cl::NDRange(32, 4, 2); // 43.86 RELAXED
+                        localRangeProjection = cl::NDRange(32, 2, 4); // 31.32 RELAXED
+                        localRangeProjection = cl::NDRange(4, 32, 2); // 24.13 RELAXED
+                        localRangeProjection = cl::NDRange(2, 32, 4); // 25.48 RELAXED
+                        localRangeProjection = cl::NDRange(2, 4, 32); // 34.53 RELAXED
+                        localRangeProjection = cl::NDRange(4, 2, 32); // 27.54 RELAXED
+                        localRangeProjection = cl::NDRange(32, 8, 1); // 36.83 RELAXED
+                        localRangeProjection = cl::NDRange(32, 1, 8); // 26.3 RELAXED
+                        localRangeProjection = cl::NDRange(8, 32, 1); // 25.82 RELAXED
+                        localRangeProjection = cl::NDRange(1, 32, 8); // 36.59 RELAXED
+                        localRangeProjection = cl::NDRange(1, 8, 32); // 47.2 RELAXED
+                        localRangeProjection = cl::NDRange(8, 1, 32); // 25.1 RELAXED
+                        localRangeProjection = cl::NDRange(16, 16, 1); // 31.18 RELAXED
+                        localRangeProjection = cl::NDRange(16, 1, 16); // 26.12 RELAXED
+                        localRangeProjection = cl::NDRange(1, 16, 16); // 42.28 RELAXED
+                        localRangeProjection = cl::NDRange(16, 8, 2); // 40.83 RELAXED
+                        localRangeProjection = cl::NDRange(16, 2, 8); // 27 RELAXED
+                        localRangeProjection = cl::NDRange(8, 16, 2); // 29.07 RELAXED
+                        localRangeProjection = cl::NDRange(2, 16, 8); // 29.98 RELAXED
+                        localRangeProjection = cl::NDRange(8, 2, 16); // 26.1 RELAXED
+                        localRangeProjection = cl::NDRange(2, 8, 16); // 33.99 RELAXED
+                        localRangeProjection = cl::NDRange(16, 4, 4); // 30.98 RELAXED
+                        localRangeProjection = cl::NDRange(4, 16, 4); // 25.22 RELAXED
+                        localRangeProjection = cl::NDRange(4, 4, 16); // 28.43 RELAXED
+                        localRangeProjection = cl::NDRange(8, 8, 4); // 26.01 RELAXED
+                        localRangeProjection = cl::NDRange(8, 4, 8); // 25.94 RELAXED
+                        localRangeProjection = cl::NDRange(8, 8, 4); // 25.99 RELAXED
+                        localRangeProjection = cl::NDRange(128, 1, 1); // 31.41 RELAXED
+                        localRangeProjection = cl::NDRange(1, 128, 1); // 29.77 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 128); // 32.65 RELAXED
+                        localRangeProjection = cl::NDRange(64, 2, 1); // 36.02 RELAXED
+                        localRangeProjection = cl::NDRange(64, 1, 2); // 48.74 RELAXED
+                        localRangeProjection = cl::NDRange(1, 64, 2); // 31.02 RELAXED
+                        localRangeProjection = cl::NDRange(2, 64, 1); // 25.5 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 64); // 28.37 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 64); // 37.47 RELAXED
+                        localRangeProjection = cl::NDRange(32, 4, 1); // 70.6 RELAXED
+                        localRangeProjection = cl::NDRange(32, 1, 4); // 36.1 RELAXED
+                        localRangeProjection = cl::NDRange(1, 32, 4); // 33.84 RELAXED
+                        localRangeProjection = cl::NDRange(4, 32, 1); // 27.14 RELAXED
+                        localRangeProjection = cl::NDRange(4, 1, 32); // 26.39 RELAXED
+                        localRangeProjection = cl::NDRange(1, 4, 32); // 42.66 RELAXED
+                        localRangeProjection = cl::NDRange(32, 2, 2); // 52.77 RELAXED
+                        localRangeProjection = cl::NDRange(2, 32, 2); // 25.63 RELAXED
+                        localRangeProjection = cl::NDRange(2, 2, 32); // 31.02 RELAXED
+                        localRangeProjection = cl::NDRange(16, 8, 1); // 62.91 RELAXED
+                        localRangeProjection = cl::NDRange(16, 1, 8); // 30.92 RELAXED
+                        localRangeProjection = cl::NDRange(8, 16, 1); // 35.56 RELAXED
+                        localRangeProjection = cl::NDRange(1, 16, 8); // 41.01 RELAXED
+                        localRangeProjection = cl::NDRange(1, 8, 16); // 44.49 RELAXED
+                        localRangeProjection = cl::NDRange(8, 1, 16); // 27.51 RELAXED
+                        localRangeProjection = cl::NDRange(16, 4, 2); // 52.41 RELAXED
+                        localRangeProjection = cl::NDRange(16, 2, 4); // 35.46 RELAXED
+                        localRangeProjection = cl::NDRange(2, 16, 4); // 28.74 RELAXED
+                        localRangeProjection = cl::NDRange(4, 16, 2); // 38.59 RELAXED
+                        localRangeProjection = cl::NDRange(2, 4, 16); // 33.57 RELAXED
+                        localRangeProjection = cl::NDRange(4, 2, 16); // 28.13 RELAXED
+                        localRangeProjection = cl::NDRange(8, 8, 2); // 42.77 RELAXED
+                        localRangeProjection = cl::NDRange(8, 2, 8); // 29.21 RELAXED
+                        localRangeProjection = cl::NDRange(2, 8, 8); // 32.44 RELAXED
+                        localRangeProjection = cl::NDRange(8, 4, 4); // 33.73 RELAXED
+                        localRangeProjection = cl::NDRange(4, 8, 4); // 28.29 RELAXED
+                        localRangeProjection = cl::NDRange(4, 4, 8); // 28.96 RELAXED
+                        localRangeProjection = cl::NDRange(64, 1, 1); // 73.33 RELAXED
+                        localRangeProjection = cl::NDRange(1, 64, 1); // 30.72 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 64); // 34.66 RELAXED
+                        localRangeProjection = cl::NDRange(32, 2, 1); // 83.75 RELAXED
+                        localRangeProjection = cl::NDRange(32, 1, 2); // 60.47 RELAXED
+                        localRangeProjection = cl::NDRange(1, 32, 2); // 33.54 RELAXED
+                        localRangeProjection = cl::NDRange(2, 32, 1); // 28.32 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 32); // 37.56 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 32); // 29.73 RELAXED
+                        localRangeProjection = cl::NDRange(16, 4, 1); // 88.21 RELAXED
+                        localRangeProjection = cl::NDRange(16, 1, 4); // 43.81 RELAXED
+                        localRangeProjection = cl::NDRange(4, 16, 1); // 45.73 RELAXED
+                        localRangeProjection = cl::NDRange(1, 16, 4); // 38.55 RELAXED
+                        localRangeProjection = cl::NDRange(4, 1, 16); // 30.69 RELAXED
+                        localRangeProjection = cl::NDRange(1, 4, 16); // 41.65 RELAXED
+                        localRangeProjection = cl::NDRange(16, 2, 2); // 61.03 RELAXED
+                        localRangeProjection = cl::NDRange(2, 16, 2); // 40.26 RELAXED
+                        localRangeProjection = cl::NDRange(2, 2, 16); // 32.01 RELAXED
+                        localRangeProjection = cl::NDRange(8, 8, 1); // 84.33 RELAXED
+                        localRangeProjection = cl::NDRange(8, 1, 8); // 35.4 RELAXED
+                        localRangeProjection = cl::NDRange(1, 8, 8); // 42.66 RELAXED
+                        localRangeProjection = cl::NDRange(8, 4, 2); // 57.54 RELAXED
+                        localRangeProjection = cl::NDRange(8, 2, 4); // 40.99 RELAXED
+                        localRangeProjection = cl::NDRange(4, 8, 2); // 41.55 RELAXED
+                        localRangeProjection = cl::NDRange(2, 8, 4); // 34.14 RELAXED
+                        localRangeProjection = cl::NDRange(4, 2, 8); // 33.25 RELAXED
+                        localRangeProjection = cl::NDRange(2, 4, 8); // 33.94 RELAXED
+                        localRangeProjection = cl::NDRange(4, 4, 4); // 37.98 RELAXED
+                        localRangeProjection = cl::NDRange(32, 1, 1); // 115.24 RELAXED
+                        localRangeProjection = cl::NDRange(1, 32, 1); // 33.92 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 32); // 39.21 RELAXED
+                        localRangeProjection = cl::NDRange(16, 2, 1); // 114.62 RELAXED
+                        localRangeProjection = cl::NDRange(16, 1, 2); // 77.93 RELAXED
+                        localRangeProjection = cl::NDRange(2, 16, 1); // 75.46 RELAXED
+                        localRangeProjection = cl::NDRange(1, 16, 2); // 45.32 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 16); // 43.31 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 16); // 41.63 RELAXED
+                        localRangeProjection = cl::NDRange(8, 4, 1); // 110.89 RELAXED
+                        localRangeProjection = cl::NDRange(8, 1, 4); // 62.35 RELAXED
+                        localRangeProjection = cl::NDRange(4, 8, 1); // 81.61 RELAXED
+                        localRangeProjection = cl::NDRange(1, 8, 4); // 42.95 RELAXED
+                        localRangeProjection = cl::NDRange(4, 1, 8); // 51.45 RELAXED
+                        localRangeProjection = cl::NDRange(1, 4, 8); // 43.01 RELAXED
+                        localRangeProjection = cl::NDRange(8, 2, 2); // 73.64 RELAXED
+                        localRangeProjection = cl::NDRange(2, 8, 2); // 51.65 RELAXED
+                        localRangeProjection = cl::NDRange(2, 2, 8); // 45.86 RELAXED
+                        localRangeProjection = cl::NDRange(4, 4, 2); // 68.42 RELAXED
+                        localRangeProjection = cl::NDRange(4, 2, 4); // 56.71 RELAXED
+                        localRangeProjection = cl::NDRange(2, 4, 4); // 50.84 RELAXED
+                        localRangeProjection = cl::NDRange(16, 1, 1); // 143.31 RELAXED
+                        localRangeProjection = cl::NDRange(1, 16, 1); // 82.41 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 16); // 63.43 RELAXED
+                        localRangeProjection = cl::NDRange(8, 2, 1); // 137.76 RELAXED
+                        localRangeProjection = cl::NDRange(8, 1, 2); // 114.3 RELAXED
+                        localRangeProjection = cl::NDRange(2, 8, 1); // 90.78 RELAXED
+                        localRangeProjection = cl::NDRange(1, 8, 2); // 71.05 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 8); // 77.34 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 8); // 67.66 RELAXED
+                        localRangeProjection = cl::NDRange(4, 4, 1); // 132.09 RELAXED
+                        localRangeProjection = cl::NDRange(4, 1, 4); // 93.69 RELAXED
+                        localRangeProjection = cl::NDRange(1, 4, 4); // 71.06 RELAXED
+                        localRangeProjection = cl::NDRange(4, 2, 2); // 105.82 RELAXED
+                        localRangeProjection = cl::NDRange(2, 4, 2); // 94.46 RELAXED
+                        localRangeProjection = cl::NDRange(2, 2, 4); // 82.65 RELAXED
+                        localRangeProjection = cl::NDRange(8, 1, 1); // 214.05 RELAXED
+                        localRangeProjection = cl::NDRange(1, 8, 1); // 127.61 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 8); // 115.48 RELAXED
+                        localRangeProjection = cl::NDRange(4, 2, 1); // 196.41 RELAXED
+                        localRangeProjection = cl::NDRange(4, 1, 2); // 171.96 RELAXED
+                        localRangeProjection = cl::NDRange(2, 4, 1); // 171.29 RELAXED
+                        localRangeProjection = cl::NDRange(1, 4, 2); // 126.08 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 4); // 142.78 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 4); // 121.82 RELAXED
+                        localRangeProjection = cl::NDRange(2, 2, 2); // 152.92 RELAXED
+                        localRangeProjection = cl::NDRange(4, 1, 1); // 313.17 RELAXED
+                        localRangeProjection = cl::NDRange(1, 4, 1); // 224.94 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 4); // 211.77 RELAXED
+                        localRangeProjection = cl::NDRange(2, 2, 1); // 272.84 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 2); // 260.53 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 2); // 219.3 RELAXED
+                        localRangeProjection = cl::NDRange(2, 1, 1); // 476.79 RELAXED
+                        localRangeProjection = cl::NDRange(1, 2, 1); // 385.66 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 2); // 381.26 RELAXED
+                        localRangeProjection = cl::NDRange(1, 1, 1); // 697.49 RELAXED
+            */
         }
         return projectorLocalNDRange;
-        /*
-                    // ZYX
-                    localRangeProjection = cl::NDRange(4, 64, 1); // 23.23 RELAXED
-                    localRangeProjection = cl::NDRange(); // 27.58 RELAXED
-                    localRangeProjection = cl::NDRange(256, 1, 1); // 31.4 RELAXED
-                    localRangeProjection = cl::NDRange(1, 256, 1); // 42.27 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 256); // 42.52 RELAXED
-                    localRangeProjection = cl::NDRange(128, 2, 1); // 27.52 RELAXED
-                    localRangeProjection = cl::NDRange(128, 1, 2); // 38.1 RELAXED
-                    localRangeProjection = cl::NDRange(2, 128, 1); // 24.53 RELAXED
-                    localRangeProjection = cl::NDRange(1, 128, 2); // 30.5 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 128); // 36.17 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 128); // 26.57 RELAXED
-                    localRangeProjection = cl::NDRange(64, 4, 1); // 33.59 RELAXED
-                    localRangeProjection = cl::NDRange(64, 1, 4); // 30.79 RELAXED
-                    localRangeProjection = cl::NDRange(4, 64, 1); // 23.29 RELAXED
-                    localRangeProjection = cl::NDRange(1, 64, 4); // 31.22 RELAXED
-                    localRangeProjection = cl::NDRange(4, 1, 64); // 25.24 RELAXED
-                    localRangeProjection = cl::NDRange(1, 4, 64); // 43.15 RELAXED
-                    localRangeProjection = cl::NDRange(64, 2, 2); // 42.27 RELAXED
-                    localRangeProjection = cl::NDRange(2, 64, 2); // 26.31 RELAXED
-                    localRangeProjection = cl::NDRange(2, 2, 64); // 30.83 RELAXED
-                    localRangeProjection = cl::NDRange(1, 16, 16); // 42.28 RELAXED
-                    localRangeProjection = cl::NDRange(32, 4, 2); // 43.86 RELAXED
-                    localRangeProjection = cl::NDRange(32, 2, 4); // 31.32 RELAXED
-                    localRangeProjection = cl::NDRange(4, 32, 2); // 24.13 RELAXED
-                    localRangeProjection = cl::NDRange(2, 32, 4); // 25.48 RELAXED
-                    localRangeProjection = cl::NDRange(2, 4, 32); // 34.53 RELAXED
-                    localRangeProjection = cl::NDRange(4, 2, 32); // 27.54 RELAXED
-                    localRangeProjection = cl::NDRange(32, 8, 1); // 36.83 RELAXED
-                    localRangeProjection = cl::NDRange(32, 1, 8); // 26.3 RELAXED
-                    localRangeProjection = cl::NDRange(8, 32, 1); // 25.82 RELAXED
-                    localRangeProjection = cl::NDRange(1, 32, 8); // 36.59 RELAXED
-                    localRangeProjection = cl::NDRange(1, 8, 32); // 47.2 RELAXED
-                    localRangeProjection = cl::NDRange(8, 1, 32); // 25.1 RELAXED
-                    localRangeProjection = cl::NDRange(16, 16, 1); // 31.18 RELAXED
-                    localRangeProjection = cl::NDRange(16, 1, 16); // 26.12 RELAXED
-                    localRangeProjection = cl::NDRange(1, 16, 16); // 42.28 RELAXED
-                    localRangeProjection = cl::NDRange(16, 8, 2); // 40.83 RELAXED
-                    localRangeProjection = cl::NDRange(16, 2, 8); // 27 RELAXED
-                    localRangeProjection = cl::NDRange(8, 16, 2); // 29.07 RELAXED
-                    localRangeProjection = cl::NDRange(2, 16, 8); // 29.98 RELAXED
-                    localRangeProjection = cl::NDRange(8, 2, 16); // 26.1 RELAXED
-                    localRangeProjection = cl::NDRange(2, 8, 16); // 33.99 RELAXED
-                    localRangeProjection = cl::NDRange(16, 4, 4); // 30.98 RELAXED
-                    localRangeProjection = cl::NDRange(4, 16, 4); // 25.22 RELAXED
-                    localRangeProjection = cl::NDRange(4, 4, 16); // 28.43 RELAXED
-                    localRangeProjection = cl::NDRange(8, 8, 4); // 26.01 RELAXED
-                    localRangeProjection = cl::NDRange(8, 4, 8); // 25.94 RELAXED
-                    localRangeProjection = cl::NDRange(8, 8, 4); // 25.99 RELAXED
-                    localRangeProjection = cl::NDRange(128, 1, 1); // 31.41 RELAXED
-                    localRangeProjection = cl::NDRange(1, 128, 1); // 29.77 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 128); // 32.65 RELAXED
-                    localRangeProjection = cl::NDRange(64, 2, 1); // 36.02 RELAXED
-                    localRangeProjection = cl::NDRange(64, 1, 2); // 48.74 RELAXED
-                    localRangeProjection = cl::NDRange(1, 64, 2); // 31.02 RELAXED
-                    localRangeProjection = cl::NDRange(2, 64, 1); // 25.5 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 64); // 28.37 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 64); // 37.47 RELAXED
-                    localRangeProjection = cl::NDRange(32, 4, 1); // 70.6 RELAXED
-                    localRangeProjection = cl::NDRange(32, 1, 4); // 36.1 RELAXED
-                    localRangeProjection = cl::NDRange(1, 32, 4); // 33.84 RELAXED
-                    localRangeProjection = cl::NDRange(4, 32, 1); // 27.14 RELAXED
-                    localRangeProjection = cl::NDRange(4, 1, 32); // 26.39 RELAXED
-                    localRangeProjection = cl::NDRange(1, 4, 32); // 42.66 RELAXED
-                    localRangeProjection = cl::NDRange(32, 2, 2); // 52.77 RELAXED
-                    localRangeProjection = cl::NDRange(2, 32, 2); // 25.63 RELAXED
-                    localRangeProjection = cl::NDRange(2, 2, 32); // 31.02 RELAXED
-                    localRangeProjection = cl::NDRange(16, 8, 1); // 62.91 RELAXED
-                    localRangeProjection = cl::NDRange(16, 1, 8); // 30.92 RELAXED
-                    localRangeProjection = cl::NDRange(8, 16, 1); // 35.56 RELAXED
-                    localRangeProjection = cl::NDRange(1, 16, 8); // 41.01 RELAXED
-                    localRangeProjection = cl::NDRange(1, 8, 16); // 44.49 RELAXED
-                    localRangeProjection = cl::NDRange(8, 1, 16); // 27.51 RELAXED
-                    localRangeProjection = cl::NDRange(16, 4, 2); // 52.41 RELAXED
-                    localRangeProjection = cl::NDRange(16, 2, 4); // 35.46 RELAXED
-                    localRangeProjection = cl::NDRange(2, 16, 4); // 28.74 RELAXED
-                    localRangeProjection = cl::NDRange(4, 16, 2); // 38.59 RELAXED
-                    localRangeProjection = cl::NDRange(2, 4, 16); // 33.57 RELAXED
-                    localRangeProjection = cl::NDRange(4, 2, 16); // 28.13 RELAXED
-                    localRangeProjection = cl::NDRange(8, 8, 2); // 42.77 RELAXED
-                    localRangeProjection = cl::NDRange(8, 2, 8); // 29.21 RELAXED
-                    localRangeProjection = cl::NDRange(2, 8, 8); // 32.44 RELAXED
-                    localRangeProjection = cl::NDRange(8, 4, 4); // 33.73 RELAXED
-                    localRangeProjection = cl::NDRange(4, 8, 4); // 28.29 RELAXED
-                    localRangeProjection = cl::NDRange(4, 4, 8); // 28.96 RELAXED
-                    localRangeProjection = cl::NDRange(64, 1, 1); // 73.33 RELAXED
-                    localRangeProjection = cl::NDRange(1, 64, 1); // 30.72 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 64); // 34.66 RELAXED
-                    localRangeProjection = cl::NDRange(32, 2, 1); // 83.75 RELAXED
-                    localRangeProjection = cl::NDRange(32, 1, 2); // 60.47 RELAXED
-                    localRangeProjection = cl::NDRange(1, 32, 2); // 33.54 RELAXED
-                    localRangeProjection = cl::NDRange(2, 32, 1); // 28.32 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 32); // 37.56 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 32); // 29.73 RELAXED
-                    localRangeProjection = cl::NDRange(16, 4, 1); // 88.21 RELAXED
-                    localRangeProjection = cl::NDRange(16, 1, 4); // 43.81 RELAXED
-                    localRangeProjection = cl::NDRange(4, 16, 1); // 45.73 RELAXED
-                    localRangeProjection = cl::NDRange(1, 16, 4); // 38.55 RELAXED
-                    localRangeProjection = cl::NDRange(4, 1, 16); // 30.69 RELAXED
-                    localRangeProjection = cl::NDRange(1, 4, 16); // 41.65 RELAXED
-                    localRangeProjection = cl::NDRange(16, 2, 2); // 61.03 RELAXED
-                    localRangeProjection = cl::NDRange(2, 16, 2); // 40.26 RELAXED
-                    localRangeProjection = cl::NDRange(2, 2, 16); // 32.01 RELAXED
-                    localRangeProjection = cl::NDRange(8, 8, 1); // 84.33 RELAXED
-                    localRangeProjection = cl::NDRange(8, 1, 8); // 35.4 RELAXED
-                    localRangeProjection = cl::NDRange(1, 8, 8); // 42.66 RELAXED
-                    localRangeProjection = cl::NDRange(8, 4, 2); // 57.54 RELAXED
-                    localRangeProjection = cl::NDRange(8, 2, 4); // 40.99 RELAXED
-                    localRangeProjection = cl::NDRange(4, 8, 2); // 41.55 RELAXED
-                    localRangeProjection = cl::NDRange(2, 8, 4); // 34.14 RELAXED
-                    localRangeProjection = cl::NDRange(4, 2, 8); // 33.25 RELAXED
-                    localRangeProjection = cl::NDRange(2, 4, 8); // 33.94 RELAXED
-                    localRangeProjection = cl::NDRange(4, 4, 4); // 37.98 RELAXED
-                    localRangeProjection = cl::NDRange(32, 1, 1); // 115.24 RELAXED
-                    localRangeProjection = cl::NDRange(1, 32, 1); // 33.92 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 32); // 39.21 RELAXED
-                    localRangeProjection = cl::NDRange(16, 2, 1); // 114.62 RELAXED
-                    localRangeProjection = cl::NDRange(16, 1, 2); // 77.93 RELAXED
-                    localRangeProjection = cl::NDRange(2, 16, 1); // 75.46 RELAXED
-                    localRangeProjection = cl::NDRange(1, 16, 2); // 45.32 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 16); // 43.31 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 16); // 41.63 RELAXED
-                    localRangeProjection = cl::NDRange(8, 4, 1); // 110.89 RELAXED
-                    localRangeProjection = cl::NDRange(8, 1, 4); // 62.35 RELAXED
-                    localRangeProjection = cl::NDRange(4, 8, 1); // 81.61 RELAXED
-                    localRangeProjection = cl::NDRange(1, 8, 4); // 42.95 RELAXED
-                    localRangeProjection = cl::NDRange(4, 1, 8); // 51.45 RELAXED
-                    localRangeProjection = cl::NDRange(1, 4, 8); // 43.01 RELAXED
-                    localRangeProjection = cl::NDRange(8, 2, 2); // 73.64 RELAXED
-                    localRangeProjection = cl::NDRange(2, 8, 2); // 51.65 RELAXED
-                    localRangeProjection = cl::NDRange(2, 2, 8); // 45.86 RELAXED
-                    localRangeProjection = cl::NDRange(4, 4, 2); // 68.42 RELAXED
-                    localRangeProjection = cl::NDRange(4, 2, 4); // 56.71 RELAXED
-                    localRangeProjection = cl::NDRange(2, 4, 4); // 50.84 RELAXED
-                    localRangeProjection = cl::NDRange(16, 1, 1); // 143.31 RELAXED
-                    localRangeProjection = cl::NDRange(1, 16, 1); // 82.41 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 16); // 63.43 RELAXED
-                    localRangeProjection = cl::NDRange(8, 2, 1); // 137.76 RELAXED
-                    localRangeProjection = cl::NDRange(8, 1, 2); // 114.3 RELAXED
-                    localRangeProjection = cl::NDRange(2, 8, 1); // 90.78 RELAXED
-                    localRangeProjection = cl::NDRange(1, 8, 2); // 71.05 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 8); // 77.34 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 8); // 67.66 RELAXED
-                    localRangeProjection = cl::NDRange(4, 4, 1); // 132.09 RELAXED
-                    localRangeProjection = cl::NDRange(4, 1, 4); // 93.69 RELAXED
-                    localRangeProjection = cl::NDRange(1, 4, 4); // 71.06 RELAXED
-                    localRangeProjection = cl::NDRange(4, 2, 2); // 105.82 RELAXED
-                    localRangeProjection = cl::NDRange(2, 4, 2); // 94.46 RELAXED
-                    localRangeProjection = cl::NDRange(2, 2, 4); // 82.65 RELAXED
-                    localRangeProjection = cl::NDRange(8, 1, 1); // 214.05 RELAXED
-                    localRangeProjection = cl::NDRange(1, 8, 1); // 127.61 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 8); // 115.48 RELAXED
-                    localRangeProjection = cl::NDRange(4, 2, 1); // 196.41 RELAXED
-                    localRangeProjection = cl::NDRange(4, 1, 2); // 171.96 RELAXED
-                    localRangeProjection = cl::NDRange(2, 4, 1); // 171.29 RELAXED
-                    localRangeProjection = cl::NDRange(1, 4, 2); // 126.08 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 4); // 142.78 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 4); // 121.82 RELAXED
-                    localRangeProjection = cl::NDRange(2, 2, 2); // 152.92 RELAXED
-                    localRangeProjection = cl::NDRange(4, 1, 1); // 313.17 RELAXED
-                    localRangeProjection = cl::NDRange(1, 4, 1); // 224.94 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 4); // 211.77 RELAXED
-                    localRangeProjection = cl::NDRange(2, 2, 1); // 272.84 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 2); // 260.53 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 2); // 219.3 RELAXED
-                    localRangeProjection = cl::NDRange(2, 1, 1); // 476.79 RELAXED
-                    localRangeProjection = cl::NDRange(1, 2, 1); // 385.66 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 2); // 381.26 RELAXED
-                    localRangeProjection = cl::NDRange(1, 1, 1); // 697.49 RELAXED
-        */
     }
 
     cl::NDRange guessBackprojectorLocalNDRange()
@@ -419,13 +432,16 @@ public:
                && projectorLocalNDRange[2] == 0)
             {
                 this->projectorLocalNDRange = cl::NDRange();
+                this->projectorLocalNDRangeBarrier = cl::NDRange();
             } else if(projectorLocalNDRange[0] == 0 || projectorLocalNDRange[1] == 0
                       || projectorLocalNDRange[2] == 0)
             {
-                this->projectorLocalNDRange = guessProjectionLocalNDRange();
+                this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
+                this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
             } else
             {
                 this->projectorLocalNDRange = projectorLocalNDRange;
+                this->projectorLocalNDRangeBarrier = projectorLocalNDRange;
             }
         } else
         {
@@ -434,7 +450,8 @@ public:
                 LOGE << io::xprintf(
                     "Wrong specification of projectorLocalNDRange, trying guessing!");
             }
-            this->projectorLocalNDRange = guessProjectionLocalNDRange();
+                this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
+                this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
         }
         if(backprojectorLocalNDRangeDim == 3)
         {
@@ -482,7 +499,9 @@ public:
         }
     }
 
-    void initializeCVPProjector(bool useExactScaling, bool barrierVariant);
+    void initializeCVPProjector(bool useExactScaling,
+                                bool barrierVariant,
+                                uint32_t LOCALARRAYSIZE = 7680);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
 
@@ -542,6 +561,7 @@ protected:
     bool useCVPProjector = true;
     bool exactProjectionScaling = true;
     bool CVPBarrierImplementation = false;
+    uint32_t LOCALARRAYSIZE = 0;
     bool useSidonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;
@@ -576,6 +596,7 @@ protected:
     std::vector<float> computeScalingFactors();
 
     cl::NDRange projectorLocalNDRange;
+    cl::NDRange projectorLocalNDRangeBarrier;
     cl::NDRange backprojectorLocalNDRange;
     /**
      * Backprojection X = AT(B)

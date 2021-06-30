@@ -3,6 +3,14 @@
 using namespace CTL;
 namespace CTL {
 
+void Kniha::addOptString(std::string option)
+{
+    if(!openCLInitialized)
+    {
+        optstrings.emplace_back(option);
+    }
+}
+
 int Kniha::initializeOpenCL(uint32_t platformId,
                             uint32_t* deviceIds,
                             uint32_t deviceIdsLength,
@@ -63,7 +71,6 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     io::concatenateTextFiles(clFile, true, clFilesXpath);
     std::string projectorSource = io::fileToString(clFile);
     cl::Program program(*context, projectorSource);
-    std::vector<std::string> optstrings;
     if(relaxed)
     {
         optstrings.emplace_back("-DRELAXED");
@@ -625,6 +632,7 @@ int Kniha::algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
                                                  cl_double3& volumeCenter,
                                                  cl_int2& pdims,
                                                  float globalScalingMultiplier,
+                                                 unsigned int LOCALARRAYSIZE,
                                                  cl::NDRange& globalRange,
                                                  std::shared_ptr<cl::NDRange> localRange,
                                                  bool blocking)
@@ -637,9 +645,18 @@ int Kniha::algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
     {
         eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
     }
+    cl::LocalSpaceArg localProjection = cl::Local(LOCALARRAYSIZE * sizeof(float));
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
     auto exe = (*FLOATcutting_voxel_project_barrier)(
-        *eargs, volume, projection, projectionOffset, CM, sourcePosition, normalToDetector, vdims,
-        voxelSizes, volumeCenter, pdims, globalScalingMultiplier);
+        *eargs, volume, projection, localProjection, projectionOffset, CM, sourcePosition,
+        normalToDetector, vdims, voxelSizes, volumeCenter, pdims, globalScalingMultiplier);
+    exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)
     {
         exe.wait();

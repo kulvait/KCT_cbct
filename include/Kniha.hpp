@@ -47,6 +47,7 @@ public:
 
     bool isOpenCLInitialized() { return openCLInitialized; }
 
+    void addOptString(std::string option);
     void CLINCLUDEbackprojector();
     void CLINCLUDEbackprojector_minmax();
     void CLINCLUDEbackprojector_sidon();
@@ -68,6 +69,8 @@ protected:
     const cl_float FLOATZERO = 0.0;
     const cl_double DOUBLEZERO = 0.0;
     float FLOATONE = 1.0f;
+
+    std::vector<std::string> optstrings;
 
     // Functions to manipulate with buffers
     int multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size);
@@ -237,6 +240,7 @@ protected:
     // projector_cvp_barrier.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
+                                    cl::LocalSpaceArg&,
                                     unsigned int&,
                                     cl_double16&,
                                     cl_double3&,
@@ -248,19 +252,20 @@ protected:
                                     float&>>
         FLOATcutting_voxel_project_barrier;
     int algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
-                                             cl::Buffer& projection,
-                                             unsigned int& projectionOffset,
-                                             cl_double16& CM,
-                                             cl_double3& sourcePosition,
-                                             cl_double3& normalToDetector,
-                                             cl_int3& vdims,
-                                             cl_double3& voxelSizes,
-                                             cl_double3& volumeCenter,
-                                             cl_int2& pdims,
-                                             float globalScalingMultiplier,
-                                             cl::NDRange& globalRange,
-                                             std::shared_ptr<cl::NDRange> localRange = nullptr,
-                                             bool blocking = false);
+                                              cl::Buffer& projection,
+                                              unsigned int& projectionOffset,
+                                              cl_double16& CM,
+                                              cl_double3& sourcePosition,
+                                              cl_double3& normalToDetector,
+                                              cl_int3& vdims,
+                                              cl_double3& voxelSizes,
+                                              cl_double3& volumeCenter,
+                                              cl_int2& pdims,
+                                              float globalScalingMultiplier,
+                                              unsigned int LOCALARRAYSIZE,
+                                              cl::NDRange& globalRange,
+                                              std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                              bool blocking = false);
 
     // projector_old.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,

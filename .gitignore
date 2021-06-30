@@ -1,6 +1,7 @@
 build
 exec
 doc
+info
 *.swp
 *.pdf
 opencl/allsources.cl

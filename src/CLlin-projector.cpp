@@ -135,6 +135,7 @@ void Args::defineArguments()
         "If the parameter is specified, then we also compute the norm of the right hand "
         "side from the projected vector.");
     addProjectionSizeArgs();
+    addProjectorLocalNDRangeArgs();
     addVolumeCenterArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
@@ -166,11 +167,13 @@ int main(int argc, char* argv[])
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
     std::shared_ptr<io::DenProjectionMatrixReader> dr
         = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
+    cl::NDRange projectorLocalNDRange = cl::NDRange(
+        ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1], ARG.projectorLocalNDRange[2]);
 
     // Construct projector and initialize OpenCL
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX,
-                              ARG.volumeSizeY, ARG.voxelSizeZ);
-    //CVP.initializeAllAlgorithms();
+                              ARG.volumeSizeY, ARG.voxelSizeZ, projectorLocalNDRange);
+    // CVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {
         CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -180,7 +183,7 @@ int main(int argc, char* argv[])
         CVP.initializeTTProjector();
     } else
     {
-        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls);
+        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls, ARG.barrierArraySize);
     }
     int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
                                    xpath, ARG.CLdebug, ARG.CLrelaxed);

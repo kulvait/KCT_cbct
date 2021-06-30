@@ -36,7 +36,8 @@ public:
                           uint64_t pdimy,
                           uint64_t vdimx,
                           uint64_t vdimy,
-                          uint64_t vdimz)
+                          uint64_t vdimz,
+                          cl::NDRange projectorLocalNDRange = cl::NDRange())
         : pdimx(pdimx)
         , pdimy(pdimy)
         , vdimx(vdimx)
@@ -51,9 +52,41 @@ public:
         totalVolumeBufferSize = totalVoxelNum * sizeof(float);
         frameSize = pdimx * pdimy;
         timestamp = std::chrono::steady_clock::now();
+        std::size_t projectorLocalNDRangeDim = projectorLocalNDRange.dimensions();
+        if(projectorLocalNDRangeDim == 3)
+        {
+            if(projectorLocalNDRange[0] == 0 && projectorLocalNDRange[1] == 0
+               && projectorLocalNDRange[2] == 0)
+            {
+                this->projectorLocalNDRange = cl::NDRange();
+                this->projectorLocalNDRangeBarrier = cl::NDRange();
+            } else if(projectorLocalNDRange[0] == 0 || projectorLocalNDRange[1] == 0
+                      || projectorLocalNDRange[2] == 0)
+            {
+                this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
+                this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
+            } else
+            {
+                this->projectorLocalNDRange = projectorLocalNDRange;
+                this->projectorLocalNDRangeBarrier = projectorLocalNDRange;
+            }
+        } else
+        {
+            if(projectorLocalNDRangeDim != 0)
+            {
+                LOGE << io::xprintf(
+                    "Wrong specification of projectorLocalNDRange, trying guessing!");
+            }
+            this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
+            this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
+        }
     }
 
-    void initializeCVPProjector(bool useExactScaling, bool useBarrierImplementation);
+    cl::NDRange guessProjectionLocalNDRange(bool barrierCalls);
+
+    void initializeCVPProjector(bool useExactScaling,
+                                bool useBarrierImplementation,
+                                uint32_t LOCALARRAYSIZE);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
     void initializeAllAlgorithms();
@@ -140,6 +173,8 @@ private:
     uint64_t totalVoxelNum, totalVolumeBufferSize;
     uint64_t frameSize;
     uint64_t totalPixelNum, totalProjectionBufferSize;
+    cl::NDRange projectorLocalNDRange;
+    cl::NDRange projectorLocalNDRangeBarrier;
 
     bool centerVoxelProjector = false;
     cl_int3 vdims;
@@ -149,7 +184,8 @@ private:
     cl_double3 volumeCenter;
     bool useCVPProjector = true;
     bool exactProjectionScaling = true;
-	bool useBarrierImplementation = false;
+    bool useBarrierImplementation = false;
+    uint32_t LOCALARRAYSIZE = 0;
     bool useSidonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;

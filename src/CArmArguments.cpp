@@ -449,6 +449,9 @@ void CArmArguments::addCuttingVoxelProjectorArgs(bool includeNoScaling)
         "--barrier,!--no-barrier", useBarrierCalls,
         io::xprintf("Use barrier calls for CVP, defaults to %s.", optValue.c_str()));
     optBarier->needs(optCVP);
+    optBarier = og_projectorsettings->add_option(
+        "--local-array-size", barrierArraySize,
+        io::xprintf("Size of LOCALARRAYSIZE for barrier calls, defaults to %d.", barrierArraySize));
 }
 
 void CArmArguments::addTTProjectorArgs()

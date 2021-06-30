@@ -2,7 +2,9 @@
 
 namespace CTL {
 
-void BaseReconstructor::initializeCVPProjector(bool useExactScaling, bool useBarrierCalls)
+void BaseReconstructor::initializeCVPProjector(bool useExactScaling,
+                                               bool useBarrierCalls,
+                                               uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())
     {
@@ -16,6 +18,8 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling, bool useBar
         CLINCLUDEinclude();
         if(useBarrierCalls)
         {
+            addOptString(io::xprintf("-DLOCALARRAYSIZE=%d", LOCALARRAYSIZE));
+            this->LOCALARRAYSIZE = LOCALARRAYSIZE;
             CLINCLUDEprojector_cvp_barrier();
         } else
         {
@@ -546,7 +550,8 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), projectorLocalNDRange);
     cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> barrierLocalRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    std::shared_ptr<cl::NDRange> barrierLocalRange
+        = std::make_shared<cl::NDRange>(projectorLocalNDRangeBarrier);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
@@ -586,7 +591,7 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
             {
                 algFLOATcutting_voxel_project_barrier(
                     X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
-                    volumeCenter, pdims, FLOATONE, barrierGlobalRange, barrierLocalRange, false);
+                    volumeCenter, pdims, FLOATONE, this->LOCALARRAYSIZE, barrierGlobalRange, barrierLocalRange, false);
             } else
             {
                 (*FLOATcutting_voxel_project)(eargs, X, B, offset, CM, SOURCEPOSITION,
