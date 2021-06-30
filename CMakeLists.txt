@@ -21,6 +21,12 @@ include_directories(${GLOBAL_INCLUDE_DIR})
 
 #OpenCL
 find_package(OpenCL REQUIRED)
+include_directories(OpenCL_INCLUDE_DIRS)
+SET(CUDA_INCLUDE_DIR "/opt/cuda/include")
+IF(EXISTS ${CUDA_INCLUDE_DIR})
+include_directories(${CUDA_INCLUDE_DIR})
+ENDIF()
+
 
 #Plog logger include
 include_directories(${CMAKE_SOURCE_DIR}/submodules/plog/include)

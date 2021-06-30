@@ -539,6 +539,8 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
                                                     NORMALTODETECTOR, vdims, voxelSizes,
                                                     volumeCenter, pdims, FLOATONE, voxelRange);
         }
+        // TODO: Don't know if that is neccesary in current implementation
+        algFLOATvector_zero_infinite_values(X, XDIM);
     }
     return 0;
 }
@@ -591,7 +593,8 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
             {
                 algFLOATcutting_voxel_project_barrier(
                     X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
-                    volumeCenter, pdims, FLOATONE, this->LOCALARRAYSIZE, barrierGlobalRange, barrierLocalRange, false);
+                    volumeCenter, pdims, FLOATONE, this->LOCALARRAYSIZE, barrierGlobalRange,
+                    barrierLocalRange, false);
             } else
             {
                 (*FLOATcutting_voxel_project)(eargs, X, B, offset, CM, SOURCEPOSITION,

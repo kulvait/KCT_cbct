@@ -141,7 +141,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
     multiplyVectorsIntoFirstVector(*directionVector_xbuf, *invertedpreconditioner_xbuf, XDIM);
     copyFloatVector(*directionVector_xbuf, *preconditionedResidualVector_xbuf, XDIM);
     residualNorm2_old = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
-                                                           *preconditionedResidualVector_xbuf);
+                                                            *preconditionedResidualVector_xbuf);
     NR0 = std::sqrt(residualNorm2_old);
     // DEBUG
     NR0 = std::sqrt(normXBuffer_barrier_double(*residualVector_xbuf));
@@ -191,7 +191,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
         //                                progressPrefixPath.c_str(), iteration));
         reportTime(io::xprintf("Backprojection %d", iteration), blockingReport, true);
         residualNorm2_now = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
-                                                               *preconditionedResidualVector_xbuf);
+                                                                *preconditionedResidualVector_xbuf);
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         LOGI << io::xprintf("Beta=%f/%f is %f", residualNorm2_now, residualNorm2_old, beta);
@@ -430,6 +430,9 @@ int CGLSReconstructor::reconstructJacobi(uint32_t maxIterations, float errCondit
     {
         std::shared_ptr<cl::Buffer> minmax_xbuf = getXBuffer(4);
         backproject_minmax(*b_buf, *minmax_xbuf);
+        // TODO: Is the following line neccessarry?
+        // Without this problematic
+        algFLOATvector_substitute_greater_than(*minmax_xbuf, 0.0, 1.0, XDIM);
         writeVolume(*minmax_xbuf, io::xprintf("%sx_minmax.den", progressPrefixPath.c_str()));
         algFLOATvector_A_equals_A_times_B(*preconditioner_xbuf, *minmax_xbuf, XDIM);
     }
