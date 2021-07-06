@@ -16,7 +16,7 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
     uint px = get_global_id(0);
     uint py = get_global_id(1);
     double totalProbes = (double)raysPerPixel.x * raysPerPixel.y;
-    uint pin = px + pdims.x * py;
+    uint pin = px * pdims.y + py;
     float VAL = projection[projectionOffset + pin];
     double2 pixelCorner = (double2)((double)px, (double)py) - (double2)0.5;
     double2 pixelSamplingGap = (double2)(1.0) / convert_double2(raysPerPixel);

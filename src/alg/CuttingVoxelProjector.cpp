@@ -642,7 +642,7 @@ int CuttingVoxelProjector::backproject(float* volume,
         tmpBuffer_size = totalProjectionBufferSize;
     }
     algFLOATvector_copy(*projectionBuffer, *tmpBuffer, totalPixelNum);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz));
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;
@@ -726,8 +726,8 @@ int CuttingVoxelProjector::backproject_minmax(
         tmpBuffer_size = totalProjectionBufferSize;
     }
     algFLOATvector_copy(*projectionBuffer, *tmpBuffer, totalPixelNum);
-    cl::NDRange voxelRange(vdimz, vdimy, vdimx);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
+    cl::NDRange voxelRange(vdimx, vdimy, vdimz);
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz));
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;

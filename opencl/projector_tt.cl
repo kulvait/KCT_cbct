@@ -40,7 +40,7 @@ void inline insertVericalFootprints(global float* projection,
             footprint = footprintX
                 * gamma1(fmax(PY_inc0, J - 0.5) - PY_inc0, fmin(PY_inc1, J + 0.5) - PY_inc0,
                          intervalLength);
-            AtomicAdd_g_f(&projection[PX + pdims.x * J],
+            AtomicAdd_g_f(&projection[PX * pdims.y + J],
                           footprint); // Atomic version of projection[ind] += value;
         }
     }
@@ -54,7 +54,7 @@ void inline insertVericalFootprints(global float* projection,
         {
             footprint = footprintX
                 * gamma2(fmax(PY_inc1, J - 0.5) - PY_inc1, fmin(PY_inc2, J + 0.5) - PY_inc1);
-            AtomicAdd_g_f(&projection[PX + pdims.x * J],
+            AtomicAdd_g_f(&projection[PX * pdims.y + J],
                           footprint); // Atomic version of projection[ind] += value;
         }
     }
@@ -70,7 +70,7 @@ void inline insertVericalFootprints(global float* projection,
             footprint = footprintX
                 * gamma1(PY_inc3 - fmin(PY_inc3, J + 0.5), PY_inc3 - fmax(PY_inc2, J - 0.5),
                          intervalLength);
-            AtomicAdd_g_f(&projection[PX + pdims.x * J],
+            AtomicAdd_g_f(&projection[PX * pdims.y + J],
                           footprint); // Atomic version of projection[ind] += value;
         }
     }

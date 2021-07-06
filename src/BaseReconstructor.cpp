@@ -491,8 +491,8 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
     unsigned int frameSize = pdimx * pdimy;
     copyFloatVector(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
-    cl::NDRange voxelRange(vdimz, vdimy, vdimx);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), backprojectorLocalNDRange);
+    cl::NDRange voxelRange(vdimx, vdimy, vdimz);
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimx, vdimy, vdimz), backprojectorLocalNDRange);
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;

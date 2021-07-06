@@ -21,7 +21,7 @@ float inline backprojectVericalFootprints(global const float* projection,
         int J_STOP = min(max_PY + 1, pdims.y);
         for(; J < J_STOP; J++)
         {
-            footprint += projection[PX + pdims.x * J] * footprintX
+            footprint += projection[PX * pdims.y + J] * footprintX
                 * gamma1(fmax(PY_inc0, J - 0.5) - PY_inc0, fmin(PY_inc1, J + 0.5) - PY_inc0,
                          intervalLength);
         }
@@ -34,7 +34,7 @@ float inline backprojectVericalFootprints(global const float* projection,
         int J_STOP = min(max_PY + 1, pdims.y);
         for(; J < J_STOP; J++)
         {
-            footprint += projection[PX + pdims.x * J] * footprintX
+            footprint += projection[PX * pdims.y + J] * footprintX
                 * gamma2(fmax(PY_inc1, J - 0.5) - PY_inc1, fmin(PY_inc2, J + 0.5) - PY_inc1);
         }
     }
@@ -47,7 +47,7 @@ float inline backprojectVericalFootprints(global const float* projection,
         int J_STOP = min(max_PY + 1, pdims.y);
         for(; J < J_STOP; J++)
         {
-            footprint += projection[PX + pdims.x * J] * footprintX
+            footprint += projection[PX * pdims.y + J] * footprintX
                 * gamma1(PY_inc3 - fmin(PY_inc3, J + 0.5), PY_inc3 - fmax(PY_inc2, J - 0.5),
                          intervalLength);
         }
@@ -83,9 +83,9 @@ void kernel FLOATta3_backproject(global float* restrict volume,
                                  private int2 pdims,
                                  private float scalingFactor)
 {
-    uint i = get_global_id(2);
+    uint i = get_global_id(0);
     uint j = get_global_id(1);
-    uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
+    uint k = get_global_id(2);
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
     const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
                                      volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,

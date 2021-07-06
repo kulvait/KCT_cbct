@@ -61,7 +61,7 @@ float inline backprojectMinMaxEdgeValues(global const float* projection,
             }
             for(; J < PJ_max; J++)
             {
-                projectionValue = projection[PX + pdims.x * J];
+                projectionValue = projection[PX * pdims.y + J];
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_down, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
                     / (negativeEdgeLength * Fvector.s2);
@@ -72,7 +72,7 @@ float inline backprojectMinMaxEdgeValues(global const float* projection,
                 }
                 lastLambda = lambda;
             }
-            projectionValue = projection[PX + pdims.x * PJ_max];
+            projectionValue = projection[PX * pdims.y + PJ_max];
             factor = (leastLambda - lastLambda) * scaledCutArea;
             if(factor > 0.0)
             {
@@ -113,7 +113,7 @@ float inline backprojectMinMaxEdgeValues(global const float* projection,
             }
             for(; J < PJ_max; J++)
             {
-                projectionValue = projection[PX + pdims.x * J];
+                projectionValue = projection[PX * pdims.y + J];
                 Fvector -= CM.s89a; // Fvector = CM.s456 - (J + 0.5) * CM.s89a;
                 lambda = (dot(v_up, Fvector) + CM.s7 - ((double)J + 0.5) * CM.sb)
                     / (negativeEdgeLength * Fvector.s2);
@@ -125,7 +125,7 @@ float inline backprojectMinMaxEdgeValues(global const float* projection,
                 lastLambda = lambda;
             }
             // PJ_max
-            projectionValue = projection[PX + pdims.x * PJ_max];
+            projectionValue = projection[PX * pdims.y + PJ_max];
             factor = (lastLambda - leastLambda) * scaledCutArea;
             if(factor > 0.0)
             {
@@ -134,7 +134,7 @@ float inline backprojectMinMaxEdgeValues(global const float* projection,
         }
     } else if(PJ_down == PJ_up && PJ_down >= 0 && PJ_down < pdims.y)
     {
-        projectionValue = projection[PX + pdims.x * PJ_down];
+        projectionValue = projection[PX * pdims.y + PJ_down];
         factor = scaledCutArea;
         if(factor > 0.0)
         {
@@ -174,9 +174,9 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
                                                  private float globalScalingMultiplier,
                                                  private int2 dummy)
 {
-    int i = get_global_id(2);
+    int i = get_global_id(0);
     int j = get_global_id(1);
-    int k = get_global_id(0); // This is more effective from the perspective of atomic colisions
+    int k = get_global_id(2);
     float ADD = INFINITY;
     const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
     const double3 zerocorner_xyz

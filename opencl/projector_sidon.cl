@@ -235,7 +235,7 @@ void kernel FLOATsidon_project(global const float* restrict volume,
             }
         }
     }
-    uint pin = px + pdims.x * py;
+    uint pin = px * pdims.y + py;
     projection[projectionOffset + pin] = VAL / totalProbes;
 }
 //==============================END projector_sidon.cl=====================================
