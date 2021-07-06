@@ -514,9 +514,9 @@ public:
                      double voxelSpacingX,
                      double voxelSpacingY,
                      double voxelSpacingZ,
-                     double volumeOffsetX = 0.0,
-                     double volumeOffsetY = 0.0,
-                     double volumeOffsetZ = 0.0);
+                     double volumeCenterX = 0.0,
+                     double volumeCenterY = 0.0,
+                     double volumeCenterZ = 0.0);
 
     int allocateXBuffers(uint32_t xBufferCount);
     int allocateBBuffers(uint32_t bBufferCount);
@@ -548,7 +548,6 @@ protected:
     cl_int3 vdims;
 
     // Problem setup variables
-    double volumeOffsetX, volumeOffsetY, volumeOffsetZ;
     double voxelSpacingX, voxelSpacingY, voxelSpacingZ;
     cl_double3 voxelSizes;
     cl_double3 volumeCenter;

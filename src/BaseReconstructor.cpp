@@ -159,7 +159,7 @@ int BaseReconstructor::problemSetup(float* projection,
     }
     voxelSizes = cl_double3({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
     volumeCenter = cl_double3({ volumeCenterX, volumeCenterY, volumeCenterZ });
-    std::array<double, 3> centerGlobal = { volumeOffsetX, volumeOffsetY, volumeOffsetZ };
+    std::array<double, 3> centerGlobal = { volumeCenterX, volumeCenterY, volumeCenterZ };
     std::array<double, 3> offsetx = { voxelSpacingX * vdims.x * 0.5, 0.0, 0.0 };
     std::array<double, 3> offsety = { 0.0, voxelSpacingY * vdims.y * 0.5, 0.0 };
     std::array<double, 3> offsetz = { 0.0, 0.0, voxelSpacingZ * vdims.z * 0.5 };
@@ -183,10 +183,10 @@ int BaseReconstructor::problemSetup(float* projection,
         VN = P->directionVectorVN();
         if(vectorDotProduct(VN, center) < 0)
         {
-            LOGW << io::xprintf(
-                "Apparently the volume is specified such that its center do not "
-                "belong to the half space orthogonal to the principal ray in %d-th projection.",
-                k);
+            LOGW << io::xprintf("Apparently the volume is specified such that its center do not "
+                                "belong to the half space orthogonal to the principal ray in %d-th "
+                                "projection. VN=(%f,%f,%f), center=(%f,%f, %f), dot(VN,center)=%f.",
+                                k, VN[0], VN[1], VN[2], center[0], center[1], center[2], vectorDotProduct(VN, center));
         }
         if(vectorDotProduct(VN, A) < 0 || vectorDotProduct(VN, B) < 0 || vectorDotProduct(VN, C) < 0
            || vectorDotProduct(VN, D) < 0 || vectorDotProduct(VN, E) < 0
