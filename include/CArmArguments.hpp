@@ -109,5 +109,6 @@ protected:
 
     CLI::Option* opt_cl_backprojectorlocalrange = nullptr;
     CLI::Option* opt_cl_projectorlocalrange = nullptr;
+    CLI::Option* opt_cl_localarraysize = nullptr;
 };
 } // namespace CTL::util
