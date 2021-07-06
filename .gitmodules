@@ -21,4 +21,4 @@
 	url = https://github.com/catchorg/Catch2.git
 [submodule "submodules/gitversion"]
 	path = submodules/gitversion
-	url = https://github.com/smessmer/gitversion
+	url = https://github.com/kulvait/gitversion

@@ -49,7 +49,7 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         project(*x_buf, *discrepancy_bbuf);
         algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
-        LOGI << io::xprintf_red("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
+        LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
                             iteration, norm, 100.0 * norm / NB0);
         iteration++;
         algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *invrowsums_bbuf, BDIM);
@@ -70,7 +70,7 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
             algFLOATvector_substitute_greater_than(*x_buf, 1.0, 1.0, XDIM);
             algFLOATvector_substitute_lower_than(*x_buf, 0.0, 0.0, XDIM);
         }
-        LOGI << io::xprintf_red("Size of x=%f and size of the update=%f.", normx, normupdate);
+        LOGI << io::xprintf_green("Size of x=%f and size of the update=%f.", normx, normupdate);
         // algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, alpha * p, XDIM);
         // algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, alpha * p, XDIM);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
@@ -81,7 +81,7 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
                         io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
         }
     }
-    LOGI << io::xprintf_red("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
+    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
                         norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
@@ -122,7 +122,7 @@ int PSIRTReconstructor::reconstruct_sirt(uint32_t maxIterations, float errCondit
         project(*x_buf, *discrepancy_bbuf);
         algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
-        LOGI << io::xprintf_red("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
+        LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
                             iteration, norm, 100.0 * norm / NB0);
         algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *invrowsums_bbuf, BDIM);
         backproject(*discrepancy_bbuf, *update_xbuf);
@@ -136,7 +136,7 @@ int PSIRTReconstructor::reconstruct_sirt(uint32_t maxIterations, float errCondit
             algFLOATvector_substitute_greater_than(*x_buf, 1.0, 1.0, XDIM);
             algFLOATvector_substitute_lower_than(*x_buf, 0.0, 0.0, XDIM);
         }
-        LOGI << io::xprintf_red("Size of x=%f and size of the update=%f.", normx, normupdate);
+        LOGI << io::xprintf_green("Size of x=%f and size of the update=%f.", normx, normupdate);
         // algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, alpha * p, XDIM);
         // algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, alpha * p, XDIM);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
@@ -147,7 +147,7 @@ int PSIRTReconstructor::reconstruct_sirt(uint32_t maxIterations, float errCondit
                         io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
         }
     }
-    LOGI << io::xprintf_red("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
+    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
                         norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;

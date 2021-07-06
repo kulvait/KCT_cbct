@@ -11,28 +11,28 @@
 
 #define BACKPROJECTMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                              \
     int J;                                                                                         \
-    double3 Fvector;                                                                               \
-    double lambda;                                                                                 \
-    double lastLambda = 0.0;                                                                       \
-    double leastLambda;                                                                            \
+    REAL3 Fvector;                                                                                 \
+    REAL lambda;                                                                                   \
+    REAL lastLambda = ZERO;                                                                        \
+    REAL leastLambda;                                                                              \
     if(PJ_max >= pdims.y)                                                                          \
     {                                                                                              \
         PJ_max = pdims.y - 1;                                                                      \
-        Fvector = CM.s456 - (PJ_max + 0.5) * CM.s89a;                                              \
+        Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;                                             \
         leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
     } else                                                                                         \
     {                                                                                              \
-        leastLambda = 1.0;                                                                         \
+        leastLambda = ONE;                                                                         \
     }                                                                                              \
     if(PJ_min < 0)                                                                                 \
     {                                                                                              \
         J = 0;                                                                                     \
-        Fvector = CM.s456 + 0.5 * CM.s89a;                                                         \
+        Fvector = CM.s456 + HALF * CM.s89a;                                                        \
         lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                     \
     } else                                                                                         \
     {                                                                                              \
         J = PJ_min;                                                                                \
-        Fvector = CM.s456 - (J - 0.5) * CM.s89a;                                                   \
+        Fvector = CM.s456 - (J - HALF) * CM.s89a;                                                  \
     }                                                                                              \
     for(; J < PJ_max; J++)                                                                         \
     {                                                                                              \
@@ -56,7 +56,7 @@
         leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
     } else                                                                                         \
     {                                                                                              \
-        leastLambda = 1.0f;                                                                         \
+        leastLambda = 1.0f;                                                                        \
     }                                                                                              \
     if(PJ_min < 0)                                                                                 \
     {                                                                                              \
@@ -79,21 +79,21 @@
 
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline backprojectExactEdgeValues0(global const float* projection,
-                                         private double16 CM,
-                                         private double3 v,
+                                         private REAL16 CM,
+                                         private REAL3 v,
                                          private int PX,
-                                         private double3 voxelSizes,
+                                         private REAL3 voxelSizes,
                                          private int2 pdims)
 {
     projection = projection + PX * pdims.y;
-    const double3 distanceToEdge = (double3)(0.0, 0.0, 0.5 * voxelSizes.s2);
-    const double3 v_up = v + distanceToEdge;
-    const double3 v_down = v - distanceToEdge;
-    const double PY_up = PROJECTY0(CM, v_up);
-    const double PY_down = PROJECTY0(CM, v_down);
-    int PJ_up = convert_int_rtn(PY_up + 0.5);
-    int PJ_down = convert_int_rtn(PY_down + 0.5);
-    float ADD = 0.0;
+    const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
+    const REAL3 v_up = v + distanceToEdge;
+    const REAL3 v_down = v - distanceToEdge;
+    const REAL PY_up = PROJECTY0(CM, v_up);
+    const REAL PY_down = PROJECTY0(CM, v_down);
+    int PJ_up = convert_int_rtn(PY_up + HALF);
+    int PJ_down = convert_int_rtn(PY_down + HALF);
+    float ADD = 0.0f;
     if(PJ_up < PJ_down)
     {
         if(PJ_down >= 0 && PJ_up < pdims.y)
@@ -365,186 +365,135 @@ float inline backprojectEdgeValues(global float* projection,
 void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
                                            global const float* restrict projection,
                                            private uint projectionOffset,
-                                           private double16 CM,
-                                           private double3 sourcePosition,
-                                           private double3 normalToDetector,
+                                           private double16 _CM,
+                                           private double3 _sourcePosition,
+                                           private double3 _normalToDetector,
                                            private int3 vdims,
-                                           private double3 voxelSizes,
-                                           private double3 volumeCenter,
+                                           private double3 _voxelSizes,
+                                           private double3 _volumeCenter,
                                            private int2 pdims,
                                            private float scalingFactor)
 {
-    uint i = get_global_id(0);
-    uint j = get_global_id(1);
-    uint k = get_global_id(2); // This is more effective from the perspective of atomic colisions
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+    int k = get_global_id(2);
+    // Not uint for correct int subtraction
+    // Shift projection array by offset
+    projection += projectionOffset;
+//_normalToDetector is not used in this implementation
+#ifdef RELAXED
+    const float16 CM = convert_float16(_CM);
+    const float3 sourcePosition = convert_float3(_sourcePosition);
+    const float3 voxelSizes = convert_float3(_voxelSizes);
+    const float3 volumeCenter = convert_float3(_volumeCenter);
+#else
+#define CM _CM
+#define sourcePosition _sourcePosition
+#define voxelSizes _voxelSizes
+#define volumeCenter _volumeCenter
+#endif
+    const REAL3 halfVoxelSizes = HALF * voxelSizes;
+    const REAL3 volumeCenter_voxelcenter_offset
+        = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
+    const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
+
     const uint IND = voxelIndex(i, j, k, vdims);
     float ADD = 0.0;
-    const float voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
 
-#ifdef RELAXED
-    const float16 CMF = convert_float16(CM);
-    const float3 sourcePositionF = convert_float3(sourcePosition);
-    const float3 voxelSizesF = convert_float3(voxelSizes);
-    const float3 volumeCenterF = convert_float3(volumeCenter);
-    const float3 IND_ijk = { (float)(i), (float)(j), (float)(k) };
-    const float3 zerocorner_xyz
-        = volumeCenterF - sourcePositionF - 0.5f * convert_float3(vdims) * voxelSizesF;
-    const float3 voxelcorner_xyz = zerocorner_xyz + (IND_ijk * voxelSizesF);
-    const float3 voxelcenter_xyz = voxelcorner_xyz + 0.5f * voxelSizesF;
-    int cornerProjectionIndex = projectionIndexF0(CMF, voxelcenter_xyz, pdims);
-    if(cornerProjectionIndex == -1)
+#ifdef DROPCENTEROFFPROJECTORVOXELS
+    int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
+    int yindex = INDEX(PROJECTY0(CM, voxelcenter_xyz));
+    if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)
     {
         return;
     }
-    float sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
-    float value = scalingFactor * voxelVolume / sourceToVoxel_xyz_norm2;
-    // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
-    // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
-    // project the rectangle that lies on the z midline of the voxel on the projector
-    float px00, px01, px10, px11;
-    float3 vx00, vx01, vx10, vx11;
-    vx00 = voxelcorner_xyz + voxelSizesF * (float3)(0.0, 0.0, 0.5);
-    vx01 = voxelcorner_xyz + voxelSizesF * (float3)(1.0, 0.0, 0.5);
-    vx10 = voxelcorner_xyz + voxelSizesF * (float3)(0.0, 1.0, 0.5);
-    vx11 = voxelcorner_xyz + voxelSizesF * (float3)(1.0, 1.0, 0.5);
-    px00 = PROJECTX0(CMF, vx00);
-    px01 = PROJECTX0(CMF, vx01);
-    px10 = PROJECTX0(CMF, vx10);
-    px11 = PROJECTX0(CMF, vx11);
-    // We now figure out the vertex that projects to minimum and maximum px
-    float pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
-    int max_PX,
-        min_PX; // Pixel to which are the voxels with minimum and maximum values are
-                // projected
-    // pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
-    // pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
-    float3* V_ccw[4]; // Point in which minimum is achieved and counter clock wise points
-    // from the minimum voxel
-    float* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise  points
-    // from the minimum voxel
-#else
-    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz
-        = volumeCenter - sourcePosition - 0.5 * convert_double3(vdims) * voxelSizes;
-    const double3 voxelcorner_xyz = zerocorner_xyz + (IND_ijk * voxelSizes);
-    const double3 voxelcenter_xyz = voxelcorner_xyz + 0.5 * voxelSizes;
-    int cornerProjectionIndex = projectionIndex0(CM, voxelcorner_xyz, pdims);
-    if(cornerProjectionIndex == -1)
-    {
-        if(projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0), pdims)
-               == -1
-           && projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.0), pdims)
-               == -1
-           && projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 1.0), pdims)
-               == -1
-           && projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 1.0), pdims)
-               == -1
-           && projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.0), pdims)
-               == -1
-           && projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.0), pdims)
-               == -1
-           && projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 1.0),
-                               pdims)
-               == -1) // When all projections are the same
-        {
-            return;
-        }
-    }
-    /*
-        if(cornerProjectionIndex
-               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 1.0),
-       pdims)
-           && cornerProjectionIndex
-               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.0),
-       pdims)
-           && cornerProjectionIndex
-               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 1.0),
-       pdims)
-           && cornerProjectionIndex
-               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 1.0),
-       pdims)
-           && cornerProjectionIndex
-               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.0),
-       pdims)
-           && cornerProjectionIndex
-               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.0),
-       pdims)
-           && cornerProjectionIndex
-               == projectionIndex0(CM, voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 1.0),
-                                   pdims)) // When all projections are the same
-        {
-            if(cornerProjectionIndex != -1)
-            {
-                double sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
-                ADD = projection[projectionOffset + cornerProjectionIndex] * scalingFactor *
-       voxelVolume / sourceToVoxel_xyz_norm2; volume[IND] += ADD;
-            }
-            return;
-        }*/
-    double sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
-    float value = scalingFactor * voxelVolume / sourceToVoxel_xyz_norm2;
-    // I assume that the volume point (x,y,z_1) projects to the same px as (x,y,z_2) for any z_1,
-    // z_2  This assumption is restricted to the voxel edges, where it holds very accurately  We
-    // project the rectangle that lies on the z midline of the voxel on the projector
-    double px00, px01, px10, px11;
-    double3 vx00, vx01, vx10, vx11;
-    vx00 = voxelcorner_xyz + voxelSizes * (double3)(0.0, 0.0, 0.5);
-    vx01 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 0.0, 0.5);
-    vx10 = voxelcorner_xyz + voxelSizes * (double3)(0.0, 1.0, 0.5);
-    vx11 = voxelcorner_xyz + voxelSizes * (double3)(1.0, 1.0, 0.5);
-    px00 = PROJECTX0(CM, vx00);
-    px01 = PROJECTX0(CM, vx01);
-    px10 = PROJECTX0(CM, vx10);
-    px11 = PROJECTX0(CM, vx11);
-    // We now figure out the vertex that projects to minimum and maximum px
-    double pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
-    int max_PX,
-        min_PX; // Pixel to which are the voxels with minimum and maximum values are
-                // projected
-    // pxx_min = fmin(fmin(px00, px01), fmin(px10, px11));
-    // pxx_max = fmax(fmax(px00, px01), fmax(px10, px11));
-    double3* V_ccw[4]; // Point in which minimum is achieved and counter clock wise points
-    // from the minimum voxel
-    double* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise  points
-    // from the minimum voxel
 #endif
-    if(px00 < px01)
+
+#ifdef DROPINCOMPLETEVOXELS // Here I need to do more
+    int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
+    int yindex = INDEX(PROJECTY0(CM, voxelcenter_xyz));
+    if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)
     {
-        if(px00 < px10)
+        return;
+    }
+#endif
+    const REAL voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
+    REAL sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
+#ifdef RELAXED
+    float value = (voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2);
+#else
+    float value = (float)(voxelVolume * scalingFactor / sourceToVoxel_xyz_norm2);
+#endif
+
+    REAL px00, px10, px01, px11;
+    REAL3 vx00, vx10, vx01, vx11;
+    vx00 = voxelcenter_xyz + halfVoxelSizes * (REAL3)(-ONE, -ONE, ZERO);
+    vx10 = voxelcenter_xyz + halfVoxelSizes * (REAL3)(ONE, -ONE, ZERO);
+    vx01 = voxelcenter_xyz + halfVoxelSizes * (REAL3)(-ONE, ONE, ZERO);
+    vx11 = voxelcenter_xyz + halfVoxelSizes * (REAL3)(ONE, ONE, ZERO);
+    {
+        REAL nx = dot(voxelcenter_xyz, CM.s012);
+        REAL dv = dot(voxelcenter_xyz, CM.s89a);
+        REAL nhx = halfVoxelSizes.x * CM.s0;
+        REAL nhy = halfVoxelSizes.y * CM.s1;
+        REAL dhx = halfVoxelSizes.x * CM.s8;
+        REAL dhy = halfVoxelSizes.y * CM.s9;
+        px00 = (nx - nhx - nhy) / (dv - dhx - dhy);
+        px01 = (nx - nhx + nhy) / (dv - dhx + dhy);
+        px10 = (nx + nhx - nhy) / (dv + dhx - dhy);
+        px11 = (nx + nhx + nhy) / (dv + dhx + dhy);
+    }
+    // printf("X projections are %f, %f, %f, %f", px00, px10, px01, px11);
+    // We now figure out the vertex that projects to minimum and maximum px
+    REAL pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
+    int max_PX,
+        min_PX; // Pixel to which are the voxels with minimum and maximum values are
+                // projected
+    // pxx_min = fmin(fmin(px00, px10), fmin(px01, px11));
+    // pxx_max = fmax(fmax(px00, px10), fmax(px01, px11));
+    REAL3* V_ccw[4]; // Point in which minimum is achieved and counter clock wise
+                     // points
+    // from the minimum voxel
+    REAL* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise
+                     // points
+
+    if(px00 < px10)
+    {
+        if(px00 < px01)
         {
             pxx_min = px00;
             V_ccw[0] = &vx00;
-            V_ccw[1] = &vx01;
+            V_ccw[1] = &vx10;
             V_ccw[2] = &vx11;
-            V_ccw[3] = &vx10;
+            V_ccw[3] = &vx01;
             PX_ccw[0] = &px00;
-            PX_ccw[1] = &px01;
+            PX_ccw[1] = &px10;
             PX_ccw[2] = &px11;
-            PX_ccw[3] = &px10;
-            if(px10 > px11)
-            {
-                pxx_max = px10;
-            } else if(px01 > px11)
+            PX_ccw[3] = &px01;
+            if(px01 > px11)
             {
                 pxx_max = px01;
+            } else if(px10 > px11)
+            {
+                pxx_max = px10;
             } else
             {
                 pxx_max = px11;
             }
-        } else if(px10 < px11)
+        } else if(px01 < px11)
         {
-            pxx_min = px10;
-            V_ccw[0] = &vx10;
+            pxx_min = px01;
+            V_ccw[0] = &vx01;
             V_ccw[1] = &vx00;
-            V_ccw[2] = &vx01;
+            V_ccw[2] = &vx10;
             V_ccw[3] = &vx11;
-            PX_ccw[0] = &px10;
+            PX_ccw[0] = &px01;
             PX_ccw[1] = &px00;
-            PX_ccw[2] = &px01;
+            PX_ccw[2] = &px10;
             PX_ccw[3] = &px11;
-            if(px01 > px11)
+            if(px10 > px11)
             {
-                pxx_max = px01;
+                pxx_max = px10;
             } else
             {
                 pxx_max = px11;
@@ -552,67 +501,67 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
         } else
         {
             pxx_min = px11;
-            pxx_max = px01;
+            pxx_max = px10;
             V_ccw[0] = &vx11;
-            V_ccw[1] = &vx10;
+            V_ccw[1] = &vx01;
             V_ccw[2] = &vx00;
-            V_ccw[3] = &vx01;
+            V_ccw[3] = &vx10;
             PX_ccw[0] = &px11;
-            PX_ccw[1] = &px10;
+            PX_ccw[1] = &px01;
             PX_ccw[2] = &px00;
-            PX_ccw[3] = &px01;
+            PX_ccw[3] = &px10;
         }
 
-    } else if(px01 < px11)
+    } else if(px10 < px11)
     {
-        pxx_min = px01;
-        V_ccw[0] = &vx01;
+        pxx_min = px10;
+        V_ccw[0] = &vx10;
         V_ccw[1] = &vx11;
-        V_ccw[2] = &vx10;
+        V_ccw[2] = &vx01;
         V_ccw[3] = &vx00;
-        PX_ccw[0] = &px01;
+        PX_ccw[0] = &px10;
         PX_ccw[1] = &px11;
-        PX_ccw[2] = &px10;
+        PX_ccw[2] = &px01;
         PX_ccw[3] = &px00;
-        if(px00 > px10)
+        if(px00 > px01)
         {
             pxx_max = px00;
-        } else if(px11 > px10)
+        } else if(px11 > px01)
         {
             pxx_max = px11;
         } else
         {
-            pxx_max = px10;
+            pxx_max = px01;
         }
-    } else if(px11 < px10)
+    } else if(px11 < px01)
     {
         pxx_min = px11;
         V_ccw[0] = &vx11;
-        V_ccw[1] = &vx10;
+        V_ccw[1] = &vx01;
         V_ccw[2] = &vx00;
-        V_ccw[3] = &vx01;
+        V_ccw[3] = &vx10;
         PX_ccw[0] = &px11;
-        PX_ccw[1] = &px10;
+        PX_ccw[1] = &px01;
         PX_ccw[2] = &px00;
-        PX_ccw[3] = &px01;
-        if(px00 > px10)
+        PX_ccw[3] = &px10;
+        if(px00 > px01)
         {
             pxx_max = px00;
         } else
         {
-            pxx_max = px10;
+            pxx_max = px01;
         }
     } else
     {
-        pxx_min = px10;
+        pxx_min = px01;
         pxx_max = px00;
-        V_ccw[0] = &vx10;
+        V_ccw[0] = &vx01;
         V_ccw[1] = &vx00;
-        V_ccw[2] = &vx01;
+        V_ccw[2] = &vx10;
         V_ccw[3] = &vx11;
-        PX_ccw[0] = &px10;
+        PX_ccw[0] = &px01;
         PX_ccw[1] = &px00;
-        PX_ccw[2] = &px01;
+        PX_ccw[2] = &px10;
         PX_ccw[3] = &px11;
     }
 
@@ -620,37 +569,21 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
     max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
     if(max_PX >= 0 && min_PX < pdims.x)
     {
-#ifdef RELAXED
-        float3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
-        float3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
-#else
-        double3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
-        double3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
-#endif
+        REAL3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
+        REAL3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
         if(max_PX <= min_PX) // These indices are in the admissible range
         {
-#ifdef RELAXED
-            min_PX = convert_int_rtn(0.5f * (pxx_min + pxx_max) + 0.5f);
-            ADD = backprojectExactEdgeValuesF0(&projection[projectionOffset], CMF,
-                                               (vx10 + vx01) / 2.0f, min_PX, voxelSizesF, pdims);
-#else
-            min_PX = convert_int_rtn(0.5 * (pxx_min + pxx_max) + 0.5);
-            ADD = backprojectExactEdgeValues0(&projection[projectionOffset], CM,
-                                              (vx10 + vx01) / 2.0, min_PX, voxelSizes, pdims);
-#endif
+            min_PX = convert_int_rtn(HALF * (pxx_min + pxx_max) + HALF);
+            ADD = backprojectExactEdgeValues0(projection, CM, HALF * (vx10 + vx01), min_PX,
+                                              voxelSizes, pdims);
             volume[IND] += value * ADD;
         } else
         {
-#ifdef RELAXED
-            float lastSectionSize, nextSectionSize, polygonSize;
-            float3 lastInt, nextInt, Int;
-#else
-            double lastSectionSize, nextSectionSize, polygonSize;
-            double3 lastInt, nextInt, Int;
-#endif
+            REAL lastSectionSize, nextSectionSize, polygonSize;
+            REAL3 lastInt, nextInt, Int;
+            REAL factor;
             int I = max(-1, min_PX);
             int I_STOP = min(max_PX, pdims.x);
-            float factor;
             // Section of the square that corresponds to the indices < i
             // CCW and CW coordinates of the last intersection on the lines specified by the points
             // in V_ccw lastSectionSize
@@ -660,7 +593,7 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
 #ifdef RELAXED
             lastSectionSize = exactIntersectionPointsF0_extended(
                 ((float)I) + 0.5f, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
-                PX_ccw[1], PX_ccw[2], PX_ccw[3], CMF, &lastInt);
+                PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
 #else
             lastSectionSize = exactIntersectionPoints0_extended(
                 ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
@@ -668,13 +601,7 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
 #endif
             if(I >= 0)
             {
-#ifdef RELAXED
-                factor = backprojectExactEdgeValuesF0(&projection[projectionOffset], CMF, lastInt,
-                                                      I, voxelSizesF, pdims);
-#else
-                factor = backprojectExactEdgeValues0(&projection[projectionOffset], CM, lastInt, I,
-                                                     voxelSizes, pdims);
-#endif
+                factor = backprojectExactEdgeValues0(projection, CM, lastInt, I, voxelSizes, pdims);
                 ADD += lastSectionSize * factor;
             }
             for(I = I + 1; I < I_STOP; I++)
@@ -682,7 +609,7 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
 #ifdef RELAXED
                 nextSectionSize = exactIntersectionPointsF0_extended(
                     ((float)I) + 0.5F, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
-                    PX_ccw[1], PX_ccw[2], PX_ccw[3], CMF, &nextInt);
+                    PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
 #else
                 nextSectionSize = exactIntersectionPoints0_extended(
                     ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
@@ -690,30 +617,16 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
 #endif
                 polygonSize = nextSectionSize - lastSectionSize;
                 Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
-#ifdef RELAXED
-                factor = backprojectExactEdgeValuesF0(&projection[projectionOffset], CMF, Int, I,
-                                                      voxelSizesF, pdims);
-#else
-                factor = backprojectExactEdgeValues0(&projection[projectionOffset], CM, Int, I,
-                                                     voxelSizes, pdims);
-#endif
+                factor = backprojectExactEdgeValues0(projection, CM, Int, I, voxelSizes, pdims);
                 ADD += polygonSize * factor;
                 lastSectionSize = nextSectionSize;
                 lastInt = nextInt;
             }
             if(I_STOP < pdims.x)
             {
-#ifdef RELAXED
-                polygonSize = 1.0f - lastSectionSize;
-                Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5f - lastSectionSize * lastInt) / polygonSize;
-                factor = backprojectExactEdgeValuesF0(&projection[projectionOffset], CMF, Int, I,
-                                                      voxelSizesF, pdims);
-#else
-                polygonSize = 1.0 - lastSectionSize;
-                Int = ((*V_ccw[0] + *V_ccw[2]) * 0.5 - lastSectionSize * lastInt) / polygonSize;
-                factor = backprojectExactEdgeValues0(&projection[projectionOffset], CM, Int, I,
-                                                     voxelSizes, pdims);
-#endif
+                polygonSize = ONE - lastSectionSize;
+                Int = ((*V_ccw[0] + *V_ccw[2]) * HALF - lastSectionSize * lastInt) / polygonSize;
+                factor = backprojectExactEdgeValues0(projection, CM, Int, I, voxelSizes, pdims);
                 ADD += polygonSize * factor;
             }
             volume[IND] += value * ADD;

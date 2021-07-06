@@ -10,6 +10,7 @@
 #include <functional>
 #include <iostream>
 #include <numeric>
+#include <experimental/filesystem>
 
 // Internal libraries
 #include "DEN/DenProjectionMatrixReader.hpp"

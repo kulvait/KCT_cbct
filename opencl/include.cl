@@ -1,4 +1,6 @@
 //==============================include.cl=====================================
+#define DROPCENTEROFFPROJECTORVOXELS
+//DROPINCOMPLETEVOXELS is not implemented the same in barrier implementation
 #ifdef RELAXED
 typedef float REAL;
 typedef float3 REAL3;

@@ -87,8 +87,6 @@ int projectionIndex(private double16 CM, private double3 v, int2 pdims)
     }
 }
 
-#define DROPINCOMPLETEVOXELS
-
 #define LOCALMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                    \
     if(PJ_max >= pdims.y)                                                                          \
     {                                                                                              \
@@ -1099,6 +1097,17 @@ const REAL3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizes
     {
         dropVoxel = true;
     }
+#ifdef DROPCENTEROFFPROJECTORVOXELS
+    if(partlyOffProjectorPosition)
+    {
+        int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
+        int yindex = INDEX(PROJECTY0(CM, voxelcenter_xyz));
+        if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)
+        {
+            dropVoxel = true;
+        }
+    }
+#endif
 #ifdef DROPINCOMPLETEVOXELS
     if(partlyOffProjectorPosition)
     {

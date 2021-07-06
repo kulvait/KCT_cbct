@@ -61,7 +61,11 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     // https://software.intel.com/en-us/openclsdk-devguide-enabling-debugging-in-opencl-runtime
     std::string clFile;
     std::string sourceText;
-    clFile = io::xprintf("%s/opencl/allsources.cl", xpath.c_str());
+    // clFile = io::xprintf("%s/opencl/allsources.cl", xpath.c_str());
+    std::string tmpDir = std::experimental::filesystem::temp_directory_path().string();
+    std::srand(std::time(nullptr));
+    unsigned int randomNumber = std::rand();
+    clFile = io::xprintf("%s/allsources_%d.cl", tmpDir.c_str(), randomNumber);
     std::vector<std::string> clFilesXpath;
     for(std::string f : CLFiles)
     {
