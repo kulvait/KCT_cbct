@@ -78,6 +78,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     if(relaxed)
     {
         optstrings.emplace_back("-DRELAXED");
+        optstrings.emplace_back("-cl-fast-relaxed-math");
     }
     if(debug)
     {

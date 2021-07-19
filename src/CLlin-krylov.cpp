@@ -251,6 +251,7 @@ int main(int argc, char* argv[])
     {
         return -1; // Exited somehow wrong
     }
+    LOGI << prgInfo;
     PRG.startLog(true);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
     std::shared_ptr<io::DenProjectionMatrixReader> projectionMatrixReader
@@ -379,7 +380,7 @@ int main(int argc, char* argv[])
         } else
         {
             glsqr->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                         ARG.barrierArraySize);
+                                          ARG.barrierArraySize);
         }
         int ecd
             = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
@@ -438,7 +439,7 @@ int main(int argc, char* argv[])
         } else
         {
             psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                         ARG.barrierArraySize);
+                                          ARG.barrierArraySize);
         }
         int ecd
             = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
@@ -497,7 +498,7 @@ int main(int argc, char* argv[])
         } else
         {
             psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                         ARG.barrierArraySize);
+                                          ARG.barrierArraySize);
         }
         int ecd
             = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
