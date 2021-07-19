@@ -29,6 +29,7 @@
 #include "PROG/Program.hpp"
 #include "PROG/parseArgs.h"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
+#include "DEN/DenAsyncFrame2DWritter.hpp"
 
 using namespace CTL;
 using namespace CTL::util;
@@ -212,7 +213,7 @@ int main(int argc, char* argv[])
     float* volume = new float[ARG.totalVoxelNum];
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.voxelNumX,
                               ARG.voxelNumY, ARG.voxelNumZ);
-    CVP.initializeAllAlgorithms();
+    //CVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {
         CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -249,6 +250,8 @@ int main(int argc, char* argv[])
     }
     CVP.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
                      ARG.volumeCenterY, ARG.volumeCenterZ);
+    io::DenAsyncFrame2DWritter<float> projectionWritter(ARG.outputProjection, ARG.projectionSizeX,
+                                                        ARG.projectionSizeY, ARG.frames.size());
     for(uint32_t i = 0; i != ARG.frames.size(); i++)
     {
         io::readBytesFrom(ARG.inputVolumes[i], 6, (uint8_t*)volume,
@@ -273,8 +276,13 @@ int main(int argc, char* argv[])
             normSquareDifference += CVP.normSquareDifference(
                 (float*)fr->getDataPointer(), ARG.projectionSizeX, ARG.projectionSizeY);
         }
-        io::appendBytes(ARG.outputProjection, (uint8_t*)projection, frameSize * sizeof(float));
+        //io::appendBytes(ARG.outputProjection, (uint8_t*)projection, frameSize * sizeof(float));
         //        std::fill_n(projection, projectionElementsCount, float(0.0));
+        io::BufferedFrame2D<float> transposedFrame(projection, ARG.projectionSizeY,
+                                                   ARG.projectionSizeX);
+        std::shared_ptr<io::Frame2DI<float>> frame = transposedFrame.transposed();
+        projectionWritter.writeFrame(*frame, i);
+        std::fill_n(projection, frameSize, float(0.0));
     }
     delete[] volume;
     delete[] projection;
