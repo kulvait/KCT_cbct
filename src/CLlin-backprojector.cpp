@@ -16,6 +16,7 @@
 #include "gitversion/version.h"
 
 // Internal libraries
+#include "BufferedFrame2D.hpp"
 #include "CArmArguments.hpp"
 #include "CuttingVoxelProjector.hpp"
 #include "DEN/DenAsyncFrame2DWritter.hpp"
@@ -180,6 +181,7 @@ int main(int argc, char* argv[])
     {
         return -1; // Exited somehow wrong
     }
+    LOGI << prgInfo;
     PRG.startLog(true);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
     std::shared_ptr<io::DenProjectionMatrixReader> dr
@@ -188,7 +190,6 @@ int main(int argc, char* argv[])
     // Construct projector and initialize OpenCL
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX,
                               ARG.volumeSizeY, ARG.volumeSizeZ);
-    CVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {
         CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -215,13 +216,23 @@ int main(int argc, char* argv[])
     // End parsing arguments
     std::vector<std::shared_ptr<matrix::CameraI>> cameraVector;
     std::shared_ptr<matrix::CameraI> pm;
+    bool XMajorAlignment = false;
     float* projection = new float[ARG.projectionFrameSize * ARG.frames.size()];
     {
         io::DenFrame2DReader<float> dpr(ARG.inputProjection);
-        for(uint32_t i = 0; i != ARG.frames.size(); i++)
+        for(uint32_t k = 0; k != ARG.frames.size(); k++)
         {
-            dpr.readFrameIntoBuffer(ARG.frames[i], projection + i * ARG.projectionFrameSize);
-            pm = std::make_shared<matrix::LightProjectionMatrix>(dr->readMatrix(ARG.frames[i]));
+            /*
+                        std::shared_ptr<io::BufferedFrame2D<float>> frame
+                            = dpr.readBufferedFrame(ARG.frames[k]);
+                        std::shared_ptr<io::BufferedFrame2D<float>> transposedFrame =
+               frame->transposed(); float* dataPointer = transposedFrame->getDataPointer();
+                        std::copy(dataPointer, dataPointer + ARG.projectionFrameSize,
+                                  projection + k * ARG.projectionFrameSize);
+            */
+            dpr.readFrameIntoBuffer(ARG.frames[k], projection + k * ARG.projectionFrameSize,
+                                    XMajorAlignment);
+            pm = std::make_shared<matrix::LightProjectionMatrix>(dr->readMatrix(ARG.frames[k]));
             cameraVector.emplace_back(pm);
         }
     }

@@ -3,94 +3,11 @@
 #define zeroPrecisionTolerance 1e-10
 #endif
 
-/** Projection of a volume point v onto X coordinate on projector.
- * No checks for boundaries.
- *
- * @param CM Projection camera matrix
- * @param v Volume point
- * @param PX_out Output
- */
-inline double projectX(private const double16 CM, private const double3 v)
-{
-    return (dot(v, CM.s012) + CM.s3) / (dot(v, CM.s89a) + CM.sb);
-}
-
-/** Projection of a volume point v onto Y coordinate on projector.
- * No checks for boundaries.
- *
- * @param CM Projection camera matrix
- * @param v Volume point
- * @param PY_out Output
- */
-inline double projectY(private const double16 CM, private const double3 v)
-{
-    return (dot(v, CM.s456) + CM.s7) / (dot(v, CM.s89a) + CM.sb);
-}
-
-/** Projection of a volume point v onto P coordinate on projector.
- * No checks for boundaries.
- *
- * @param CM Projection camera matrix
- * @param v Volume point
- * @param P_out Output
- */
-inline void project(private const double16* CM, private const double3* v, private double2* P_out)
-{
-
-    double3 coord;
-    coord.x = dot(*v, CM->s012) + CM->s3;
-    coord.y = dot(*v, CM->s456) + CM->s7;
-    coord.z = dot(*v, CM->s89a) + CM->sb;
-    P_out->x = coord.x / coord.z;
-    P_out->y = coord.y / coord.z;
-}
-
-int2 projectionIndices(private double16 CM, private double3 v, int2 pdims)
-{
-    double3 coord;
-    coord.x = dot(v, CM.s012) + CM.s3;
-    coord.y = dot(v, CM.s456) + CM.s7;
-    coord.z = dot(v, CM.s89a) + CM.sb;
-    coord.x /= coord.z;
-    coord.y /= coord.z;
-    int2 ind;
-    ind.x = convert_int_rtn(coord.x + 0.5);
-    ind.y = convert_int_rtn(coord.y + 0.5);
-    if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
-    {
-        return ind;
-    } else
-    {
-        return pdims;
-    }
-}
-
-int projectionIndex(private double16 CM, private double3 v, int2 pdims)
-{
-    double3 coord;
-    coord.x = dot(v, CM.s012);
-    coord.y = dot(v, CM.s456);
-    coord.z = dot(v, CM.s89a);
-    coord += CM.s37b;
-    coord.x /= coord.z;
-    coord.y /= coord.z;
-    int2 ind;
-    ind.x = convert_int_rtn(coord.x + 0.5);
-    ind.y = convert_int_rtn(coord.y + 0.5);
-    if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
-    {
-        return ind.x + pdims.x * ind.y;
-    } else
-    {
-        return -1;
-    }
-}
-
 /// insertEdgeValues(factor, V, P, projection, pdims);
 void inline insertEdgeValues(global float* projection,
-                             private double16 CM,
+                             private double16 CM, 
                              private double3 v,
-                             private int PX,
+                             private int PX, 
                              private double value,
                              private double3 voxelSizes,
                              private int2 pdims)
@@ -99,108 +16,73 @@ void inline insertEdgeValues(global float* projection,
     double PY_down, PY_up;
     int PJ_down, PJ_up;
     v_down = v + voxelSizes * (double3)(0.0, 0.0, -0.5);
-    v_up = v + voxelSizes * (double3)(0.0, 0.0, +0.5);
+    v_up = v + voxelSizes * (double3)(0.0, 0.0, 0.5);
     PY_down = projectY(CM, v_down);
     PY_up = projectY(CM, v_up);
     PJ_down = convert_int_rtn(PY_down + 0.5);
     PJ_up = convert_int_rtn(PY_up + 0.5);
-    int increment = 1;
-    if(PJ_down == PJ_up)
-    {
-        if(PJ_down >= 0 && PJ_down < pdims.y)
-        {
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
-                          value * voxelSizes.z); // Atomic version of projection[ind] += value;
-        }
-        return;
-    }
     if(PJ_down > PJ_up)
-    {
-        increment = -1;
-    }
-    double stepSize = voxelSizes.z
-        / (PY_up - PY_down); // Lenght of z in volume to increase y in projection by 1
-    double factor;
-    if(PJ_up >= 0 && PJ_up < pdims.y && PJ_down >= 0 && PJ_down < pdims.y)
-    { // Do not check for every insert
-
-        for(int j = PJ_down + increment; j != PJ_up; j += increment)
-        {
-            AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                          value * stepSize
-                              * increment); // Atomic version of projection[ind] += value;
-        }
-
-        // Add part that maps to PJ_down
-        double nextGridY;
-        if(increment > 0)
-        {
-            nextGridY = (double)PJ_down + 0.5;
-        } else
-        {
-            nextGridY = (double)PJ_down - 0.5;
-        }
-        factor = (nextGridY - PY_down) * stepSize;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
-                      value * factor); // Atomic version of projection[ind] += value;
-        // Add part that maps to PJ_up
-        double prevGridY;
-        if(increment > 0)
-        {
-            prevGridY = (double)PJ_up - 0.5;
-        } else
-        {
-            prevGridY = (double)PJ_up + 0.5;
-        }
-        factor = (PY_up - prevGridY) * stepSize;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
-                      value * factor); // Atomic version of projection[ind] += value;
-
+    {   
+        int tmp_i;
+        double tmp_d;
+        tmp_i = PJ_down;
+        PJ_down = PJ_up;
+        PJ_up = tmp_i;
+        tmp_d = PY_down;
+        PY_down = PY_up;
+        PY_up = tmp_d;
+    }   
+    if(PJ_up < 0 || PJ_down >= pdims.y)
+    {   
+        return;
+    }   
+    if(PJ_down == PJ_up)
+    {   
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
+                      value * voxelSizes.z); // Atomic version of projection[ind] += value;
+        return;
+    }   
+    double stepSize = voxelSizes.z * value
+        / (PY_up
+           - PY_down); // Length of z in volume to increase y in projection by 1 multiplied by value
+    // int j = max(-1, PJ_down);
+    // int j_STOP = min(PJ_up, pdims.y);
+    int j, j_STOP;
+    // Add part that maps to PJ_down
+    if(PJ_down >= 0)
+    {   
+        // double nextGridY;
+        // nextGridY = (double)PJ_down + 0.5;
+        // factor = (nextGridY - PY_down) * stepSize * value;
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
+                      ((double)PJ_down + 0.5 - PY_down)
+                          * stepSize); // Atomic version of projection[ind] += value;
+        j = PJ_down + 1;
     } else
     {
-
-        for(int j = PJ_down + increment; j != PJ_up; j += increment)
-        {
-
-            if(j >= 0 && j < pdims.y)
-            {
-                AtomicAdd_g_f(&projection[PX + pdims.x * j],
-                              value * stepSize
-                                  * increment); // Atomic version of projection[ind] += value;
-            }
-        }
-
-        // Add part that maps to PJ_down
-        if(PJ_down >= 0 && PJ_down < pdims.y)
-        {
-            double nextGridY;
-            if(increment > 0)
-            {
-                nextGridY = (double)PJ_down + 0.5;
-            } else
-            {
-                nextGridY = (double)PJ_down - 0.5;
-            }
-            factor = (nextGridY - PY_down) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
-                          value * factor); // Atomic version of projection[ind] += value;
-        } // Add part that maps to PJ_up
-        if(PJ_up >= 0 && PJ_up < pdims.y)
-        {
-            double prevGridY;
-            if(increment > 0)
-            {
-                prevGridY = (double)PJ_up - 0.5;
-            } else
-            {
-                prevGridY = (double)PJ_up + 0.5;
-            }
-            factor = (PY_up - prevGridY) * stepSize;
-            AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
-                          value * factor); // Atomic version of projection[ind] += value;
-        }
+        j = 0;
+    }
+    // Add part that maps to PJ_up
+    if(PJ_up < pdims.y)
+    {
+        // double prevGridY;
+        // prevGridY = (double)PJ_up - 0.5;
+        // factor = (PY_up - prevGridY) * stepSize * value;
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_up],
+                      (PY_up - ((double)PJ_up - 0.5))
+                          * stepSize); // Atomic version of projection[ind] += value;
+        j_STOP = PJ_up;
+    } else
+    {
+        j_STOP = pdims.y;
+    }
+    for(; j < j_STOP; j++)
+    {
+        AtomicAdd_g_f(&projection[PX * pdims.y + j],
+                      stepSize); // Atomic version of projection[ind] += value;
     }
 }
+
 
 /**
  * We parametrize the line segment from A to B by parameter t such that t=0 for A and t=1 for B.

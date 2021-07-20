@@ -565,8 +565,8 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
         PX_ccw[3] = &px11;
     }
 
-    min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + 0.5);
-    max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
+    min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + HALF);
+    max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + HALF);
     if(max_PX >= 0 && min_PX < pdims.x)
     {
         REAL3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
@@ -590,15 +590,9 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
             //    = findIntersectionPoints(((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2],
             //    V_ccw[3],
             //                             PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], &lastInt);
-#ifdef RELAXED
-            lastSectionSize = exactIntersectionPointsF0_extended(
-                ((float)I) + 0.5f, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
-                PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
-#else
             lastSectionSize = exactIntersectionPoints0_extended(
-                ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
+                ((REAL)I) + HALF, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
                 PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
-#endif
             if(I >= 0)
             {
                 factor = backprojectExactEdgeValues0(projection, CM, lastInt, I, voxelSizes, pdims);
@@ -606,15 +600,9 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
             }
             for(I = I + 1; I < I_STOP; I++)
             {
-#ifdef RELAXED
-                nextSectionSize = exactIntersectionPointsF0_extended(
-                    ((float)I) + 0.5F, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
-                    PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
-#else
                 nextSectionSize = exactIntersectionPoints0_extended(
-                    ((double)I) + 0.5, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
+                    ((REAL)I) + HALF, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
                     PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
-#endif
                 polygonSize = nextSectionSize - lastSectionSize;
                 Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
                 factor = backprojectExactEdgeValues0(projection, CM, Int, I, voxelSizes, pdims);

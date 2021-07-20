@@ -1,24 +1,4 @@
 //==============================centerVoxelProjector.cl=====================================
-int2 projectionIndex(private double16 P, private double3 vdim, int2 pdims)
-{
-    double4 coord;
-    coord.x = vdim.x * P[0] + vdim.y * P[1] + vdim.z * P[2] + P[3];
-    coord.y = vdim.x * P[4] + vdim.y * P[5] + vdim.z * P[6] + P[7];
-    coord.z = vdim.x * P[8] + vdim.y * P[9] + vdim.z * P[10] + P[11];
-    coord.x /= coord.z;
-    coord.y /= coord.z;
-    int2 ind;
-    ind.x = convert_int_rtp(coord.x + 0.5);
-    ind.y = convert_int_rtp(coord.y + 0.5);
-    if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
-    {
-        return ind;
-    } else
-    {
-        return pdims;
-    }
-}
-
 int volIndex(int* i, int* j, int* k, int3* vdims)
 {
     return (*i) + (*j) * vdims->x + (*k) * (vdims->x * vdims->y);
@@ -61,8 +41,8 @@ void kernel FLOATcenter_voxel_project(global const float* restrict volume,
                                      volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
     const double3 voxelcenter_xyz = zerocorner_xyz
         + ((IND_ijk + 0.5) * voxelSizes); // Using widening and vector multiplication operations
-    int2 p_ab = projectionIndex(PM, voxelcenter_xyz, pdims);
-    if(p_ab.x != pdims.x && p_ab.y != pdims.y)
+    int ind = projectionIndex(PM, voxelcenter_xyz, pdims);
+    if(ind != -1)
     {
         int VINDEX = volIndex(&i, &j, &k, &vdims);
         float voxelValue = volume[VINDEX];
@@ -72,7 +52,6 @@ void kernel FLOATcenter_voxel_project(global const float* restrict volume,
         double cosPowThree = cosine * cosine * cosine;
         float value = voxelValue * scalingFactor
             / (sourceToVoxel_xyz_norm * sourceToVoxel_xyz_norm * cosPowThree);
-        int ind = p_ab.y * pdims.x + p_ab.x;
         AtomicAdd_g_f(&projection[projectionOffset + ind],
                       value); // Atomic version of projection[ind] += value;
     }

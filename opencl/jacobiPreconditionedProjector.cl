@@ -1,88 +1,4 @@
 //==============================jacobiPreconditionedProjector.cl=====================================
-/** Projection of a volume point v onto X coordinate on projector.
- * No checks for boundaries.
- *
- * @param CM Projection camera matrix
- * @param v Volume point
- * @param PX_out Output
- */
-inline double projectX(private const double16 CM, private const double3 v)
-{
-    return (dot(v, CM.s012) + CM.s3) / (dot(v, CM.s89a) + CM.sb);
-}
-
-/** Projection of a volume point v onto Y coordinate on projector.
- * No checks for boundaries.
- *
- * @param CM Projection camera matrix
- * @param v Volume point
- * @param PY_out Output
- */
-inline double projectY(private const double16 CM, private const double3 v)
-{
-    return (dot(v, CM.s456) + CM.s7) / (dot(v, CM.s89a) + CM.sb);
-}
-
-/** Projection of a volume point v onto P coordinate on projector.
- * No checks for boundaries.
- *
- * @param CM Projection camera matrix
- * @param v Volume point
- * @param P_out Output
- */
-inline void project(private const double16* CM, private const double3* v, private double2* P_out)
-{
-
-    double3 coord;
-    coord.x = dot(*v, CM->s012) + CM->s3;
-    coord.y = dot(*v, CM->s456) + CM->s7;
-    coord.z = dot(*v, CM->s89a) + CM->sb;
-    P_out->x = coord.x / coord.z;
-    P_out->y = coord.y / coord.z;
-}
-
-int2 projectionIndices(private double16 CM, private double3 v, int2 pdims)
-{
-    double3 coord;
-    coord.x = dot(v, CM.s012);
-    coord.y = dot(v, CM.s456);
-    coord.z = dot(v, CM.s89a);
-    coord += CM.s37b;
-    coord.x /= coord.z;
-    coord.y /= coord.z;
-    int2 ind;
-    ind.x = convert_int_rtn(coord.x + 0.5);
-    ind.y = convert_int_rtn(coord.y + 0.5);
-    if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
-    {
-        return ind;
-    } else
-    {
-        return pdims;
-    }
-}
-
-int projectionIndex(private double16 CM, private double3 v, int2 pdims)
-{
-    double3 coord;
-    coord.x = dot(v, CM.s012);
-    coord.y = dot(v, CM.s456);
-    coord.z = dot(v, CM.s89a);
-    coord += CM.s37b;
-    coord.x /= coord.z;
-    coord.y /= coord.z;
-    int2 ind;
-    ind.x = convert_int_rtn(coord.x + 0.5);
-    ind.y = convert_int_rtn(coord.y + 0.5);
-    if(ind.x >= 0 && ind.y >= 0 && ind.x < pdims.x && ind.y < pdims.y)
-    {
-        return ind.x + pdims.x * ind.y;
-    } else
-    {
-        return -1;
-    }
-}
-
 /// insertEdgeValues(factor, V, P, projection, pdims);
 void inline insertEdgeValues(global float* projection,
                              private double16 CM,
@@ -118,7 +34,7 @@ void inline insertEdgeValues(global float* projection,
     }
     if(PJ_down == PJ_up)
     {
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
                       value * voxelSizes.z); // Atomic version of projection[ind] += value;
         return;
     }
@@ -134,7 +50,7 @@ void inline insertEdgeValues(global float* projection,
         // double nextGridY;
         // nextGridY = (double)PJ_down + 0.5;
         // factor = (nextGridY - PY_down) * stepSize * value;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_down],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_down],
                       ((double)PJ_down + 0.5 - PY_down)
                           * stepSize); // Atomic version of projection[ind] += value;
         j = PJ_down + 1;
@@ -148,7 +64,7 @@ void inline insertEdgeValues(global float* projection,
         // double prevGridY;
         // prevGridY = (double)PJ_up - 0.5;
         // factor = (PY_up - prevGridY) * stepSize * value;
-        AtomicAdd_g_f(&projection[PX + pdims.x * PJ_up],
+        AtomicAdd_g_f(&projection[PX * pdims.y + PJ_up],
                       (PY_up - ((double)PJ_up - 0.5))
                           * stepSize); // Atomic version of projection[ind] += value;
         j_STOP = PJ_up;
@@ -158,7 +74,7 @@ void inline insertEdgeValues(global float* projection,
     }
     for(; j < j_STOP; j++)
     {
-        AtomicAdd_g_f(&projection[PX + pdims.x * j],
+        AtomicAdd_g_f(&projection[PX * pdims.y + j],
                       stepSize); // Atomic version of projection[ind] += value;
     }
 }
