@@ -74,7 +74,17 @@ void inline localEdgeValues0(local float* projection,
     }
 }
 
-// Finds ranges of corners when center v is given
+/**
+* @brief Finds ranges of corners when center voxel v is given
+*
+* @param v Center of given voxel
+* @param voxelSizes Voxel dimensions
+* @param CM Projection matrix
+* @param I_min OUT i range
+* @param I_max OUT i range inclusive
+* @param J_min OUT j range
+* @param J_max OUT j range inclusive
+*/
 inline void
 getVoxelRanges(REAL3 v, REAL3 voxelSizes, REAL16 CM, int* I_min, int* I_max, int* J_min, int* J_max)
 {
