@@ -435,6 +435,78 @@ inline uint voxelIndex(uint i, uint j, uint k, int3 vdims)
     return i + j * vdims.x + k * vdims.x * vdims.y;
 }
 
+/**
+* @brief Finds ranges of corners when center voxel v is given
+*
+* @param v Center of given voxel
+* @param voxelSizes Voxel dimensions
+* @param CM Projection matrix
+* @param I_min OUT i range
+* @param I_max OUT i range inclusive
+* @param J_min OUT j range
+* @param J_max OUT j range inclusive
+*/
+inline void
+getVoxelRanges(REAL3 v, REAL3 voxelSizes, REAL16 CM, int* I_min, int* I_max, int* J_min, int* J_max)
+{
+    REAL nI = dot(CM.s012, v);
+    REAL nJ = dot(CM.s456, v);
+    REAL dv = dot(CM.s89a, v);
+    REAL hxI = CM.s0 * voxelSizes.x;
+    REAL hyI = CM.s1 * voxelSizes.y;
+    REAL hzI = CM.s2 * voxelSizes.z;
+    REAL hxJ = CM.s4 * voxelSizes.x;
+    REAL hyJ = CM.s5 * voxelSizes.y;
+    REAL hzJ = CM.s6 * voxelSizes.z;
+    REAL hxD = CM.s8 * voxelSizes.x;
+    REAL hyD = CM.s9 * voxelSizes.y;
+    REAL hzD = CM.sa * voxelSizes.z;
+    REAL numeratorI = nI - HALF * (hxI + hyI + hzI);
+    REAL numeratorJ = nJ - HALF * (hxJ + hyJ + hzJ);
+    REAL denominator = dv - HALF * (hxD + hyD + hzD);
+    int IND1 = INDEX(numeratorI / denominator); // 000
+    int JND1 = INDEX(numeratorJ / denominator); // 000
+    numeratorI += hzI;
+    numeratorJ += hzJ;
+    denominator += hzD;
+    int IND2 = INDEX(numeratorI / denominator); // 001
+    int JND2 = INDEX(numeratorJ / denominator); // 001
+    numeratorI += hyI;
+    numeratorJ += hyJ;
+    denominator += hyD;
+    int IND3 = INDEX(numeratorI / denominator); // 011
+    int JND3 = INDEX(numeratorJ / denominator); // 011
+    numeratorI -= hzI;
+    numeratorJ -= hzJ;
+    denominator -= hzD;
+    int IND4 = INDEX(numeratorI / denominator); // 010
+    int JND4 = INDEX(numeratorJ / denominator); // 010
+    numeratorI += hxI;
+    numeratorJ += hxJ;
+    denominator += hxD;
+    int IND5 = INDEX(numeratorI / denominator); // 110
+    int JND5 = INDEX(numeratorJ / denominator); // 110
+    numeratorI -= hyI;
+    numeratorJ -= hyJ;
+    denominator -= hyD;
+    int IND6 = INDEX(numeratorI / denominator); // 100
+    int JND6 = INDEX(numeratorJ / denominator); // 100
+    numeratorI += hzI;
+    numeratorJ += hzJ;
+    denominator += hzD;
+    int IND7 = INDEX(numeratorI / denominator); // 101
+    int JND7 = INDEX(numeratorJ / denominator); // 101
+    numeratorI += hyI;
+    numeratorJ += hyJ;
+    denominator += hyD;
+    int IND8 = INDEX(numeratorI / denominator); // 111
+    int JND8 = INDEX(numeratorJ / denominator); // 111
+    *I_min = min(min(min(IND1, IND2), min(IND3, IND4)), min(min(IND5, IND6), min(IND7, IND8)));
+    *I_max = max(max(max(IND1, IND2), max(IND3, IND4)), max(max(IND5, IND6), max(IND7, IND8)));
+    *J_min = min(min(min(JND1, JND2), min(JND3, JND4)), min(min(JND5, JND6), min(JND7, JND8)));
+    *J_max = max(max(max(JND1, JND2), max(JND3, JND4)), max(max(JND5, JND6), max(JND7, JND8)));
+}
+
 /** Kernel to precompute projection indices to spare some redundancy.
  *
  * @param vertexProjectionIndices
@@ -459,5 +531,4 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
     vertexProjectionIndices[i + j * (vdims.x + 1) + k * (vdims.x + 1) * (vdims.y + 1)] 
         = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
 }
-
 //==============================END include.cl=====================================

@@ -3,6 +3,8 @@
 #define zeroPrecisionTolerance 1e-10
 #endif
 
+#define DROPNOTIRRADIATED
+
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline backprojectMinMaxEdgeValues(global const float* projection,
                                          private REAL16 CM,
@@ -193,9 +195,21 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
         = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
     const uint IND = voxelIndex(i, j, k, vdims);
+
+#ifdef DROPNOTIRRADIATED
+    int I_min, I_max, J_min, J_max;
+    getVoxelRanges(voxelcenter_xyz, voxelSizes, CM, &I_min, &I_max, &J_min, &J_max);
+    if(I_min < 0 || I_max >= pdims.x || J_min < 0 || J_max >= pdims.y)
+    {
+        volume[IND] = 0.0f;
+        return;
+    }
+#endif
+
     float ADD = INFINITY;
     const REAL voxelVolume = voxelSizes.x * voxelSizes.y * voxelSizes.z;
     REAL sourceToVoxel_xyz_norm2 = dot(voxelcenter_xyz, voxelcenter_xyz);
+
 #ifdef RELAXED
     float value = (voxelVolume * globalScalingMultiplier / sourceToVoxel_xyz_norm2);
 #else
@@ -220,7 +234,7 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
         px10 = (nx + nhx - nhy) / (dv + dhx - dhy);
         px11 = (nx + nhx + nhy) / (dv + dhx + dhy);
     }
-   REAL pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
+    REAL pxx_min, pxx_max; // Minimum and maximum values of projector x coordinate
     int max_PX,
         min_PX; // Pixel to which are the voxels with minimum and maximum values are
                 // projected
@@ -351,8 +365,8 @@ void kernel FLOATcutting_voxel_minmaxbackproject(global float* restrict volume,
         {
             min_PX = convert_int_rtn(HALF * (pxx_min + pxx_max) + HALF);
             ADD = backprojectMinMaxEdgeValues(&projection[projectionOffset], CM,
-                                              HALF * (vx10 + vx01), min_PX, value,
-                                              voxelSizes, pdims);
+                                              HALF * (vx10 + vx01), min_PX, value, voxelSizes,
+                                              pdims);
             volume[IND] = min(ADD, volume[IND]);
         } else
         {
