@@ -151,25 +151,21 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
     if(LID == 0) // Get dimension
     {
-                //LID==0
+        // LID==0
         const REAL3 volumeCenter_localVoxelcenter_offset
-            = (REAL3)(2 * i +  lis - vdims.x, 2 * j + ljs - vdims.y, 2 * k +  lks - vdims.z)
+            = (REAL3)(2 * i + lis - vdims.x, 2 * j + ljs - vdims.y, 2 * k + lks - vdims.z)
             * halfVoxelSizes;
-/*
-        // LID==LIX
-        const REAL3 volumeCenter_localVoxelcenter_offset
-            = (REAL3)(2 * i + 2 - lis - vdims.x, 2 * j + 2 - ljs - vdims.y,
-                      2 * k + 2 - lks - vdims.z)
-            * halfVoxelSizes;*/
+        /*
+            // LID==LIX
+            const REAL3 volumeCenter_localVoxelcenter_offset = (REAL3)(2 * i + 2 - lis -
+                        vdims.x, 2 * j + 2 - ljs - vdims.y, 2 * k + 2 - lks - vdims.z) *
+                                        halfVoxelSizes;
+        */
         const REAL3 voxelcenter_local_xyz
             = volumeCenter + volumeCenter_localVoxelcenter_offset - sourcePosition;
 
         const REAL3 halfLocalSizes
             = { HALF * lis * voxelSizes.x, HALF * ljs * voxelSizes.y, HALF * lks * voxelSizes.z };
-        /*
-const REAL3 IND_local_ijk = { i + HALF * lis, j + HALF * ljs, k + HALF * lks };
-const REAL3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizes);
-*/
         positiveShift[0] = halfLocalSizes; // X direction
         positiveShift[1] = halfLocalSizes; // Y direction
         if(all(fabs(voxelcenter_local_xyz) > halfLocalSizes)) // Increase or decrease of the value
@@ -682,11 +678,6 @@ px11 = PROJECTX0(CML, vx11);*/
                     if(I >= 0)
                     {
                         factor = value * lastSectionSize;
-                        // insertEdgeValues(&projection[projectionOffset], CM, lastInt, I,
-                        // factor, voxelSizes, pdims);
-                        //                                printf("lastInt=(%f, %f, %f),
-                        //                                I=%d, factor=%f\n", lastInt.x,
-                        //                                lastInt.y, lastInt.z, I, factor);
                         localEdgeValues0(localProjection, CML, lastInt, I, factor, voxelSizes,
                                          Lpdims);
                     }
@@ -702,7 +693,7 @@ px11 = PROJECTX0(CML, vx11);*/
                         lastSectionSize = nextSectionSize;
                         lastInt = nextInt;
                     }
-                    if(I_STOP < pdims.x)
+                    if(I_STOP < Lpdims.x)
                     {
                         polygonSize = ONE - lastSectionSize;
                         Int = ((*V_ccw[0] + *V_ccw[2]) * HALF - lastSectionSize * lastInt)
