@@ -117,13 +117,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     // initialize localProjection in given workGroup
     uint LOCSIZE = lis * ljs * lks;
     uint LID = li * ljs * lks + lj * lks + lk;
-    uint LIDRANGE = (LOCALARRAYSIZE + LOCSIZE - 1) / LOCSIZE;
-    uint fillStart = LID * LIDRANGE;
-    uint fillStop = min(fillStart + LIDRANGE, (uint)LOCALARRAYSIZE);
-    for(uint IND = fillStart; IND != fillStop; IND++)
-    {
-        localProjection[IND] = 0.0f;
-    }
+    uint LIDRANGE, fillStart, fillStop;
     int2 Lpdims;
     uint mappedLocalRange, Jrange, ILocalRange; // Memory used only in cornerWorkItem
     local bool offAxisPosition; // If true, position of local cuboid is such that the direction
@@ -157,9 +151,16 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
     if(LID == 0) // Get dimension
     {
+                //LID==0
         const REAL3 volumeCenter_localVoxelcenter_offset
-            = (REAL3)(2 * i + lis - vdims.x, 2 * j + ljs - vdims.y, 2 * k + lks - vdims.z)
+            = (REAL3)(2 * i +  lis - vdims.x, 2 * j + ljs - vdims.y, 2 * k +  lks - vdims.z)
             * halfVoxelSizes;
+/*
+        // LID==LIX
+        const REAL3 volumeCenter_localVoxelcenter_offset
+            = (REAL3)(2 * i + 2 - lis - vdims.x, 2 * j + 2 - ljs - vdims.y,
+                      2 * k + 2 - lks - vdims.z)
+            * halfVoxelSizes;*/
         const REAL3 voxelcenter_local_xyz
             = volumeCenter + volumeCenter_localVoxelcenter_offset - sourcePosition;
 
@@ -292,6 +293,17 @@ const REAL3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizes
                                   // .. PJMAX-PJMIN, 6 CurrentPISTART
     if(fullyOffProjectorPosition)
         return;
+    Lpdims = (int2)(projectorLocalRange[4], projectorLocalRange[5]);
+    mappedLocalRange = Lpdims.x * Lpdims.y;
+    LIDRANGE = (mappedLocalRange + LOCSIZE - 1) / LOCSIZE;
+    fillStart = min(LID * LIDRANGE, mappedLocalRange);
+    // minimum for LIDRANGE=1 and LID >= mappedLocalRange
+    fillStop = min(fillStart + LIDRANGE, mappedLocalRange);
+    for(uint IND = fillStart; IND != fillStop; IND++)
+    {
+        localProjection[IND] = 0.0f;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
     uint prevStartRange;
     const uint IND = voxelIndex(i, j, k, vdims);
     const float voxelValue = volume[IND];
@@ -342,7 +354,6 @@ const REAL3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizes
         prevStartRange = projectorLocalRange[6];
         // printf("i,j,k=%d,%d,%d", i, j, k);
         // Start CVP
-        Lpdims = (int2)(projectorLocalRange[4], projectorLocalRange[5]);
         if(!dropVoxel)
         {
             /*
@@ -356,7 +367,7 @@ const REAL3 voxelcenter_local_xyz = zerocorner_xyz + (IND_local_ijk * voxelSizes
                             {
                                 dropVoxel = true;
                             }
-                            if(LID==0 && voxelValue)
+                            if(LID==LIX && voxelValue)
                             {
                                 // Debug
                                 int id, iu, jd, ju;
@@ -707,7 +718,6 @@ px11 = PROJECTX0(CML, vx11);*/
         // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5 .. PJMAX-PJMIN, 6
         // CurrentPISTART
         barrier(CLK_LOCAL_MEM_FENCE); // Local to global copy
-        mappedLocalRange = Lpdims.x * Lpdims.y;
         fillStart = min(fillStart, mappedLocalRange);
         fillStop = min(fillStop, mappedLocalRange);
         uint LI, LJ, globalIndex;
@@ -738,6 +748,12 @@ px11 = PROJECTX0(CML, vx11);*/
 
         if(!stopNextIteration)
         {
+            barrier(CLK_LOCAL_MEM_FENCE);
+            Lpdims = (int2)(projectorLocalRange[4], projectorLocalRange[5]);
+            mappedLocalRange = Lpdims.x * Lpdims.y;
+            fillStart = min(fillStart, mappedLocalRange);
+            fillStop = min(fillStop, mappedLocalRange);
+            // When LIDRANGE=1 there might be processes not to fill at all
             for(int IND = fillStart; IND != fillStop; IND++)
             {
                 localProjection[IND] = 0.0f;
