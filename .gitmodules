@@ -9,16 +9,13 @@
 	url = https://github.com/vit-vit/ctpl
 [submodule "submodules/CTIOL"]
 	path = submodules/CTIOL
-	url = ../CTIOL.git
+	url = ../kct_ctiol.git
 [submodule "submodules/CTMAL"]
 	path = submodules/CTMAL
-	url = ../CTMAL.git
+	url = ../kct_ctmal.git
 [submodule "submodules/matplotlib-cpp"]
 	path = submodules/matplotlib-cpp
 	url = https://github.com/lava/matplotlib-cpp
 [submodule "submodules/gitversion"]
 	path = submodules/gitversion
 	url = https://github.com/kulvait/gitversion
-[submodule "submodules/Catch2"]
-	path = submodules/Catch2
-	url = https://github.com/catchorg/Catch2.git
