@@ -16,9 +16,9 @@
 [submodule "submodules/matplotlib-cpp"]
 	path = submodules/matplotlib-cpp
 	url = https://github.com/lava/matplotlib-cpp
-[submodule "submodules/Catch2"]
-	path = submodules/Catch2
-	url = https://github.com/catchorg/Catch2.git
 [submodule "submodules/gitversion"]
 	path = submodules/gitversion
 	url = https://github.com/kulvait/gitversion
+[submodule "submodules/Catch2"]
+	path = submodules/Catch2
+	url = https://github.com/catchorg/Catch2.git
