@@ -117,6 +117,7 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl opencl/projector_si
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl opencl/projector_tt.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl opencl/rescaleProjections.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/convolution.cl opencl/convolution.cl COPYONLY)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
@@ -133,6 +134,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/convolution.cl DESTINATION opencl)
 
 
 SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
@@ -159,6 +161,24 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl opencl/backproj
 configure_file(${CMAKE_SOURCE_DIR}/opencl/backprojector_tt.cl opencl/backprojector_tt.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/centerVoxelProjector.cl opencl/centerVoxelProjector.cl COPYONLY)
 install (TARGETS CLlin-projector RUNTIME DESTINATION .)
+
+SET(CLLINCONVOLUTION_SOURCES src/CLlin-convolution.cpp src/Kniha.cpp src/alg/VolumeConvolutionOperator.cpp src/CArmArguments.cpp)
+add_executable(CLlin-convolution ${CLLINCONVOLUTION_SOURCES})
+set_target_properties(
+    CLlin-convolution
+    PROPERTIES 
+        OUTPUT_NAME "cllin-convolution"
+        SUFFIX ""
+)
+target_link_libraries(CLlin-convolution ctiol)
+target_link_libraries(CLlin-convolution ctmal)
+target_link_libraries(CLlin-convolution OpenCL::OpenCL)
+target_link_libraries(CLlin-convolution CTIOL_OPENCL)
+target_include_directories(CLlin-convolution PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(CLlin-convolution PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_git_version_init(CLlin-convolution)
+target_link_libraries (CLlin-convolution ${CMAKE_THREAD_LIBS_INIT})
+install (TARGETS CLlin-convolution RUNTIME DESTINATION .)
 
 
 SET(CLLINBACKPROJECTOR_SOURCES src/CLlin-backprojector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)

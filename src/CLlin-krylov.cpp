@@ -66,35 +66,39 @@ public:
         totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
         totalProjectionsSize
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+        std::string ERR;
         if(inf.dimz() != pmi.dimz())
         {
-            std::string ERR = io::xprintf(
+            ERR = io::xprintf(
                 "Projection matrices z dimension %d is different from projections z dimension %d.",
                 pmi.dimz(), inf.dimz());
             LOGE << ERR;
-            throw std::runtime_error(ERR);
+            return 1;
         }
         if(totalVolumeSize > INT_MAX)
         {
-            throw std::runtime_error(
-                "Implement indexing by uint64_t matrix dimension overflow of voxels count.");
+            ERR = "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
+            LOGE << ERR;
+            return 1;
         }
         // End parsing arguments
         if(totalProjectionsSize > INT_MAX)
         {
-            io::throwerr("Implement indexing by uint64_t matrix dimension overflow of projection "
-                         "pixels count.");
+            ERR = io::xprintf(
+                "Implement indexing by uint64_t matrix dimension overflow of projection "
+                "pixels count.");
+            LOGE << ERR;
+            return -1;
         }
         io::DenSupportedType t = inf.getDataType();
         if(t != io::DenSupportedType::float_)
         {
-            std::string ERR
-                = io::xprintf("This program supports float projections only but the supplied "
+            ERR = io::xprintf("This program supports float projections only but the supplied "
                               "projection file %s is "
                               "of type %s",
                               inputProjections.c_str(), io::DenSupportedTypeToString(t).c_str());
             LOGE << ERR;
-            io::throwerr(ERR);
+            return -1;
         }
         if(initialVectorX0 != "")
         {
@@ -103,12 +107,12 @@ public:
                || volumeSizeZ != x0inf.dimz())
             {
 
-                std::string ERR = io::xprintf("Declared dimensions of volume (%d, %d, %d) and the "
-                                              "dimensions of x0 (%d, %d, %d) does not match!",
-                                              volumeSizeX, volumeSizeY, volumeSizeZ, x0inf.dimx(),
-                                              x0inf.dimy(), x0inf.dimz());
+                ERR = io::xprintf("Declared dimensions of volume (%d, %d, %d) and the "
+                                  "dimensions of x0 (%d, %d, %d) does not match!",
+                                  volumeSizeX, volumeSizeY, volumeSizeZ, x0inf.dimx(), x0inf.dimy(),
+                                  x0inf.dimz());
                 LOGE << ERR;
-                throw std::runtime_error(ERR);
+                return -1;
             }
             DenSupportedType dataType = x0inf.getDataType();
             if(dataType != DenSupportedType::float_)
@@ -118,7 +122,7 @@ public:
                                   "only supports floats!",
                                   initialVectorX0.c_str(), DenSupportedTypeToString(dataType));
                 LOGE << ERR;
-                throw std::runtime_error(ERR);
+                return -1;
             }
         }
         if(diagonalPreconditioner != "")
@@ -128,22 +132,22 @@ public:
                || volumeSizeZ != x0inf.dimz())
             {
 
-                std::string ERR = io::xprintf("Declared dimensions of volume (%d, %d, %d) and the "
-                                              "dimensions of x0 (%d, %d, %d) does not match!",
-                                              volumeSizeX, volumeSizeY, volumeSizeZ, x0inf.dimx(),
-                                              x0inf.dimy(), x0inf.dimz());
+                ERR = io::xprintf("Declared dimensions of volume (%d, %d, %d) and the "
+                                  "dimensions of x0 (%d, %d, %d) does not match!",
+                                  volumeSizeX, volumeSizeY, volumeSizeZ, x0inf.dimx(), x0inf.dimy(),
+                                  x0inf.dimz());
                 LOGE << ERR;
-                throw std::runtime_error(ERR);
+                return -1;
             }
             DenSupportedType dataType = x0inf.getDataType();
             if(dataType != DenSupportedType::float_)
             {
-                std::string ERR = io::xprintf(
-                    "The file %s has declared data type %s but this implementation "
-                    "only supports floats!",
-                    diagonalPreconditioner.c_str(), DenSupportedTypeToString(dataType));
+                ERR = io::xprintf("The file %s has declared data type %s but this implementation "
+                                  "only supports floats!",
+                                  diagonalPreconditioner.c_str(),
+                                  DenSupportedTypeToString(dataType));
                 LOGE << ERR;
-                throw std::runtime_error(ERR);
+                return -1;
             }
         }
         parsePlatformString();
@@ -275,7 +279,9 @@ int main(int argc, char* argv[])
     if(ARG.initialVectorX0 != "")
     {
         volume = new float[ARG.totalVolumeSize];
-        io::readBytesFrom(ARG.initialVectorX0, 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
+        io::DenFileInfo iv(ARG.initialVectorX0);
+        io::readBytesFrom(ARG.initialVectorX0, iv.getOffset(), (uint8_t*)volume,
+                          ARG.totalVolumeSize * 4);
     } else
     {
         volume = new float[ARG.totalVolumeSize]();
@@ -345,8 +351,9 @@ int main(int argc, char* argv[])
             if(ARG.diagonalPreconditioner != "")
             {
                 float* preconditionerVolume = new float[ARG.totalVolumeSize];
-                io::readBytesFrom(ARG.diagonalPreconditioner, 6, (uint8_t*)preconditionerVolume,
-                                  ARG.totalVolumeSize * 4);
+                io::DenFileInfo dpInfo(ARG.diagonalPreconditioner);
+                io::readBytesFrom(ARG.diagonalPreconditioner, dpInfo.getOffset(),
+                                  (uint8_t*)preconditionerVolume, ARG.totalVolumeSize * 4);
                 cgls->reconstructDiagonalPreconditioner(preconditionerVolume, ARG.maxIterationCount,
                                                         ARG.stoppingRelativeError);
                 delete[] preconditionerVolume;
@@ -355,12 +362,8 @@ int main(int argc, char* argv[])
                 cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
             }
         }
-        uint16_t buf[3];
-        buf[0] = ARG.volumeSizeY;
-        buf[1] = ARG.volumeSizeX;
-        buf[2] = ARG.volumeSizeZ;
-        io::createEmptyFile(ARG.outputVolume, 0, true);
-        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
+        DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
+                                     ARG.volumeSizeZ);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;
@@ -406,12 +409,6 @@ int main(int argc, char* argv[])
             LOGE << ERR;
             throw std::runtime_error(ERR);
         }
-        uint16_t buf[3];
-        buf[0] = ARG.volumeSizeY;
-        buf[1] = ARG.volumeSizeX;
-        buf[2] = ARG.volumeSizeZ;
-        io::createEmptyFile(ARG.outputVolume, 0, true);
-        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
         if(ARG.tikhonovLambda <= 0.0)
         {
             glsqr->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
@@ -420,6 +417,8 @@ int main(int argc, char* argv[])
             glsqr->reconstructTikhonov(ARG.tikhonovLambda, ARG.maxIterationCount,
                                        ARG.stoppingRelativeError);
         }
+        DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
+                                     ARG.volumeSizeZ);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;
@@ -466,12 +465,6 @@ int main(int argc, char* argv[])
             throw std::runtime_error(ERR);
         }
         psirt->setup(1.99); // 10.1109/TMI.2008.923696
-        uint16_t buf[3];
-        buf[0] = ARG.volumeSizeY;
-        buf[1] = ARG.volumeSizeX;
-        buf[2] = ARG.volumeSizeZ;
-        io::createEmptyFile(ARG.outputVolume, 0, true);
-        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
         if(ARG.tikhonovLambda <= 0.0)
         {
             psirt->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
@@ -479,6 +472,8 @@ int main(int argc, char* argv[])
         {
             throw std::runtime_error("Tikhonov stabilization is not implemented for PSIRT!");
         }
+        DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
+                                     ARG.volumeSizeZ);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;
@@ -525,12 +520,6 @@ int main(int argc, char* argv[])
             throw std::runtime_error(ERR);
         }
         psirt->setup(1.00); // 10.1109/TMI.2008.923696
-        uint16_t buf[3];
-        buf[0] = ARG.volumeSizeY;
-        buf[1] = ARG.volumeSizeX;
-        buf[2] = ARG.volumeSizeZ;
-        io::createEmptyFile(ARG.outputVolume, 0, true);
-        io::appendBytes(ARG.outputVolume, (uint8_t*)buf, 6);
         if(ARG.tikhonovLambda <= 0.0)
         {
             psirt->reconstruct_sirt(ARG.maxIterationCount, ARG.stoppingRelativeError);
@@ -538,6 +527,8 @@ int main(int argc, char* argv[])
         {
             throw std::runtime_error("Tikhonov stabilization is not implemented for PSIRT!");
         }
+        DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
+                                     ARG.volumeSizeZ);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
         delete[] volume;
         delete[] projection;

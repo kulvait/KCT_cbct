@@ -583,6 +583,20 @@ void Kniha::CLINCLUDEutils()
     });
 }
 
+void Kniha::CLINCLUDEconvolution()
+{
+    insertCLFile("opencl/convolution.cl");
+    callbacks.emplace_back([this](cl::Program program) {
+        auto& ptr = FLOATvector_2Dconvolution3x3;
+        std::string str = "FLOATvector_2Dconvolution3x3";
+        if(ptr == nullptr)
+        {
+            ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                cl::Kernel(program, str.c_str()));
+        };
+    });
+}
+
 void Kniha::insertCLFile(std::string f)
 {
     if(std::find(CLFiles.begin(), CLFiles.end(), f) == CLFiles.end())
@@ -872,4 +886,37 @@ int Kniha::algFLOATvector_C_equals_A_times_B(
     }
     return 0;
 }
+// convolution.cl
+int Kniha::algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
+                                           cl::Buffer& B,
+                                           cl_int3& vdims,
+                                           cl_float16& convolutionKernel,
+                                           cl::NDRange& globalRange,
+                                           std::shared_ptr<cl::NDRange> localRange,
+                                           bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
+    auto exe = (*FLOATvector_2Dconvolution3x3)(*eargs, A, B, vdims, convolutionKernel);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
 } // namespace CTL

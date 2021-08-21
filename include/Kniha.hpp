@@ -7,10 +7,10 @@
 #include <CL/cl.hpp>
 #include <chrono>
 #include <ctime>
+#include <experimental/filesystem>
 #include <functional>
 #include <iostream>
 #include <numeric>
-#include <experimental/filesystem>
 
 // Internal libraries
 #include "DEN/DenProjectionMatrixReader.hpp"
@@ -65,6 +65,7 @@ public:
     void CLINCLUDEprojector_tt();
     void CLINCLUDErescaleProjections();
     void CLINCLUDEutils();
+    void CLINCLUDEconvolution();
 
 protected:
     const cl_float FLOATZERO = 0.0;
@@ -446,6 +447,17 @@ protected:
                                                   float c,
                                                   uint64_t size,
                                                   bool blocking = false);
+    // convolution.cl
+    // FLOATvector_2Dconvolution3x3
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float16&>>
+        FLOATvector_2Dconvolution3x3;
+    int algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
+                                        cl::Buffer& B,
+                                        cl_int3& vdims,
+                                        cl_float16& convolutionKernel,
+                                        cl::NDRange& globalRange,
+                                        std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                        bool blocking = false);
 
 private:
     bool openCLInitialized = false;
