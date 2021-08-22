@@ -319,6 +319,10 @@ int main(int argc, char* argv[])
             cgls->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
                                          ARG.barrierArraySize);
         }
+        if(ARG.tikhonovLambda > 0.0)
+        {
+            cgls->initializeVolumeConvolution();
+        }
         if(ARG.useJacobiPreconditioning)
         {
             cgls->useJacobiVectorCLCode();

@@ -80,6 +80,19 @@ void BaseReconstructor::initializeTTProjector()
     }
 }
 
+void BaseReconstructor::initializeVolumeConvolution()
+{
+    if(!isOpenCLInitialized())
+    {
+        CLINCLUDEconvolution();
+    } else
+    {
+        std::string err = "Could not initialize volume convolution when OpenCL was already initialized.";
+        LOGE << err;
+        throw std::runtime_error(err.c_str());
+    }
+}
+
 void BaseReconstructor::useJacobiVectorCLCode()
 {
     if(!isOpenCLInitialized())
