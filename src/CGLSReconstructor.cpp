@@ -71,9 +71,10 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
-        LOGI << io::xprintf_green("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
-                            "that is %0.3f%% of |AT(Ax0-b)|.",
-                            iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
+        LOGI << io::xprintf_green(
+            "Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
+            "that is %0.3f%% of |AT(Ax0-b)|.",
+            iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
         algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
@@ -86,8 +87,150 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
     }
-    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
-                        norm, 100.0 * norm / NB0);
+    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
+                              iteration, norm, 100.0 * norm / NB0);
+    Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
+    return 0;
+}
+
+void CGLSReconstructor::tikhonovMatrixAction(cl::Buffer XIN, cl::Buffer XOUT)
+{
+    cl::NDRange globalRange(vdimx, vdimy, vdimz);
+    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
+                                     0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
+    algFLOATvector_2Dconvolution3x3(XIN, XOUT, vdims, convolutionKernel, globalRange, localRange);
+}
+
+int CGLSReconstructor::reconstructTikhonov(float effectSizeTikhonov,
+                                           uint32_t maxIterations,
+                                           float errCondition)
+{
+    LOGD << printTime(
+        io::xprintf("WELCOME TO CGLS WITH TIKHONOV REGULARIZATION %f, init", effectSizeTikhonov),
+        false, true);
+    uint32_t iteration = 1;
+    // Tikhonov initialization
+
+    // Initialization
+    double norm, normDiscB2, normDiscX2, residualNorm2_old, residualNorm2_now, AdirectionNorm2,
+        AdirectionNorm2Xpart, alpha, beta;
+    double NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
+    double NR0, NX;
+    LOGI << io::xprintf("||b||=%f", NB0);
+    std::shared_ptr<cl::Buffer> directionVector_xbuf, residualVector_xbuf,
+        residualVector_xbuf_add; // X buffers
+    allocateXBuffers(5);
+    directionVector_xbuf = getXBuffer(0);
+    residualVector_xbuf = getXBuffer(1);
+    residualVector_xbuf_add = getXBuffer(2);
+    allocateBBuffers(2);
+    std::shared_ptr<cl::Buffer> discrepancy_bbuf, AdirectionVector_bbuf; // B buffers
+    std::shared_ptr<cl::Buffer> discrepancy_bbuf_xpart, AdirectionVector_bbuf_xpart; // X buffers
+    discrepancy_bbuf = getBBuffer(0);
+    AdirectionVector_bbuf = getBBuffer(1);
+    discrepancy_bbuf_xpart = getXBuffer(3);
+    AdirectionVector_bbuf_xpart = getXBuffer(4);
+    // discrepancy_bbuf stores initial discrepancy
+    algFLOATvector_copy(*b_buf, *discrepancy_bbuf, BDIM);
+    Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart, FLOATZERO, 0, XDIM * sizeof(float));
+    if(useVolumeAsInitialX0)
+    {
+        project(*x_buf, *AdirectionVector_bbuf);
+        tikhonovMatrixAction(*x_buf, *AdirectionVector_bbuf_xpart);
+        scaleFloatVector(*AdirectionVector_bbuf_xpart, effectSizeTikhonov, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -1.0f, BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart, *AdirectionVector_bbuf_xpart,
+                                          -1.0f, XDIM);
+        reportTime("Projection x0", false, true);
+    } else
+    {
+        Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
+    }
+    backproject(*discrepancy_bbuf, *residualVector_xbuf);
+    tikhonovMatrixAction(*discrepancy_bbuf_xpart, *residualVector_xbuf_add);
+    algFLOATvector_A_equals_A_plus_cB(*residualVector_xbuf, *residualVector_xbuf_add,
+                                      effectSizeTikhonov, XDIM);
+    algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
+    residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
+    reportTime("Backprojection 0", false, true);
+    NR0 = std::sqrt(residualNorm2_old);
+    project(*directionVector_xbuf, *AdirectionVector_bbuf);
+    tikhonovMatrixAction(*directionVector_xbuf, *AdirectionVector_bbuf_xpart);
+    scaleFloatVector(*AdirectionVector_bbuf_xpart, effectSizeTikhonov, XDIM);
+    AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf);
+    AdirectionNorm2Xpart = normXBuffer_barrier_double(*AdirectionVector_bbuf_xpart);
+    reportTime("Projection 1", false, true);
+    alpha = residualNorm2_old / (AdirectionNorm2 + AdirectionNorm2Xpart);
+    algFLOATvector_A_equals_A_plus_cB(*x_buf, *directionVector_xbuf, alpha, XDIM);
+    algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
+    algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart, *AdirectionVector_bbuf_xpart, -alpha,
+                                      XDIM);
+    normDiscB2 = normBBuffer_barrier_double(*discrepancy_bbuf);
+    normDiscX2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart);
+    norm = std::sqrt(normDiscB2 + normDiscX2);
+    while(norm / NB0 > errCondition && iteration < maxIterations)
+    {
+        if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
+        {
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+                                iteration);
+            writeVolume(*x_buf,
+                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+        }
+        // DEBUG
+        if(iteration % 1000 == 0)
+        {
+            project(*x_buf, *discrepancy_bbuf);
+            tikhonovMatrixAction(*x_buf, *discrepancy_bbuf_xpart);
+            scaleFloatVector(*discrepancy_bbuf_xpart, effectSizeTikhonov, XDIM);
+            algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
+            double normDiscB2 = normBBuffer_barrier_double(*discrepancy_bbuf);
+            double normDiscX2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart);
+            double norm2 = std::sqrt(normDiscB2 + normDiscX2);
+            reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
+            LOGI << io::xprintf_green("Reorthogonalization in iteration %d: "
+                                      "sqrt(|Ax-b|^2+|Tx|^2)=%0.1f that is %0.2f%% of |b|, "
+                                      "|Ax-b|=%f, |Tx|=%f, , loss of orthogonality %f%%.",
+                                      iteration, norm2, 100.0 * norm2 / NB0, std::sqrt(normDiscB2),
+                                      std::sqrt(normDiscX2), 100 * std::abs(norm2 - norm) / norm);
+        }
+        // DEBUG
+        backproject(*discrepancy_bbuf, *residualVector_xbuf);
+        tikhonovMatrixAction(*discrepancy_bbuf_xpart, *residualVector_xbuf_add);
+        algFLOATvector_A_equals_A_plus_cB(*residualVector_xbuf, *residualVector_xbuf_add,
+                                          effectSizeTikhonov, XDIM);
+        residualNorm2_now = normXBuffer_barrier_double(*residualVector_xbuf);
+        reportTime(io::xprintf("Backprojection %d", iteration), false, true);
+        // Delayed update of residual vector
+        beta = residualNorm2_now / residualNorm2_old;
+        NX = std::sqrt(residualNorm2_now);
+        LOGI << io::xprintf_green(
+            "Iteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f that is %0.2f%% of |b|, |Ax-b|=%f, |Tx|=%f, "
+            ", |AT(Ax-b)|=%0.2f that is %0.3f%% of |AT(Ax0-b)|.",
+            iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscB2), std::sqrt(normDiscX2), NX,
+            100 * NX / NR0);
+        algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
+        // Delayed update of direction vector
+        iteration = iteration + 1;
+        residualNorm2_old = residualNorm2_now;
+        project(*directionVector_xbuf, *AdirectionVector_bbuf);
+        tikhonovMatrixAction(*directionVector_xbuf, *AdirectionVector_bbuf_xpart);
+        scaleFloatVector(*AdirectionVector_bbuf_xpart, effectSizeTikhonov, XDIM);
+        AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf);
+        AdirectionNorm2Xpart = normXBuffer_barrier_double(*AdirectionVector_bbuf_xpart);
+        reportTime(io::xprintf("Projection %d", iteration), false, true);
+        alpha = residualNorm2_old / (AdirectionNorm2 + AdirectionNorm2Xpart);
+        algFLOATvector_A_equals_A_plus_cB(*x_buf, *directionVector_xbuf, alpha, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart, *AdirectionVector_bbuf_xpart,
+                                          -alpha, XDIM);
+        normDiscB2 = normBBuffer_barrier_double(*discrepancy_bbuf);
+        normDiscX2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart);
+        norm = std::sqrt(normDiscB2 + normDiscX2);
+    }
+    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
+                              iteration, norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
@@ -173,7 +316,7 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
             double norm2 = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
 
             LOGI << io::xprintf_green(
-                "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
+               "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
                 "loss of orthogonality %f%%.",
                 iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
         }
@@ -199,9 +342,10 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
         // DEBUG
         NX = std::sqrt(normXBuffer_barrier_double(*residualVector_xbuf));
         // DEBUG
-        LOGI << io::xprintf_green("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
-                            "that is %0.3f%% of |AT(Ax0-b)|.",
-                            iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
+        LOGI << io::xprintf_green(
+            "Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
+            "that is %0.3f%% of |AT(Ax0-b)|.",
+            iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
         addIntoFirstVectorScaledSecondVector(*directionVector_xbuf,
                                              *preconditionedResidualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
@@ -217,8 +361,8 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
                                              BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
     }
-    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration,
-                        norm, 100.0 * norm / NB0);
+    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
+                              iteration, norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
@@ -403,8 +547,9 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         dnorm2_old = normBBuffer_barrier_double(*d_buf);
 
         norm = std::sqrt(normBBuffer_barrier_double(*tmp_b_buf));
-        LOGI << io::xprintf_green("After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.",
-                            iteration, norm, 100.0 * norm / NB0);
+        LOGI << io::xprintf_green(
+            "After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.", iteration, norm,
+            100.0 * norm / NB0);
     }
     // Optionally write even more converged solution
     alpha = vnorm2_old / dnorm2_old;

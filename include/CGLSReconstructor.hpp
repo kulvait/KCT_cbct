@@ -58,6 +58,10 @@ public:
 
     int reconstruct_experimental(uint32_t maxIterations = 100, float errCondition = 0.01);
 
+    int reconstructTikhonov(float effectSizeTikhonov,
+                            uint32_t maxIterations = 100,
+                            float errCondition = 0.01);
+
     int reconstructDiagonalPreconditioner(std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
                                           uint32_t maxIterations = 100,
                                           float errCondition = 0.01);
@@ -69,6 +73,9 @@ public:
     int reconstructJacobi(uint32_t maxIterations = 100, float errCondition = 0.01);
 
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
+
+private:
+    void tikhonovMatrixAction(cl::Buffer XIN, cl::Buffer XOUT);
 };
 
 } // namespace CTL

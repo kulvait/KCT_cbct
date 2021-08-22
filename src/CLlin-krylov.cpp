@@ -216,12 +216,11 @@ void Args::defineArguments()
                               ->add_option("--tikhonov-lambda", tikhonovLambda,
                                            "Tikhonov regularization parameter.")
                               ->check(CLI::Range(0.0, 5000.0));
-    tl_cli->needs(glsqr_cli);
-    og_settings->add_flag("--psirt", psirt,
-                          "Perform PSIRT instead of CGLS, note its not Krylov method.");
-    og_settings->add_flag("--sirt", sirt,
-                          "Perform SIRT instead of CGLS, note its not Krylov method.");
-
+    CLI::Option* psirt_opt = og_settings->add_flag(
+        "--psirt", psirt, "Perform PSIRT instead of CGLS, note its not Krylov method.");
+    CLI::Option* sirt_opt = og_settings->add_flag(
+        "--sirt", sirt, "Perform SIRT instead of CGLS, note its not Krylov method.");
+    tl_cli->excludes(psirt_opt)->excludes(sirt_opt);
     og_settings->add_option("--x0", initialVectorX0, "Specify x0 vector, zero by default.");
     CLI::Option* dpc = og_settings->add_option(
         "--diagonal-preconditioner", diagonalPreconditioner,
@@ -359,7 +358,14 @@ int main(int argc, char* argv[])
                 delete[] preconditionerVolume;
             } else
             {
-                cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
+                if(ARG.tikhonovLambda <= 0.0)
+                {
+                    cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
+                } else
+                {
+                    cgls->reconstructTikhonov(ARG.tikhonovLambda, ARG.maxIterationCount,
+                                              ARG.stoppingRelativeError);
+                }
             }
         }
         DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
