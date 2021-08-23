@@ -10,7 +10,10 @@ set(CMAKE_CXX_STANDARD 14)#Supported values are 98, 11 and 14.
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra")
 message("Current value of flags is ${CMAKE_CXX_FLAGS} and debug is ${CMAKE_CXX_FLAGS_DEBUG} and release is ${CMAKE_CXX_FLAGS_RELEASE}")
 #Default CMAKE_CXX_FLAGS are empty, default for CMAKE_CXX_FLAGS_DEBUG is -g and CMAKE_CXX_FLAGS_RELEASE are not empty
-set(CMAKE_CXX_FLAGS "-Wall")
+set(CMAKE_CXX_FLAGS "-Wall -Wno-ignored-attributes -Wno-deprecated-copy")
+#Turn -Werror or -Wextra to see problems
+#Set -Wno-ignored-attributes due to the OpenCL Nvidia libraries
+#Is it also possible to set it target specific using target_compile_options https://www.foonathan.net/2018/10/cmake-warnings/
 set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
 message("New value of flags is ${CMAKE_CXX_FLAGS} and debug is ${CMAKE_CXX_FLAGS_DEBUG} and release is ${CMAKE_CXX_FLAGS_RELEASE}")
 #add_definitions(-DDEBUG)

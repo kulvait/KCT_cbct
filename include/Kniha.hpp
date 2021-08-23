@@ -459,6 +459,20 @@ protected:
                                         std::shared_ptr<cl::NDRange> localRange = nullptr,
                                         bool blocking = false);
 
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_3DconvolutionGradientSobelFeldman;
+    int algFLOATvector_3DconvolutionGradientSobelFeldman(cl::Buffer& F,
+                                                         cl::Buffer& GX,
+                                                         cl::Buffer& GY,
+                                                         cl::Buffer& GZ,
+                                                         cl_int3& vdims,
+                                                         cl_float3& voxelSizes,
+                                                         cl::NDRange& globalRange,
+                                                         std::shared_ptr<cl::NDRange> localRange
+                                                         = nullptr,
+                                                         bool blocking = false);
+
 private:
     bool openCLInitialized = false;
     void insertCLFile(std::string f);

@@ -170,6 +170,48 @@ int VolumeConvolutionOperator::initializeOrUpdateOutputBuffer()
     return 0;
 }
 
+int VolumeConvolutionOperator::initializeOrUpdateGradientOutputBuffers()
+{
+    cl_int err = CL_SUCCESS;
+    std::string ERR;
+    if(volumeBuffer == nullptr)
+    {
+        ERR = io::xprintf(
+            "Volume buffer must be initialized before calling initializeOrUpdateOutputBuffer!");
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    if(outputGradientX != nullptr)
+    {
+        if(this->totalOutputGradientBuffersSize != this->totalVolumeBufferSize)
+        {
+            this->totalOutputGradientBuffersSize = this->totalVolumeBufferSize;
+            outputGradientX = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                           totalVolumeBufferSize, nullptr, &err);
+            outputGradientY = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                           totalVolumeBufferSize, nullptr, &err);
+            outputGradientZ = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                           totalVolumeBufferSize, nullptr, &err);
+        }
+    } else
+    {
+        this->totalOutputGradientBuffersSize = this->totalVolumeBufferSize;
+        outputGradientX = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                       totalVolumeBufferSize, nullptr, &err);
+        outputGradientY = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                       totalVolumeBufferSize, nullptr, &err);
+        outputGradientZ = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
+                                                       totalVolumeBufferSize, nullptr, &err);
+    }
+    if(err != CL_SUCCESS)
+    {
+        ERR = io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    return 0;
+}
+
 int VolumeConvolutionOperator::fillVolumeBufferByConstant(float constant)
 {
     std::string msg;
@@ -197,6 +239,43 @@ int VolumeConvolutionOperator::convolve(std::string kernelName, float* outputVol
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
+        return -1;
+    }
+    return 0;
+}
+
+int VolumeConvolutionOperator::sobelGradient3D(cl_float3 voxelSizes,
+                                               float* outputX,
+                                               float* outputY,
+                                               float* outputZ)
+{
+    cl::NDRange globalRange(vdimx, vdimy, vdimz);
+    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    localRange = nullptr;
+    initializeOrUpdateGradientOutputBuffers();
+    algFLOATvector_3DconvolutionGradientSobelFeldman(*volumeBuffer, *outputGradientX,
+                                                     *outputGradientY, *outputGradientZ, vdims,
+                                                     voxelSizes, globalRange, localRange);
+    cl_int err
+        = Q[0]->enqueueReadBuffer(*outputGradientX, CL_TRUE, 0, totalVolumeBufferSize, outputX);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte outputGradientX to the variable outputX, code %d!",
+                            err);
+        return -1;
+    }
+    err = Q[0]->enqueueReadBuffer(*outputGradientY, CL_TRUE, 0, totalVolumeBufferSize, outputY);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte outputGradientY to the variable outputY, code %d!",
+                            err);
+        return -1;
+    }
+    err = Q[0]->enqueueReadBuffer(*outputGradientZ, CL_TRUE, 0, totalVolumeBufferSize, outputZ);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte outputGradientZ to the variable outputZ, code %d!",
+                            err);
         return -1;
     }
     return 0;

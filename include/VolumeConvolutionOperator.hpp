@@ -107,8 +107,10 @@ public:
 
     int fillVolumeBufferByConstant(float constant);
     int initializeOrUpdateOutputBuffer();
+    int initializeOrUpdateGradientOutputBuffers();
 
     int convolve(std::string kernelName, float* volume);
+    int sobelGradient3D(cl_float3 voxelSizes, float* vx, float* vy, float* vz);
 
 private:
     const cl_float FLOATZERO = 0.0f;
@@ -129,6 +131,10 @@ private:
 
     std::shared_ptr<cl::Buffer> volumeBuffer = nullptr;
     std::shared_ptr<cl::Buffer> outputBuffer = nullptr;
+    uint64_t totalOutputGradientBuffersSize;
+    std::shared_ptr<cl::Buffer> outputGradientX = nullptr;
+    std::shared_ptr<cl::Buffer> outputGradientY = nullptr;
+    std::shared_ptr<cl::Buffer> outputGradientZ = nullptr;
     size_t tmpBuffer_size = 0;
     std::vector<cl_double16> invertProjectionMatrices(std::vector<matrix::ProjectionMatrix> CM);
     std::vector<float> computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM);
