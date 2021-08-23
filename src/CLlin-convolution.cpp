@@ -119,7 +119,7 @@ void Args::defineArguments()
         ->required()
         ->check(CLI::ExistingFile);
     cliApp->add_option("output_volume", outputVolume, "Output projection")->required();
-    cliApp->add_flag("--sobel-gradient-3d", sobelGradient3D, "Output projection")->required();
+    cliApp->add_flag("--sobel-gradient-3d", sobelGradient3D, "3D gradient.");
     addForceArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();

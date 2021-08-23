@@ -1,6 +1,6 @@
 //==============================convolution.cl=====================================
 // see https://www.evl.uic.edu/kreda/gpu/image-convolution/
-#define VOXELINDEX(i, j, k, vdims) i + (j + k * vdims.y) * vdims.x
+#define VOXELINDEX(i, j, k, vdims) i + (j + (k)*vdims.y) * vdims.x
 
 void kernel FLOATvector_2Dconvolution3x3(global const float* restrict A,
                                          global float* restrict B,
@@ -16,20 +16,19 @@ void kernel FLOATvector_2Dconvolution3x3(global const float* restrict A,
     float sum = 0.0f;
     float* convolutionKernel = (float*)&_convolutionKernel;
     // Manipulation to fix problems on boundaries
-    int IMINDIFF = -min(i - convolutionKernelRadius, 0);
-    int IMAXDIFF = max(i + convolutionKernelRadius, vdims.x) - vdims.x;
-    int JMINDIFF = -min(j - convolutionKernelRadius, 0);
-    int JMAXDIFF = max(j + convolutionKernelRadius, vdims.y) - vdims.y;
-    int JLIMIT = convolutionKernelSize - JMAXDIFF;
-    int ILIMIT = convolutionKernelSize - IMAXDIFF;
-    int IRANGE = ILIMIT - IMINDIFF;
+    int LIMIN = -min(i - convolutionKernelRadius, 0);
+    int LJMIN = -min(j - convolutionKernelRadius, 0);
+    // Find one behind
+    int ILIMIT = convolutionKernelSize + vdims.x - max(i + convolutionKernelRadius + 1, vdims.x);
+    int JLIMIT = convolutionKernelSize + vdims.y - max(j + convolutionKernelRadius + 1, vdims.y);
+    int IRANGE = ILIMIT - LIMIN;
     int yskip = vdims.x - IRANGE;
     int ylocalskip = convolutionKernelSize - IRANGE;
-    int localIndex = JMINDIFF * convolutionKernelSize + IMINDIFF;
-    int index = VOXELINDEX(i - 1 + IMINDIFF, j - 1 + JMINDIFF, k, vdims);
-    for(int j_loc = JMINDIFF; j_loc < JLIMIT; j_loc++)
+    int localIndex = LJMIN * convolutionKernelSize + LIMIN;
+    int index = VOXELINDEX(i + LIMIN - 1, j + LJMIN - 1, k, vdims);
+    for(int j_loc = LJMIN; j_loc < JLIMIT; j_loc++)
     {
-        for(int i_loc = IMINDIFF; i_loc < ILIMIT; i_loc++)
+        for(int i_loc = LIMIN; i_loc < ILIMIT; i_loc++)
         {
             sum += A[index] * convolutionKernel[localIndex];
             index++;
@@ -62,7 +61,11 @@ void kernel FLOATvector_3DconvolutionGradientSobelFeldman(global const float* re
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
-    const int k = get_global_id(2);
+    const int k = get_global_id(2); /*
+     if(k == 3 && i == 5 && j == 55)
+     {
+         printf("Calling with i=%d, j=%d, k=%d", i, j, k);
+     }*/
     const int IND = VOXELINDEX(i, j, k, vdims);
     float cube[3][3][3]; // First fill this object where possible
     int DJ = vdims.x;
@@ -70,29 +73,48 @@ void kernel FLOATvector_3DconvolutionGradientSobelFeldman(global const float* re
     int LIMIN = -min(i - 1, 0);
     int LJMIN = -min(j - 1, 0);
     int LKMIN = -min(k - 1, 0);
-    int ILIMIT = 3 + vdims.x - max(i + 1, vdims.x);
-    int JLIMIT = 3 + vdims.y - max(j + 1, vdims.y);
-    int KLIMIT = 3 + vdims.z - max(k + 1, vdims.z);
+    // One behind the limit
+    int ILIMIT = 3 + vdims.x - max(i + 2, vdims.x);
+    int JLIMIT = 3 + vdims.y - max(j + 2, vdims.y);
+    int KLIMIT = 3 + vdims.z - max(k + 2, vdims.z);
     int IRANGE = ILIMIT - LIMIN;
     int JRANGE = JLIMIT - LJMIN;
     int JSKIP = DJ - IRANGE;
     int KSKIP = DK - JRANGE * DJ;
-    int index = VOXELINDEX(i - 1 + LIMIN, j - 1 + LJMIN, k - 1 + LKMIN, vdims);
+    int index = VOXELINDEX(i + LIMIN - 1, j + LJMIN - 1, k + LKMIN - 1, vdims);
+    /*
+        if(k == 30 && j == 511)
+        {
+            printf("i=%d j=%d k=%d index=%d IND=%d LIMIN=%d, LJMIN=%d, LKMIN=%d start=(%d, %d, %d) "
+                   "LIMITS=(%d, "
+                   "%d, %d)",
+                   i, j, k, index, IND, LIMIN, LJMIN, LKMIN, i - 1 + LIMIN, j - 1 + LJMIN,
+                   k - 1 + LKMIN, ILIMIT, JLIMIT, KLIMIT);
+        }
+    */
     for(int lk = LKMIN; lk < KLIMIT; lk++)
     {
         for(int lj = LJMIN; lj < JLIMIT; lj++)
         {
             for(int li = LIMIN; li < ILIMIT; li++)
             {
-/*
+
                 int index_computed = VOXELINDEX(i - 1 + li, j - 1 + lj, k - 1 + lk, vdims);
                 if(index_computed != index)
                 {
                     printf("Problem with index alignment index=%d, index_computed=%d", index,
                            index_computed);
                 }
-*/
-                cube[i][j][k] = F[index];
+
+                cube[li][lj][lk] = F[index];
+                /*
+                        if(k == 3 && i == 5 && j == 55)
+                        {
+                            printf("I in [%d, %d] J in [%d, %d] K in [%d, %d] index=%d vdims.x=%d
+                   vdims.y=%d vdims.z=%d" "F[index]=%f voxelSizes.x=%f", LIMIN, ILIMIT, LJMIN,
+                   JLIMIT, LKMIN, KLIMIT, index, vdims.x, vdims.y, vdims.z, cube[li][lj][lk],
+                   voxelSizes.x);
+                        }*/
                 index++;
             }
             index += JSKIP;
@@ -111,7 +133,7 @@ void kernel FLOATvector_3DconvolutionGradientSobelFeldman(global const float* re
                 cube[0][lj][lk] = cube[2][lj][lk];
             }
         }
-    } else if(i == vdims.x)
+    } else if(i + 1 == vdims.x)
     {
         // i reflection li=2 lj=. lk=. equals li=0 lj=. lk=.
         // if 2, lj, lk invalid so is 0,lj,lk
@@ -134,7 +156,7 @@ void kernel FLOATvector_3DconvolutionGradientSobelFeldman(global const float* re
                 cube[li][0][lk] = cube[li][2][lk];
             }
         }
-    } else if(j == vdims.y)
+    } else if(j + 1 == vdims.y)
     {
         // j reflection li=. lj=2 lk=. equals li=. lj=0 lk=.
         // if li, 0, lk invalid so is li,0,lk
@@ -157,15 +179,15 @@ void kernel FLOATvector_3DconvolutionGradientSobelFeldman(global const float* re
                 cube[li][lj][0] = cube[li][lj][2];
             }
         }
-    } else if(k == vdims.z)
+    } else if(k + 1 == vdims.z)
     {
-        // k reflection li=. lj=. lk=0 equals li=. lj=. lk=2
+        // k reflection li=. lj=. lk=2 equals li=. lj=. lk=0
         // if li, lj, 2 invalid so is li,lj,0
         for(int li = 0; li < 3; li++)
         {
             for(int lj = 0; lj < 3; lj++)
             {
-                cube[lj][lj][2] = cube[li][lj][0];
+                cube[li][lj][2] = cube[li][lj][0];
             }
         }
     }
