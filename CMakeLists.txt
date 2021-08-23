@@ -4,7 +4,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 #When you want a different install folder
 #cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr/local/bin ..
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-set(CMAKE_INSTALL_PREFIX $ENV{HOME}/bin CACHE PATH "Path to install binaries of the CBCT" FORCE)
+set(CMAKE_INSTALL_PREFIX $ENV{HOME}/KCT_bin CACHE PATH "Path to install binaries of the CBCT" FORCE)
 ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 set(CMAKE_CXX_STANDARD 14)#Supported values are 98, 11 and 14.
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra")
