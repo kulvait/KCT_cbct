@@ -163,7 +163,9 @@ public:
     uint64_t totalProjectionsSize;
     uint64_t totalVolumeSize;
     uint32_t baseOffset = 0;
-    double tikhonovLambda = -1.0;
+    double tikhonovLambdaL2 = std::numeric_limits<float>::quiet_NaN();
+    double tikhonovLambdaV2 = std::numeric_limits<float>::quiet_NaN();
+    double tikhonovLambdaLaplace2D = std::numeric_limits<float>::quiet_NaN();
     bool noFrameOffset = false;
     std::string initialVectorX0;
     std::string outputVolume;
@@ -219,11 +221,23 @@ void Args::defineArguments()
         "--os-sart", ossart, "OS SART reconstruction (non Krylov method).");
     addSettingsGroup();
     // STOP reconstruction algorithms
-    CLI::Option* tl_cli = og_settings
-                              ->add_option("--tikhonov-lambda", tikhonovLambda,
-                                           "Tikhonov regularization parameter.")
-                              ->check(CLI::Range(0.0, 5000.0));
-    tl_cli->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
+    std::string str = io::xprintf(
+        "Tikhonov L2 regularization of volume, NAN to disable, [defaults to %f]", tikhonovLambdaL2);
+    CLI::Option* tl2_opt = og_settings->add_option("--tikhonov-lambda-l2", tikhonovLambdaL2, str)
+                               ->check(CLI::Range(0.0, 1000000.0));
+    str = io::xprintf("Tikhonov V2 regularization of volume, NAN to disable, [defaults to %f]",
+                      tikhonovLambdaV2);
+    CLI::Option* tv2_opt = og_settings->add_option("--tikhonov-lambda-v2", tikhonovLambdaV2, str)
+                               ->check(CLI::Range(0.0, 1000000.0));
+    str = io::xprintf(
+        "Tikhonov Laplace regularization of 2D slices of volume, NAN to disable, [defaults to %f]",
+        tikhonovLambdaLaplace2D);
+    CLI::Option* tlaplace2d_opt
+        = og_settings->add_option("--tikhonov-lambda-v2", tikhonovLambdaLaplace2D, str)
+              ->check(CLI::Range(0.0, 1000000.0));
+    tl2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
+    tv2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
+    tlaplace2d_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
 
     addForceArgs();
     // Reconstruction geometry
@@ -251,9 +265,9 @@ void Args::defineArguments()
                                                     "Use Jacobi preconditioning.");
     jacobi_cli->excludes(glsqr_opt);
     dpc->excludes(jacobi_cli);
-    std::string str = io::xprintf("Ordered subset level, number of subsets to be used, 1 for "
-                                  "classical SART. [defaults to %d]",
-                                  ossartSubsetCount);
+    str = io::xprintf("Ordered subset level, number of subsets to be used, 1 for "
+                      "classical SART. [defaults to %d]",
+                      ossartSubsetCount);
     CLI::Option* ossubsets_opt
         = og_settings->add_option("--os-subset-count", ossartSubsetCount, str);
     str = io::xprintf(
@@ -367,7 +381,8 @@ int main(int argc, char* argv[])
             cgls->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
                                          ARG.barrierArraySize);
         }
-        if(ARG.tikhonovLambda > 0.0)
+        if(!std::isnan(ARG.tikhonovLambdaL2) || !std::isnan(ARG.tikhonovLambdaV2)
+           || !std::isnan(ARG.tikhonovLambdaLaplace2D))
         {
             cgls->initializeVolumeConvolution();
         }
@@ -410,14 +425,7 @@ int main(int argc, char* argv[])
                 delete[] preconditionerVolume;
             } else
             {
-                if(ARG.tikhonovLambda <= 0.0)
-                {
-                    cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-                } else
-                {
-                    cgls->reconstructTikhonov(ARG.tikhonovLambda, ARG.maxIterationCount,
-                                              ARG.stoppingRelativeError);
-                }
+                cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
             }
         }
         DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
@@ -467,12 +475,12 @@ int main(int argc, char* argv[])
             LOGE << ERR;
             throw std::runtime_error(ERR);
         }
-        if(ARG.tikhonovLambda <= 0.0)
+        if(!std::isnan(ARG.tikhonovLambdaL2))
         {
             glsqr->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
         } else
         {
-            glsqr->reconstructTikhonov(ARG.tikhonovLambda, ARG.maxIterationCount,
+            glsqr->reconstructTikhonov(ARG.tikhonovLambdaL2, ARG.maxIterationCount,
                                        ARG.stoppingRelativeError);
         }
         DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,

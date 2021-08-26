@@ -52,15 +52,14 @@ public:
                             projectorLocalNDRange,
                             backprojectorLocalNDRange)
     {
+        removeTikhonovRegularization();
     }
 
     virtual int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01);
 
     int reconstruct_experimental(uint32_t maxIterations = 100, float errCondition = 0.01);
 
-    int reconstructTikhonov(float effectSizeTikhonov,
-                            uint32_t maxIterations = 100,
-                            float errCondition = 0.01);
+    int reconstructTikhonov(uint32_t maxIterations = 100, float errCondition = 0.01);
 
     int reconstructDiagonalPreconditioner(std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
                                           uint32_t maxIterations = 100,
@@ -74,8 +73,33 @@ public:
 
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
 
+    void addTikhonovRegularization(float L2, float V2, float Laplace);
+
+    void removeTikhonovRegularization();
+
 private:
-    void tikhonovMatrixAction(cl::Buffer XIN, cl::Buffer XOUT);
+    void tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN);
+    void tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN);
+    void tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(cl::Buffer residualVector);
+    void tikhonov_discrepancy_equals_discrepancy_minus_alphaAdirection(double alpha);
+    void tikhonovZeroDiscrepancyBuffers();
+    void tikhonovSetRegularizingBuffersNull();
+    double tikhonovSumOfAdirectionNorms2();
+
+    std::shared_ptr<cl::Buffer> residualVector_xbuf_L2add, residualVector_xbuf_V2xadd,
+        residualVector_xbuf_V2yadd, residualVector_xbuf_V2zadd,
+        residualVector_xbuf_Laplaceadd; // X buffers
+    std::shared_ptr<cl::Buffer> discrepancy_bbuf_xpart_L2, discrepancy_bbuf_xpart_V2x,
+        discrepancy_bbuf_xpart_V2y, discrepancy_bbuf_xpart_V2z,
+        discrepancy_bbuf_xpart_Laplace; // X buffers
+    std::shared_ptr<cl::Buffer> AdirectionVector_bbuf_xpart_L2, AdirectionVector_bbuf_xpart_V2x,
+        AdirectionVector_bbuf_xpart_V2y, AdirectionVector_bbuf_xpart_V2z,
+        AdirectionVector_bbuf_xpart_Laplace; // X buffers
+    bool tikhonovRegularization;
+    bool tikhonovRegularizationL2;
+    bool tikhonovRegularizationV2;
+    bool tikhonovRegularizationLaplace;
+    float effectSizeL2, effectSizeV2, effectSizeLaplace;
 };
 
 } // namespace KCT
