@@ -29,7 +29,7 @@ void OSSARTReconstructor::removeLowerBoxCondition() { this->lowerBoxCondition = 
 int OSSARTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
     std::string welcomeString
-        = io::xprintf("WELCOME TO OS SART with %d subsets and relaxation parameter %f.",
+        = io::xprintf("WELCOME TO OS SART with %d subsets and relaxation parameter %0.2f.",
                       subsetCount, relaxationParameter);
     LOGD << printTime(welcomeString, false, true);
     uint32_t iteration = 0;
