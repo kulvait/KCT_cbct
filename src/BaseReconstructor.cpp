@@ -435,7 +435,12 @@ int BaseReconstructor::multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer&
     return 0;
 }
 
-int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
+/**
+* @param initialProjectionIndex For OS SART 0 by default
+* @param projectionIncrement For OS SART 1 by default
+*
+*/
+int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X, uint32_t initialProjectionIndex, uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
@@ -454,7 +459,7 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
     std::array<double, 2> focalLength;
     float scalingFactor;
     unsigned int offset;
-    for(std::size_t i = 0; i != pdimz; i++)
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i+=projectionIncrement)
     {
         P = cameraVector[i];
         focalLength = P->focalLength();
@@ -497,7 +502,12 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X)
     return 0;
 }
 
-int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
+/**
+* @param initialProjectionIndex For OS SART 0 by default
+* @param projectionIncrement For OS SART 1 by default
+*
+*/
+int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X, uint32_t initialProjectionIndex, uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, std::numeric_limits<float>::infinity(), 0,
                                       XDIM * sizeof(float));
@@ -517,7 +527,7 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
     std::array<double, 2> focalLength;
     float scalingFactor;
     unsigned int offset;
-    for(std::size_t i = 0; i != pdimz; i++)
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i+=projectionIncrement)
     {
         P = cameraVector[i];
         focalLength = P->focalLength();
@@ -558,7 +568,13 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X)
     return 0;
 }
 
-int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
+
+/**
+* @param initialProjectionIndex For OS SART, 0 by default
+* @param projectionIncrement For OS SART, 1 by default
+*
+*/
+int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B, uint32_t initialProjectionIndex, uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
@@ -578,7 +594,7 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B)
     std::array<double, 2> focalLength;
     float scalingFactor;
     unsigned int offset;
-    for(std::size_t i = 0; i != pdimz; i++)
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i+=projectionIncrement)
     {
         P = cameraVector[i];
         focalLength = P->focalLength();

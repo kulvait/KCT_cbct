@@ -16,18 +16,21 @@
 #include "ctpl_stl.h" //Threadpool
 #include "gitversion/version.h"
 
+// Reconstructors
+#include "CGLSReconstructor.hpp"
+#include "GLSQRReconstructor.hpp"
+#include "OSSARTReconstructor.hpp"
+#include "PSIRTReconstructor.hpp"
+
 // Internal libraries
 #include "CArmArguments.hpp"
-#include "CGLSReconstructor.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
-#include "GLSQRReconstructor.hpp"
 #include "MATRIX/CameraI.hpp"
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/Program.hpp"
-#include "PSIRTReconstructor.hpp"
 
 using namespace KCT;
 using namespace KCT::util;
@@ -173,6 +176,9 @@ public:
     bool sirt = false;
     bool ossart = false;
     uint32_t ossartSubsetCount = 1;
+    float lowerBoxCondition = std::numeric_limits<float>::quiet_NaN();
+    float upperBoxCondition = std::numeric_limits<float>::quiet_NaN();
+    float relaxationParameter = 1.0f;
     bool verbose = true;
 };
 
@@ -202,7 +208,7 @@ void Args::defineArguments()
     registerOptionGroup("reconstruction algorithm", og_reconstructionAlgorithm);
     og_reconstructionAlgorithm->require_option(1, 1);
     CLI::Option* cgls_opt = og_reconstructionAlgorithm->add_flag(
-        "--cgls", glsqr, "Perform CGLS reconstruction (Krylov method).");
+        "--cgls", cgls, "Perform CGLS reconstruction (Krylov method).");
     CLI::Option* glsqr_opt = og_reconstructionAlgorithm->add_flag(
         "--glsqr", glsqr, "Perform GLSQR instead reconstruction (Krylov method).");
     CLI::Option* psirt_opt = og_reconstructionAlgorithm->add_flag(
@@ -250,8 +256,28 @@ void Args::defineArguments()
                                   ossartSubsetCount);
     CLI::Option* ossubsets_opt
         = og_settings->add_option("--os-subset-count", ossartSubsetCount, str);
+    str = io::xprintf(
+        "Lower box condition, lower numbers will be substituted by this number after "
+        "the end of each full iteration, NAN for no lower box condition [defaults to %f]",
+        lowerBoxCondition);
+    CLI::Option* lowbox_opt
+        = og_settings->add_option("--lower-box-condition", lowerBoxCondition, str);
+    str = io::xprintf(
+        "Upper box condition, higher numbers will be substituted by this number after "
+        "the end of each full iteration, NAN for no lower box condition [defaults to %f]",
+        upperBoxCondition);
+    CLI::Option* upbox_opt
+        = og_settings->add_option("--upper-box-condition", upperBoxCondition, str);
+    str = io::xprintf("Relaxation parameter for classical algorithms, update step will be "
+                      "multiplied by this factor after end of each full iteration [defaults to %f]",
+                      relaxationParameter);
+    CLI::Option* relaxation_opt
+        = og_settings->add_option("--relaxation-parameter", relaxationParameter, str);
     ossubsets_opt->excludes(sirt_opt)->excludes(psirt_opt);
     ossubsets_opt->excludes(cgls_opt)->excludes(glsqr_opt);
+    lowbox_opt->excludes(cgls_opt)->excludes(glsqr_opt);
+    upbox_opt->excludes(cgls_opt)->excludes(glsqr_opt);
+    relaxation_opt->excludes(cgls_opt)->excludes(glsqr_opt)->excludes(psirt_opt);
 }
 
 int main(int argc, char* argv[])
@@ -314,7 +340,7 @@ int main(int argc, char* argv[])
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
 
-    if(!ARG.glsqr && !ARG.psirt && !ARG.sirt)
+    if(ARG.cgls)
     {
         cl::NDRange projectorLocalNDRange
             = cl::NDRange(ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1],
@@ -497,13 +523,7 @@ int main(int argc, char* argv[])
             throw std::runtime_error(ERR);
         }
         psirt->setup(1.99); // 10.1109/TMI.2008.923696
-        if(ARG.tikhonovLambda <= 0.0)
-        {
-            psirt->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-        } else
-        {
-            throw std::runtime_error("Tikhonov stabilization is not implemented for PSIRT!");
-        }
+        psirt->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
         DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
                                      ARG.volumeSizeZ);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
@@ -552,13 +572,65 @@ int main(int argc, char* argv[])
             throw std::runtime_error(ERR);
         }
         psirt->setup(1.00); // 10.1109/TMI.2008.923696
-        if(ARG.tikhonovLambda <= 0.0)
+        psirt->reconstruct_sirt(ARG.maxIterationCount, ARG.stoppingRelativeError);
+        DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
+                                     ARG.volumeSizeZ);
+        io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));
+        delete[] volume;
+        delete[] projection;
+    } else if(ARG.ossart)
+    {
+        std::shared_ptr<OSSARTReconstructor> ossart = std::make_shared<OSSARTReconstructor>(
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
+        ossart->setup(ARG.relaxationParameter, ARG.ossartSubsetCount);
+        if(!std::isnan(ARG.lowerBoxCondition))
         {
-            psirt->reconstruct_sirt(ARG.maxIterationCount, ARG.stoppingRelativeError);
+            ossart->addLowerBoxCondition(ARG.lowerBoxCondition, ARG.lowerBoxCondition);
+        }
+        if(!std::isnan(ARG.upperBoxCondition))
+        {
+            ossart->addUpperBoxCondition(ARG.upperBoxCondition, ARG.upperBoxCondition);
+        }
+        ossart->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+        if(ARG.useSidonProjector)
+        {
+            ossart->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        } else if(ARG.useTTProjector)
+        {
+
+            ossart->initializeTTProjector();
         } else
         {
-            throw std::runtime_error("Tikhonov stabilization is not implemented for PSIRT!");
+            ossart->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
+                                           ARG.barrierArraySize);
         }
+        int ecd
+            = ossart->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                       ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
+
+        if(ecd < 0)
+        {
+            std::string ERR
+                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
+        float* volume = new float[ARG.totalVolumeSize]();
+        // testing
+        //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
+
+        bool X0initialized = ARG.initialVectorX0 != "";
+        ecd = ossart->problemSetup(projection, volume, X0initialized, cameraVector, ARG.voxelSizeX,
+                                   ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
+                                   ARG.volumeCenterY, ARG.volumeCenterZ);
+        if(ecd != 0)
+        {
+            std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+            LOGE << ERR;
+            throw std::runtime_error(ERR);
+        }
+        ossart->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
         DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
                                      ARG.volumeSizeZ);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize * sizeof(float));

@@ -450,8 +450,8 @@ public:
                 LOGE << io::xprintf(
                     "Wrong specification of projectorLocalNDRange, trying guessing!");
             }
-                this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
-                this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
+            this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
+            this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
         }
         if(backprojectorLocalNDRangeDim == 3)
         {
@@ -604,11 +604,19 @@ protected:
      * @param B Buffer of all projections from all reconstructed angles of the minimal size
      * BDIM*sizeof(float).
      * @param X Buffer of the size at least XDIM*sizeof(float) to be backprojected to.
+     * @param initialProjectionIndex For OS SART 0 by default
+     * @param projectionIncrement For OS SART 1 by default
      *
      * @return 0 on success
      */
-    int backproject(cl::Buffer& B, cl::Buffer& X);
-    int backproject_minmax(cl::Buffer& B, cl::Buffer& X);
+    int backproject(cl::Buffer& B,
+                    cl::Buffer& X,
+                    uint32_t initialProjectionIndex = 0,
+                    uint32_t projectionIncrement = 1);
+    int backproject_minmax(cl::Buffer& B,
+                           cl::Buffer& X,
+                           uint32_t initialProjectionIndex = 0,
+                           uint32_t projectionIncrement = 1);
 
     /**
      * Projection B = A (X)
@@ -616,10 +624,15 @@ protected:
      * @param X Buffer of the size at least XDIM*sizeof(float) to be projected.
      * @param B Buffer to write all projections from all reconstructed angles of the minimal size
      * BDIM*sizeof(float).
+     * @param initialProjectionIndex For OS SART 0 by default
+     * @param projectionIncrement For OS SART 1 by default
      *
      * @return
      */
-    int project(cl::Buffer& X, cl::Buffer& B);
+    int project(cl::Buffer& X,
+                cl::Buffer& B,
+                uint32_t initialProjectionIndex = 0,
+                uint32_t projectionIncrement = 1);
 
     float* x = nullptr; // Volume data
     float* b = nullptr; // Projection data
