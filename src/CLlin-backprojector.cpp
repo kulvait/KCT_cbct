@@ -31,8 +31,8 @@
 #include "PROG/Program.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
-using namespace CTL;
-using namespace CTL::util;
+using namespace KCT;
+using namespace KCT::util;
 
 /**Arguments parsed by the main function.
  */
@@ -162,7 +162,7 @@ void Args::defineArguments()
 
 int main(int argc, char* argv[])
 {
-    using namespace CTL::util;
+    using namespace KCT::util;
     Program PRG(argc, argv);
     std::string prgInfo = "OpenCL implementation of the cone beam backprojection.";
     if(version::MODIFIED_SINCE_COMMIT == true)

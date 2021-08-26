@@ -1,7 +1,7 @@
 #include "Kniha.hpp"
 
-using namespace CTL;
-namespace CTL {
+using namespace KCT;
+namespace KCT {
 
 void Kniha::addOptString(std::string option)
 {
@@ -963,4 +963,4 @@ int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldman(cl::Buffer& F,
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

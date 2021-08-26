@@ -1,6 +1,6 @@
 #include "PSIRTReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 void PSIRTReconstructor::setup(double alpha) { this->alpha = alpha; }
 
@@ -152,4 +152,4 @@ int PSIRTReconstructor::reconstruct_sirt(uint32_t maxIterations, float errCondit
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
-} // namespace CTL
+} // namespace KCT

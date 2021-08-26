@@ -1,6 +1,6 @@
 #include "CArmArguments.hpp"
 
-namespace CTL::util {
+namespace KCT::util {
 
 CArmArguments::CArmArguments(int argc, char** argv, std::string appName)
     : Arguments(argc, argv, appName)
@@ -145,7 +145,7 @@ void CArmArguments::parsePlatformString(bool verbose)
         str = io::xprintf("%s.", str.c_str());
         LOGD << io::xprintf("Selected devices %s on platformID %d.", str.c_str(), CLplatformID);
     }
-} // namespace CTL::util
+} // namespace KCT::util
 
 void CArmArguments::addGeometryGroup()
 {
@@ -542,4 +542,4 @@ void CArmArguments::addRelaxedArg()
         io::xprintf("OpenCL define RELAXED, defaults to %s.", defaultValue.c_str()));
 }
 
-} // namespace CTL::util
+} // namespace KCT::util

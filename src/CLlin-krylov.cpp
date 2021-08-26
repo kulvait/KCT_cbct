@@ -29,9 +29,9 @@
 #include "PROG/Program.hpp"
 #include "PSIRTReconstructor.hpp"
 
-using namespace CTL;
-using namespace CTL::util;
-using namespace CTL::io;
+using namespace KCT;
+using namespace KCT::util;
+using namespace KCT::io;
 
 void populateVoume(float* volume, std::string volumeFile);
 
@@ -167,9 +167,12 @@ public:
     std::string inputProjectionMatrices;
     std::string inputProjections;
     std::string diagonalPreconditioner;
+    bool cgls = false;
     bool glsqr = false;
     bool psirt = false;
     bool sirt = false;
+    bool ossart = false;
+    uint32_t ossartSubsetCount = 1;
     bool verbose = true;
 };
 
@@ -193,6 +196,29 @@ void Args::defineArguments()
         ->required()
         ->check(CLI::ExistingFile);
     cliApp->add_option("output_volume", outputVolume, "Volume to project")->required();
+    // START reconstruction algorithms
+    CLI::Option_group* og_reconstructionAlgorithm = cliApp->add_option_group(
+        "Reconstruction algorithm", "Algorithm that will be used for the reconstruction.");
+    registerOptionGroup("reconstruction algorithm", og_reconstructionAlgorithm);
+    og_reconstructionAlgorithm->require_option(1, 1);
+    CLI::Option* cgls_opt = og_reconstructionAlgorithm->add_flag(
+        "--cgls", glsqr, "Perform CGLS reconstruction (Krylov method).");
+    CLI::Option* glsqr_opt = og_reconstructionAlgorithm->add_flag(
+        "--glsqr", glsqr, "Perform GLSQR instead reconstruction (Krylov method).");
+    CLI::Option* psirt_opt = og_reconstructionAlgorithm->add_flag(
+        "--psirt", psirt, "Perform PSIRT reconstruction (non Krylov method).");
+    CLI::Option* sirt_opt = og_reconstructionAlgorithm->add_flag(
+        "--sirt", sirt, "Perform SIRT reconstruction (non Krylov method).");
+    CLI::Option* os_sart_opt = og_reconstructionAlgorithm->add_flag(
+        "--os-sart", ossart, "OS SART reconstruction (non Krylov method).");
+    addSettingsGroup();
+    // STOP reconstruction algorithms
+    CLI::Option* tl_cli = og_settings
+                              ->add_option("--tikhonov-lambda", tikhonovLambda,
+                                           "Tikhonov regularization parameter.")
+                              ->check(CLI::Range(0.0, 5000.0));
+    tl_cli->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
+
     addForceArgs();
     // Reconstruction geometry
     addVolumeSizeArgs();
@@ -209,18 +235,7 @@ void Args::defineArguments()
     addProjectorArgs();
 
     cliApp->add_flag("--verbose,!--no-verbose", verbose, "Verbose print, defaults to true.");
-    CLI::Option* glsqr_cli
-        = og_settings->add_flag("--glsqr", glsqr, "Perform GLSQR instead of CGLS.");
 
-    CLI::Option* tl_cli = og_settings
-                              ->add_option("--tikhonov-lambda", tikhonovLambda,
-                                           "Tikhonov regularization parameter.")
-                              ->check(CLI::Range(0.0, 5000.0));
-    CLI::Option* psirt_opt = og_settings->add_flag(
-        "--psirt", psirt, "Perform PSIRT instead of CGLS, note its not Krylov method.");
-    CLI::Option* sirt_opt = og_settings->add_flag(
-        "--sirt", sirt, "Perform SIRT instead of CGLS, note its not Krylov method.");
-    tl_cli->excludes(psirt_opt)->excludes(sirt_opt);
     og_settings->add_option("--x0", initialVectorX0, "Specify x0 vector, zero by default.");
     CLI::Option* dpc = og_settings->add_option(
         "--diagonal-preconditioner", diagonalPreconditioner,
@@ -228,8 +243,15 @@ void Args::defineArguments()
 
     CLI::Option* jacobi_cli = og_settings->add_flag("--jacobi", useJacobiPreconditioning,
                                                     "Use Jacobi preconditioning.");
-    jacobi_cli->excludes(glsqr_cli);
+    jacobi_cli->excludes(glsqr_opt);
     dpc->excludes(jacobi_cli);
+    std::string str = io::xprintf("Ordered subset level, number of subsets to be used, 1 for "
+                                  "classical SART. [defaults to %d]",
+                                  ossartSubsetCount);
+    CLI::Option* ossubsets_opt
+        = og_settings->add_option("--os-subset-count", ossartSubsetCount, str);
+    ossubsets_opt->excludes(sirt_opt)->excludes(psirt_opt);
+    ossubsets_opt->excludes(cgls_opt)->excludes(glsqr_opt);
 }
 
 int main(int argc, char* argv[])

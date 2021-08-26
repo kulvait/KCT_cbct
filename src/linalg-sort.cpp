@@ -20,7 +20,7 @@
 #include "SMA/BufferedSparseMatrixFloatReader.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
-using namespace CTL;
+using namespace KCT;
 
 struct Args
 {

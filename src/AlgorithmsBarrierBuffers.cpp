@@ -1,6 +1,6 @@
 #include "AlgorithmsBarrierBuffers.hpp"
 
-namespace CTL {
+namespace KCT {
 
 /**
  * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
@@ -383,4 +383,4 @@ int AlgorithmsBarrierBuffers::initializeAlgorithmsBuffers()
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

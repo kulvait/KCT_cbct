@@ -9,7 +9,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-using namespace CTL;
+using namespace KCT;
 
 std::string basedir(); // Defined in main file so that it will be accessible to linker
 uint32_t CLplatformID = 1;
@@ -41,7 +41,7 @@ void findFirstPlatform()
 /*
  *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details
  */
-TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][NOVIZ]")
+TEST_CASE("CVP.AdjointDotProduct.nobarrier", "[adjointop][cuttingvox][NOVIZ]")
 {
     findFirstPlatform();
     double tol = 1e-5;
@@ -64,10 +64,12 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
         = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
     uint64_t totalProjectionsSize
         = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+    // BaseReconstructor is abstract class so can not be costructed
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
-    glsqr->initializeCVPProjector(true, CVPBarierImplementation);
+    bool barrier = false;
+    glsqr->initializeCVPProjector(true, barrier);
     int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
@@ -75,7 +77,70 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TEST", "[adjointop][cuttingvox][
         LOGE << ERR;
         throw std::runtime_error(ERR);
     }
+    // Pseudorandom vectors
+    std::random_device randomInts;
+    int seed;
+    seed = randomInts(); // To get random results
+    seed = 5; // Fix for tests
+    std::mt19937 engine(seed);
+    std::uniform_real_distribution<float> dis(0.0, 1.0);
+    float* randomX = new float[totalVolumeSize];
+    float* randomB = new float[totalProjectionsSize];
+    auto gen = [&dis, &engine]() { return dis(engine); };
+    std::generate(randomX, randomX + totalVolumeSize, gen);
+    std::generate(randomB, randomB + totalProjectionsSize, gen);
+    // LOGE << io::xprintf("X%f, %f, %f", randomX[0], randomX[1], randomX[totalVolumeSize - 1]);
+    // LOGE << io::xprintf("B%f, %f, %f", randomB[0], randomB[1], randomB[totalProjectionsSize -
+    // 1]);
+    std::string cameraMatrices = io::xprintf("%s/tests/files/camera.matrices", basedir().c_str());
+    std::shared_ptr<io::DenProjectionMatrixReader> cameraMatricesReader
+        = std::make_shared<io::DenProjectionMatrixReader>(cameraMatrices);
+    std::vector<std::shared_ptr<CameraI>> cameraVector
+        = BaseReconstructor::encodeProjectionMatrices(cameraMatricesReader);
+    glsqr->problemSetup(randomB, randomX, true, cameraVector, voxelSizeX, voxelSizeY, voxelSizeZ);
+    double adjointProductRatio = glsqr->adjointProductTest();
+    LOGI << io::xprintf("Ratio is %f", adjointProductRatio);
+    REQUIRE(std::abs(adjointProductRatio - 1.0) < tol);
+    delete[] randomX;
+    delete[] randomB;
+}
 
+TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed", "[adjointop][cuttingvox][NOVIZ]")
+{
+    findFirstPlatform();
+    double tol = 1e-5;
+    uint32_t projectionSizeX = 616;
+    uint32_t projectionSizeY = 480;
+    uint32_t projectionSizeZ = 248;
+    uint32_t volumeSizeX = 256;
+    uint32_t volumeSizeY = 256;
+    uint32_t volumeSizeZ = 199;
+    double voxelSizeX = 1.0;
+    double voxelSizeY = 1.0;
+    double voxelSizeZ = 1.0;
+    util::RunTimeInfo rti;
+    std::string xpath = rti.getExecutableDirectoryPath(); // build dir
+    bool debug = false;
+    bool CLrelaxed = true;
+    uint32_t itemsPerWorkgroup = 256;
+    std::string startPath = "";
+    uint64_t totalVolumeSize
+        = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
+    uint64_t totalProjectionsSize
+        = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+    // BaseReconstructor is abstract class so can not be costructed
+    std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
+        projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
+        itemsPerWorkgroup);
+    bool barrier = true;
+    glsqr->initializeCVPProjector(true, barrier);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
+    if(ecd < 0)
+    {
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
     // Pseudorandom vectors
     std::random_device randomInts;
     int seed;

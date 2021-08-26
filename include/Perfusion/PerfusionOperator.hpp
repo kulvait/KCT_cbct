@@ -17,7 +17,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class PerfusionOperator : public BasePerfusionReconstructor
 {
@@ -52,4 +52,4 @@ public:
     int backproject(bool blocking = false);
 };
 
-} // namespace CTL
+} // namespace KCT

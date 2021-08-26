@@ -18,7 +18,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class PSIRTReconstructor : public BaseReconstructor
 {
@@ -53,4 +53,4 @@ private:
     double alpha;
 };
 
-} // namespace CTL
+} // namespace KCT

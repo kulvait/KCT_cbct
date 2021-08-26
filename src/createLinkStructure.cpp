@@ -18,7 +18,7 @@
 #include "SMA/BufferedSparseMatrixFloatReader.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
-using namespace CTL;
+using namespace KCT;
 
 void insertvectopix(std::string file, uint16_t num) {}
 

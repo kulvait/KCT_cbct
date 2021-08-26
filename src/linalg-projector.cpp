@@ -18,7 +18,7 @@
 #include "SMA/BufferedSparseMatrixFloatReader.hpp"
 #include "rawop.h"
 
-using namespace CTL;
+using namespace KCT;
 
 struct Args
 {

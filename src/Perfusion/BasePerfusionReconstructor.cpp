@@ -1,6 +1,6 @@
 #include "Perfusion/BasePerfusionReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 void BasePerfusionReconstructor::setReportingParameters(bool verbose,
                                                         uint32_t reportKthIteration,
@@ -835,4 +835,4 @@ double BasePerfusionReconstructor::adjointProductTest()
     return (bdotAx / ATbdotx);
 }
 
-} // namespace CTL
+} // namespace KCT

@@ -20,7 +20,7 @@
 
 #include "VolumeFootprintExecutor.hpp"
 
-using namespace CTL;
+using namespace KCT;
 
 struct Args
 {

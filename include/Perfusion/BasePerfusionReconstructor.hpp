@@ -18,7 +18,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class BasePerfusionReconstructor : public virtual Kniha, public AlgorithmsBarrierBuffers
 {
@@ -207,4 +207,4 @@ protected:
     std::string progressPrefixPath = "";
 };
 
-} // namespace CTL
+} // namespace KCT

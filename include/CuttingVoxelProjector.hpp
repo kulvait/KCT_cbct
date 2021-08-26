@@ -17,7 +17,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class CuttingVoxelProjector : public virtual Kniha
 {
@@ -200,4 +200,4 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
 };
 
-} // namespace CTL
+} // namespace KCT

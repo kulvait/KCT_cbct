@@ -1,7 +1,7 @@
 #include "stringFormatter.h"
 #include <chrono>
 
-namespace CTL {
+namespace KCT {
 
 class Watches
 {
@@ -77,4 +77,4 @@ public:
         }
     };
 };
-} // namespace CTL
+} // namespace KCT

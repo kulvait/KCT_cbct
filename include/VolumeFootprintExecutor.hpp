@@ -3,7 +3,7 @@
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
-namespace CTL {
+namespace KCT {
 namespace util {
 
     struct ElmInt
@@ -876,4 +876,4 @@ namespace util {
         float scalingFactor;
     }; // namespace util
 } // namespace util
-} // namespace CTL
+} // namespace KCT

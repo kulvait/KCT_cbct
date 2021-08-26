@@ -16,7 +16,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class GLSQRReconstructor
 {
@@ -262,4 +262,4 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> timepoint;
 };
 
-} // namespace CTL
+} // namespace KCT

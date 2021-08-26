@@ -1,6 +1,6 @@
 #include "Perfusion/PerfusionOperator.hpp"
 
-namespace CTL {
+namespace KCT {
 
 int PerfusionOperator::project(bool blocking)
 {
@@ -28,4 +28,4 @@ int PerfusionOperator::backproject(bool blocking)
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

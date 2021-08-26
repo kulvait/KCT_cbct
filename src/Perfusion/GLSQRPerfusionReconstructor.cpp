@@ -1,6 +1,6 @@
 #include "Perfusion/GLSQRPerfusionReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
                                              float errCondition,
@@ -205,4 +205,4 @@ int GLSQRPerfusionReconstructor::reconstruct(uint32_t maxIterations,
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

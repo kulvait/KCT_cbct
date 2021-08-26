@@ -29,8 +29,8 @@
 #include "Perfusion/CGLSPerfusionReconstructor.hpp"
 #include "Perfusion/GLSQRPerfusionReconstructor.hpp"
 
-using namespace CTL;
-using namespace CTL::util;
+using namespace KCT;
+using namespace KCT::util;
 
 /**Arguments parsed by the main function.
  */

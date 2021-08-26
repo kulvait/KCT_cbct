@@ -19,8 +19,8 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-using namespace CTL::matrix;
-namespace CTL {
+using namespace KCT::matrix;
+namespace KCT {
 
 class AlgorithmsBarrierBuffers : public virtual Kniha
 {
@@ -124,4 +124,4 @@ protected:
     std::shared_ptr<cl::Buffer> tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
 };
 
-} // namespace CTL
+} // namespace KCT

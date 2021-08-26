@@ -1,6 +1,6 @@
 #include "BaseReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 void BaseReconstructor::initializeCVPProjector(bool useExactScaling,
                                                bool useBarrierCalls,
@@ -780,4 +780,4 @@ double BaseReconstructor::adjointProductTest()
     return (bdotAx / ATbdotx);
 }
 
-} // namespace CTL
+} // namespace KCT

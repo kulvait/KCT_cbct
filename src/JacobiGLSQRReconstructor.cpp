@@ -1,6 +1,6 @@
 #include "JacobiGLSQRReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 int GLSQRReconstructor::initializeOpenCL(uint32_t platformId)
 {
@@ -946,4 +946,4 @@ int GLSQRReconstructor::reconstruct(std::shared_ptr<io::DenProjectionMatrixReade
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

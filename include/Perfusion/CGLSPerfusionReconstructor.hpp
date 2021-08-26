@@ -17,7 +17,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class CGLSPerfusionReconstructor : public BasePerfusionReconstructor
 {
@@ -46,4 +46,4 @@ public:
     int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01, bool blocking = false);
 };
 
-} // namespace CTL
+} // namespace KCT

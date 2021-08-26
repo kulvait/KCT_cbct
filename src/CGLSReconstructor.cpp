@@ -1,6 +1,6 @@
 #include "CGLSReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
@@ -625,4 +625,4 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(float* invertedprecondi
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

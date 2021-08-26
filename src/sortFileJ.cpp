@@ -18,7 +18,7 @@
 #include "SMA/BufferedSparseMatrixDoubleReader.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
-using namespace CTL;
+using namespace KCT;
 
 int main(int argc, char* argv[])
 {

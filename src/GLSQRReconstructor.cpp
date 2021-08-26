@@ -1,6 +1,6 @@
 #include "GLSQRReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 {
@@ -426,4 +426,4 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

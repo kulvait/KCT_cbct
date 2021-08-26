@@ -1,6 +1,6 @@
 #include "Perfusion/CGLSPerfusionReconstructor.hpp"
 
-namespace CTL {
+namespace KCT {
 
 int CGLSPerfusionReconstructor::reconstruct(uint32_t maxIterations,
                                             float errCondition,
@@ -108,4 +108,4 @@ int CGLSPerfusionReconstructor::reconstruct(uint32_t maxIterations,
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

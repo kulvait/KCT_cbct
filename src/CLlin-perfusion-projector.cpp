@@ -12,9 +12,9 @@
 #include "PROG/Program.hpp"
 #include "Perfusion/PerfusionOperator.hpp"
 
-using namespace CTL;
-using namespace CTL::util;
-using namespace CTL::io;
+using namespace KCT;
+using namespace KCT::util;
+using namespace KCT::io;
 
 class Args : public CArmArguments
 {

@@ -20,8 +20,8 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-using namespace CTL::matrix;
-namespace CTL {
+using namespace KCT::matrix;
+namespace KCT {
 
 class BaseReconstructor : public virtual Kniha, public AlgorithmsBarrierBuffers
 {
@@ -638,4 +638,4 @@ protected:
     uint32_t reportKthIteration = 0;
 };
 
-} // namespace CTL
+} // namespace KCT

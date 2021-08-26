@@ -2,7 +2,7 @@
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "SMA/BufferedSparseMatrixDoubleWritter.hpp"
 
-namespace CTL {
+namespace KCT {
 namespace util {
 
     struct Elm
@@ -622,4 +622,4 @@ namespace util {
         double scalingFactor;
     }; // namespace util
 } // namespace util
-} // namespace CTL
+} // namespace KCT

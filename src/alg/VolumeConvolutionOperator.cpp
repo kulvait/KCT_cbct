@@ -1,6 +1,6 @@
 #include "VolumeConvolutionOperator.hpp"
 
-namespace CTL {
+namespace KCT {
 cl::NDRange VolumeConvolutionOperator::guessProjectionLocalNDRange(bool barrierCalls)
 {
     cl::NDRange projectorLocalNDRange;
@@ -281,4 +281,4 @@ int VolumeConvolutionOperator::sobelGradient3D(cl_float3 voxelSizes,
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

@@ -6,7 +6,7 @@
 #include "PROG/Arguments.hpp"
 #include "rawop.h"
 
-namespace CTL::util {
+namespace KCT::util {
 
 class CArmArguments : public virtual Arguments
 {
@@ -111,4 +111,4 @@ protected:
     CLI::Option* opt_cl_projectorlocalrange = nullptr;
     CLI::Option* opt_cl_localarraysize = nullptr;
 };
-} // namespace CTL::util
+} // namespace KCT::util

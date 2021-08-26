@@ -17,7 +17,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class GLSQRReconstructor : public BaseReconstructor
 {
@@ -37,4 +37,4 @@ public:
     int reconstructTikhonov(double lambda, uint32_t maxIterations = 100, float errCondition = 0.01);
 };
 
-} // namespace CTL
+} // namespace KCT

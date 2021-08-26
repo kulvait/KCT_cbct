@@ -1,6 +1,6 @@
 #include "CuttingVoxelProjector.hpp"
 
-namespace CTL {
+namespace KCT {
 cl::NDRange CuttingVoxelProjector::guessProjectionLocalNDRange(bool barrierCalls)
 {
     cl::NDRange projectorLocalNDRange;
@@ -578,7 +578,7 @@ CuttingVoxelProjector::invertProjectionMatrices(std::vector<matrix::ProjectionMa
 
         double* P = matrix.getPtr();
         std::array<double, 3> sourcePosition = matrix.sourcePosition();
-        CTL::matrix::SquareMatrix CME(4,
+        KCT::matrix::SquareMatrix CME(4,
                                       { P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7], P[8], P[9],
                                         P[10], P[11], sourcePosition[0], sourcePosition[1],
                                         sourcePosition[2], 1.0 });
@@ -622,7 +622,7 @@ int CuttingVoxelProjector::backproject(float* volume,
                                        std::vector<std::shared_ptr<matrix::CameraI>>& cameraVector,
                                        uint64_t baseOffset)
 {
-    using namespace CTL::matrix;
+    using namespace KCT::matrix;
     std::string msg;
     if(cameraVector.size() > pdimz)
     {
@@ -706,7 +706,7 @@ int CuttingVoxelProjector::backproject(float* volume,
 int CuttingVoxelProjector::backproject_minmax(
     float* volume, std::vector<std::shared_ptr<matrix::CameraI>>& cameraVector, uint64_t baseOffset)
 {
-    using namespace CTL::matrix;
+    using namespace KCT::matrix;
     std::string msg;
     if(cameraVector.size() > pdimz)
     {
@@ -772,4 +772,4 @@ int CuttingVoxelProjector::backproject_minmax(
     return 0;
 }
 
-} // namespace CTL
+} // namespace KCT

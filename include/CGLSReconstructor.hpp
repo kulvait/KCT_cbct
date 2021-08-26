@@ -18,7 +18,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class CGLSReconstructor : public BaseReconstructor
 {
@@ -78,4 +78,4 @@ private:
     void tikhonovMatrixAction(cl::Buffer XIN, cl::Buffer XOUT);
 };
 
-} // namespace CTL
+} // namespace KCT

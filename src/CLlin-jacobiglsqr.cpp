@@ -23,7 +23,7 @@
 #include "DEN/DenSupportedType.hpp"
 #include "JacobiGLSQRReconstructor.hpp"
 
-using namespace CTL;
+using namespace KCT;
 
 /**Arguments parsed by the main function.
  */

@@ -17,7 +17,7 @@
 #include "SMA/BufferedSparseMatrixDoubleReader.hpp"
 #include "rawop.h"
 
-using namespace CTL;
+using namespace KCT;
 
 int main(int argc, char* argv[])
 {

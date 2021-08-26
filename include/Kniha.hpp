@@ -19,7 +19,7 @@
 #include "rawop.h"
 #include "stringFormatter.h"
 
-namespace CTL {
+namespace KCT {
 
 class Kniha
 {
@@ -480,4 +480,4 @@ private:
     std::vector<std::function<void(cl::Program)>> callbacks;
 };
 
-} // namespace CTL
+} // namespace KCT
