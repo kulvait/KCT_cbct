@@ -177,6 +177,7 @@ public:
     bool psirt = false;
     bool sirt = false;
     bool ossart = false;
+    bool boundaryReflection = false;
     uint32_t ossartSubsetCount = 1;
     float lowerBoxCondition = std::numeric_limits<float>::quiet_NaN();
     float upperBoxCondition = std::numeric_limits<float>::quiet_NaN();
@@ -238,7 +239,11 @@ void Args::defineArguments()
     tl2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
     tv2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
     tlaplace2d_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
-
+    str = io::xprintf("Boundary reflection when using V2 regularization, [defaults to %s]",
+                      boundaryReflection ? "true" : "false");
+    CLI::Option* boundaryReflection_opt
+        = og_settings->add_flag("--boundary-reflection", boundaryReflection, str);
+    boundaryReflection_opt->needs(tv2_opt);
     addForceArgs();
     // Reconstruction geometry
     addVolumeSizeArgs();
@@ -385,7 +390,12 @@ int main(int argc, char* argv[])
            || !std::isnan(ARG.tikhonovLambdaLaplace2D))
         {
             cgls->initializeVolumeConvolution();
-            cgls->addTikhonovRegularization(ARG.tikhonovLambdaL2, ARG.tikhonovLambdaV2, ARG.tikhonovLambdaLaplace2D);
+            cgls->addTikhonovRegularization(ARG.tikhonovLambdaL2, ARG.tikhonovLambdaV2,
+                                            ARG.tikhonovLambdaLaplace2D);
+            if(ARG.boundaryReflection)
+            {
+                cgls->useBoundaryReflection(ARG.boundaryReflection);
+            }
         }
         if(ARG.useJacobiPreconditioning)
         {

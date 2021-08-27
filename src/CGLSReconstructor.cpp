@@ -130,6 +130,11 @@ void CGLSReconstructor::addTikhonovRegularization(float L2, float V2, float Lapl
     }
 }
 
+void CGLSReconstructor::useBoundaryReflection(bool boundaryReflection)
+{
+    this->boundaryReflection = boundaryReflection;
+}
+
 void CGLSReconstructor::removeTikhonovRegularization() { this->tikhonovRegularization = false; }
 
 void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
@@ -145,9 +150,17 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
     if(tikhonovRegularizationV2)
     {
         cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
-        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-            XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
-            *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+        if(boundaryReflection)
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
+                XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
+                *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+        } else
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
+                XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
+                *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+        }
         scaleFloatVector(*AdirectionVector_bbuf_xpart_V2x, effectSizeV2, XDIM);
         scaleFloatVector(*AdirectionVector_bbuf_xpart_V2y, effectSizeV2, XDIM);
         scaleFloatVector(*AdirectionVector_bbuf_xpart_V2z, effectSizeV2, XDIM);
@@ -175,9 +188,17 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
     if(tikhonovRegularizationV2)
     {
         cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
-        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-            XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
-            *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+        if(boundaryReflection)
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
+                XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
+                *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+        } else
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
+                XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
+                *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+        }
         scaleFloatVector(*discrepancy_bbuf_xpart_V2x, effectSizeV2, XDIM);
         scaleFloatVector(*discrepancy_bbuf_xpart_V2y, effectSizeV2, XDIM);
         scaleFloatVector(*discrepancy_bbuf_xpart_V2z, effectSizeV2, XDIM);
@@ -210,19 +231,49 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
         // This shall be action of transposed regularizing matrix, it is with - sign but it will not
         // be exact with reflection conditions
         cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
-        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-            *discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd, *residualVector_xbuf_V2yadd,
-            *residualVector_xbuf_V2zadd, vdims, voxelSizesF, globalRange, localRange);
+        if(boundaryReflection)
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
+                *discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
+                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
+                globalRange, localRange);
+        } else
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
+                *discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
+                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
+                globalRange, localRange);
+        }
         algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd,
                                           -effectSizeV2, XDIM);
-        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-            *discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2xadd, *residualVector_xbuf_V2yadd,
-            *residualVector_xbuf_V2zadd, vdims, voxelSizesF, globalRange, localRange);
+        if(boundaryReflection)
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
+                *discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2xadd,
+                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
+                globalRange, localRange);
+        } else
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
+                *discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2xadd,
+                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
+                globalRange, localRange);
+        }
         algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd,
                                           -effectSizeV2, XDIM);
-        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-            *discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2xadd, *residualVector_xbuf_V2yadd,
-            *residualVector_xbuf_V2zadd, vdims, voxelSizesF, globalRange, localRange);
+        if(boundaryReflection)
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
+                *discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2xadd,
+                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
+                globalRange, localRange);
+        } else
+        {
+            algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
+                *discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2xadd,
+                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
+                globalRange, localRange);
+        }
         algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2zadd,
                                           -effectSizeV2, XDIM);
     }

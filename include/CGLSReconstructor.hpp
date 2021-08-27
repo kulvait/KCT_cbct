@@ -53,6 +53,7 @@ public:
                             backprojectorLocalNDRange)
     {
         removeTikhonovRegularization();
+        useBoundaryReflection(false);
     }
 
     virtual int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01);
@@ -74,6 +75,8 @@ public:
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
 
     void addTikhonovRegularization(float L2, float V2, float Laplace);
+
+    void useBoundaryReflection(bool boundaryReflection);
 
     void removeTikhonovRegularization();
 
@@ -99,6 +102,7 @@ private:
     bool tikhonovRegularizationL2;
     bool tikhonovRegularizationV2;
     bool tikhonovRegularizationLaplace;
+    bool boundaryReflection;
     float effectSizeL2, effectSizeV2, effectSizeLaplace;
 };
 
