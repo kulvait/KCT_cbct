@@ -101,7 +101,7 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 void CGLSReconstructor::addTikhonovRegularization(float L2, float V2, float Laplace)
 {
     this->tikhonovRegularization = false;
-    if(!std::isnan(L2))
+    if(!std::isnan(L2) && L2 != 0.0f)
     {
         this->tikhonovRegularization = true;
         this->tikhonovRegularizationL2 = true;
@@ -110,7 +110,7 @@ void CGLSReconstructor::addTikhonovRegularization(float L2, float V2, float Lapl
     {
         this->tikhonovRegularizationL2 = false;
     }
-    if(!std::isnan(V2))
+    if(!std::isnan(V2) && V2 != 0.0f)
     {
         this->tikhonovRegularization = true;
         this->tikhonovRegularizationV2 = true;
@@ -119,7 +119,7 @@ void CGLSReconstructor::addTikhonovRegularization(float L2, float V2, float Lapl
     {
         this->tikhonovRegularizationV2 = false;
     }
-    if(!std::isnan(Laplace))
+    if(!std::isnan(Laplace) && Laplace != 0.0f)
     {
         this->tikhonovRegularization = true;
         this->tikhonovRegularizationLaplace = true;
@@ -353,7 +353,8 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
     LOGD << printTime(INFO, false, true);
     uint32_t iteration = 1;
     // Initialization
-    double norm, normDiscrepancy2 = 0.0, normL22 = 0.0, normV22 = 0.0, normLaplace2 = 0.0;
+    double norm, normDiscrepancy2 = 0.0, normL22 = 0.0, normV2x2 = 0.0, normV2y2 = 0.0,
+                 normV2z2 = 0.0, normLaplace2 = 0.0;
 
     double residualNorm2_old, residualNorm2_now, AdirectionNorm2, AdirectionNorm2Xpart;
     double alpha, beta;
@@ -432,15 +433,15 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
     }
     if(tikhonovRegularizationV2)
     {
-        normV22 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2x);
-        normV22 += normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2y);
-        normV22 += normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2z);
+        normV2x2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2x);
+        normV2y2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2y);
+        normV2z2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2z);
     }
     if(tikhonovRegularizationLaplace)
     {
         normLaplace2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_Laplace);
     }
-    norm = std::sqrt(normDiscrepancy2 + normL22 + normV22 + normLaplace2);
+    norm = std::sqrt(normDiscrepancy2 + normL22 + normV2x2 + normV2y2 + normV2z2 + normLaplace2);
     while(norm / NB0 > errCondition && iteration < maxIterations)
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
@@ -457,7 +458,8 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
             tikhonovMatrixActionToDiscrepancyAndScale(*x_buf);
             algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
             // Comparing the following with alredy computed to estimate LOO
-            double normDiscrepancy2_, normL22_ = 0.0, normV22_ = 0.0, normLaplace2_ = 0.0, norm_;
+            double normDiscrepancy2_, normL22_ = 0.0, normV2x2_ = 0.0, normV2y2_ = 0.0,
+                                      normV2z2_ = 0.0, normLaplace2_ = 0.0, norm_;
             normDiscrepancy2_ = normBBuffer_barrier_double(*discrepancy_bbuf);
             if(tikhonovRegularizationL2)
             {
@@ -465,23 +467,24 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
             }
             if(tikhonovRegularizationV2)
             {
-                normV22_ = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2x);
-                normV22_ += normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2y);
-                normV22_ += normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2z);
+                normV2x2_ = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2x);
+                normV2y2_ = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2y);
+                normV2z2_ = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2z);
             }
             if(tikhonovRegularizationLaplace)
             {
                 normLaplace2_ = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_Laplace);
             }
-            norm_ = std::sqrt(normDiscrepancy2_ + normL22_ + normV22_ + normLaplace2_);
+            norm_ = std::sqrt(normDiscrepancy2_ + normL22_ + normV2x2_ + normV2y2_ + normV2z2_
+                              + normLaplace2_);
             reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
             LOGI << io::xprintf_green(
                 "Reorthogonalization in iteration %d: "
                 "sqrt(|Ax-b|^2+|Tx|^2)=%0.1f that is %0.2f%% of "
                 "|b|, |Ax-b|=%f, |L2|=%f, |V2|=%f, |Laplace|=%f, loss of orthogonality %f%%.",
                 iteration, norm_, 100.0 * norm_ / NB0, std::sqrt(normDiscrepancy2_),
-                std::sqrt(normL22_), std::sqrt(normV22_), std::sqrt(normLaplace2_),
-                100 * std::abs(norm - norm_) / norm);
+                std::sqrt(normL22_), std::sqrt(normV2x2_ + normV2y2_ + normV2z2),
+                std::sqrt(normLaplace2_), 100 * std::abs(norm - norm_) / norm);
         }
         // DEBUG
         backproject(*discrepancy_bbuf, *residualVector_xbuf);
@@ -491,12 +494,13 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
-        LOGI << io::xprintf_green("Iteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f that is %0.2f%% of "
-                                  "|b|, |Ax-b|=%f, |L2|=%f, |V2|=%f, |Laplace|=%f "
-                                  ", |AT(Ax-b)|=%0.2f that is %0.3f%% of |AT(Ax0-b)|.",
-                                  iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2),
-                                  std::sqrt(normL22), std::sqrt(normV22), std::sqrt(normLaplace2),
-                                  NX, 100 * NX / NR0);
+        LOGI << io::xprintf_green(
+            "Iteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f that is %0.2f%% of "
+            "|b|, |Ax-b|=%f, |L2|=%f, |V2|=%f, |V2x|=%f, |V2y|=%f, |V2z|=%f, |Laplace|=%f "
+            ", |AT(Ax-b)|=%0.2f that is %0.3f%% of |AT(Ax0-b)|.",
+            iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2), std::sqrt(normL22),
+            std::sqrt(normV2x2 + normV2y2 + normV2z2), std::sqrt(normV2x2), std::sqrt(normV2y2),
+            std::sqrt(normV2z2), std::sqrt(normLaplace2), NX, 100 * NX / NR0);
         algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
@@ -517,15 +521,16 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
         }
         if(tikhonovRegularizationV2)
         {
-            normV22 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2x);
-            normV22 += normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2y);
-            normV22 += normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2z);
+            normV2x2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2x);
+            normV2y2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2y);
+            normV2z2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_V2z);
         }
         if(tikhonovRegularizationLaplace)
         {
             normLaplace2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_Laplace);
         }
-        norm = std::sqrt(normDiscrepancy2 + normL22 + normV22 + normLaplace2);
+        norm
+            = std::sqrt(normDiscrepancy2 + normL22 + normV2x2 + normV2y2 + normV2z2 + normLaplace2);
     }
     LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
                               iteration, norm, 100.0 * norm / NB0);
