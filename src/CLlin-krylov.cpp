@@ -233,7 +233,7 @@ void Args::defineArguments()
         "Tikhonov Laplace regularization of 2D slices of volume, NAN to disable, [defaults to %f]",
         tikhonovLambdaLaplace2D);
     CLI::Option* tlaplace2d_opt
-        = og_settings->add_option("--tikhonov-lambda-v2", tikhonovLambdaLaplace2D, str)
+        = og_settings->add_option("--tikhonov-lambda-laplace", tikhonovLambdaLaplace2D, str)
               ->check(CLI::Range(0.0, 1000000.0));
     tl2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
     tv2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
