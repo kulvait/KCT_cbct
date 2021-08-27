@@ -145,8 +145,6 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
     if(tikhonovRegularizationV2)
     {
         cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
-        LOGD << io::xprintf("Voxel sizes are %f %f %f", voxelSizesF.x, voxelSizesF.y,
-                            voxelSizesF.z);
         algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
             XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
             *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
