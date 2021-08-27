@@ -342,7 +342,7 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
         INFO = io::xprintf("%sLaplace=%0.2f, ", effectSizeLaplace, INFO.c_str());
         additionalRegularizationVectors++;
     }
-    INFO = io::xprintf("%s, init", effectSizeLaplace, INFO.c_str());
+    INFO = io::xprintf("%sinit", effectSizeLaplace, INFO.c_str());
     tikhonovSetRegularizingBuffersNull();
     allocateXBuffers(2 + 3 * additionalRegularizationVectors); // We neeed three new X buffers per
                                                                // one regularization vector

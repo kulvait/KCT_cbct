@@ -385,6 +385,7 @@ int main(int argc, char* argv[])
            || !std::isnan(ARG.tikhonovLambdaLaplace2D))
         {
             cgls->initializeVolumeConvolution();
+            cgls->addTikhonovRegularization(ARG.tikhonovLambdaL2, ARG.tikhonovLambdaV2, ARG.tikhonovLambdaLaplace2D);
         }
         if(ARG.useJacobiPreconditioning)
         {
