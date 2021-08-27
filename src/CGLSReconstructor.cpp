@@ -147,7 +147,7 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
         cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
         LOGD << io::xprintf("Voxel sizes are %f %f %f", voxelSizesF.x, voxelSizesF.y,
                             voxelSizesF.z);
-        algFLOATvector_3DconvolutionGradientSobelFeldman(
+        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
             XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
             *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
         scaleFloatVector(*AdirectionVector_bbuf_xpart_V2x, effectSizeV2, XDIM);
@@ -177,7 +177,7 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
     if(tikhonovRegularizationV2)
     {
         cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
-        algFLOATvector_3DconvolutionGradientSobelFeldman(
+        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
             XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
             *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
         scaleFloatVector(*discrepancy_bbuf_xpart_V2x, effectSizeV2, XDIM);
@@ -208,22 +208,25 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
     if(tikhonovRegularizationV2)
     {
         // Here backprojection needs three calls
+        // We need to multiply with -1
+        // This shall be action of transposed regularizing matrix, it is with - sign but it will not
+        // be exact with reflection conditions
         cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
-        algFLOATvector_3DconvolutionGradientSobelFeldman(
+        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
             *discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd, *residualVector_xbuf_V2yadd,
             *residualVector_xbuf_V2zadd, vdims, voxelSizesF, globalRange, localRange);
-        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd, effectSizeV2,
-                                          XDIM);
-        algFLOATvector_3DconvolutionGradientSobelFeldman(
+        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd,
+                                          -effectSizeV2, XDIM);
+        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
             *discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2xadd, *residualVector_xbuf_V2yadd,
             *residualVector_xbuf_V2zadd, vdims, voxelSizesF, globalRange, localRange);
-        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd, effectSizeV2,
-                                          XDIM);
-        algFLOATvector_3DconvolutionGradientSobelFeldman(
+        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd,
+                                          -effectSizeV2, XDIM);
+        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
             *discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2xadd, *residualVector_xbuf_V2yadd,
             *residualVector_xbuf_V2zadd, vdims, voxelSizesF, globalRange, localRange);
-        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2zadd, effectSizeV2,
-                                          XDIM);
+        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2zadd,
+                                          -effectSizeV2, XDIM);
     }
     if(tikhonovRegularizationLaplace)
     {
@@ -391,6 +394,7 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
         residualVector_xbuf_Laplaceadd = getXBuffer(xBufferIndex + 1);
         discrepancy_bbuf_xpart_Laplace = getXBuffer(xBufferIndex + 2);
         AdirectionVector_bbuf_xpart_Laplace = getXBuffer(xBufferIndex + 3);
+        xBufferIndex = xBufferIndex + 3;
     }
     // discrepancy_bbuf stores initial discrepancy
     algFLOATvector_copy(*b_buf, *discrepancy_bbuf, BDIM);

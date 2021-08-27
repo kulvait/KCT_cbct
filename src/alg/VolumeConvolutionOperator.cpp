@@ -247,15 +247,24 @@ int VolumeConvolutionOperator::convolve(std::string kernelName, float* outputVol
 int VolumeConvolutionOperator::sobelGradient3D(cl_float3 voxelSizes,
                                                float* outputX,
                                                float* outputY,
-                                               float* outputZ)
+                                               float* outputZ,
+                                               bool reflectionBoundaryConditions)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
     localRange = nullptr;
     initializeOrUpdateGradientOutputBuffers();
-    algFLOATvector_3DconvolutionGradientSobelFeldman(*volumeBuffer, *outputGradientX,
-                                                     *outputGradientY, *outputGradientZ, vdims,
-                                                     voxelSizes, globalRange, localRange);
+    if(reflectionBoundaryConditions)
+    {
+        algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
+            *volumeBuffer, *outputGradientX, *outputGradientY, *outputGradientZ, vdims, voxelSizes,
+            globalRange, localRange);
+    } else
+    {
+        algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
+            *volumeBuffer, *outputGradientX, *outputGradientY, *outputGradientZ, vdims, voxelSizes,
+            globalRange, localRange);
+    }
     cl_int err
         = Q[0]->enqueueReadBuffer(*outputGradientX, CL_TRUE, 0, totalVolumeBufferSize, outputX);
     if(err != CL_SUCCESS)

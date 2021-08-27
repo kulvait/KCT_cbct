@@ -597,8 +597,17 @@ void Kniha::CLINCLUDEconvolution()
             };
         }
         {
-            auto& ptr = FLOATvector_3DconvolutionGradientSobelFeldman;
-            std::string str = "FLOATvector_3DconvolutionGradientSobelFeldman";
+            auto& ptr = FLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary;
+            std::string str = "FLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary;
+            std::string str = "FLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary";
             if(ptr == nullptr)
             {
                 ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -929,7 +938,8 @@ int Kniha::algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
     }
     return 0;
 }
-int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldman(cl::Buffer& F,
+
+int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(cl::Buffer& F,
                                                             cl::Buffer& GX,
                                                             cl::Buffer& GY,
                                                             cl::Buffer& GZ,
@@ -953,7 +963,41 @@ int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldman(cl::Buffer& F,
             LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
         }
     };
-    auto exe = (*FLOATvector_3DconvolutionGradientSobelFeldman)(*eargs, F, GX, GY, GZ, vdims,
+    auto exe = (*FLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary)(*eargs, F, GX, GY, GZ, vdims,
+                                                                voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(cl::Buffer& F,
+                                                            cl::Buffer& GX,
+                                                            cl::Buffer& GY,
+                                                            cl::Buffer& GZ,
+                                                            cl_int3& vdims,
+                                                            cl_float3& voxelSizes,
+                                                            cl::NDRange& globalRange,
+                                                            std::shared_ptr<cl::NDRange> localRange,
+                                                            bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+    auto exe = (*FLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary)(*eargs, F, GX, GY, GZ, vdims,
                                                                 voxelSizes);
     exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)

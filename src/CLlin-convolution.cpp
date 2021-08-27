@@ -49,7 +49,7 @@ public:
         std::string ERR;
         if(!force)
         {
-            if(sobelGradient3D)
+            if(sobelGradient3DZeroBoundary || sobelGradient3DReflectionBoundary)
             {
                 std::string gx = io::xprintf("%s_x", outputVolume.c_str());
                 std::string gy = io::xprintf("%s_y", outputVolume.c_str());
@@ -100,7 +100,8 @@ public:
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     // Here (0,0,0) is in the center of the volume
     uint64_t totalVolumeSize;
-    bool sobelGradient3D = false;
+    bool sobelGradient3DZeroBoundary = false;
+    bool sobelGradient3DReflectionBoundary = false;
     std::string inputVolume;
     std::string outputVolume;
 };
@@ -119,7 +120,12 @@ void Args::defineArguments()
         ->required()
         ->check(CLI::ExistingFile);
     cliApp->add_option("output_volume", outputVolume, "Output projection")->required();
-    cliApp->add_flag("--sobel-gradient-3d", sobelGradient3D, "3D gradient.");
+    CLI::Option* srb = cliApp->add_flag("--sobel-gradient-3d-reflection-boundary",
+                                        sobelGradient3DReflectionBoundary, "3D gradient.");
+    CLI::Option* szb = cliApp->add_flag("--sobel-gradient-3d-zero-boundary",
+                                        sobelGradient3DZeroBoundary, "3D gradient.");
+    srb->excludes(szb);
+    szb->excludes(srb);
     addForceArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
@@ -166,8 +172,7 @@ int main(int argc, char* argv[])
     }
     VCO.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ);
     // End parsing arguments
-    LOGI << io::xprintf("Before if ARG.sobelGradient3D=%d", ARG.sobelGradient3D);
-    if(ARG.sobelGradient3D)
+    if(ARG.sobelGradient3DReflectionBoundary || ARG.sobelGradient3DZeroBoundary)
     {
         float* vx = new float[ARG.totalVolumeSize];
         float* vy = new float[ARG.totalVolumeSize];
@@ -180,7 +185,9 @@ int main(int argc, char* argv[])
         cl_float3 voxelSizes
             = { (float)ARG.voxelSizeX, (float)ARG.voxelSizeY, (float)ARG.voxelSizeZ };
         LOGI << io::xprintf("Call VCO.sobelGradient3D.");
-        VCO.sobelGradient3D(voxelSizes, vx, vy, vz);
+        VCO.sobelGradient3D(voxelSizes, vx, vy, vz,
+                            ARG.sobelGradient3DReflectionBoundary); // When false it will lead to
+                                                                    // zero boundary conditions
         LOGI << io::xprintf("After VCO.sobelGradient3D.");
         uint64_t totalArraySize = ARG.totalVolumeSize * sizeof(float);
         std::string gx = io::xprintf("%s_x", ARG.outputVolume.c_str());
