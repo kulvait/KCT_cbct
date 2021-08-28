@@ -244,6 +244,23 @@ int VolumeConvolutionOperator::convolve(std::string kernelName, float* outputVol
     return 0;
 }
 
+int VolumeConvolutionOperator::laplace3D(cl_float3 voxelSizes, float* outputVolume)
+{
+    cl::NDRange globalRange(vdimx, vdimy, vdimz);
+    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    initializeOrUpdateOutputBuffer();
+    algFLOATvector_3DconvolutionLaplaceZeroBoundary(*volumeBuffer, *outputBuffer, vdims, voxelSizes,
+                                                    globalRange, localRange);
+    cl_int err
+        = Q[0]->enqueueReadBuffer(*outputBuffer, CL_TRUE, 0, totalVolumeBufferSize, outputVolume);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte buffer to the projection variable, code %d!", err);
+        return -1;
+    }
+    return 0;
+}
+
 int VolumeConvolutionOperator::sobelGradient3D(cl_float3 voxelSizes,
                                                float* outputX,
                                                float* outputY,

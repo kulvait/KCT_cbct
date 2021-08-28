@@ -135,12 +135,15 @@ void CGLSReconstructor::useBoundaryReflection(bool boundaryReflection)
     this->boundaryReflection = boundaryReflection;
 }
 
+void CGLSReconstructor::useLaplace3D(bool laplace3D) { this->laplace3D = laplace3D; }
+
 void CGLSReconstructor::removeTikhonovRegularization() { this->tikhonovRegularization = false; }
 
 void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
         copyFloatVector(XIN, *AdirectionVector_bbuf_xpart_L2,
@@ -149,7 +152,6 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
     }
     if(tikhonovRegularizationV2)
     {
-        cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
         if(boundaryReflection)
         {
             algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
@@ -167,10 +169,19 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
     }
     if(tikhonovRegularizationLaplace)
     {
-        cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                                         0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-        algFLOATvector_2Dconvolution3x3(XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims,
-                                        convolutionKernel, globalRange, localRange);
+
+        if(laplace3D)
+        {
+            algFLOATvector_3DconvolutionLaplaceZeroBoundary(
+                XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims, voxelSizesF, globalRange,
+                localRange);
+        } else
+        {
+            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
+                                             0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
+            algFLOATvector_2Dconvolution3x3(XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims,
+                                            convolutionKernel, globalRange, localRange);
+        }
         scaleFloatVector(*AdirectionVector_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
 }
@@ -179,6 +190,7 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
         copyFloatVector(XIN, *discrepancy_bbuf_xpart_L2,
@@ -187,7 +199,6 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
     }
     if(tikhonovRegularizationV2)
     {
-        cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
         if(boundaryReflection)
         {
             algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
@@ -205,10 +216,17 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
     }
     if(tikhonovRegularizationLaplace)
     {
-        cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                                         0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-        algFLOATvector_2Dconvolution3x3(XIN, *discrepancy_bbuf_xpart_Laplace, vdims,
-                                        convolutionKernel, globalRange, localRange);
+        if(laplace3D)
+        {
+            algFLOATvector_3DconvolutionLaplaceZeroBoundary(
+                XIN, *discrepancy_bbuf_xpart_Laplace, vdims, voxelSizesF, globalRange, localRange);
+        } else
+        {
+            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
+                                             0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
+            algFLOATvector_2Dconvolution3x3(XIN, *discrepancy_bbuf_xpart_Laplace, vdims,
+                                            convolutionKernel, globalRange, localRange);
+        }
         scaleFloatVector(*discrepancy_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
 }
@@ -218,6 +236,7 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
         copyFloatVector(*discrepancy_bbuf_xpart_L2, *residualVector_xbuf_L2add, XDIM);
@@ -230,7 +249,6 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
         // We need to multiply with -1
         // This shall be action of transposed regularizing matrix, it is with - sign but it will not
         // be exact with reflection conditions
-        cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
         if(boundaryReflection)
         {
             algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
@@ -279,11 +297,19 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
     }
     if(tikhonovRegularizationLaplace)
     {
-        cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                                         0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-        algFLOATvector_2Dconvolution3x3(*discrepancy_bbuf_xpart_Laplace,
-                                        *residualVector_xbuf_Laplaceadd, vdims, convolutionKernel,
-                                        globalRange, localRange);
+        if(laplace3D)
+        {
+            algFLOATvector_3DconvolutionLaplaceZeroBoundary(*discrepancy_bbuf_xpart_Laplace,
+                                                            *residualVector_xbuf_Laplaceadd, vdims,
+                                                            voxelSizesF, globalRange, localRange);
+        } else
+        {
+            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
+                                             0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
+            algFLOATvector_2Dconvolution3x3(*discrepancy_bbuf_xpart_Laplace,
+                                            *residualVector_xbuf_Laplaceadd, vdims,
+                                            convolutionKernel, globalRange, localRange);
+        }
         algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_Laplaceadd,
                                           effectSizeLaplace, XDIM);
     }

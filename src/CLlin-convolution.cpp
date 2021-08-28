@@ -102,6 +102,7 @@ public:
     uint64_t totalVolumeSize;
     bool sobelGradient3DZeroBoundary = false;
     bool sobelGradient3DReflectionBoundary = false;
+    bool laplace3D = false;
     std::string inputVolume;
     std::string outputVolume;
 };
@@ -124,8 +125,10 @@ void Args::defineArguments()
                                         sobelGradient3DReflectionBoundary, "3D gradient.");
     CLI::Option* szb = cliApp->add_flag("--sobel-gradient-3d-zero-boundary",
                                         sobelGradient3DZeroBoundary, "3D gradient.");
-    srb->excludes(szb);
-    szb->excludes(srb);
+    CLI::Option* l3d = cliApp->add_flag("--laplace-3d", laplace3D, "3D Laplace operator.");
+    srb->excludes(szb)->excludes(l3d);
+    szb->excludes(l3d)->excludes(srb);
+    l3d->excludes(srb)->excludes(szb);
     addForceArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
@@ -211,9 +214,16 @@ int main(int argc, char* argv[])
                           ARG.totalVolumeSize * 4);
         VCO.initializeOrUpdateVolumeBuffer(ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
                                            volume);
-        std::string kernelName = "Laplace";
-        VCO.convolve(kernelName, volume);
-
+        if(ARG.laplace3D)
+        {
+            cl_float3 voxelSizes
+                = { (float)ARG.voxelSizeX, (float)ARG.voxelSizeY, (float)ARG.voxelSizeZ };
+            VCO.laplace3D(voxelSizes, volume);
+        } else
+        {
+            std::string kernelName = "Laplace";
+            VCO.convolve(kernelName, volume);
+        }
         io::DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
                                          ARG.volumeSizeZ);
         uint64_t totalArraySize = ARG.totalVolumeSize * sizeof(float);

@@ -110,7 +110,12 @@ public:
     int initializeOrUpdateGradientOutputBuffers();
 
     int convolve(std::string kernelName, float* volume);
-    int sobelGradient3D(cl_float3 voxelSizes, float* vx, float* vy, float* vz, bool reflectionBoundaryConditions = false);
+    int sobelGradient3D(cl_float3 voxelSizes,
+                        float* vx,
+                        float* vy,
+                        float* vz,
+                        bool reflectionBoundaryConditions = false);
+    int laplace3D(cl_float3 voxelSizes, float* outputVolume);
 
 private:
     const cl_float FLOATZERO = 0.0f;

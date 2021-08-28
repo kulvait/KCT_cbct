@@ -485,6 +485,16 @@ protected:
         cl::NDRange& globalRange,
         std::shared_ptr<cl::NDRange> localRange = nullptr,
         bool blocking = false);
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_3DconvolutionLaplaceZeroBoundary;
+    int algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
+                                                        cl::Buffer& B,
+                                                        cl_int3& vdims,
+                                                        cl_float3& voxelSizes,
+                                                        cl::NDRange& globalRange,
+                                                        std::shared_ptr<cl::NDRange> localRange
+                                                        = nullptr,
+                                                        bool blocking = false);
 
 private:
     bool openCLInitialized = false;
