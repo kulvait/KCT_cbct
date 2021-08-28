@@ -59,12 +59,13 @@ int OSSARTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         project(*x_buf, *discrepancy_bbuf);
         algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
+        LOGI << io::xprintf_green("\nInitialization: |Ax-b|=%0.1f representing %0.2f%% of |b|.", norm,
+                                  100.0 * norm / NB0);
     } else
     {
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
         norm = NB0;
     }
-    LOGI << io::xprintf_green("|Ax-b|=%0.1f that is %0.2f%% of |b|.", norm, 100.0 * norm / NB0);
     ones_bbuf = getBBuffer(2);
     Q[0]->enqueueFillBuffer<cl_float>(*ones_bbuf, FLOATONE, 0, BDIM * sizeof(float));
     partial_invcolsum_xbuf = getXBuffer(1);
@@ -98,7 +99,7 @@ int OSSARTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         project(*x_buf, *discrepancy_bbuf);
         algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
-        LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
+        LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
                                   iteration, norm, 100.0 * norm / NB0);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
