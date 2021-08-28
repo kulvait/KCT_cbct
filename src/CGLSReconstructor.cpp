@@ -62,12 +62,12 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         {
             project(*x_buf, *discrepancy_bbuf);
             algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
-            double norm2 = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
+            double norm_ = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
             reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
-            LOGI << io::xprintf_green(
-                "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
-                "loss of orthogonality %f%%.",
-                iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
+            LOGI << io::xprintf_green("\nReorthogonalization in iteration %d: |Ax-b|=%0.1f "
+                                      "representing %0.2f%% of |b|, loss of orthogonality %f%%.",
+                                      iteration, norm_, 100.0 * norm_ / NB0,
+                                      100 * std::abs(norm - norm_) / norm);
         }
         // DEBUG
         backproject(*discrepancy_bbuf, *residualVector_xbuf);
@@ -76,10 +76,10 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
-        LOGI << io::xprintf_green(
-            "Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
-            "that is %0.3f%% of |AT(Ax0-b)|.",
-            iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
+        LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, "
+                                  "|AT(Ax-b)|=%0.2f representing %0.3f%% of "
+                                  "|AT(Ax0-b)|.",
+                                  iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
         algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
@@ -92,7 +92,7 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
     }
-    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
+    LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
                               iteration, norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
@@ -554,11 +554,15 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
                               + normLaplace2_);
             reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
             LOGI << io::xprintf_green(
-                "Reorthogonalization in iteration %d: "
-                "sqrt(|Ax-b|^2+|Tx|^2)=%0.1f that is %0.2f%% of "
-                "|b|, |Ax-b|=%f, |L2|=%f, |V2|=%f, |Laplace|=%f, loss of orthogonality %f%%.",
+                "\nReorthogonalization in iteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing "
+                "%0.2f%% of |b|, "
+                "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
+                "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
+                "|Laplace|=%0.1f, loss of orthogonality %f%%.",
                 iteration, norm_, 100.0 * norm_ / NB0, std::sqrt(normDiscrepancy2_),
-                std::sqrt(normL22_), std::sqrt(normV2x2_ + normV2y2_ + normV2z2),
+                100.0 * std::sqrt(normDiscrepancy2_) / NB0, std::sqrt(normDiscrepancy2_),
+                std::sqrt(normL22_), std::sqrt(normV2x2_ + normV2y2_ + normV2z2_),
+                std::sqrt(normV2x2_), std::sqrt(normV2y2_), std::sqrt(normV2z2_),
                 std::sqrt(normLaplace2_), 100 * std::abs(norm - norm_) / norm);
         }
         // DEBUG
@@ -570,12 +574,17 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
         LOGI << io::xprintf_green(
-            "Iteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f that is %0.2f%% of "
-            "|b|, |Ax-b|=%f, |L2|=%f, |V2|=%f, |V2x|=%f, |V2y|=%f, |V2z|=%f, |Laplace|=%f "
-            ", |AT(Ax-b)|=%0.2f that is %0.3f%% of |AT(Ax0-b)|.",
-            iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2), std::sqrt(normL22),
+            "\nIteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing %0.2f%% of |b|, "
+            "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
+            "sqrt(|AT(Ax-b)|^2 + |TTTx|^2)=%0.2f representing %0.3f%% of "
+            "sqrt(|AT(Ax0-b)|^2+|TTTx0|^2), "
+            "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
+            "|Laplace|=%0.1f.",
+            iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2),
+            100.0 * std::sqrt(normDiscrepancy2) / NB0, NX, 100 * NX / NR0,
+            std::sqrt(normDiscrepancy2), std::sqrt(normL22),
             std::sqrt(normV2x2 + normV2y2 + normV2z2), std::sqrt(normV2x2), std::sqrt(normV2y2),
-            std::sqrt(normV2z2), std::sqrt(normLaplace2), NX, 100 * NX / NR0);
+            std::sqrt(normV2z2), std::sqrt(normLaplace2));
         algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
@@ -607,8 +616,15 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
         norm
             = std::sqrt(normDiscrepancy2 + normL22 + normV2x2 + normV2y2 + normV2z2 + normLaplace2);
     }
-    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
-                              iteration, norm, 100.0 * norm / NB0);
+    LOGI << io::xprintf_green(
+        "\nIteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing %0.2f%% of |b|, "
+        "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
+        "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
+        "|Laplace|=%0.1f.",
+        iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2),
+        100.0 * std::sqrt(normDiscrepancy2) / NB0, std::sqrt(normDiscrepancy2), std::sqrt(normL22),
+        std::sqrt(normV2x2 + normV2y2 + normV2z2), std::sqrt(normV2x2), std::sqrt(normV2y2),
+        std::sqrt(normV2z2), std::sqrt(normLaplace2));
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
