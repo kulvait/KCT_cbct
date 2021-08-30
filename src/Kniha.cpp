@@ -623,6 +623,60 @@ void Kniha::CLINCLUDEconvolution()
                     cl::Kernel(program, str.c_str()));
             };
         }
+        {
+            auto& ptr = FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary;
+            std::string str = "FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_3DisotropicGradient;
+            std::string str = "FLOATvector_3DisotropicGradient";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_2DisotropicGradient;
+            std::string str = "FLOATvector_2DisotropicGradient";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_isotropicBackDx;
+            std::string str = "FLOATvector_isotropicBackDx";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_isotropicBackDy;
+            std::string str = "FLOATvector_isotropicBackDy";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_isotropicBackDz;
+            std::string str = "FLOATvector_isotropicBackDz";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
     });
 }
 
@@ -1018,6 +1072,41 @@ int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
     return 0;
 }
 
+int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
+    cl::Buffer& F,
+    cl::Buffer& GX,
+    cl::Buffer& GY,
+    cl::Buffer& GZ,
+    cl_int3& vdims,
+    cl_float3& voxelSizes,
+    cl::NDRange& globalRange,
+    std::shared_ptr<cl::NDRange> localRange,
+    bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+    auto exe = (*FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary)(*eargs, F, GX, GY, GZ,
+                                                                          vdims, voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
 int Kniha::algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
                                                            cl::Buffer& B,
                                                            cl_int3& vdims,
@@ -1042,6 +1131,167 @@ int Kniha::algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
     };
 
     auto exe = (*FLOATvector_3DconvolutionLaplaceZeroBoundary)(*eargs, A, B, vdims, voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_3DisotropicGradient(cl::Buffer& F,
+                                              cl::Buffer& GX,
+                                              cl::Buffer& GY,
+                                              cl::Buffer& GZ,
+                                              cl_int3& vdims,
+                                              cl_float3& voxelSizes,
+                                              cl::NDRange& globalRange,
+                                              std::shared_ptr<cl::NDRange> localRange,
+                                              bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+    auto exe = (*FLOATvector_3DisotropicGradient)(*eargs, F, GX, GY, GZ, vdims, voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_2DisotropicGradient(cl::Buffer& F,
+                                              cl::Buffer& GX,
+                                              cl::Buffer& GY,
+                                              cl_int3& vdims,
+                                              cl_float3& voxelSizes,
+                                              cl::NDRange& globalRange,
+                                              std::shared_ptr<cl::NDRange> localRange,
+                                              bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+    auto exe = (*FLOATvector_2DisotropicGradient)(*eargs, F, GX, GY, vdims, voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_isotropicBackDx(cl::Buffer& F,
+                                          cl::Buffer& DX,
+                                          cl_int3& vdims,
+                                          cl_float3& voxelSizes,
+                                          cl::NDRange& globalRange,
+                                          std::shared_ptr<cl::NDRange> localRange,
+                                          bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
+    auto exe = (*FLOATvector_isotropicBackDx)(*eargs, F, DX, vdims, voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_isotropicBackDy(cl::Buffer& F,
+                                          cl::Buffer& DY,
+                                          cl_int3& vdims,
+                                          cl_float3& voxelSizes,
+                                          cl::NDRange& globalRange,
+                                          std::shared_ptr<cl::NDRange> localRange,
+                                          bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
+    auto exe = (*FLOATvector_isotropicBackDy)(*eargs, F, DY, vdims, voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_isotropicBackDz(cl::Buffer& F,
+                                          cl::Buffer& DZ,
+                                          cl_int3& vdims,
+                                          cl_float3& voxelSizes,
+                                          cl::NDRange& globalRange,
+                                          std::shared_ptr<cl::NDRange> localRange,
+                                          bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
+    auto exe = (*FLOATvector_isotropicBackDz)(*eargs, F, DZ, vdims, voxelSizes);
     exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)
     {
