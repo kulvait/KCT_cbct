@@ -63,7 +63,7 @@ Doc files and this file can be written using [Markdown syntax](https://daringfir
 
 When there is no other licensing and/or copyright information in the source files of this project, the following apply for the source files in the directories include and src and for CMakeLists.txt file:
 
-Copyright (C) 2018-2020 Vojtěch Kulvait
+Copyright (C) 2018-2021 Vojtěch Kulvait
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
