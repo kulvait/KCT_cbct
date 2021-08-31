@@ -344,4 +344,41 @@ int VolumeConvolutionOperator::sobelGradient3D(cl_float3 voxelSizes,
     return 0;
 }
 
+int VolumeConvolutionOperator::isotropicGradient3D(cl_float3 voxelSizes,
+                                                   float* outputX,
+                                                   float* outputY,
+                                                   float* outputZ)
+{
+    cl::NDRange globalRange(vdimx, vdimy, vdimz);
+    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    localRange = nullptr;
+    initializeOrUpdateGradientOutputBuffers();
+    algFLOATvector_3DisotropicGradient(*volumeBuffer, *outputGradientX, *outputGradientY,
+                                       *outputGradientZ, vdims, voxelSizes, globalRange,
+                                       localRange);
+    cl_int err
+        = Q[0]->enqueueReadBuffer(*outputGradientX, CL_TRUE, 0, totalVolumeBufferSize, outputX);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte outputGradientX to the variable outputX, code %d!",
+                            err);
+        return -1;
+    }
+    err = Q[0]->enqueueReadBuffer(*outputGradientY, CL_TRUE, 0, totalVolumeBufferSize, outputY);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte outputGradientY to the variable outputY, code %d!",
+                            err);
+        return -1;
+    }
+    err = Q[0]->enqueueReadBuffer(*outputGradientZ, CL_TRUE, 0, totalVolumeBufferSize, outputZ);
+    if(err != CL_SUCCESS)
+    {
+        LOGE << io::xprintf("Unsucessful writte outputGradientZ to the variable outputZ, code %d!",
+                            err);
+        return -1;
+    }
+    return 0;
+}
+
 } // namespace KCT

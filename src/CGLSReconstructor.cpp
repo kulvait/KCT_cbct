@@ -228,7 +228,6 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
         } else if(gradient3D)
         {
             algFLOATvector_3DisotropicGradient(
-
                 XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
                 *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
         } else
@@ -313,9 +312,9 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
         {
             algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
                                            vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd,
+            algFLOATvector_isotropicBackDy(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd,
                                            vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2zadd,
+            algFLOATvector_isotropicBackDz(*discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2zadd,
                                            vdims, voxelSizesF, globalRange, localRange);
             algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd,
                                               effectSizeV2, XDIM);
@@ -328,7 +327,7 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
         {
             algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
                                            vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd,
+            algFLOATvector_isotropicBackDy(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd,
                                            vdims, voxelSizesF, globalRange, localRange);
             algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd,
                                               effectSizeV2, XDIM);

@@ -103,6 +103,7 @@ public:
     bool sobelGradient3DZeroBoundary = false;
     bool farid5Gradient3DZeroBoundary = false;
     bool sobelGradient3DReflectionBoundary = false;
+    bool isotropicGradient3D = false;
     bool laplace3D = false;
     std::string inputVolume;
     std::string outputVolume;
@@ -128,11 +129,14 @@ void Args::defineArguments()
                                         sobelGradient3DZeroBoundary, "3D gradient.");
     CLI::Option* f53zb = cliApp->add_flag("--farid5-gradient-3d-zero-boundary",
                                           farid5Gradient3DZeroBoundary, "3D gradient.");
+    CLI::Option* ig3
+        = cliApp->add_flag("--isotropic-gradient-3d", isotropicGradient3D, "3D gradient.");
     CLI::Option* l3d = cliApp->add_flag("--laplace-3d", laplace3D, "3D Laplace operator.");
-    srb->excludes(szb)->excludes(l3d)->excludes(f53zb);
-    szb->excludes(l3d)->excludes(srb)->excludes(f53zb);
-    l3d->excludes(srb)->excludes(szb)->excludes(f53zb);
-    f53zb->excludes(srb)->excludes(szb)->excludes(l3d);
+    srb->excludes(szb)->excludes(l3d)->excludes(f53zb)->excludes(ig3);
+    szb->excludes(l3d)->excludes(srb)->excludes(f53zb)->excludes(ig3);
+    l3d->excludes(srb)->excludes(szb)->excludes(f53zb)->excludes(ig3);
+    f53zb->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(ig3);
+    ig3->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(f53zb);
     addForceArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
@@ -180,7 +184,7 @@ int main(int argc, char* argv[])
     VCO.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ);
     // End parsing arguments
     if(ARG.sobelGradient3DReflectionBoundary || ARG.sobelGradient3DZeroBoundary
-       || ARG.farid5Gradient3DZeroBoundary)
+       || ARG.farid5Gradient3DZeroBoundary || ARG.isotropicGradient3D)
     {
         float* vx = new float[ARG.totalVolumeSize];
         float* vy = new float[ARG.totalVolumeSize];
@@ -199,10 +203,13 @@ int main(int argc, char* argv[])
                 voxelSizes, vx, vy, vz,
                 ARG.sobelGradient3DReflectionBoundary); // When false it will lead to
                                                         // zero boundary conditions
-        } else
+        } else if(ARG.farid5Gradient3DZeroBoundary)
         {
 
             VCO.faridGradient3D(voxelSizes, vx, vy, vz);
+        } else
+        {
+            VCO.isotropicGradient3D(voxelSizes, vx, vy, vz);
         }
         LOGI << io::xprintf("After VCO.sobelGradient3D.");
         uint64_t totalArraySize = ARG.totalVolumeSize * sizeof(float);

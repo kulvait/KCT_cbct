@@ -496,7 +496,7 @@ void kernel FLOATvector_isotropicBackDy(global const float* restrict F,
     const int IND = VOXELINDEX(i, j, k, vdims);
     float v = F[IND];
     float out;
-    if(i == 0)
+    if(j == 0)
     {
         out = 0.0f;
     } else
@@ -517,7 +517,7 @@ void kernel FLOATvector_isotropicBackDz(global const float* restrict F,
     const int IND = VOXELINDEX(i, j, k, vdims);
     float v = F[IND];
     float out;
-    if(i == 0)
+    if(k == 0)
     {
         out = 0.0f;
     } else

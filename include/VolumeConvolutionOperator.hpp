@@ -116,6 +116,7 @@ public:
                         float* vz,
                         bool reflectionBoundaryConditions = false);
     int faridGradient3D(cl_float3 voxelSizes, float* vx, float* vy, float* vz);
+    int isotropicGradient3D(cl_float3 voxelSizes, float* outputX, float* outputY, float* outputZ);
     int laplace3D(cl_float3 voxelSizes, float* outputVolume);
 
 private:
