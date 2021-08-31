@@ -130,14 +130,8 @@ void CGLSReconstructor::addTikhonovRegularization(float L2, float V2, float Lapl
     }
 }
 
-void CGLSReconstructor::useBoundaryReflection(bool boundaryReflection)
-{
-    this->boundaryReflection = boundaryReflection;
-}
-
 void CGLSReconstructor::useGradient3D(bool gradient3D) { this->gradient3D = gradient3D; }
 void CGLSReconstructor::useLaplace3D(bool laplace3D) { this->laplace3D = laplace3D; }
-void CGLSReconstructor::useFarid5(bool farid5) { this->farid5 = farid5; }
 
 void CGLSReconstructor::removeTikhonovRegularization() { this->tikhonovRegularization = false; }
 
@@ -154,12 +148,7 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
     }
     if(tikhonovRegularizationV2)
     {
-        if(farid5)
-        {
-            algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
-                XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
-                *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
-        } else if(gradient3D)
+        if(gradient3D)
         {
             algFLOATvector_3DisotropicGradient(
                 XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
@@ -170,20 +159,6 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
                                                *AdirectionVector_bbuf_xpart_V2y, vdims, voxelSizesF,
                                                globalRange, localRange);
         }
-
-        /*
-        else if(boundaryReflection)
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
-                        XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
-                        *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange,
-        localRange); } else
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-                        XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
-                        *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange,
-        localRange);
-                }*/
         scaleFloatVector(*AdirectionVector_bbuf_xpart_V2x, effectSizeV2, XDIM);
         scaleFloatVector(*AdirectionVector_bbuf_xpart_V2y, effectSizeV2, XDIM);
         scaleFloatVector(*AdirectionVector_bbuf_xpart_V2z, effectSizeV2, XDIM);
@@ -220,12 +195,7 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
     }
     if(tikhonovRegularizationV2)
     {
-        if(farid5)
-        {
-            algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
-                XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
-                *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
-        } else if(gradient3D)
+        if(gradient3D)
         {
             algFLOATvector_3DisotropicGradient(
                 XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
@@ -237,18 +207,6 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
                 XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y, vdims, voxelSizesF,
                 globalRange, localRange);
         }
-
-        /*else if(boundaryReflection)
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
-                        XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
-                        *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
-                } else
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-                        XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
-                        *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
-                }*/
         scaleFloatVector(*discrepancy_bbuf_xpart_V2x, effectSizeV2, XDIM);
         scaleFloatVector(*discrepancy_bbuf_xpart_V2y, effectSizeV2, XDIM);
         scaleFloatVector(*discrepancy_bbuf_xpart_V2z, effectSizeV2, XDIM);
@@ -288,27 +246,7 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
         // We need to multiply with -1
         // This shall be action of transposed regularizing matrix, it is with - sign but it will not
         // be exact with reflection conditions
-        if(farid5)
-        {
-            algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
-                *discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
-                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
-                globalRange, localRange);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd,
-                                              -effectSizeV2, XDIM);
-            algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
-                *discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2xadd,
-                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
-                globalRange, localRange);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd,
-                                              -effectSizeV2, XDIM);
-            algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
-                *discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2xadd,
-                *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims, voxelSizesF,
-                globalRange, localRange);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2zadd,
-                                              -effectSizeV2, XDIM);
-        } else if(gradient3D)
+        if(gradient3D)
         {
             algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
                                            vdims, voxelSizesF, globalRange, localRange);
@@ -334,47 +272,6 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
             algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd,
                                               effectSizeV2, XDIM);
         }
-
-        /* else if(boundaryReflection)
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
-                        *discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
-                        *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims,
-           voxelSizesF, globalRange, localRange); } else
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-                        *discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
-                        *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims,
-           voxelSizesF, globalRange, localRange);
-                }
-                if(farid5)
-                {
-                } else if(boundaryReflection)
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
-                        *discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2xadd,
-                        *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims,
-           voxelSizesF, globalRange, localRange); } else
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-                        *discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2xadd,
-                        *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims,
-           voxelSizesF, globalRange, localRange);
-                }
-                if(farid5)
-                {
-                } else if(boundaryReflection)
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
-                        *discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2xadd,
-                        *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims,
-           voxelSizesF, globalRange, localRange); } else
-                {
-                    algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-                        *discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2xadd,
-                        *residualVector_xbuf_V2yadd, *residualVector_xbuf_V2zadd, vdims,
-           voxelSizesF, globalRange, localRange);
-                }*/
     }
     if(tikhonovRegularizationLaplace)
     {
@@ -409,7 +306,7 @@ void CGLSReconstructor::tikhonov_discrepancy_equals_discrepancy_minus_alphaAdire
                                           *AdirectionVector_bbuf_xpart_V2x, -alpha, XDIM);
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2y,
                                           *AdirectionVector_bbuf_xpart_V2y, -alpha, XDIM);
-        if(gradient3D || farid5)
+        if(gradient3D)
         {
             algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2z,
                                               *AdirectionVector_bbuf_xpart_V2z, -alpha, XDIM);
@@ -433,7 +330,7 @@ double CGLSReconstructor::tikhonovSumOfAdirectionNorms2()
     {
         AdirectionNorms2Xpart += normXBuffer_barrier_double(*AdirectionVector_bbuf_xpart_V2x);
         AdirectionNorms2Xpart += normXBuffer_barrier_double(*AdirectionVector_bbuf_xpart_V2y);
-        if(gradient3D || farid5)
+        if(gradient3D)
         {
             AdirectionNorms2Xpart += normXBuffer_barrier_double(*AdirectionVector_bbuf_xpart_V2z);
         }

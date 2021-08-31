@@ -177,8 +177,6 @@ public:
     bool psirt = false;
     bool sirt = false;
     bool ossart = false;
-    bool boundaryReflection = false;
-    bool farid5Gradient = false;
     bool gradient2D = false;
     bool laplace2D = false;
     uint32_t ossartSubsetCount = 1;
@@ -233,11 +231,8 @@ void Args::defineArguments()
                       tikhonovLambdaV2);
     CLI::Option* tv2_opt = og_settings->add_option("--tikhonov-lambda-v2", tikhonovLambdaV2, str)
                                ->check(CLI::Range(0.0, 1000000.0));
-    CLI::Option* f5_opt
-        = og_settings->add_flag("--farid5-gradient", farid5Gradient, "Use Farid5 gradient.");
     CLI::Option* g2d_opt = og_settings->add_flag("--gradient-2d", gradient2D, "Use 2D gradient.");
     g2d_opt->needs(tv2_opt);
-    f5_opt->needs(tv2_opt);
     str = io::xprintf(
         "Tikhonov Laplace regularization of 2D slices of volume, NAN to disable, [defaults to %f]",
         tikhonovLambdaLaplace2D);
@@ -247,12 +242,7 @@ void Args::defineArguments()
     tl2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
     tv2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
     tlaplace2d_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
-    str = io::xprintf("Boundary reflection when using V2 regularization, [defaults to %s]",
-                      boundaryReflection ? "true" : "false");
-    CLI::Option* boundaryReflection_opt
-        = og_settings->add_flag("--boundary-reflection", boundaryReflection, str);
     CLI::Option* l3d = cliApp->add_flag("--laplace-2d", laplace2D, "2D Laplace operator.");
-    boundaryReflection_opt->needs(tv2_opt);
     l3d->needs(tlaplace2d_opt);
     addForceArgs();
     // Reconstruction geometry
@@ -402,10 +392,8 @@ int main(int argc, char* argv[])
             cgls->initializeVolumeConvolution();
             cgls->addTikhonovRegularization(ARG.tikhonovLambdaL2, ARG.tikhonovLambdaV2,
                                             ARG.tikhonovLambdaLaplace2D);
-            cgls->useBoundaryReflection(ARG.boundaryReflection);
             cgls->useGradient3D(!ARG.gradient2D);
             cgls->useLaplace3D(!ARG.laplace2D);
-            cgls->useFarid5(ARG.farid5Gradient);
         }
         if(ARG.useJacobiPreconditioning)
         {
