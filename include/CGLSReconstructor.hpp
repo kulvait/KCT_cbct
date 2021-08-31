@@ -53,8 +53,8 @@ public:
                             backprojectorLocalNDRange)
     {
         removeTikhonovRegularization();
-        useBoundaryReflection(false);
-        useLaplace3D(false);
+        useGradient3D(true);
+        useLaplace3D(true);
     }
 
     virtual int reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01);
@@ -77,7 +77,7 @@ public:
 
     void addTikhonovRegularization(float L2, float V2, float Laplace);
 
-    void useBoundaryReflection(bool boundaryReflection);
+    void useGradient3D(bool gradient3D);
     void useLaplace3D(bool laplace3D);
 
     void removeTikhonovRegularization();
@@ -104,8 +104,8 @@ private:
     bool tikhonovRegularizationL2;
     bool tikhonovRegularizationV2;
     bool tikhonovRegularizationLaplace;
-    bool boundaryReflection;
     bool laplace3D;
+    bool gradient3D;
     float effectSizeL2, effectSizeV2, effectSizeLaplace;
 };
 

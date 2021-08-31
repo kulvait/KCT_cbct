@@ -485,6 +485,19 @@ protected:
         cl::NDRange& globalRange,
         std::shared_ptr<cl::NDRange> localRange = nullptr,
         bool blocking = false);
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary;
+    int algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
+        cl::Buffer& F,
+        cl::Buffer& GX,
+        cl::Buffer& GY,
+        cl::Buffer& GZ,
+        cl_int3& vdims,
+        cl_float3& voxelSizes,
+        cl::NDRange& globalRange,
+        std::shared_ptr<cl::NDRange> localRange = nullptr,
+        bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionLaplaceZeroBoundary;
     int algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
@@ -495,6 +508,57 @@ protected:
                                                         std::shared_ptr<cl::NDRange> localRange
                                                         = nullptr,
                                                         bool blocking = false);
+
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_3DisotropicGradient;
+    int algFLOATvector_3DisotropicGradient(cl::Buffer& F,
+                                           cl::Buffer& GX,
+                                           cl::Buffer& GY,
+                                           cl::Buffer& GZ,
+                                           cl_int3& vdims,
+                                           cl_float3& voxelSizes,
+                                           cl::NDRange& globalRange,
+                                           std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                           bool blocking = false);
+
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_2DisotropicGradient;
+    int algFLOATvector_2DisotropicGradient(cl::Buffer& F,
+                                           cl::Buffer& GX,
+                                           cl::Buffer& GY,
+                                           cl_int3& vdims,
+                                           cl_float3& voxelSizes,
+                                           cl::NDRange& globalRange,
+                                           std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                           bool blocking = false);
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_isotropicBackDx;
+    int algFLOATvector_isotropicBackDx(cl::Buffer& F,
+                                       cl::Buffer& DX,
+                                       cl_int3& vdims,
+                                       cl_float3& voxelSizes,
+                                       cl::NDRange& globalRange,
+                                       std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                       bool blocking = false);
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_isotropicBackDy;
+    int algFLOATvector_isotropicBackDy(cl::Buffer& F,
+                                       cl::Buffer& DY,
+                                       cl_int3& vdims,
+                                       cl_float3& voxelSizes,
+                                       cl::NDRange& globalRange,
+                                       std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                       bool blocking = false);
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_isotropicBackDz;
+    int algFLOATvector_isotropicBackDz(cl::Buffer& F,
+                                       cl::Buffer& DZ,
+                                       cl_int3& vdims,
+                                       cl_float3& voxelSizes,
+                                       cl::NDRange& globalRange,
+                                       std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                       bool blocking = false);
 
 private:
     bool openCLInitialized = false;
