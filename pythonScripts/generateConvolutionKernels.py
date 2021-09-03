@@ -9,22 +9,8 @@ Code to generate convolution kernels code when I have separable d0 and d1 vector
 """
 import numpy as np
 
-def generateConvolution2D(d0, d1):
-	dx=len(d0)
-	dy=len(d1)
-	sumstr=""
-	for i in range(dx):
-		if not sumstr.endswith("\n") and not len(sumstr)==0:			
-			sumstr="%s\n"%(sumstr)
-		for j in range(dy):
-			if np.float32(d0[i]*d1[j]) != 0:
-				term = "%sf*cube[%d][%d]"%(np.format_float_positional(np.float32(d0[i]*d1[j])), i, j)
-				if np.float32(d0[i]*d1[j]) > 0:
-					sumstr="%s +%s"%(sumstr, term)
-				else:
-					sumstr="%s %s"%(sumstr, term)
-	return sumstr;
-
+def normalizeVectorL1(v):
+	return v/np.linalg.norm(v, ord=1)
 
 def generateBracket(plusKeys, minusKeys, key):
 	outplus=""
@@ -41,9 +27,38 @@ def generateBracket(plusKeys, minusKeys, key):
 	else:
 		return "%s%s"%(outplus, outminus)
 
-def generateConvolutionCompact2D(d0, d1):
+def generateConvolution2D(d0, d1, normalize=None):
+	if normalize is None:
+		normalize=True
 	dx=len(d0)
 	dy=len(d1)
+	if normalize:
+		normalizationTerm=np.sqrt(np.linalg.norm(np.outer(d0,d1).flatten(), ord=1))
+		d0=d0/normalizationTerm
+		d1=d1/normalizationTerm
+	sumstr=""
+	for i in range(dx):
+		if not sumstr.endswith("\n") and not len(sumstr)==0:
+			sumstr="%s\n"%(sumstr)
+		for j in range(dy):
+			if np.float32(d0[i]*d1[j]) != 0:
+				term = "%sf*cube[%d][%d]"%(np.format_float_positional(np.float32(d0[i]*d1[j])), i, j)
+				if np.float32(d0[i]*d1[j]) > 0:
+					sumstr="%s +%s"%(sumstr, term)
+				else:
+					sumstr="%s %s"%(sumstr, term)
+	return sumstr;
+
+
+def generateConvolutionCompact2D(d0, d1, normalize=None):
+	if normalize is None:
+		normalize=True
+	dx=len(d0)
+	dy=len(d1)
+	if normalize:
+		normalizationTerm=np.sqrt(np.linalg.norm(np.outer(d0,d1).flatten(), ord=1))
+		d0=d0/normalizationTerm
+		d1=d1/normalizationTerm
 	plusTerms={}
 	minusTerms={}
 	for i in range(dx):
@@ -69,10 +84,17 @@ def generateConvolutionCompact2D(d0, d1):
 		allstr.append(itm)
 	return "+\n".join(allstr)
 
-def generateConvolutionCompact3D(d0, d1, d2):
+def generateConvolutionCompact3D(d0, d1, d2, normalize=None):
+	if normalize is None:
+		normalize=True
 	dx=len(d0)
 	dy=len(d1)
 	dz=len(d2)
+	if normalize:
+		normalizationTerm=np.power(np.linalg.norm(np.outer(np.outer(d0,d1).flatten(), d2).flatten(), ord=1), 1.0/3.0)
+		d0=d0/normalizationTerm
+		d1=d1/normalizationTerm
+		d2=d2/normalizationTerm
 	plusTerms={}
 	minusTerms={}
 	for i in range(dx):
@@ -99,10 +121,18 @@ def generateConvolutionCompact3D(d0, d1, d2):
 		allstr.append(itm)
 	return "+\n".join(allstr)
 
-def generateConvolution3D(d0, d1, d2):
+def generateConvolution3D(d0, d1, d2, normalize=None):
+	if normalize is None:
+		normalize=True
 	dx=len(d0)
 	dy=len(d1)
 	dz=len(d2)
+	if normalize:
+		normalizationTerm=np.power(np.linalg.norm(np.outer(np.outer(d0,d1).flatten(), d2).flatten(), ord=1), 1.0/3.0)
+		d0=d0/normalizationTerm
+		d1=d1/normalizationTerm
+		d2=d2/normalizationTerm
+		
 	sumstr=""
 	for i in range(dx):
 		for j in range(dy):
@@ -118,64 +148,74 @@ def generateConvolution3D(d0, d1, d2):
 	return sumstr;
 
 
-def normalizeVectorL1(v):
-	return v/np.linalg.norm(v, ord=1)
 
-x=generateConvolution2D([1,2,1], [-1,0,1])#Sobel2D
-print(x)
 sobeld0=[1,2,1]
 sobeld1=[-1,0,1]
-sobelnd0=sobeld0/np.linalg.norm(sobeld0, ord=1)
-sobelnd1=sobeld1/np.linalg.norm(sobeld1, ord=1)
-gx=generateConvolutionCompact2D([-1,0,1], [1,2,1])#Sobel2Dy
-gy=generateConvolutionCompact2D([1,2,1], [-1,0,1])#Sobel2Dy
-#Scaled sobel so that the derivatives can be just scaled by voxel sizes
-gx=generateConvolutionCompact2D(sobelnd1, sobelnd0)#Sobel2Dy
-gy=generateConvolutionCompact2D(sobelnd0, sobelnd1)#Sobel2Dy
+gx=generateConvolutionCompact2D(sobeld0, sobeld1, False)#Sobel2Dy
+gy=generateConvolutionCompact2D(sobeld1, sobeld0, False)#Sobel2Dy
+print("Sobel 2D")
 print("grad.x=%s;"%gx)
+print("")
 print("grad.y=%s;"%gy)
-x=generateConvolution3D([1,2,1], [1,2,1], [-1,0,1])#Sobel3D
-sx=generateConvolutionCompact3D(sobelnd1, sobelnd0, sobelnd0)#Sobel3Dy
-sy=generateConvolutionCompact3D(sobelnd0, sobelnd1, sobelnd0)#Sobel3Dy
-sz=generateConvolutionCompact3D(sobelnd0, sobelnd0, sobelnd1)#Sobel3Dz
+print("")
+#Scaled sobel so that the derivatives can be just scaled by voxel sizes
+gx=generateConvolutionCompact2D(sobeld1, sobeld0)#Sobel2Dy
+gy=generateConvolutionCompact2D(sobeld0, sobeld1)#Sobel2Dy
+print("Sobel 2D normalized")
+print("grad.x=%s;"%gx)
+print("")
+print("grad.y=%s;"%gy)
+print("")
+sx=generateConvolutionCompact3D(sobeld1, sobeld0, sobeld0)#Sobel3Dy
+sy=generateConvolutionCompact3D(sobeld0, sobeld1, sobeld0)#Sobel3Dy
+sz=generateConvolutionCompact3D(sobeld0, sobeld0, sobeld1)#Sobel3Dz
+print("Sobel 3D normalized")
 print("grad.x=%s;"%sx)
+print("")
 print("grad.y=%s;"%sy)
+print("")
 print("grad.z=%s;"%sz)
 
 faridd0=[0.229879,0.540242,0.229879]
 faridd1=[-0.425287,0,0.425287]
-nd0=normalizeVectorL1(faridd0)
-nd1=normalizeVectorL1(faridd1)
+nd0=faridd0
+nd1=faridd1
 gx=generateConvolutionCompact2D(nd1, nd0)
 gy=generateConvolutionCompact2D(nd0, nd1)
-print()
+print("Farid3 2D normalized")
 print("grad.x=%s;"%gx)
+print("")
 print("grad.y=%s;"%gy)
+print("")
 gx=generateConvolutionCompact3D(nd1, nd0, nd0)
 gy=generateConvolutionCompact3D(nd0, nd1, nd0)
 gz=generateConvolutionCompact3D(nd0, nd0, nd1)
-print()
+print("Farid3 3D normalized")
 print("grad.x=%s;"%gx)
-print()
+print("")
 print("grad.y=%s;"%gy)
-print()
+print("")
 print("grad.z=%s;"%gz)
+print("")
 
 faridd0=[0.037659, 0.249153, 0.426375, 0.249153, 0.037659]
 faridd1=[-0.109604,-0.276691, 0, 0.276691, 0.109604]
-nd0=normalizeVectorL1(faridd0)
-nd1=normalizeVectorL1(faridd1)
+nd0=faridd0
+nd1=faridd1
 gx=generateConvolutionCompact2D(nd1, nd0)
 gy=generateConvolutionCompact2D(nd0, nd1)
-print()
+print("Farid5 2D normalized")
 print("grad.x=%s;"%gx)
+print("")
 print("grad.y=%s;"%gy)
+print("")
 gx=generateConvolutionCompact3D(nd1, nd0, nd0)
 gy=generateConvolutionCompact3D(nd0, nd1, nd0)
 gz=generateConvolutionCompact3D(nd0, nd0, nd1)
-print()
+print("Farid5 3D normalized")
 print("grad.x=%s;"%gx)
-print()
+print("")
 print("grad.y=%s;"%gy)
-print()
+print("")
 print("grad.z=%s;"%gz)
+print("")

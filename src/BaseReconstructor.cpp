@@ -26,7 +26,6 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling,
             CLINCLUDEprojector();
         }
         CLINCLUDEbackprojector();
-        CLINCLUDEbackprojector_minmax();
         CLINCLUDErescaleProjections();
     } else
     {
