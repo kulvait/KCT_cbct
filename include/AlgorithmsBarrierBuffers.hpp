@@ -18,6 +18,7 @@
 #include "OPENCL/OpenCLManager.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
+#include "PROG/KCTException.hpp"
 
 using namespace KCT::matrix;
 namespace KCT {

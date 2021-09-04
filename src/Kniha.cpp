@@ -383,8 +383,13 @@ void Kniha::CLINCLUDEutils()
         str = "FLOATvector_NormSquarePartial_barrier";
         if(ptr02 == nullptr)
         {
+            cl_int err;
             ptr02 = std::make_shared<std::remove_reference<decltype(*ptr02)>::type>(
-                cl::Kernel(program, str.c_str()));
+                cl::Kernel(program, str.c_str(), &err));
+            if(err != CL_SUCCESS)
+            {
+                LOGE << io::xprintf("Error %d kernel %s", err, str.c_str());
+            }
         };
         auto& ptr03 = FLOATvector_SumPartial_barrier;
         str = "FLOATvector_SumPartial_barrier";
@@ -698,6 +703,35 @@ void Kniha::insertCLFile(std::string f)
     }
 }
 
+int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& errout)
+{
+    cl_int inf;
+    std::string kernelName;
+    if(blocking)
+    {
+        exe.wait();
+    }
+    exe.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &inf);
+    if(blocking)
+    {
+        if(inf != CL_COMPLETE)
+        {
+            exe.getInfo(CL_KERNEL_FUNCTION_NAME, &kernelName);
+            errout = io::xprintf(
+                "Kernel %s COMMAND_EXECUTION_STATUS is %d that is different from CL_COMPLETE!",
+                kernelName.c_str(), inf);
+            return 1;
+        }
+    } else if(inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING)
+    {
+        exe.getInfo(CL_KERNEL_FUNCTION_NAME, &kernelName);
+        errout = io::xprintf("Kernel %s COMMAND_EXECUTION_STATUS is %d implying an error!",
+                             kernelName.c_str(), inf);
+        return 2;
+    }
+    return 0;
+}
+
 int Kniha::algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
                                                    cl::Buffer& projection,
                                                    unsigned int& projectionOffset,
@@ -978,6 +1012,48 @@ int Kniha::algFLOATvector_C_equals_A_times_B(
     }
     return 0;
 }
+int Kniha::algvector_NormSquarePartial_barrier(cl::Buffer& V,
+                                               cl::Buffer& V_red,
+                                               unsigned int& VDIM,
+                                               unsigned int& VDIM_ALIGNED,
+                                               uint32_t workGroupSize,
+                                               bool blocking)
+{
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
+    auto exe = (*vector_NormSquarePartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
+    std::string err;
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+int Kniha::algvector_SumPartial_barrier(cl::Buffer& V,
+                                        cl::Buffer& V_red,
+                                        unsigned int& VDIM,
+                                        unsigned int& VDIM_ALIGNED,
+                                        uint32_t workGroupSize,
+                                        bool blocking)
+{
+    cl_int inf;
+    std::string err;
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
+    auto exe = (*vector_SumPartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    exe.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &inf);
+    if((blocking && inf != CL_COMPLETE)
+       || (inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING))
+    {
+        err = io::xprintf("COMMAND_EXECUTION_STATUS is %d", inf);
+        KCTERR(err);
+    }
+    return 0;
+}
 // convolution.cl
 int Kniha::algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
                                            cl::Buffer& B,
@@ -1106,8 +1182,8 @@ int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5(cl::Buffer& F,
             LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
         }
     };
-    auto exe = (*FLOATvector_3DconvolutionGradientFarid5x5x5)(
-        *eargs, F, GX, GY, GZ, vdims, voxelSizes, reflectionBoundary);
+    auto exe = (*FLOATvector_3DconvolutionGradientFarid5x5x5)(*eargs, F, GX, GY, GZ, vdims,
+                                                              voxelSizes, reflectionBoundary);
     exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)
     {
@@ -1117,14 +1193,14 @@ int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5(cl::Buffer& F,
 }
 
 int Kniha::algFLOATvector_2DconvolutionGradientFarid5x5(cl::Buffer& F,
-                                                          cl::Buffer& GX,
-                                                          cl::Buffer& GY,
-                                                          cl_int3& vdims,
-                                                          cl_float3& voxelSizes,
-                                                          int reflectionBoundary,
-                                                          cl::NDRange& globalRange,
-                                                          std::shared_ptr<cl::NDRange> localRange,
-                                                          bool blocking)
+                                                        cl::Buffer& GX,
+                                                        cl::Buffer& GY,
+                                                        cl_int3& vdims,
+                                                        cl_float3& voxelSizes,
+                                                        int reflectionBoundary,
+                                                        cl::NDRange& globalRange,
+                                                        std::shared_ptr<cl::NDRange> localRange,
+                                                        bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
     if(localRange != nullptr)
@@ -1140,8 +1216,8 @@ int Kniha::algFLOATvector_2DconvolutionGradientFarid5x5(cl::Buffer& F,
             LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
         }
     };
-    auto exe = (*FLOATvector_2DconvolutionGradientFarid5x5)(
-        *eargs, F, GX, GY, vdims, voxelSizes, reflectionBoundary);
+    auto exe = (*FLOATvector_2DconvolutionGradientFarid5x5)(*eargs, F, GX, GY, vdims, voxelSizes,
+                                                            reflectionBoundary);
     exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)
     {

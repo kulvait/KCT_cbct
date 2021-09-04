@@ -16,6 +16,7 @@
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "OPENCL/OpenCLManager.hpp"
+#include "PROG/KCTException.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
 
@@ -345,8 +346,20 @@ protected:
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         vector_NormSquarePartial_barrier;
+    int algvector_NormSquarePartial_barrier(cl::Buffer& V,
+                                            cl::Buffer& V_red,
+                                            unsigned int& VDIM,
+                                            unsigned int& VDIM_ALIGNED,
+                                            uint32_t workGroupSize,
+                                            bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         vector_SumPartial_barrier;
+    int algvector_SumPartial_barrier(cl::Buffer& V,
+                                     cl::Buffer& V_red,
+                                     unsigned int& VDIM,
+                                     unsigned int& VDIM_ALIGNED,
+                                     uint32_t workGroupSize,
+                                     bool blocking = false);
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
         vector_ScalarProductPartial_barrier;
@@ -485,8 +498,13 @@ protected:
         cl::NDRange& globalRange,
         std::shared_ptr<cl::NDRange> localRange = nullptr,
         bool blocking = false);
-    std::shared_ptr<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&, int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl_int3&,
+                                    cl_float3&,
+                                    int&>>
         FLOATvector_3DconvolutionGradientFarid5x5x5;
     int algFLOATvector_3DconvolutionGradientFarid5x5x5(cl::Buffer& F,
                                                        cl::Buffer& GX,
@@ -503,15 +521,15 @@ protected:
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&, int&>>
         FLOATvector_2DconvolutionGradientFarid5x5;
     int algFLOATvector_2DconvolutionGradientFarid5x5(cl::Buffer& F,
-                                                       cl::Buffer& GX,
-                                                       cl::Buffer& GY,
-                                                       cl_int3& vdims,
-                                                       cl_float3& voxelSizes,
-                                                       int reflectionBoundary,
-                                                       cl::NDRange& globalRange,
-                                                       std::shared_ptr<cl::NDRange> localRange
-                                                       = nullptr,
-                                                       bool blocking = false);
+                                                     cl::Buffer& GX,
+                                                     cl::Buffer& GY,
+                                                     cl_int3& vdims,
+                                                     cl_float3& voxelSizes,
+                                                     int reflectionBoundary,
+                                                     cl::NDRange& globalRange,
+                                                     std::shared_ptr<cl::NDRange> localRange
+                                                     = nullptr,
+                                                     bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionLaplaceZeroBoundary;
     int algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
@@ -575,6 +593,13 @@ protected:
                                        bool blocking = false);
 
 private:
+    /**
+     * Will wait if blocking and print an error message if the status indicates error.
+     *
+     * @param exe
+     * @param blocking
+     */
+    int handleKernelExecution(cl::Event exe, bool blocking, std::string& errout);
     bool openCLInitialized = false;
     void insertCLFile(std::string f);
     std::vector<std::string> CLFiles;
