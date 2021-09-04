@@ -102,6 +102,7 @@ public:
     uint64_t totalVolumeSize;
     bool sobelGradient3DZeroBoundary = false;
     bool farid5Gradient3DZeroBoundary = false;
+    bool farid5Gradient3DReflectionBoundary = false;
     bool sobelGradient3DReflectionBoundary = false;
     bool isotropicGradient3D = false;
     bool laplace3D = false;
@@ -129,14 +130,18 @@ void Args::defineArguments()
                                         sobelGradient3DZeroBoundary, "3D gradient.");
     CLI::Option* f53zb = cliApp->add_flag("--farid5-gradient-3d-zero-boundary",
                                           farid5Gradient3DZeroBoundary, "3D gradient.");
+    CLI::Option* f53rb = cliApp->add_flag("--farid5-gradient-3d-reflection-boundary",
+                                          farid5Gradient3DReflectionBoundary, "3D gradient.");
     CLI::Option* ig3
         = cliApp->add_flag("--isotropic-gradient-3d", isotropicGradient3D, "3D gradient.");
     CLI::Option* l3d = cliApp->add_flag("--laplace-3d", laplace3D, "3D Laplace operator.");
-    srb->excludes(szb)->excludes(l3d)->excludes(f53zb)->excludes(ig3);
-    szb->excludes(l3d)->excludes(srb)->excludes(f53zb)->excludes(ig3);
-    l3d->excludes(srb)->excludes(szb)->excludes(f53zb)->excludes(ig3);
-    f53zb->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(ig3);
-    ig3->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(f53zb);
+    srb->excludes(szb)->excludes(l3d)->excludes(f53zb)->excludes(ig3)->excludes(f53rb);
+    szb->excludes(l3d)->excludes(srb)->excludes(f53zb)->excludes(ig3)->excludes(f53rb);
+    l3d->excludes(srb)->excludes(szb)->excludes(f53zb)->excludes(ig3)->excludes(f53rb);
+    f53zb->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(ig3)->excludes(f53rb);
+    ig3->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(f53zb)->excludes(f53rb);
+    f53rb->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(ig3)->excludes(f53zb);
+
     addForceArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
@@ -184,7 +189,8 @@ int main(int argc, char* argv[])
     VCO.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ);
     // End parsing arguments
     if(ARG.sobelGradient3DReflectionBoundary || ARG.sobelGradient3DZeroBoundary
-       || ARG.farid5Gradient3DZeroBoundary || ARG.isotropicGradient3D)
+       || ARG.farid5Gradient3DZeroBoundary || ARG.isotropicGradient3D
+       || ARG.farid5Gradient3DReflectionBoundary)
     {
         float* vx = new float[ARG.totalVolumeSize];
         float* vy = new float[ARG.totalVolumeSize];
@@ -196,27 +202,24 @@ int main(int argc, char* argv[])
         VCO.initializeOrUpdateVolumeBuffer(ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, vx);
         cl_float3 voxelSizes
             = { (float)ARG.voxelSizeX, (float)ARG.voxelSizeY, (float)ARG.voxelSizeZ };
-        LOGI << io::xprintf("Call VCO.sobelGradient3D.");
         if(ARG.sobelGradient3DReflectionBoundary || ARG.sobelGradient3DZeroBoundary)
         {
             VCO.sobelGradient3D(
                 voxelSizes, vx, vy, vz,
                 ARG.sobelGradient3DReflectionBoundary); // When false it will lead to
                                                         // zero boundary conditions
-        } else if(ARG.farid5Gradient3DZeroBoundary)
+        } else if(ARG.farid5Gradient3DZeroBoundary || ARG.farid5Gradient3DReflectionBoundary)
         {
 
-            VCO.faridGradient3D(voxelSizes, vx, vy, vz);
+            VCO.faridGradient3D(voxelSizes, vx, vy, vz, ARG.farid5Gradient3DReflectionBoundary);
         } else
         {
             VCO.isotropicGradient3D(voxelSizes, vx, vy, vz);
         }
-        LOGI << io::xprintf("After VCO.sobelGradient3D.");
         uint64_t totalArraySize = ARG.totalVolumeSize * sizeof(float);
         std::string gx = io::xprintf("%s_x", ARG.outputVolume.c_str());
         std::string gy = io::xprintf("%s_y", ARG.outputVolume.c_str());
         std::string gz = io::xprintf("%s_z", ARG.outputVolume.c_str());
-        LOGI << io::xprintf("Printing x to file %s.", gx.c_str());
         io::DenFileInfo::createDenHeader(gx, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
         io::appendBytes(gx, (uint8_t*)vx, totalArraySize);
         io::DenFileInfo::createDenHeader(gy, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);

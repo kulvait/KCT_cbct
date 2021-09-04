@@ -527,12 +527,380 @@ void kernel FLOATvector_isotropicBackDz(global const float* restrict F,
     DZ[IND] = out / voxelSizes.z;
 }
 
-void kernel FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(global const float* restrict F,
-                                                                    global float* restrict GX,
-                                                                    global float* restrict GY,
-                                                                    global float* restrict GZ,
-                                                                    private int3 vdims,
-                                                                    private float3 voxelSizes)
+#define ZERO555BOUNDARY()                                                                          \
+    {                                                                                              \
+        if(i < 2)                                                                                  \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[0][lj][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(i == 0)                                                                                 \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[1][lj][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 3 > vdims.x)                                                                        \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[4][lj][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 1 == vdims.x)                                                                       \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[3][lj][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j < 2)                                                                                  \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][0][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j == 0)                                                                                 \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][1][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 3 > vdims.y)                                                                        \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][4][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 1 == vdims.y)                                                                       \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][3][lk] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k < 2)                                                                                  \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][0] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k == 0)                                                                                 \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][1] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k + 3 > vdims.z)                                                                        \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][4] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k + 1 == vdims.z)                                                                       \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][3] = 0.0f;                                                        \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+    }
+
+#define REFLECTION555BOUNDARY()                                                                    \
+    {                                                                                              \
+        if(i < 2)                                                                                  \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[0][lj][lk] = cube[4][lj][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(i == 0)                                                                                 \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[1][lj][lk] = cube[3][lj][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 3 > vdims.x)                                                                        \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[4][lj][lk] = cube[0][lj][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 1 == vdims.x)                                                                       \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[3][lj][lk] = cube[1][lj][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j < 2)                                                                                  \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][0][lk] = cube[li][4][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j == 0)                                                                                 \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][1][lk] = cube[li][3][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 3 > vdims.y)                                                                        \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][4][lk] = cube[li][0][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 1 == vdims.y)                                                                       \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lk = 0; lk < 5; lk++)                                                      \
+                {                                                                                  \
+                    cube[li][3][lk] = cube[li][1][lk];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k < 2)                                                                                  \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][0] = cube[li][lj][4];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k == 0)                                                                                 \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][1] = cube[li][lj][3];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k + 3 > vdims.z)                                                                        \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][4] = cube[li][lj][0];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+        if(k + 1 == vdims.z)                                                                       \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                for(int lj = 0; lj < 5; lj++)                                                      \
+                {                                                                                  \
+                    cube[li][lj][3] = cube[li][lj][1];                                             \
+                }                                                                                  \
+            }                                                                                      \
+        }                                                                                          \
+    }
+
+#define ZERO55BOUNDARY()                                                                           \
+    {                                                                                              \
+        if(i < 2)                                                                                  \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[0][lj] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        if(i == 0)                                                                                 \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[1][lj] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 3 > vdims.x)                                                                        \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[4][lj] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 1 == vdims.x)                                                                       \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[3][lj] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        if(j < 2)                                                                                  \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][0] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        if(j == 0)                                                                                 \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][1] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 3 > vdims.y)                                                                        \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][4] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 1 == vdims.y)                                                                       \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][3] = 0.0f;                                                                \
+            }                                                                                      \
+        }                                                                                          \
+    }
+
+#define REFLECTION55BOUNDARY()                                                                     \
+    {                                                                                              \
+        if(i < 2)                                                                                  \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[0][lj] = cube[4][lj];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(i == 0)                                                                                 \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[1][lj] = cube[3][lj];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 3 > vdims.x)                                                                        \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[4][lj] = cube[0][lj];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 1 == vdims.x)                                                                       \
+        {                                                                                          \
+            for(int lj = 0; lj < 5; lj++)                                                          \
+            {                                                                                      \
+                cube[3][lj] = cube[1][lj];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(j < 2)                                                                                  \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][0] = cube[li][4];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(j == 0)                                                                                 \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][1] = cube[li][3];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 3 > vdims.y)                                                                        \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][4] = cube[li][0];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 1 == vdims.y)                                                                       \
+        {                                                                                          \
+            for(int li = 0; li < 5; li++)                                                          \
+            {                                                                                      \
+                cube[li][3] = cube[li][1];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+    }
+void kernel FLOATvector_3DconvolutionGradientFarid5x5x5(global const float* restrict F,
+                                                        global float* restrict GX,
+                                                        global float* restrict GY,
+                                                        global float* restrict GZ,
+                                                        private int3 vdims,
+                                                        private float3 voxelSizes,
+                                                        private int reflectionBoundary)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -566,152 +934,14 @@ void kernel FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(global const
         }
         index += KSKIP;
     }
+    if(reflectionBoundary != 0)
+    {
+        REFLECTION555BOUNDARY();
+    } else
+    {
+        ZERO555BOUNDARY();
+    }
     // fill with zeros
-    if(i < 2)
-    {
-        // i reflection li=0 lj=. lk=. equals li=2 lj=. lk=.
-        // if 0, lj, lk invalid so is 2,lj,lk
-        for(int lj = 0; lj < 5; lj++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[0][lj][lk] = 0.0f;
-            }
-        }
-    }
-    if(i == 0)
-    {
-        // i reflection li=0 lj=. lk=. equals li=2 lj=. lk=.
-        // if 0, lj, lk invalid so is 2,lj,lk
-        for(int lj = 0; lj < 5; lj++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[1][lj][lk] = 0.0f;
-            }
-        }
-    }
-    if(i + 3 > vdims.x)
-    {
-        // i reflection li=2 lj=. lk=. equals li=0 lj=. lk=.
-        // if 2, lj, lk invalid so is 0,lj,lk
-        for(int lj = 0; lj < 5; lj++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[4][lj][lk] = 0.0f;
-            }
-        }
-    }
-    if(i + 1 == vdims.x)
-    {
-        // i reflection li=2 lj=. lk=. equals li=0 lj=. lk=.
-        // if 2, lj, lk invalid so is 0,lj,lk
-        for(int lj = 0; lj < 5; lj++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[3][lj][lk] = 0.0f;
-            }
-        }
-    }
-    if(j < 2)
-    {
-        // j reflection li=. lj=0 lk=. equals li=. lj=2 lk=.
-        // if li, 0, lk invalid so is li,0,lk
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[li][0][lk] = 0.0f;
-            }
-        }
-    }
-    if(j == 0)
-    {
-        // j reflection li=. lj=0 lk=. equals li=. lj=2 lk=.
-        // if li, 0, lk invalid so is li,0,lk
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[li][1][lk] = 0.0f;
-            }
-        }
-    }
-    if(j + 3 > vdims.y)
-    {
-        // j reflection li=. lj=2 lk=. equals li=. lj=0 lk=.
-        // if li, 0, lk invalid so is li,0,lk
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[li][4][lk] = 0.0f;
-            }
-        }
-    }
-    if(j + 1 == vdims.y)
-    {
-        // j reflection li=. lj=2 lk=. equals li=. lj=0 lk=.
-        // if li, 0, lk invalid so is li,0,lk
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lk = 0; lk < 5; lk++)
-            {
-                cube[li][3][lk] = 0.0f;
-            }
-        }
-    }
-    if(k < 2)
-    {
-        // k reflection li=. lj=. lk=0 equals li=. lj=. lk=2
-        // if li, lj, 2 invalid so is li,lj,0
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lj = 0; lj < 5; lj++)
-            {
-                cube[li][lj][0] = 0.0f;
-            }
-        }
-    }
-    if(k == 0)
-    {
-        // k reflection li=. lj=. lk=0 equals li=. lj=. lk=2
-        // if li, lj, 2 invalid so is li,lj,0
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lj = 0; lj < 5; lj++)
-            {
-                cube[li][lj][1] = 0.0f;
-            }
-        }
-    }
-
-    if(k + 3 > vdims.z)
-    {
-        // k reflection li=. lj=. lk=2 equals li=. lj=. lk=0
-        // if li, lj, 2 invalid so is li,lj,0
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lj = 0; lj < 5; lj++)
-            {
-                cube[li][lj][4] = 0.0f;
-            }
-        }
-    }
-    if(k + 1 == vdims.z)
-    {
-        // k reflection li=. lj=. lk=2 equals li=. lj=. lk=0
-        // if li, lj, 2 invalid so is li,lj,0
-        for(int li = 0; li < 5; li++)
-        {
-            for(int lj = 0; lj < 5; lj++)
-            {
-                cube[li][lj][3] = 0.0f;
-            }
-        }
-    }
     float3 grad;
     grad.x = 0.00050790724f
             * (cube[3][0][0] + cube[3][0][4] + cube[3][4][0] + cube[3][4][4] - cube[1][0][0]
@@ -721,34 +951,35 @@ void kernel FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(global const
                + cube[3][3][4] + cube[3][4][1] + cube[3][4][3] - cube[1][0][1] - cube[1][0][3]
                - cube[1][1][0] - cube[1][1][4] - cube[1][3][0] - cube[1][3][4] - cube[1][4][1]
                - cube[1][4][3])
-        + 0.0022779212f
-            * (cube[4][0][2] + cube[4][2][0] + cube[4][2][4] + cube[4][4][2] - cube[0][0][2]
-               - cube[0][2][0] - cube[0][2][4] - cube[0][4][2])
+        + 0.038045622f
+            * (cube[3][1][2] + cube[3][2][1] + cube[3][2][3] + cube[3][3][2] - cube[1][1][2]
+               - cube[1][2][1] - cube[1][2][3] - cube[1][3][2])
+        + 0.005750523f
+            * (cube[3][0][2] + cube[3][2][0] + cube[3][2][4] + cube[3][4][2] - cube[1][0][2]
+               - cube[1][2][0] - cube[1][2][4] - cube[1][4][2])
+        + 0.022232028f
+            * (cube[3][1][1] + cube[3][1][3] + cube[3][3][1] + cube[3][3][3] - cube[1][1][1]
+               - cube[1][1][3] - cube[1][3][1] - cube[1][3][3])
+        + 0.06510739f * (cube[3][2][2] - cube[1][2][2])
+        + 0.00020119434f
+            * (cube[4][0][0] + cube[4][0][4] + cube[4][4][0] + cube[4][4][4] - cube[0][0][0]
+               - cube[0][0][4] - cube[0][4][0] - cube[0][4][4])
         + 0.0013311073f
             * (cube[4][0][1] + cube[4][0][3] + cube[4][1][0] + cube[4][1][4] + cube[4][3][0]
                + cube[4][3][4] + cube[4][4][1] + cube[4][4][3] - cube[0][0][1] - cube[0][0][3]
                - cube[0][1][0] - cube[0][1][4] - cube[0][3][0] - cube[0][3][4] - cube[0][4][1]
                - cube[0][4][3])
+        + 0.0022779212f
+            * (cube[4][0][2] + cube[4][2][0] + cube[4][2][4] + cube[4][4][2] - cube[0][0][2]
+               - cube[0][2][0] - cube[0][2][4] - cube[0][4][2])
         + 0.008806644f
             * (cube[4][1][1] + cube[4][1][3] + cube[4][3][1] + cube[4][3][3] - cube[0][1][1]
                - cube[0][1][3] - cube[0][3][1] - cube[0][3][3])
-        + 0.025790613f * (cube[4][2][2] - cube[0][2][2])
-        + 0.06510739f * (cube[3][2][2] - cube[1][2][2])
-        + 0.038045622f
-            * (cube[3][1][2] + cube[3][2][1] + cube[3][2][3] + cube[3][3][2] - cube[1][1][2]
-               - cube[1][2][1] - cube[1][2][3] - cube[1][3][2])
-        + 0.022232028f
-            * (cube[3][1][1] + cube[3][1][3] + cube[3][3][1] + cube[3][3][3] - cube[1][1][1]
-               - cube[1][1][3] - cube[1][3][1] - cube[1][3][3])
-        + 0.005750523f
-            * (cube[3][0][2] + cube[3][2][0] + cube[3][2][4] + cube[3][4][2] - cube[1][0][2]
-               - cube[1][2][0] - cube[1][2][4] - cube[1][4][2])
-        + 0.00020119434f
-            * (cube[4][0][0] + cube[4][0][4] + cube[4][4][0] + cube[4][4][4] - cube[0][0][0]
-               - cube[0][0][4] - cube[0][4][0] - cube[0][4][4])
         + 0.01507079f
             * (cube[4][1][2] + cube[4][2][1] + cube[4][2][3] + cube[4][3][2] - cube[0][1][2]
-               - cube[0][2][1] - cube[0][2][3] - cube[0][3][2]);
+               - cube[0][2][1] - cube[0][2][3] - cube[0][3][2])
+        + 0.025790613f * (cube[4][2][2] - cube[0][2][2]);
+
     grad.y = 0.00050790724f
             * (cube[0][3][0] + cube[0][3][4] + cube[4][3][0] + cube[4][3][4] - cube[0][1][0]
                - cube[0][1][4] - cube[4][1][0] - cube[4][1][4])
@@ -757,74 +988,136 @@ void kernel FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(global const
                + cube[3][3][4] + cube[4][3][1] + cube[4][3][3] - cube[0][1][1] - cube[0][1][3]
                - cube[1][1][0] - cube[1][1][4] - cube[3][1][0] - cube[3][1][4] - cube[4][1][1]
                - cube[4][1][3])
-        + 0.022232028f
-            * (cube[1][3][1] + cube[1][3][3] + cube[3][3][1] + cube[3][3][3] - cube[1][1][1]
-               - cube[1][1][3] - cube[3][1][1] - cube[3][1][3])
         + 0.0013311073f
             * (cube[0][4][1] + cube[0][4][3] + cube[1][4][0] + cube[1][4][4] + cube[3][4][0]
                + cube[3][4][4] + cube[4][4][1] + cube[4][4][3] - cube[0][0][1] - cube[0][0][3]
                - cube[1][0][0] - cube[1][0][4] - cube[3][0][0] - cube[3][0][4] - cube[4][0][1]
                - cube[4][0][3])
-        + 0.008806644f
-            * (cube[1][4][1] + cube[1][4][3] + cube[3][4][1] + cube[3][4][3] - cube[1][0][1]
-               - cube[1][0][3] - cube[3][0][1] - cube[3][0][3])
-        + 0.025790613f * (cube[2][4][2] - cube[2][0][2])
-        + 0.0022779212f
-            * (cube[0][4][2] + cube[2][4][0] + cube[2][4][4] + cube[4][4][2] - cube[0][0][2]
-               - cube[2][0][0] - cube[2][0][4] - cube[4][0][2])
-        + 0.00020119434f
-            * (cube[0][4][0] + cube[0][4][4] + cube[4][4][0] + cube[4][4][4] - cube[0][0][0]
-               - cube[0][0][4] - cube[4][0][0] - cube[4][0][4])
         + 0.005750523f
             * (cube[0][3][2] + cube[2][3][0] + cube[2][3][4] + cube[4][3][2] - cube[0][1][2]
                - cube[2][1][0] - cube[2][1][4] - cube[4][1][2])
+        + 0.00020119434f
+            * (cube[0][4][0] + cube[0][4][4] + cube[4][4][0] + cube[4][4][4] - cube[0][0][0]
+               - cube[0][0][4] - cube[4][0][0] - cube[4][0][4])
+        + 0.0022779212f
+            * (cube[0][4][2] + cube[2][4][0] + cube[2][4][4] + cube[4][4][2] - cube[0][0][2]
+               - cube[2][0][0] - cube[2][0][4] - cube[4][0][2])
+        + 0.022232028f
+            * (cube[1][3][1] + cube[1][3][3] + cube[3][3][1] + cube[3][3][3] - cube[1][1][1]
+               - cube[1][1][3] - cube[3][1][1] - cube[3][1][3])
         + 0.038045622f
             * (cube[1][3][2] + cube[2][3][1] + cube[2][3][3] + cube[3][3][2] - cube[1][1][2]
                - cube[2][1][1] - cube[2][1][3] - cube[3][1][2])
-        + 0.06510739f * (cube[2][3][2] - cube[2][1][2])
+        + 0.008806644f
+            * (cube[1][4][1] + cube[1][4][3] + cube[3][4][1] + cube[3][4][3] - cube[1][0][1]
+               - cube[1][0][3] - cube[3][0][1] - cube[3][0][3])
         + 0.01507079f
             * (cube[1][4][2] + cube[2][4][1] + cube[2][4][3] + cube[3][4][2] - cube[1][0][2]
-               - cube[2][0][1] - cube[2][0][3] - cube[3][0][2]);
+               - cube[2][0][1] - cube[2][0][3] - cube[3][0][2])
+        + 0.06510739f * (cube[2][3][2] - cube[2][1][2])
+        + 0.025790613f * (cube[2][4][2] - cube[2][0][2]);
+
     grad.z = 0.00050790724f
             * (cube[0][0][3] + cube[0][4][3] + cube[4][0][3] + cube[4][4][3] - cube[0][0][1]
                - cube[0][4][1] - cube[4][0][1] - cube[4][4][1])
         + 0.00020119434f
             * (cube[0][0][4] + cube[0][4][4] + cube[4][0][4] + cube[4][4][4] - cube[0][0][0]
                - cube[0][4][0] - cube[4][0][0] - cube[4][4][0])
-        + 0.022232028f
-            * (cube[1][1][3] + cube[1][3][3] + cube[3][1][3] + cube[3][3][3] - cube[1][1][1]
-               - cube[1][3][1] - cube[3][1][1] - cube[3][3][1])
-        + 0.0013311073f
-            * (cube[0][1][4] + cube[0][3][4] + cube[1][0][4] + cube[1][4][4] + cube[3][0][4]
-               + cube[3][4][4] + cube[4][1][4] + cube[4][3][4] - cube[0][1][0] - cube[0][3][0]
-               - cube[1][0][0] - cube[1][4][0] - cube[3][0][0] - cube[3][4][0] - cube[4][1][0]
-               - cube[4][3][0])
-        + 0.008806644f
-            * (cube[1][1][4] + cube[1][3][4] + cube[3][1][4] + cube[3][3][4] - cube[1][1][0]
-               - cube[1][3][0] - cube[3][1][0] - cube[3][3][0])
-        + 0.025790613f * (cube[2][2][4] - cube[2][2][0])
         + 0.005750523f
             * (cube[0][2][3] + cube[2][0][3] + cube[2][4][3] + cube[4][2][3] - cube[0][2][1]
                - cube[2][0][1] - cube[2][4][1] - cube[4][2][1])
-        + 0.0022779212f
-            * (cube[0][2][4] + cube[2][0][4] + cube[2][4][4] + cube[4][2][4] - cube[0][2][0]
-               - cube[2][0][0] - cube[2][4][0] - cube[4][2][0])
         + 0.0033603285f
             * (cube[0][1][3] + cube[0][3][3] + cube[1][0][3] + cube[1][4][3] + cube[3][0][3]
                + cube[3][4][3] + cube[4][1][3] + cube[4][3][3] - cube[0][1][1] - cube[0][3][1]
                - cube[1][0][1] - cube[1][4][1] - cube[3][0][1] - cube[3][4][1] - cube[4][1][1]
                - cube[4][3][1])
+        + 0.0013311073f
+            * (cube[0][1][4] + cube[0][3][4] + cube[1][0][4] + cube[1][4][4] + cube[3][0][4]
+               + cube[3][4][4] + cube[4][1][4] + cube[4][3][4] - cube[0][1][0] - cube[0][3][0]
+               - cube[1][0][0] - cube[1][4][0] - cube[3][0][0] - cube[3][4][0] - cube[4][1][0]
+               - cube[4][3][0])
+        + 0.0022779212f
+            * (cube[0][2][4] + cube[2][0][4] + cube[2][4][4] + cube[4][2][4] - cube[0][2][0]
+               - cube[2][0][0] - cube[2][4][0] - cube[4][2][0])
+        + 0.022232028f
+            * (cube[1][1][3] + cube[1][3][3] + cube[3][1][3] + cube[3][3][3] - cube[1][1][1]
+               - cube[1][3][1] - cube[3][1][1] - cube[3][3][1])
+        + 0.008806644f
+            * (cube[1][1][4] + cube[1][3][4] + cube[3][1][4] + cube[3][3][4] - cube[1][1][0]
+               - cube[1][3][0] - cube[3][1][0] - cube[3][3][0])
         + 0.038045622f
             * (cube[1][2][3] + cube[2][1][3] + cube[2][3][3] + cube[3][2][3] - cube[1][2][1]
                - cube[2][1][1] - cube[2][3][1] - cube[3][2][1])
-        + 0.06510739f * (cube[2][2][3] - cube[2][2][1])
         + 0.01507079f
             * (cube[1][2][4] + cube[2][1][4] + cube[2][3][4] + cube[3][2][4] - cube[1][2][0]
-               - cube[2][1][0] - cube[2][3][0] - cube[3][2][0]);
+               - cube[2][1][0] - cube[2][3][0] - cube[3][2][0])
+        + 0.06510739f * (cube[2][2][3] - cube[2][2][1])
+        + 0.025790613f * (cube[2][2][4] - cube[2][2][0]);
     grad /= voxelSizes;
     GX[IND] = grad.x;
     GY[IND] = grad.y;
     GZ[IND] = grad.z;
+}
+
+void kernel FLOATvector_2DconvolutionGradientFarid5x5(global const float* restrict F,
+                                                      global float* restrict GX,
+                                                      global float* restrict GY,
+                                                      private int3 vdims,
+                                                      private float3 voxelSizes,
+                                                      private int reflectionBoundary)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    float cube[5][5]; // First fill this object where possible
+    int DJ = vdims.x;
+    int DK = vdims.x * vdims.y;
+    int LIMIN = -min(i - 2, 0);
+    int LJMIN = -min(j - 2, 0);
+    int LKMIN = -min(k - 2, 0);
+    // One behind the limit
+    int ILIMIT = 5 + vdims.x - max(i + 3, vdims.x);
+    int JLIMIT = 5 + vdims.y - max(j + 3, vdims.y);
+    int KLIMIT = 5 + vdims.z - max(k + 3, vdims.z);
+    int IRANGE = ILIMIT - LIMIN;
+    int JRANGE = JLIMIT - LJMIN;
+    int JSKIP = DJ - IRANGE;
+    int index = VOXELINDEX(i + LIMIN - 2, j + LJMIN - 2, k, vdims);
+    for(int lj = LJMIN; lj < JLIMIT; lj++)
+    {
+        for(int li = LIMIN; li < ILIMIT; li++)
+        {
+            cube[li][lj] = F[index];
+            index++;
+        }
+        index += JSKIP;
+    }
+    if(reflectionBoundary != 0)
+    {
+        REFLECTION55BOUNDARY();
+    } else
+    {
+        ZERO55BOUNDARY();
+    }
+    // fill with zeros
+    float2 grad;
+    grad.x = 0.013486994f * (cube[3][0] + cube[3][4] - cube[1][0] - cube[1][4])
+        + 0.08923033f * (cube[3][1] + cube[3][3] - cube[1][1] - cube[1][3])
+        + 0.035346292f * (cube[4][1] + cube[4][3] - cube[0][1] - cube[0][3])
+        + 0.15269968f * (cube[3][2] - cube[1][2])
+        + 0.0053425245f * (cube[4][0] + cube[4][4] - cube[0][0] - cube[0][4])
+        + 0.060488038f * (cube[4][2] - cube[0][2]);
+
+    grad.y = 0.013486994f * (cube[0][3] + cube[4][3] - cube[0][1] - cube[4][1])
+        + 0.0053425245f * (cube[0][4] + cube[4][4] - cube[0][0] - cube[4][0])
+        + 0.15269968f * (cube[2][3] - cube[2][1])
+        + 0.08923033f * (cube[1][3] + cube[3][3] - cube[1][1] - cube[3][1])
+        + 0.035346292f * (cube[1][4] + cube[3][4] - cube[1][0] - cube[3][0])
+        + 0.060488038f * (cube[2][4] - cube[2][0]);
+    grad /= voxelSizes.s01;
+    GX[IND] = grad.x;
+    GY[IND] = grad.y;
 }
 
 /**

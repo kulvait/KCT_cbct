@@ -624,8 +624,17 @@ void Kniha::CLINCLUDEconvolution()
             };
         }
         {
-            auto& ptr = FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary;
-            std::string str = "FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary";
+            auto& ptr = FLOATvector_3DconvolutionGradientFarid5x5x5;
+            std::string str = "FLOATvector_3DconvolutionGradientFarid5x5x5";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_2DconvolutionGradientFarid5x5;
+            std::string str = "FLOATvector_3DconvolutionGradientFarid5x5";
             if(ptr == nullptr)
             {
                 ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -1072,16 +1081,16 @@ int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
     return 0;
 }
 
-int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
-    cl::Buffer& F,
-    cl::Buffer& GX,
-    cl::Buffer& GY,
-    cl::Buffer& GZ,
-    cl_int3& vdims,
-    cl_float3& voxelSizes,
-    cl::NDRange& globalRange,
-    std::shared_ptr<cl::NDRange> localRange,
-    bool blocking)
+int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5(cl::Buffer& F,
+                                                          cl::Buffer& GX,
+                                                          cl::Buffer& GY,
+                                                          cl::Buffer& GZ,
+                                                          cl_int3& vdims,
+                                                          cl_float3& voxelSizes,
+                                                          int reflectionBoundary,
+                                                          cl::NDRange& globalRange,
+                                                          std::shared_ptr<cl::NDRange> localRange,
+                                                          bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
     if(localRange != nullptr)
@@ -1097,8 +1106,42 @@ int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
             LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
         }
     };
-    auto exe = (*FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary)(*eargs, F, GX, GY, GZ,
-                                                                          vdims, voxelSizes);
+    auto exe = (*FLOATvector_3DconvolutionGradientFarid5x5x5)(
+        *eargs, F, GX, GY, GZ, vdims, voxelSizes, reflectionBoundary);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_2DconvolutionGradientFarid5x5(cl::Buffer& F,
+                                                          cl::Buffer& GX,
+                                                          cl::Buffer& GY,
+                                                          cl_int3& vdims,
+                                                          cl_float3& voxelSizes,
+                                                          int reflectionBoundary,
+                                                          cl::NDRange& globalRange,
+                                                          std::shared_ptr<cl::NDRange> localRange,
+                                                          bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+    auto exe = (*FLOATvector_2DconvolutionGradientFarid5x5)(
+        *eargs, F, GX, GY, vdims, voxelSizes, reflectionBoundary);
     exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)
     {

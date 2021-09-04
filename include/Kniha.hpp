@@ -486,18 +486,32 @@ protected:
         std::shared_ptr<cl::NDRange> localRange = nullptr,
         bool blocking = false);
     std::shared_ptr<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
-        FLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary;
-    int algFLOATvector_3DconvolutionGradientFarid5x5x5ZeroBoundary(
-        cl::Buffer& F,
-        cl::Buffer& GX,
-        cl::Buffer& GY,
-        cl::Buffer& GZ,
-        cl_int3& vdims,
-        cl_float3& voxelSizes,
-        cl::NDRange& globalRange,
-        std::shared_ptr<cl::NDRange> localRange = nullptr,
-        bool blocking = false);
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&, int&>>
+        FLOATvector_3DconvolutionGradientFarid5x5x5;
+    int algFLOATvector_3DconvolutionGradientFarid5x5x5(cl::Buffer& F,
+                                                       cl::Buffer& GX,
+                                                       cl::Buffer& GY,
+                                                       cl::Buffer& GZ,
+                                                       cl_int3& vdims,
+                                                       cl_float3& voxelSizes,
+                                                       int reflectionBoundary,
+                                                       cl::NDRange& globalRange,
+                                                       std::shared_ptr<cl::NDRange> localRange
+                                                       = nullptr,
+                                                       bool blocking = false);
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&, int&>>
+        FLOATvector_2DconvolutionGradientFarid5x5;
+    int algFLOATvector_2DconvolutionGradientFarid5x5(cl::Buffer& F,
+                                                       cl::Buffer& GX,
+                                                       cl::Buffer& GY,
+                                                       cl_int3& vdims,
+                                                       cl_float3& voxelSizes,
+                                                       int reflectionBoundary,
+                                                       cl::NDRange& globalRange,
+                                                       std::shared_ptr<cl::NDRange> localRange
+                                                       = nullptr,
+                                                       bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionLaplaceZeroBoundary;
     int algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
