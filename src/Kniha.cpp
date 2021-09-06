@@ -722,7 +722,7 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
                 kernelName.c_str(), inf);
             return 1;
         }
-    } else if(inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING)
+    } else if(inf != CL_COMPLETE && inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING)
     {
         exe.getInfo(CL_KERNEL_FUNCTION_NAME, &kernelName);
         errout = io::xprintf("Kernel %s COMMAND_EXECUTION_STATUS is %d implying an error!",
