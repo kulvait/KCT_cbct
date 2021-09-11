@@ -1,8 +1,36 @@
-# CBCT
+# KCT CBCT
 
-Cutting voxel projector and LSQR implementation for cone beam CT operator.
+Fast, accurate and reliable software for algebraic CT reconstruction.
+
+This set of software tools includes OpenCL implementation of modern CT and CBCT reconstruction algorithms including unpublished algorithms by the author. Initially, the focus was on CT reconstruction using Krylov LSQR and CGLS methods. Gradually, other widely used methods such as OS-SIRT are added. Initially, the software was based on the idea of a projector that directly computes the projections of individual voxels onto pixels using the volume integrals of the voxel slices. The author intends to publish a paper on this cutting voxel projector (CVP) in late 2021. However, the package also includes implementations of the TT projector and the Siddon projector, and the DD and TR projectors will be implemented in the near future. The code for the CVP projector is optimized using OpenCL local memory and is probably one of the fastest projector implementations ever for algebraic reconstruction. 
+
+The package has been tested and is compatible with the AMD Radeon VII Vega 20 GPU and NVIDIA GeForce RTX 2080 Ti GPU. Some routines have been optimized specifically for these GPU architectures.
+
+## Algorithms
+
+Cutting voxel projector yet to be published.
 
 LSQR algorithm was implemented according to https://doi.org/10.1002/nla.611
+
+CGLS algorithm as described in the proceedings of Fully3D conference 2021
+Software Implementation of the Krylov Methods Based Reconstruction for the 3D Cone Beam CT Operator
+Poster and extendend absract can be also found in the publications directory
+
+##Repositories
+
+The KCT package is hosted on Bitbucket and GitHub
+
+### GitHub public repository
+
+```
+git clone https://github.com/kulvait/KCT_cbct.git
+```
+
+### Bitbucket public repository
+
+```
+git clone https://bitbucket.org/kulvait/kct_cbct.git
+```
 
 
 ## Submodules
@@ -20,11 +48,11 @@ git clone --recurse-submodules
 ```
 
 
-### [CTIOL](https://bitbucket.org/kulvait/ctiol)
+### [CTIOL](https://bitbucket.org/kulvait/KCT_ctiol)
 
 Input output routines for asynchronous thread safe reading/writing CT data. The DEN format read/write is implemented.
 
-### [CTMAL](https://bitbucket.org/kulvait/ctmal)
+### [CTMAL](https://bitbucket.org/kulvait/KCT_ctmal)
 
 Mathematic/Algebraic algorithms for supporting CT data manipulation.
 
