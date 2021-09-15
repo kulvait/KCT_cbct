@@ -201,8 +201,61 @@ void kernel FLOATsidon_project(global const float* restrict volume,
             double alphanext, LEN, pos;
             int3 ind;
             int IND;
-            while(((double*)&alphasNext)[maximalAlphasIndex] - halfMinIncrement < maxalpha)
+            if(alphasNext.x < alphasNext.y)
             {
+                if(alphasNext.x < alphasNext.z)
+                {
+                    alphanext = alphasNext.x;
+                    alphasNext.x += sidonIncrement.x;
+                } else // if(alphasNext.x > alphasNext.z)
+                {
+                    alphanext = alphasNext.z;
+                    alphasNext.z += sidonIncrement.z;
+                    /*
+                                        if(alphasNext.x == alphasNext.z)
+                                        {
+                                            alphasNext.x += sidonIncrement.x;
+                                        }*/
+                }
+            } else if(alphasNext.y < alphasNext.z)
+            {
+                alphanext = alphasNext.y;
+                alphasNext.y += sidonIncrement.y;
+                /*                if(alphasNext.x == alphasNext.y)
+                                {
+                                    alphasNext.x += sidonIncrement.x;
+                                }*/
+            } else
+            {
+                alphanext = alphasNext.z;
+                alphasNext.z += sidonIncrement.z;
+                /*                if(alphasNext.x == alphasNext.z)
+                                {
+                                    alphasNext.x += sidonIncrement.x;
+                                }
+                                if(alphasNext.y == alphasNext.z)
+                                {
+                                    alphasNext.y += sidonIncrement.y;
+                                }*/
+            }
+            LEN = alphanext - alphaprev;
+            pos = alphaprev + 0.5 * LEN; // Position in between
+            while(pos + zeroPrecisionTolerance < maxalpha)
+            {
+                ind = convert_int3_rtn(
+                    (sourcePosition + pos * a - zerocorner_xyz)
+                    / voxelSizes); // Not rounding but finds integer that is closest smaller
+                IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
+                VAL += volume[IND] * LEN;
+                // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+                /*
+                                if(!(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims)))
+                                {
+                                    printf("PROBLEM (pi,pj)=(%d, %d)!!!!!!!!!!!! ind=(%d, %d, %d)
+                   pos=%f minalpha=%f maxalpha=%f", pi, pj, ind.x, ind.y, ind.z, pos, minalpha,
+                   maxalpha);
+                                }*/
+                alphaprev = alphanext;
                 if(alphasNext.x < alphasNext.y)
                 {
                     if(alphasNext.x < alphasNext.z)
@@ -213,25 +266,34 @@ void kernel FLOATsidon_project(global const float* restrict volume,
                     {
                         alphanext = alphasNext.z;
                         alphasNext.z += sidonIncrement.z;
+                        /*      if(alphasNext.x == alphasNext.z)
+                              {
+                                  alphasNext.x += sidonIncrement.x;
+                              }*/
                     }
                 } else if(alphasNext.y < alphasNext.z)
                 {
                     alphanext = alphasNext.y;
                     alphasNext.y += sidonIncrement.y;
+                    /*     if(alphasNext.x == alphasNext.y)
+                         {
+                             alphasNext.x += sidonIncrement.x;
+                         }*/
                 } else
                 {
                     alphanext = alphasNext.z;
                     alphasNext.z += sidonIncrement.z;
+                    /* if(alphasNext.x == alphasNext.z)
+                     {
+                         alphasNext.x += sidonIncrement.x;
+                     }
+                     if(alphasNext.y == alphasNext.z)
+                     {
+                         alphasNext.y += sidonIncrement.y;
+                     }*/
                 }
                 LEN = alphanext - alphaprev;
-                pos = alphaprev + 0.5 * (alphanext - alphaprev);
-                ind = convert_int3_rtn(
-                    (sourcePosition + pos * a - zerocorner_xyz)
-                    / voxelSizes); // Not rounding but finds integer that is closest smaller
-                IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
-                VAL += volume[IND] * LEN;
-                //                assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
-                alphaprev = alphanext;
+                pos = alphaprev + 0.5 * LEN; // Position in between
             }
         }
     }

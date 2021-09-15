@@ -1,4 +1,7 @@
 //==============================include.cl=====================================
+#ifndef zeroPrecisionTolerance
+#define zeroPrecisionTolerance 1e-10
+#endif
 
 //Atomic operations
 /** Atomic float addition.
