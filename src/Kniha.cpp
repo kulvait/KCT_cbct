@@ -94,13 +94,31 @@ int Kniha::initializeOpenCL(uint32_t platformId,
                               return B.empty() ? A : (A.empty() ? B : A + " " + B);
                           });
     LOGI << io::xprintf("Building file %s with options : %s", clFile.c_str(), options.c_str());
-    if(program.build(devices, options.c_str()) != CL_SUCCESS)
+    cl_int inf = program.build(devices, options.c_str());
+    if(inf != CL_SUCCESS)
     {
-        LOGE << " Error building: ";
+        // Error codes can be found here
+        // https://github.com/opencv/opencv/blob/master/3rdparty/include/opencl/1.2/CL/cl.h
+        if(inf == CL_INVALID_COMPILER_OPTIONS)
+        {
+            if(debug)
+            {
+                LOGE << io::xprintf("Error CL_INVALID_COMPILER_OPTIONS when building. Not all "
+                                    "platforms might support debugging!");
+            } else
+            {
+                LOGE << io::xprintf("Error CL_INVALID_COMPILER_OPTIONS when building.");
+            }
+            return CL_INVALID_COMPILER_OPTIONS;//-66
+        }
+        LOGE << io::xprintf("Error building, program.build returned %d, see codes at "
+                            "https://github.com/opencv/opencv/blob/master/3rdparty/include/opencl/"
+                            "1.2/CL/cl.h.",
+                            inf);
         for(cl::Device dev : devices)
         {
             cl_build_status s = program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(dev);
-            std::string status = "CL_BUILD_SUCCESS";
+            std::string status = "";
             if(s == CL_BUILD_NONE)
             {
                 status = "CL_BUILD_NONE";
@@ -110,6 +128,12 @@ int Kniha::initializeOpenCL(uint32_t platformId,
             } else if(s == CL_BUILD_IN_PROGRESS)
             {
                 status = "CL_BUILD_IN_PROGRESS";
+            } else if(s == CL_BUILD_SUCCESS)
+            {
+                status = "CL_BUILD_SUCCESS";
+            } else
+            {
+                status = io::xprintf("Status code %d", s);
             }
             std::string name = dev.getInfo<CL_DEVICE_NAME>();
             std::string buildlog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(dev);
