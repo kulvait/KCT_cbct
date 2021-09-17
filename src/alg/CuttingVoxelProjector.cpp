@@ -93,8 +93,8 @@ void CuttingVoxelProjector::initializeTTProjector()
         pixelGranularity = { 1, 1 };
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector();
-        CLINCLUDEbackprojector();
+        //CLINCLUDEprojector();
+        //CLINCLUDEbackprojector();
         CLINCLUDEprojector_tt();
         CLINCLUDEbackprojector_tt();
     } else

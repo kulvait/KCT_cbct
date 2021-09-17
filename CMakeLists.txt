@@ -28,7 +28,20 @@ include_directories(${GLOBAL_INCLUDE_DIR})
 
 #OpenCL
 find_package(OpenCL REQUIRED)
+message("Found OpenCL_INCLUDE_DIRS ${OpenCL_INCLUDE_DIRS}")
+message("Found path OpenCL_LIBRARY ${OpenCL_LIBRARY} and OpenCL_LIBRARIES ${OpenCL_LIBRARIES}")
+SET(INTELLIBDIR "/opt/kulvait/intel/opencl_compilers_and_libraries_18.1.0.015/linux/compiler/lib/intel64_lin/")
+IF(EXISTS ${INTELLIBDIR})
+SET(INTELLIBRARIES "/opt/kulvait/intel/opencl_compilers_and_libraries_18.1.0.015/linux/compiler/lib/intel64_lin/libOpenCL.so")
+SET(OpenCL_LIBRARY "${INTELLIBDIR}")
+SET(OpenCL_LIBRARIES "${INTELLIBRARIES}")
+SET(OpenCL_INCLUDE_DIRS "/home/kulvait/intel/system_studio_2020/opencl/SDK/include/")
+ENDIF()
+message("USE OpenCL_INCLUDE_DIRS ${OpenCL_INCLUDE_DIRS}")
+message("USE path OpenCL_LIBRARY ${OpenCL_LIBRARY} and OpenCL_LIBRARIES ${OpenCL_LIBRARIES}")
 include_directories(OpenCL_INCLUDE_DIRS)
+
+
 SET(CUDA_INCLUDE_DIR "/opt/cuda/include")
 IF(EXISTS ${CUDA_INCLUDE_DIR})
 include_directories(${CUDA_INCLUDE_DIR})

@@ -64,8 +64,14 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     // clFile = io::xprintf("%s/opencl/allsources.cl", xpath.c_str());
     std::string tmpDir = std::experimental::filesystem::temp_directory_path().string();
     std::srand(std::time(nullptr));
-    unsigned int randomNumber = std::rand();
-    clFile = io::xprintf("%s/allsources_%d.cl", tmpDir.c_str(), randomNumber);
+    if(!debug)
+    {
+        unsigned int randomNumber = std::rand();
+        clFile = io::xprintf("%s/allsources_%d.cl", tmpDir.c_str(), randomNumber);
+    } else
+    {
+        clFile = io::xprintf("%s/allsources.cl", tmpDir.c_str());
+    }
     std::vector<std::string> clFilesXpath;
     for(std::string f : CLFiles)
     {
@@ -109,7 +115,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
             {
                 LOGE << io::xprintf("Error CL_INVALID_COMPILER_OPTIONS when building.");
             }
-            return CL_INVALID_COMPILER_OPTIONS;//-66
+            return CL_INVALID_COMPILER_OPTIONS; //-66
         }
         LOGE << io::xprintf("Error building, program.build returned %d, see codes at "
                             "https://github.com/opencv/opencv/blob/master/3rdparty/include/opencl/"
