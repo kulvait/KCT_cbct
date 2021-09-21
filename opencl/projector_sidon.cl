@@ -25,7 +25,9 @@ void kernel FLOATsidon_project(global const float* restrict volume,
     const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
                                      volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
                                      volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
-    const double3 maxcorner_xyz = -zerocorner_xyz;
+    const double3 maxcorner_xyz = { volumeCenter.x + 0.5 * (double)vdims.x * voxelSizes.x,
+                                    volumeCenter.y + 0.5 * (double)vdims.y * voxelSizes.y,
+                                    volumeCenter.z + 0.5 * (double)vdims.z * voxelSizes.z };
     for(uint pi = 0; pi < raysPerPixel.x; pi++)
     {
         P.x = pixelCorner.x + (pi + 0.5) * pixelSamplingGap.x;
