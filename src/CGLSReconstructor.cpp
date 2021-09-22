@@ -98,6 +98,36 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     return 0;
 }
 
+int CGLSReconstructor::weightedLeastSquares(float* weightsBDIM)
+{
+    cl_int err;
+    weighting_bbuf
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                       sizeof(float) * BDIM, (void*)weightsBDIM, &err);
+    if(err != CL_SUCCESS)
+    {
+        return 0;
+    } else
+    {
+        return 1;
+    }
+}
+
+int CGLSReconstructor::preconditionnedLeastSquares(float* preconditionerXDIM)
+{
+    cl_int err;
+    preconditioning_xbuf
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                       sizeof(float) * XDIM, (void*)preconditionerXDIM, &err);
+    if(err != CL_SUCCESS)
+    {
+        return 0;
+    } else
+    {
+        return 1;
+    }
+}
+
 void CGLSReconstructor::addTikhonovRegularization(float L2, float V2, float Laplace)
 {
     this->tikhonovRegularization = false;
