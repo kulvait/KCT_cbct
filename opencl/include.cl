@@ -358,6 +358,7 @@ void inline exactEdgeValues0ElevationCorrection(
         } else
         {
             lastCorLambda = -corlambda;
+        	Qvector = CM.s456 - (PJ_min_cor_min - HALF) * CM.s89a;
         }
         for(; PJ_min_cor_min < J; PJ_min_cor_min++)
         {
@@ -387,7 +388,7 @@ void inline exactEdgeValues0ElevationCorrection(
                 } else
                 {
                     corFactor = HALF * (corlambda - lastCorLambda) + (lambda - corlambda)
-                        + corQuarterMultiplier * corlambda
+                        + corQuarterMultiplier
                             * (corlambda * corlambda - lastCorLambda * lastCorLambda);
                 }
                 AtomicAdd_g_f(&projection[J], value * corFactor);
@@ -477,7 +478,7 @@ void inline exactEdgeValues0ElevationCorrection(
         AtomicAdd_g_f(projection + PJ_max_cor_max, corFactor * value);
     } else // correctMin and correctMax
     {
-        REAL lambdaShifted, lastLambdaShifted, lastCorMaxLambdaShifted, leastCorMaxLambdaShifted, lastCorMinLambda;
+        REAL lambdaShifted, lastLambdaShifted, lastCorMaxLambdaShifted, leastCorMaxLambdaShifted;
         if(PJ_max_cor_max >= pdims.y) // Here usually no correction since it will be compensated
         {
             PJ_max = pdims.y - 1;
@@ -529,15 +530,14 @@ void inline exactEdgeValues0ElevationCorrection(
             {
                 if(lambda < corlambda)
                 {
-                    corFactor = HALF * (lambda - lastCorMinLambda)
+                    corFactor = HALF * (lambda - lastLambda)
                         + corQuarterMultiplier
-                            * (lambda * lambda - lastCorMinLambda * lastCorMinLambda);
-                    lastCorMinLambda = lambda;
+                            * (lambda * lambda - lastLambda * lastLambda);
                 } else
                 {
-                    corFactor = HALF * (corlambda - lastCorMinLambda) + (lambda - corlambda)
-                        + corQuarterMultiplier * corlambda
-                            * (corlambda * corlambda - lastCorMinLambda * lastCorMinLambda);
+                    corFactor = HALF * (corlambda - lastLambda) + (lambda - corlambda)
+                        + corQuarterMultiplier 
+                            * (corlambda * corlambda - lastLambda * lastLambda);
                 }
             }
             AtomicAdd_g_f(&projection[J], corFactor * value);
