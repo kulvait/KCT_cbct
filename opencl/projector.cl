@@ -3,6 +3,7 @@
 #define zeroPrecisionTolerance 1e-10
 #endif
 
+#define ELEVATIONCORRECTION
 /**
  * We parametrize the line segment from A to B by parameter t such that t=0 for A and t=1 for B.
  * Then we will find the t corresponding to the point v = t*B+(1-t)A  that maps to the coordinate PX
@@ -570,6 +571,10 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     const REAL3 volumeCenter_voxelcenter_offset
         = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
+#ifdef ELEVATIONCORRECTION
+    const REAL tgelevation = fabs(voxelcenter_xyz.z)
+        / sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
+#endif
 
     const uint IND = voxelIndex(i, j, k, vdims);
     const float voxelValue = volume[IND];
@@ -782,7 +787,12 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             if(I >= 0)
             {
                 factor = value * lastSectionSize;
+#ifdef ELEVATIONCORRECTION
+                exactEdgeValues0ElevationCorrection(projection, CM, lastInt, I, factor, voxelSizes,
+                                                    pdims, HALF*tgelevation);
+#else
                 exactEdgeValues0(projection, CM, lastInt, I, factor, voxelSizes, pdims);
+#endif
             }
             for(I = I + 1; I < I_STOP; I++)
             {
@@ -792,7 +802,12 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 polygonSize = nextSectionSize - lastSectionSize;
                 Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
                 factor = value * polygonSize;
+#ifdef ELEVATIONCORRECTION
+                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
+                                                    pdims, HALF*tgelevation);
+#else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
+#endif
                 lastSectionSize = nextSectionSize;
                 lastInt = nextInt;
             }
@@ -801,7 +816,12 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 polygonSize = ONE - lastSectionSize;
                 Int = ((*V_ccw[0] + *V_ccw[2]) * HALF - lastSectionSize * lastInt) / polygonSize;
                 factor = value * polygonSize;
+#ifdef ELEVATIONCORRECTION
+                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
+                                                    pdims, HALF*tgelevation);
+#else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
+#endif
             }
         }
     }
