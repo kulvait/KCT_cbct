@@ -839,10 +839,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 Int = ((*V_xyx[0] + *V_xyx[2]) * HALF - lastSectionSize * lastInt) / polygonSize;
                 factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
-                CENTROID_cur = (REAL2)(HALF * vd1, HALF * vd3);
-                CENTROID = (CENTROID_cur - lastSectionSize * CENTROID_prev)
-                    / polygonSize;
-				Int=(REAL3)(CENTROID, vx00.z);
+                CENTROID_cur = V_xyx[0]->s01 + (REAL2)(HALF * vd1, HALF * vd3);
+                CENTROID = (CENTROID_cur - lastSectionSize * CENTROID_prev) / polygonSize;
+                Int = (REAL3)(CENTROID, vx00.z);
                 corlambda = QUARTER * llength_next * tgelevation / voxelSizes.z;
                 exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
                                                     pdims, corlambda);
