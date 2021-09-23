@@ -780,10 +780,11 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             // CCW and CW coordinates of the last intersection on the lines specified by the
             // points in V_xyx
 #ifdef ELEVATIONCORRECTION
+            REAL2 CENTROID, CENTROID_cur, CENTROID_prev;
             REAL llength_next, llength_prev, corlambda;
-            exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V_xyx[0], V_xyx[1], V_xyx[2],
-                                       V_xyx[3], PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
-                                       voxelSizes, &lastInt, &llength_prev);
+            lastSectionSize = exactIntersectionPolygons0(
+                ((REAL)I) + HALF, vd1, vd3, V_xyx[0], V_xyx[1], V_xyx[2], V_xyx[3], PX_xyx[0],
+                PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, voxelSizes, &CENTROID_prev, &llength_prev);
 #else
             lastSectionSize = exactIntersectionPoints0_extended(
                 ((REAL)I) + HALF, V_xyx[0], V_xyx[1], V_xyx[2], V_xyx[3], vd1, vd3, PX_xyx[0],
@@ -794,7 +795,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 factor = value * lastSectionSize;
 #ifdef ELEVATIONCORRECTION
                 corlambda = QUARTER * llength_prev * tgelevation / voxelSizes.z;
-                exactEdgeValues0ElevationCorrection(projection, CM, lastInt, I, factor, voxelSizes,
+                // HALF*tgelevation works reasonable
+                Int = (REAL3)(CENTROID_prev, vx00.z);
+                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
                                                     pdims, corlambda);
 #else
                 exactEdgeValues0(projection, CM, lastInt, I, factor, voxelSizes, pdims);
@@ -803,22 +806,27 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             for(I = I + 1; I < I_STOP; I++)
             {
 #ifdef ELEVATIONCORRECTION
-                exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V_xyx[0], V_xyx[1], V_xyx[2],
-                                           V_xyx[3], PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
-                                           voxelSizes, &nextInt, &llength_next);
-                corlambda = QUARTER * (llength_next + llength_prev) / voxelSizes.z;
+                nextSectionSize = exactIntersectionPolygons0(
+                    ((REAL)I) + HALF, vd1, vd3, V_xyx[0], V_xyx[1], V_xyx[2], V_xyx[3], PX_xyx[0],
+                    PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, voxelSizes, &CENTROID_cur, &llength_next);
+                corlambda = QUARTER * (llength_next + llength_prev) * tgelevation / voxelSizes.z;
                 llength_prev = llength_next;
+                polygonSize = nextSectionSize - lastSectionSize;
+                CENTROID = (nextSectionSize * CENTROID_cur - lastSectionSize * CENTROID_prev)
+                    / polygonSize;
+                Int = (REAL3)(CENTROID, vx00.z);
+                CENTROID_prev = CENTROID_cur;
 #else
                 nextSectionSize = exactIntersectionPoints0_extended(
                     ((REAL)I) + HALF, V_xyx[0], V_xyx[1], V_xyx[2], V_xyx[3], vd1, vd3, PX_xyx[0],
                     PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, &nextInt);
-#endif
                 polygonSize = nextSectionSize - lastSectionSize;
                 Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
+#endif
                 factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
                 exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
-                                                    pdims, HALF * tgelevation);
+                                                    pdims, corlambda);
 #else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
 #endif
@@ -831,9 +839,13 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 Int = ((*V_xyx[0] + *V_xyx[2]) * HALF - lastSectionSize * lastInt) / polygonSize;
                 factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
+                CENTROID_cur = (REAL2)(HALF * vd1, HALF * vd3);
+                CENTROID = (CENTROID_cur - lastSectionSize * CENTROID_prev)
+                    / polygonSize;
+				Int=(REAL3)(CENTROID, vx00.z);
                 corlambda = QUARTER * llength_next * tgelevation / voxelSizes.z;
                 exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
-                                                    pdims, HALF * tgelevation);
+                                                    pdims, corlambda);
 #else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
 #endif
