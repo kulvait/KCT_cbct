@@ -70,8 +70,8 @@ inline void AtomicMin_g_f(volatile __global float* adr, const float v)
     } while(tmp.u32 != adrcatch.u32);
 }
 
-    // CVP Projector routines
-    //#define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
+// CVP Projector routines
+//#define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
 
 #define DROPCENTEROFFPROJECTORVOXELS
 // DROPINCOMPLETEVOXELS is not implemented the same in barrier implementation
@@ -811,7 +811,8 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             CENTROID = (ONE / NAREA)
                 * (REAL2)((HALF - (ONETHIRD * p + TWOTHIRDS) * NAREA_complement) * vd1,
                           (HALF - ONETHIRD * q * NAREA_complement) * vd3);
-            centroid->s01 = v0->s01 + CENTROID;
+            (*centroid) = v0->s01 + CENTROID;
+            (*llength) = LINELENGTH;
             return NAREA;
         }
     } else if(PX < (*PX_xyx2))
@@ -833,8 +834,9 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
                 wcomplement = TWOTHIRDS - ONESIXTH * w;
                 CENTROID = (REAL2)(wcomplement * vd1,
                                    (q * wcomplement + ONETHIRD * p * (ONE - w)) * vd3);
-                centroid->s01 += CENTROID;
+                (*centroid) += CENTROID;
             }
+            (*llength) = LINELENGTH;
             return NAREA;
         } else
         {
@@ -847,6 +849,7 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             CENTROID = (REAL2)(vd1, vd3)
                 + (REAL2)(-vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement));
             (*centroid) = v0->s01 + CENTROID;
+            (*llength) = LINELENGTH;
             return NAREA;
         }
     } else if(PX >= *PX_xyx3)
@@ -855,6 +858,7 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
         LINELENGTH = ZERO;
         CENTROID = (REAL2)(HALF * vd1, HALF * vd3);
         (*centroid) = v0->s01 + CENTROID;
+        (*llength) = LINELENGTH;
         return ONE;
 
     } else
@@ -870,6 +874,7 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
         CENTROID = (REAL2)(ZERO, vd3)
             + (REAL2)(vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement));
         (*centroid) = v0->s01 + CENTROID;
+        (*llength) = LINELENGTH;
         return NAREA;
     }
 }
