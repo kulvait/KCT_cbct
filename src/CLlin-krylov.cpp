@@ -185,6 +185,8 @@ public:
     float upperBoxCondition = std::numeric_limits<float>::quiet_NaN();
     float relaxationParameter = 1.0f;
     bool verbose = true;
+    bool disableExpensiveReporting = false;
+    bool elevationCorrection = false;
 };
 
 /**Argument parsing
@@ -260,8 +262,15 @@ void Args::defineArguments()
     addRelaxedArg();
     addProjectorArgs();
 
-    cliApp->add_flag("--verbose,!--no-verbose", verbose, "Verbose print, defaults to true.");
-
+    std::string optstr = io::xprintf("Verbose print. [defaults to %s]", verbose ? "true" : "false");
+    cliApp->add_flag("--verbose,!--no-verbose", verbose, optstr);
+    optstr = io::xprintf("Disable reporting that might slow down the whole computation, e.g. "
+                         "reporting of the norm of discrepancy in every itteration of OS method "
+                         "that is nice to have for convergence graph but requires additional "
+                         "projection per itteration. [defaults to %s]",
+                         disableExpensiveReporting ? "true" : "false");
+    cliApp->add_flag("--disable-expensive-reporting,!--no-disable-expensive-reporting",
+                     disableExpensiveReporting, optstr);
     og_settings->add_option("--x0", initialVectorX0, "Specify x0 vector, zero by default.");
     CLI::Option* dpc = og_settings->add_option(
         "--diagonal-preconditioner", diagonalPreconditioner,
@@ -387,8 +396,8 @@ int main(int argc, char* argv[])
                 cgls->initializeTTProjector();
             } else
             {
-                cgls->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                             ARG.barrierArraySize);
+                cgls->initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                             ARG.useBarrierCalls, ARG.barrierArraySize);
             }
             if(!std::isnan(ARG.tikhonovLambdaL2) || !std::isnan(ARG.tikhonovLambdaV2)
                || !std::isnan(ARG.tikhonovLambdaLaplace2D))
@@ -463,8 +472,8 @@ int main(int argc, char* argv[])
                 glsqr->initializeTTProjector();
             } else
             {
-                glsqr->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                              ARG.barrierArraySize);
+                glsqr->initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                              ARG.useBarrierCalls, ARG.barrierArraySize);
             }
             int ecd = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
                                               ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
@@ -519,8 +528,8 @@ int main(int argc, char* argv[])
                 psirt->initializeTTProjector();
             } else
             {
-                psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                              ARG.barrierArraySize);
+                psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                              ARG.useBarrierCalls, ARG.barrierArraySize);
             }
             int ecd = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
                                               ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
@@ -569,8 +578,8 @@ int main(int argc, char* argv[])
                 psirt->initializeTTProjector();
             } else
             {
-                psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                              ARG.barrierArraySize);
+                psirt->initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                              ARG.useBarrierCalls, ARG.barrierArraySize);
             }
             int ecd = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
                                               ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
@@ -628,8 +637,8 @@ int main(int argc, char* argv[])
                 ossart->initializeTTProjector();
             } else
             {
-                ossart->initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls,
-                                               ARG.barrierArraySize);
+                ossart->initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                               ARG.useBarrierCalls, ARG.barrierArraySize);
             }
             int ecd = ossart->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
                                                ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,

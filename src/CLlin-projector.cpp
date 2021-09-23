@@ -183,7 +183,8 @@ int main(int argc, char* argv[])
         CVP.initializeTTProjector();
     } else
     {
-        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls, ARG.barrierArraySize);
+        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                   ARG.useBarrierCalls, ARG.barrierArraySize);
     }
     int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
                                    xpath, ARG.CLdebug, ARG.CLrelaxed);

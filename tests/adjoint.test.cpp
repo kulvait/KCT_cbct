@@ -68,8 +68,10 @@ TEST_CASE("CVP.AdjointDotProduct.nobarrier", "[adjointop][cuttingvox][NOVIZ]")
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
-    bool barrier = false;
-    glsqr->initializeCVPProjector(true, barrier);
+    bool exactScaling = true;
+    bool barrierCalls = false;
+    bool elevationCorrection = false;
+    glsqr->initializeCVPProjector(exactScaling, elevationCorrection, barrierCalls);
     int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
@@ -132,8 +134,10 @@ TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed", "[adjointop][cuttingvox][NOVI
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
-    bool barrier = true;
-    glsqr->initializeCVPProjector(true, barrier);
+    bool exactScaling = true;
+    bool barrierCalls = false;
+    bool elevationCorrection = false;
+    glsqr->initializeCVPProjector(exactScaling, elevationCorrection, barrierCalls);
     int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {

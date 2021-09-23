@@ -3,19 +3,24 @@
 namespace KCT {
 
 void BaseReconstructor::initializeCVPProjector(bool useExactScaling,
+                                               bool useElevationCorrection,
                                                bool useBarrierCalls,
                                                uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())
     {
-        useCVPProjector = true;
-        exactProjectionScaling = useExactScaling;
-        this->CVPBarrierImplementation = useBarrierCalls;
-        useSidonProjector = false;
-        pixelGranularity = { 1, 1 };
-        useTTProjector = false;
+        this->useCVPProjector = true;
+        this->useCVPExactProjectionsScaling = useExactScaling;
+        this->useCVPElevationCorrection = useElevationCorrection;
+        this->useBarrierImplementation = useBarrierCalls;
+        this->useSidonProjector = false;
+        this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
+        if(useCVPElevationCorrection)
+        {
+            addOptString(io::xprintf("-DELEVATIONCORRECTION"));
+        }
         if(useBarrierCalls)
         {
             addOptString(io::xprintf("-DLOCALARRAYSIZE=%d", LOCALARRAYSIZE));
@@ -29,9 +34,7 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling,
         CLINCLUDErescaleProjections();
     } else
     {
-        std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR("Could not initialize projector when OpenCL was already initialized.");
     }
 }
 
@@ -39,20 +42,17 @@ void BaseReconstructor::initializeSidonProjector(uint32_t probesPerEdgeX, uint32
 {
     if(!isOpenCLInitialized())
     {
-        useSidonProjector = true;
-        pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
-        useCVPProjector = false;
-        exactProjectionScaling = false;
-        useTTProjector = false;
+        this->useSidonProjector = true;
+        this->pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
+        this->useCVPProjector = false;
+        this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector_sidon();
         CLINCLUDEbackprojector_sidon();
     } else
     {
-        std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR("Could not initialize projector when OpenCL was already initialized.");
     }
 }
 
@@ -60,11 +60,9 @@ void BaseReconstructor::initializeTTProjector()
 {
     if(!isOpenCLInitialized())
     {
-        useTTProjector = true;
-        useCVPProjector = false;
-        exactProjectionScaling = false;
-        useSidonProjector = false;
-        pixelGranularity = { 1, 1 };
+        this->useTTProjector = true;
+        this->useCVPProjector = false;
+        this->useSidonProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector();
@@ -73,9 +71,7 @@ void BaseReconstructor::initializeTTProjector()
         CLINCLUDEbackprojector_tt();
     } else
     {
-        std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR("Could not initialize projector when OpenCL was already initialized.");
     }
 }
 
@@ -86,7 +82,8 @@ void BaseReconstructor::initializeVolumeConvolution()
         CLINCLUDEconvolution();
     } else
     {
-        std::string err = "Could not initialize volume convolution when OpenCL was already initialized.";
+        std::string err
+            = "Could not initialize volume convolution when OpenCL was already initialized.";
         LOGE << err;
         throw std::runtime_error(err.c_str());
     }
@@ -198,7 +195,8 @@ int BaseReconstructor::problemSetup(float* projection,
             LOGW << io::xprintf("Apparently the volume is specified such that its center do not "
                                 "belong to the half space orthogonal to the principal ray in %d-th "
                                 "projection. VN=(%f,%f,%f), center=(%f,%f, %f), dot(VN,center)=%f.",
-                                k, VN[0], VN[1], VN[2], center[0], center[1], center[2], vectorDotProduct(VN, center));
+                                k, VN[0], VN[1], VN[2], center[0], center[1], center[2],
+                                vectorDotProduct(VN, center));
         }
         if(vectorDotProduct(VN, A) < 0 || vectorDotProduct(VN, B) < 0 || vectorDotProduct(VN, C) < 0
            || vectorDotProduct(VN, D) < 0 || vectorDotProduct(VN, E) < 0
@@ -435,11 +433,14 @@ int BaseReconstructor::multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer&
 }
 
 /**
-* @param initialProjectionIndex For OS SART 0 by default
-* @param projectionIncrement For OS SART 1 by default
-*
-*/
-int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X, uint32_t initialProjectionIndex, uint32_t projectionIncrement)
+ * @param initialProjectionIndex For OS SART 0 by default
+ * @param projectionIncrement For OS SART 1 by default
+ *
+ */
+int BaseReconstructor::backproject(cl::Buffer& B,
+                                   cl::Buffer& X,
+                                   uint32_t initialProjectionIndex,
+                                   uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
@@ -458,7 +459,7 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X, uint32_t initia
     std::array<double, 2> focalLength;
     float scalingFactor;
     unsigned int offset;
-    for(std::size_t i = initialProjectionIndex; i < pdimz; i+=projectionIncrement)
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
     {
         P = cameraVector[i];
         focalLength = P->focalLength();
@@ -483,7 +484,7 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X, uint32_t initia
                                     FLOATONE);
         } else
         {
-            if(exactProjectionScaling)
+            if(useCVPExactProjectionsScaling)
             {
                 (*FLOATrescale_projections_exact)(eargs2, *tmp_b_buf, offset, pdims_uint,
                                                   NORMALPROJECTION, VIRTUALPIXELSIZES,
@@ -502,11 +503,14 @@ int BaseReconstructor::backproject(cl::Buffer& B, cl::Buffer& X, uint32_t initia
 }
 
 /**
-* @param initialProjectionIndex For OS SART 0 by default
-* @param projectionIncrement For OS SART 1 by default
-*
-*/
-int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X, uint32_t initialProjectionIndex, uint32_t projectionIncrement)
+ * @param initialProjectionIndex For OS SART 0 by default
+ * @param projectionIncrement For OS SART 1 by default
+ *
+ */
+int BaseReconstructor::backproject_minmax(cl::Buffer& B,
+                                          cl::Buffer& X,
+                                          uint32_t initialProjectionIndex,
+                                          uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, std::numeric_limits<float>::infinity(), 0,
                                       XDIM * sizeof(float));
@@ -526,7 +530,7 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X, uint32_t
     std::array<double, 2> focalLength;
     float scalingFactor;
     unsigned int offset;
-    for(std::size_t i = initialProjectionIndex; i < pdimz; i+=projectionIncrement)
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
     {
         P = cameraVector[i];
         focalLength = P->focalLength();
@@ -547,7 +551,7 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X, uint32_t
             throw std::runtime_error("Minmax backprojector not implemented for TT projector.");
         } else
         {
-            if(exactProjectionScaling)
+            if(useCVPExactProjectionsScaling)
             {
                 (*FLOATrescale_projections_exact)(eargs2, *tmp_b_buf, offset, pdims_uint,
                                                   NORMALPROJECTION, VIRTUALPIXELSIZES,
@@ -567,13 +571,15 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B, cl::Buffer& X, uint32_t
     return 0;
 }
 
-
 /**
-* @param initialProjectionIndex For OS SART, 0 by default
-* @param projectionIncrement For OS SART, 1 by default
-*
-*/
-int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B, uint32_t initialProjectionIndex, uint32_t projectionIncrement)
+ * @param initialProjectionIndex For OS SART, 0 by default
+ * @param projectionIncrement For OS SART, 1 by default
+ *
+ */
+int BaseReconstructor::project(cl::Buffer& X,
+                               cl::Buffer& B,
+                               uint32_t initialProjectionIndex,
+                               uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     unsigned int frameSize = pdimx * pdimy;
@@ -593,7 +599,7 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B, uint32_t initialPro
     std::array<double, 2> focalLength;
     float scalingFactor;
     unsigned int offset;
-    for(std::size_t i = initialProjectionIndex; i < pdimz; i+=projectionIncrement)
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
     {
         P = cameraVector[i];
         focalLength = P->focalLength();
@@ -617,7 +623,7 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B, uint32_t initialPro
                                 voxelSizes, volumeCenter, pdims, FLOATONE);
         } else
         {
-            if(CVPBarrierImplementation)
+            if(useBarrierImplementation)
             {
                 algFLOATcutting_voxel_project_barrier(
                     X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
@@ -629,7 +635,7 @@ int BaseReconstructor::project(cl::Buffer& X, cl::Buffer& B, uint32_t initialPro
                                               NORMALTODETECTOR, vdims, voxelSizes, volumeCenter,
                                               pdims, FLOATONE);
             }
-            if(exactProjectionScaling)
+            if(useCVPExactProjectionsScaling)
             {
                 (*FLOATrescale_projections_exact)(eargs2, B, offset, pdims_uint, NORMALPROJECTION,
                                                   VIRTUALPIXELSIZES, VIRTUALDETECTORDISTANCE);

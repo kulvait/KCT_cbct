@@ -19,6 +19,7 @@
 // Internal libraries
 #include "CArmArguments.hpp"
 #include "CuttingVoxelProjector.hpp"
+#include "DEN/DenAsyncFrame2DWritter.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
@@ -29,7 +30,6 @@
 #include "PROG/Program.hpp"
 #include "PROG/parseArgs.h"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
-#include "DEN/DenAsyncFrame2DWritter.hpp"
 
 using namespace KCT;
 using namespace KCT::util;
@@ -213,7 +213,7 @@ int main(int argc, char* argv[])
     float* volume = new float[ARG.totalVoxelNum];
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.voxelNumX,
                               ARG.voxelNumY, ARG.voxelNumZ);
-    //CVP.initializeAllAlgorithms();
+    // CVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {
         CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -223,7 +223,8 @@ int main(int argc, char* argv[])
         CVP.initializeTTProjector();
     } else
     {
-        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useBarrierCalls, ARG.barrierArraySize);
+        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                   ARG.useBarrierCalls, ARG.barrierArraySize);
     }
     int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
                                    xpath, ARG.CLdebug, ARG.CLrelaxed);
@@ -276,7 +277,7 @@ int main(int argc, char* argv[])
             normSquareDifference += CVP.normSquareDifference(
                 (float*)fr->getDataPointer(), ARG.projectionSizeX, ARG.projectionSizeY);
         }
-        //io::appendBytes(ARG.outputProjection, (uint8_t*)projection, frameSize * sizeof(float));
+        // io::appendBytes(ARG.outputProjection, (uint8_t*)projection, frameSize * sizeof(float));
         //        std::fill_n(projection, projectionElementsCount, float(0.0));
         io::BufferedFrame2D<float> transposedFrame(projection, ARG.projectionSizeY,
                                                    ARG.projectionSizeX);

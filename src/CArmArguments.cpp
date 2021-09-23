@@ -453,6 +453,13 @@ void CArmArguments::addCuttingVoxelProjectorArgs(bool includeNoScaling)
         "--local-array-size", barrierArraySize,
         io::xprintf("Size of LOCALARRAYSIZE for barrier calls, defaults to %d.", barrierArraySize));
     opt_cl_localarraysize->needs(optCVP);
+    std::string optstr
+        = io::xprintf("Elevation correction for CVP projector, increase excactness for high "
+                      "elevation angles. [defaults to %s]",
+                      useElevationCorrection ? "true" : "false");
+    CLI::Option* elevationCorrection_cli
+        = og_projectorsettings->add_flag("--elevation-correction", useElevationCorrection, optstr);
+    elevationCorrection_cli->needs(optCVP);
 }
 
 void CArmArguments::addTTProjectorArgs()

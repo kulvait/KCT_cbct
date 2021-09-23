@@ -500,6 +500,7 @@ public:
     }
 
     void initializeCVPProjector(bool useExactScaling,
+                                bool useElevationCorrection,
                                 bool barrierVariant,
                                 uint32_t LOCALARRAYSIZE = 7680);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
@@ -559,8 +560,9 @@ protected:
 
     // Variables for projectors and openCL initialization
     bool useCVPProjector = true;
-    bool exactProjectionScaling = true;
-    bool CVPBarrierImplementation = false;
+    bool useCVPExactProjectionsScaling = true;
+    bool useCVPElevationCorrection = false;
+    bool useBarrierImplementation = false;
     uint32_t LOCALARRAYSIZE = 0;
     bool useSidonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };

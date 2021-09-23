@@ -51,6 +51,7 @@ public:
     bool useCosScaling = false;
     bool useNoScaling = false;
     bool useBarrierCalls = false;
+    bool useElevationCorrection = false;
     uint32_t barrierArraySize = 7680; // To fit Intel
     bool useCenterVoxelProjector = false;
     bool useSidonProjector = false;

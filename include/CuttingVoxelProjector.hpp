@@ -85,7 +85,8 @@ public:
     cl::NDRange guessProjectionLocalNDRange(bool barrierCalls);
 
     void initializeCVPProjector(bool useExactScaling,
-                                bool useBarrierImplementation,
+                                bool useElevationCorrection,
+                                bool useBarrierCalls,
                                 uint32_t LOCALARRAYSIZE);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
@@ -183,7 +184,8 @@ private:
     cl_double3 voxelSizes;
     cl_double3 volumeCenter;
     bool useCVPProjector = true;
-    bool exactProjectionScaling = true;
+    bool useCVPExactProjectionsScaling = true;
+    bool useCVPElevationCorrection = false;
     bool useBarrierImplementation = false;
     uint32_t LOCALARRAYSIZE = 0;
     bool useSidonProjector = false;

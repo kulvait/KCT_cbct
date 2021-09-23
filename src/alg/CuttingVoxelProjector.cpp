@@ -28,19 +28,25 @@ cl::NDRange CuttingVoxelProjector::guessProjectionLocalNDRange(bool barrierCalls
 }
 
 void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling,
+                                                   bool useElevationCorrection,
                                                    bool useBarrierCalls,
                                                    uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())
     {
+        this->useCVPProjector = true;
+        this->useCVPExactProjectionsScaling = useExactScaling;
+        this->useCVPElevationCorrection = useElevationCorrection;
         this->useBarrierImplementation = useBarrierCalls;
-        useCVPProjector = true;
-        exactProjectionScaling = useExactScaling;
-        useSidonProjector = false;
-        pixelGranularity = { 1, 1 };
-        useTTProjector = false;
+        this->useSidonProjector = false;
+        this->pixelGranularity = { 1, 1 };
+        this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
+        if(useCVPElevationCorrection)
+        {
+            addOptString(io::xprintf("-DELEVATIONCORRECTION"));
+        }
         if(useBarrierCalls)
         {
             addOptString(io::xprintf("-DLOCALARRAYSIZE=%d", LOCALARRAYSIZE));
@@ -54,9 +60,7 @@ void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling,
         CLINCLUDErescaleProjections();
     } else
     {
-        std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR("Could not initialize projector when OpenCL was already initialized.");
     }
 }
 
@@ -65,20 +69,17 @@ void CuttingVoxelProjector::initializeSidonProjector(uint32_t probesPerEdgeX,
 {
     if(!isOpenCLInitialized())
     {
-        useSidonProjector = true;
-        pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
-        useCVPProjector = false;
-        exactProjectionScaling = false;
-        useTTProjector = false;
+        this->useSidonProjector = true;
+        this->pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
+        this->useCVPProjector = false;
+        this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector_sidon();
         CLINCLUDEbackprojector_sidon();
     } else
     {
-        std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR("Could not initialize projector when OpenCL was already initialized.");
     }
 }
 
@@ -86,22 +87,18 @@ void CuttingVoxelProjector::initializeTTProjector()
 {
     if(!isOpenCLInitialized())
     {
-        useTTProjector = true;
-        useCVPProjector = false;
-        exactProjectionScaling = false;
-        useSidonProjector = false;
-        pixelGranularity = { 1, 1 };
+        this->useTTProjector = true;
+        this->useCVPProjector = false;
+        this->useSidonProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        //CLINCLUDEprojector();
-        //CLINCLUDEbackprojector();
+        CLINCLUDEprojector();
+        CLINCLUDEbackprojector();
         CLINCLUDEprojector_tt();
         CLINCLUDEbackprojector_tt();
     } else
     {
-        std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR("Could not initialize projector when OpenCL was already initialized.");
     }
 }
 
@@ -362,7 +359,7 @@ int CuttingVoxelProjector::project(float* projection, std::shared_ptr<matrix::Ca
         return projectTA3(projection, pm);
     } else
     {
-        if(exactProjectionScaling)
+        if(useCVPExactProjectionsScaling)
         {
             return projectExact(projection, pm);
         } else
@@ -679,7 +676,7 @@ int CuttingVoxelProjector::backproject(float* volume,
                                     FLOATONE);
         } else
         {
-            if(exactProjectionScaling)
+            if(useCVPExactProjectionsScaling)
             {
                 (*FLOATrescale_projections_exact)(eargs2, *tmpBuffer, offset, pdims_uint,
                                                   NORMALPROJECTION, VIRTUALPIXELSIZES,
