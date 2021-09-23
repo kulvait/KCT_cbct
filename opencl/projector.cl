@@ -26,12 +26,12 @@ inline double intersectionXTime(double PX, double PX_A, double PX_B)
 }
 
 /**
- * Let v0,v1,v2,v3 and v0,v3,v2,v1 be a piecewise lines that maps on detector on values PX_ccw0,
- * PX_ccw1, PX_ccw2, PX_ccw3. Find a two parametrization factors that maps to a PX on these
+ * Let v0,v1,v2,v3 and v0,v3,v2,v1 be a piecewise lines that maps on detector on values PX_xyx0,
+ * PX_xyx1, PX_xyx2, PX_xyx3. Find a two parametrization factors that maps to a PX on these
  * piecewise lines. We expect that the mappings are linear and nondecreasing up to the certain point
  * from both sides. Parametrization is returned in nextIntersections variable first from
- * v0,v1,v2,v3,v0 lines and next from v0,v3,v2,v1,v0. It expects that PX is between min(*PX_ccw0,
- * *PX_ccw1, *PX_ccw2, *PX_ccw3) and max(*PX_ccw0, *PX_ccw1, *PX_ccw2, *PX_ccw3).
+ * v0,v1,v2,v3,v0 lines and next from v0,v3,v2,v1,v0. It expects that PX is between min(*PX_xyx0,
+ * *PX_xyx1, *PX_xyx2, *PX_xyx3) and max(*PX_xyx0, *PX_xyx1, *PX_xyx2, *PX_xyx3).
  *
  * @param CM Projection camera matrix.
  * @param PX Mapping of projector
@@ -39,12 +39,12 @@ inline double intersectionXTime(double PX, double PX_A, double PX_B)
  * @param v1 Point v1
  * @param v2 Point v2
  * @param v3 Point v3
- * @param PX_ccw0 Mapping of v0
- * @param PX_ccw1 Mapping of v1
- * @param PX_ccw2 Mapping of v2
- * @param PX_ccw3 Mapping of v3
+ * @param PX_xyx0 Mapping of v0
+ * @param PX_xyx1 Mapping of v1
+ * @param PX_xyx2 Mapping of v2
+ * @param PX_xyx3 Mapping of v3
  * @param nextIntersections Output tuple of parametrizations that maps to PX.
- * @param v_ccw Output first coordinate that maps to PX on the parametrized piecewise line
+ * @param v_xyx Output first coordinate that maps to PX on the parametrized piecewise line
  * v0,v1,v2,v3.
  * @param v_cw Output first coordinate that maps to PX on the parametrized piecewise line
  * v0,v3,v2,v1.
@@ -54,37 +54,37 @@ inline double exactIntersectionPoints(const double PX,
                                       const double3* v1,
                                       const double3* v2,
                                       const double3* v3,
-                                      const double* PX_ccw0,
-                                      const double* PX_ccw1,
-                                      const double* PX_ccw2,
-                                      const double* PX_ccw3,
+                                      const double* PX_xyx0,
+                                      const double* PX_xyx1,
+                                      const double* PX_xyx2,
+                                      const double* PX_xyx3,
                                       const double16 CM,
                                       double3* centroid)
 {
     double p, q, tmp, totalweight;
-    double3 v_cw, v_ccw;
+    double3 v_cw, v_xyx;
     const double3 Fvector = CM.s012 - PX * CM.s89a;
     const double Fconstant = CM.s3 - PX * CM.sb;
     double FproductA, FproductB;
-    if(PX < (*PX_ccw1))
+    if(PX < (*PX_xyx1))
     {
         FproductA = dot(*v0, Fvector);
         FproductB = dot(*v1, Fvector);
         p = (FproductA + Fconstant) / (FproductA - FproductB);
-        v_ccw = (*v0) * (1.0 - p) + (*v1) * p;
-        if(PX < (*PX_ccw3))
+        v_xyx = (*v0) * (1.0 - p) + (*v1) * p;
+        if(PX < (*PX_xyx3))
         {
             q = (FproductA + Fconstant) / (FproductA - dot(*v3, Fvector));
             v_cw = (*v0) * (1.0 - q) + (*v3) * q;
-            (*centroid) = (v_ccw + v_cw + (*v0)) / 3.0;
+            (*centroid) = (v_xyx + v_cw + (*v0)) / 3.0;
             return p * q * 0.5;
-        } else if(PX < (*PX_ccw2))
+        } else if(PX < (*PX_xyx2))
         {
             q = (dot(*v3, Fvector) + Fconstant) / (dot(*v3, Fvector) - dot(*v2, Fvector));
             v_cw = (*v3) * (1.0 - q) + (*v2) * q;
             if(p + q != 0.0) // Due to rounding errors equality might happen producing nan
             {
-                (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_ccw) / 3.0;
+                (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_xyx) / 3.0;
                 return (p + q) * 0.5;
             } else
             {
@@ -97,22 +97,22 @@ inline double exactIntersectionPoints(const double PX,
             v_cw = (*v2) * (1.0 - q) + (*v1) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1 - tmp;
-            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v1)) / 3.0) / totalweight;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_xyx + v_cw + (*v1)) / 3.0) / totalweight;
             return totalweight;
         }
-    } else if(PX < (*PX_ccw2))
+    } else if(PX < (*PX_xyx2))
     {
         FproductA = dot(*v1, Fvector);
         FproductB = dot(*v2, Fvector);
         p = (FproductA + Fconstant) / (FproductA - FproductB);
-        v_ccw = (*v1) * (1.0 - p) + (*v2) * p;
-        if(PX < (*PX_ccw3))
+        v_xyx = (*v1) * (1.0 - p) + (*v2) * p;
+        if(PX < (*PX_xyx3))
         {
             q = (dot(*v0, Fvector) + Fconstant) / (dot(*v0, Fvector) - dot(*v3, Fvector));
             v_cw = (*v0) * (1.0 - q) + (*v3) * q;
             if(p + q != 0.0) // Due to rounding errors equality might happen producing nan
             {
-                (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_ccw) / 3.0;
+                (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_xyx) / 3.0;
                 return (p + q) * 0.5;
             } else
             {
@@ -125,10 +125,10 @@ inline double exactIntersectionPoints(const double PX,
             v_cw = (*v3) * (1.0 - q) + (*v2) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1.0 - tmp;
-            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v2)) / 3.0) / totalweight;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_xyx + v_cw + (*v2)) / 3.0) / totalweight;
             return totalweight;
         }
-    } else if(PX >= *PX_ccw3)
+    } else if(PX >= *PX_xyx3)
     {
         (*centroid) = ((*v0) + (*v2)) / 2;
         return 1.0;
@@ -137,12 +137,12 @@ inline double exactIntersectionPoints(const double PX,
     {
         FproductA = dot(*v3, Fvector);
         p = (FproductA + Fconstant) / (FproductA - dot(*v2, Fvector));
-        v_ccw = (*v3) * (1.0 - p) + (*v2) * p;
+        v_xyx = (*v3) * (1.0 - p) + (*v2) * p;
         q = (FproductA + Fconstant) / (FproductA - dot(*v0, Fvector));
         v_cw = (*v3) * (1.0 - q) + (*v0) * q;
         tmp = p * q * 0.5;
         totalweight = 1.0 - tmp;
-        (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_ccw + v_cw + (*v3)) / 3.0) / totalweight;
+        (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_xyx + v_cw + (*v3)) / 3.0) / totalweight;
         return totalweight;
     }
 }
@@ -152,10 +152,10 @@ inline double exactIntersectionPoints0(const double PX,
                                        const double3* v1,
                                        const double3* v2,
                                        const double3* v3,
-                                       const double* PX_ccw0,
-                                       const double* PX_ccw1,
-                                       const double* PX_ccw2,
-                                       const double* PX_ccw3,
+                                       const double* PX_xyx0,
+                                       const double* PX_xyx1,
+                                       const double* PX_xyx2,
+                                       const double* PX_xyx3,
                                        const double16 CM,
                                        double3* centroid)
 {
@@ -165,17 +165,17 @@ inline double exactIntersectionPoints0(const double PX,
     double Fproduct, FproductVD;
     double p, q;
     double A, w, wcomplement;
-    if(PX < (*PX_ccw1))
+    if(PX < (*PX_xyx1))
     {
         Fproduct = -dot(*v0, Fvector);
         FproductVD = dot(vd1, Fvector); // VD1
         p = Fproduct / FproductVD; // v0+p*(v1-v0)
-        if(PX < (*PX_ccw3))
+        if(PX < (*PX_xyx3))
         {
             q = Fproduct / dot(vd3, Fvector);
             (*centroid) = (*v0) + (p / 3.0) * vd1 + (q / 3.0) * vd3;
             return 0.5 * p * q;
-        } else if(PX < (*PX_ccw2))
+        } else if(PX < (*PX_xyx2))
         {
             q = -dot(*v3, Fvector) / FproductVD;
             A = 0.5 * (p + q);
@@ -204,12 +204,12 @@ inline double exactIntersectionPoints0(const double PX,
                 + (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
             return A;
         }
-    } else if(PX < (*PX_ccw2))
+    } else if(PX < (*PX_xyx2))
     {
         Fproduct = dot(*v2, Fvector);
         FproductVD = dot(vd3, Fvector);
         p = Fproduct / FproductVD; // V2 + p * (V1-V2)
-        if(PX < (*PX_ccw3))
+        if(PX < (*PX_xyx3))
         {
             p = 1.0 - p; // V1 + p * (V2-V1)
             q = -dot(*v0, Fvector) / FproductVD; // V0 + q (V3-V0)
@@ -238,7 +238,7 @@ inline double exactIntersectionPoints0(const double PX,
                 - (0.5 * w + (p * (1 - w)) / 3.0) * vd3;
             return A;
         }
-    } else if(PX >= *PX_ccw3)
+    } else if(PX >= *PX_xyx3)
     {
         (*centroid) = ((*v0) + (*v2)) / 2.0;
         return 1.0;
@@ -263,36 +263,36 @@ inline double exactIntersectionPoints0_stable743(const double PX,
                                                  const double3* v1,
                                                  const double3* v2,
                                                  const double3* v3,
-                                                 const double* PX_ccw0,
-                                                 const double* PX_ccw1,
-                                                 const double* PX_ccw2,
-                                                 const double* PX_ccw3,
+                                                 const double* PX_xyx0,
+                                                 const double* PX_xyx1,
+                                                 const double* PX_xyx2,
+                                                 const double* PX_xyx3,
                                                  const double16 CM,
                                                  double3* centroid)
 {
     double p, q, tmp, totalweight;
-    double3 v_cw, v_ccw, shift;
+    double3 v_cw, v_xyx, shift;
     const double3 Fvector = CM.s012 - PX * CM.s89a;
     double FproductA, FproductB;
-    if(PX < (*PX_ccw1))
+    if(PX < (*PX_xyx1))
     {
         FproductA = dot(*v0, Fvector);
         FproductB = dot(*v1, Fvector);
         p = FproductA / (FproductA - FproductB);
-        v_ccw = (*v0) * (1.0 - p) + (*v1) * p;
-        if(PX < (*PX_ccw3))
+        v_xyx = (*v0) * (1.0 - p) + (*v1) * p;
+        if(PX < (*PX_xyx3))
         {
             q = FproductA / (FproductA - dot(*v3, Fvector));
             // v_cw = (*v0) * (1.0 - q) + (*v3) * q;
             (*centroid) = ((3.0 - p - q) * (*v0) + p * (*v1) + q * (*v3)) / 3.0;
             return p * q * 0.5;
-        } else if(PX < (*PX_ccw2))
+        } else if(PX < (*PX_xyx2))
         {
             q = dot(*v3, Fvector) / (dot(*v3, Fvector) - dot(*v2, Fvector));
             v_cw = (*v3) * (1.0 - q) + (*v2) * q;
             if(p + q != 0.0) // Due to rounding errors equality might happen producing nan
             {
-                (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_ccw) / 3.0;
+                (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_xyx) / 3.0;
                 return (p + q) * 0.5;
             } else
             {
@@ -305,22 +305,22 @@ inline double exactIntersectionPoints0_stable743(const double PX,
             v_cw = (*v2) * (1.0 - q) + (*v1) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1 - tmp;
-            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v1)) / 3.0) / totalweight;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_xyx + v_cw + (*v1)) / 3.0) / totalweight;
             return totalweight;
         }
-    } else if(PX < (*PX_ccw2))
+    } else if(PX < (*PX_xyx2))
     {
         FproductA = dot(*v1, Fvector);
         FproductB = dot(*v2, Fvector);
         p = FproductA / (FproductA - FproductB);
-        v_ccw = (*v1) * (1.0 - p) + (*v2) * p;
-        if(PX < (*PX_ccw3))
+        v_xyx = (*v1) * (1.0 - p) + (*v2) * p;
+        if(PX < (*PX_xyx3))
         {
             q = dot(*v0, Fvector) / (dot(*v0, Fvector) - dot(*v3, Fvector));
             v_cw = (*v0) * (1.0 - q) + (*v3) * q;
             if(p + q != 0.0) // Due to rounding errors equality might happen producing nan
             {
-                (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_ccw) / 3.0;
+                (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_xyx) / 3.0;
                 return (p + q) * 0.5;
             } else
             {
@@ -333,10 +333,10 @@ inline double exactIntersectionPoints0_stable743(const double PX,
             v_cw = (*v3) * (1.0 - q) + (*v2) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1.0 - tmp;
-            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v2)) / 3.0) / totalweight;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_xyx + v_cw + (*v2)) / 3.0) / totalweight;
             return totalweight;
         }
-    } else if(PX >= *PX_ccw3)
+    } else if(PX >= *PX_xyx3)
     {
         (*centroid) = ((*v0) + (*v2)) / 2;
         return 1.0;
@@ -345,23 +345,23 @@ inline double exactIntersectionPoints0_stable743(const double PX,
     {
         FproductA = dot(*v3, Fvector);
         p = FproductA / (FproductA - dot(*v2, Fvector));
-        v_ccw = (*v3) * (1.0 - p) + (*v2) * p;
+        v_xyx = (*v3) * (1.0 - p) + (*v2) * p;
         q = FproductA / (FproductA - dot(*v0, Fvector));
         v_cw = (*v3) * (1.0 - q) + (*v0) * q;
         tmp = p * q * 0.5;
         totalweight = 1.0 - tmp;
-        (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_ccw + v_cw + (*v3)) / 3.0) / totalweight;
+        (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_xyx + v_cw + (*v3)) / 3.0) / totalweight;
         return totalweight;
     }
 }
 
 /**
- * Let v0,v1,v2,v3 and v0,v3,v2,v1 be a piecewise lines that maps on detector on values PX_ccw0,
- * PX_ccw1, PX_ccw2, PX_ccw3. Find a two parametrization factors that maps to a PX on these
+ * Let v0,v1,v2,v3 and v0,v3,v2,v1 be a piecewise lines that maps on detector on values PX_xyx0,
+ * PX_xyx1, PX_xyx2, PX_xyx3. Find a two parametrization factors that maps to a PX on these
  * piecewise lines. We expect that the mappings are linear and nondecreasing up to the certain point
  * from both sides. Parametrization is returned in nextIntersections variable first from
- * v0,v1,v2,v3,v0 lines and next from v0,v3,v2,v1,v0. It expects that PX is between min(*PX_ccw0,
- * *PX_ccw1, *PX_ccw2, *PX_ccw3) and max(*PX_ccw0, *PX_ccw1, *PX_ccw2, *PX_ccw3).
+ * v0,v1,v2,v3,v0 lines and next from v0,v3,v2,v1,v0. It expects that PX is between min(*PX_xyx0,
+ * *PX_xyx1, *PX_xyx2, *PX_xyx3) and max(*PX_xyx0, *PX_xyx1, *PX_xyx2, *PX_xyx3).
  *
  * @param CM Projection camera matrix.
  * @param PX Mapping of projector
@@ -369,12 +369,12 @@ inline double exactIntersectionPoints0_stable743(const double PX,
  * @param v1 Point v1
  * @param v2 Point v2
  * @param v3 Point v3
- * @param PX_ccw0 Mapping of v0
- * @param PX_ccw1 Mapping of v1
- * @param PX_ccw2 Mapping of v2
- * @param PX_ccw3 Mapping of v3
+ * @param PX_xyx0 Mapping of v0
+ * @param PX_xyx1 Mapping of v1
+ * @param PX_xyx2 Mapping of v2
+ * @param PX_xyx3 Mapping of v3
  * @param nextIntersections Output tuple of parametrizations that maps to PX.
- * @param v_ccw Output first coordinate that maps to PX on the parametrized piecewise line
+ * @param v_xyx Output first coordinate that maps to PX on the parametrized piecewise line
  * v0,v1,v2,v3.
  * @param v_cw Output first coordinate that maps to PX on the parametrized piecewise line
  * v0,v3,v2,v1.
@@ -384,96 +384,96 @@ inline double findIntersectionPoints(const double PX,
                                      const double3* v1,
                                      const double3* v2,
                                      const double3* v3,
-                                     const double* PX_ccw0,
-                                     const double* PX_ccw1,
-                                     const double* PX_ccw2,
-                                     const double* PX_ccw3,
+                                     const double* PX_xyx0,
+                                     const double* PX_xyx1,
+                                     const double* PX_xyx2,
+                                     const double* PX_xyx3,
                                      double3* centroid)
 {
     double p, q, tmp, totalweight;
-    double3 v_cw, v_ccw;
-    if(PX <= (*PX_ccw1))
+    double3 v_cw, v_xyx;
+    if(PX <= (*PX_xyx1))
     {
-        p = intersectionXTime(PX, *PX_ccw0, *PX_ccw1);
-        v_ccw = (*v0) * (1.0 - p) + (*v1) * p;
-        if(PX <= (*PX_ccw3))
+        p = intersectionXTime(PX, *PX_xyx0, *PX_xyx1);
+        v_xyx = (*v0) * (1.0 - p) + (*v1) * p;
+        if(PX <= (*PX_xyx3))
         {
-            q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
+            q = intersectionXTime(PX, *PX_xyx0, *PX_xyx3);
             v_cw = (*v0) * (1.0 - q) + (*v3) * q;
-            (*centroid) = (v_ccw + v_cw + (*v0)) / 3.0;
+            (*centroid) = (v_xyx + v_cw + (*v0)) / 3.0;
             return p * q * 0.5;
-        } else if(PX <= (*PX_ccw2))
+        } else if(PX <= (*PX_xyx2))
         {
-            q = intersectionXTime(PX, *PX_ccw3, *PX_ccw2);
+            q = intersectionXTime(PX, *PX_xyx3, *PX_xyx2);
             v_cw = (*v3) * (1.0 - q) + (*v2) * q;
-            (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_ccw) / 3.0;
+            (*centroid) = ((*v0) + v_cw + (q / (p + q)) * (*v3) + (p / (p + q)) * v_xyx) / 3.0;
             return (p + q) * 0.5;
         } else
         {
-            q = intersectionXTime(PX, *PX_ccw2, *PX_ccw1);
+            q = intersectionXTime(PX, *PX_xyx2, *PX_xyx1);
             v_cw = (*v2) * (1.0 - q) + (*v1) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1 - tmp;
-            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v1)) / 3.0) / totalweight;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_xyx + v_cw + (*v1)) / 3.0) / totalweight;
             return totalweight;
         }
-    } else if(PX <= (*PX_ccw2))
+    } else if(PX <= (*PX_xyx2))
     {
-        p = intersectionXTime(PX, *PX_ccw1, *PX_ccw2);
-        v_ccw = (*v1) * (1.0 - p) + (*v2) * p;
-        if(PX <= (*PX_ccw3))
+        p = intersectionXTime(PX, *PX_xyx1, *PX_xyx2);
+        v_xyx = (*v1) * (1.0 - p) + (*v2) * p;
+        if(PX <= (*PX_xyx3))
         {
-            q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
+            q = intersectionXTime(PX, *PX_xyx0, *PX_xyx3);
             v_cw = (*v0) * (1.0 - q) + (*v3) * q;
-            (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_ccw) / 3.0;
+            (*centroid) = ((*v1) + v_cw + (q / (p + q)) * (*v0) + (p / (p + q)) * v_xyx) / 3.0;
             return (p + q) * 0.5;
         } else
         {
-            q = intersectionXTime(PX, *PX_ccw3, *PX_ccw2);
+            q = intersectionXTime(PX, *PX_xyx3, *PX_xyx2);
             v_cw = (*v3) * (1.0 - q) + (*v2) * q;
             tmp = (1.0 - p) * (1.0 - q) * 0.5;
             totalweight = 1.0 - tmp;
-            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_ccw + v_cw + (*v2)) / 3.0) / totalweight;
+            (*centroid) = (((*v0) + (*v2)) / 2 - tmp * (v_xyx + v_cw + (*v2)) / 3.0) / totalweight;
             return totalweight;
         }
     } else
     {
-        p = intersectionXTime(PX, *PX_ccw2, *PX_ccw3);
-        v_ccw = (*v2) * (1.0 - p) + (*v3) * p;
-        q = intersectionXTime(PX, *PX_ccw0, *PX_ccw3);
+        p = intersectionXTime(PX, *PX_xyx2, *PX_xyx3);
+        v_xyx = (*v2) * (1.0 - p) + (*v3) * p;
+        q = intersectionXTime(PX, *PX_xyx0, *PX_xyx3);
         v_cw = (*v0) * (1.0 - q) + (*v3) * q;
         tmp = (1.0 - p) * (1.0 - q) * 0.5;
         totalweight = 1.0 - tmp;
-        (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_ccw + v_cw + (*v3)) / 3.0) / totalweight;
+        (*centroid) = (((*v1) + (*v3)) / 2 - tmp * (v_xyx + v_cw + (*v3)) / 3.0) / totalweight;
         return totalweight;
     }
 }
 
 /**
- * Compute point parametrized by p on piecewise line segments V_ccw0 ... V_ccw1 ... V_ccw2 ...
- * V_ccw3
+ * Compute point parametrized by p on piecewise line segments V_xyx0 ... V_xyx1 ... V_xyx2 ...
+ * V_xyx3
  *
  * @param p
- * @param V_ccw0
- * @param V_ccw1
- * @param V_ccw2
- * @param V_ccw3
+ * @param V_xyx0
+ * @param V_xyx1
+ * @param V_xyx2
+ * @param V_xyx3
  */
 double3
-intersectionPoint(double p, double3* V_ccw0, double3* V_ccw1, double3* V_ccw2, double3* V_ccw3)
+intersectionPoint(double p, double3* V_xyx0, double3* V_xyx1, double3* V_xyx2, double3* V_xyx3)
 {
     double3 v;
     if(p <= 1.0)
     {
-        v = (*V_ccw0) * (1.0 - p) + p * (*V_ccw1);
+        v = (*V_xyx0) * (1.0 - p) + p * (*V_xyx1);
     } else if(p <= 2.0)
     {
         p -= 1.0;
-        v = (*V_ccw1) * (1.0 - p) + p * (*V_ccw2);
+        v = (*V_xyx1) * (1.0 - p) + p * (*V_xyx2);
     } else if(p <= 3.0)
     {
         p -= 2.0;
-        v = (*V_ccw2) * (1.0 - p) + p * (*V_ccw3);
+        v = (*V_xyx2) * (1.0 - p) + p * (*V_xyx3);
     }
     return v;
 }
@@ -638,10 +638,10 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 // projected
     // pxx_min = fmin(fmin(px00, px10), fmin(px01, px11));
     // pxx_max = fmax(fmax(px00, px10), fmax(px01, px11));
-    REAL3* V_ccw[4]; // Point in which minimum is achieved and counter clock wise
+    REAL3* V_xyx[4]; // Point in which minimum is achieved and counter clock wise
                      // points
     // from the minimum voxel
-    REAL* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise
+    REAL* PX_xyx[4]; // Point in which minimum is achieved and counter clock wise
                      // points
 
     if(px00 < px10)
@@ -649,14 +649,14 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         if(px00 < px01)
         {
             pxx_min = px00;
-            V_ccw[0] = &vx00;
-            V_ccw[1] = &vx10;
-            V_ccw[2] = &vx11;
-            V_ccw[3] = &vx01;
-            PX_ccw[0] = &px00;
-            PX_ccw[1] = &px10;
-            PX_ccw[2] = &px11;
-            PX_ccw[3] = &px01;
+            V_xyx[0] = &vx00;
+            V_xyx[1] = &vx10;
+            V_xyx[2] = &vx11;
+            V_xyx[3] = &vx01;
+            PX_xyx[0] = &px00;
+            PX_xyx[1] = &px10;
+            PX_xyx[2] = &px11;
+            PX_xyx[3] = &px01;
             if(px01 > px11)
             {
                 pxx_max = px01;
@@ -670,14 +670,14 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         } else if(px01 < px11)
         {
             pxx_min = px01;
-            V_ccw[0] = &vx01;
-            V_ccw[1] = &vx00;
-            V_ccw[2] = &vx10;
-            V_ccw[3] = &vx11;
-            PX_ccw[0] = &px01;
-            PX_ccw[1] = &px00;
-            PX_ccw[2] = &px10;
-            PX_ccw[3] = &px11;
+            V_xyx[0] = &vx01;
+            V_xyx[1] = &vx11;
+            V_xyx[2] = &vx10;
+            V_xyx[3] = &vx00;
+            PX_xyx[0] = &px01;
+            PX_xyx[1] = &px11;
+            PX_xyx[2] = &px10;
+            PX_xyx[3] = &px00;
             if(px10 > px11)
             {
                 pxx_max = px10;
@@ -689,27 +689,27 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         {
             pxx_min = px11;
             pxx_max = px10;
-            V_ccw[0] = &vx11;
-            V_ccw[1] = &vx01;
-            V_ccw[2] = &vx00;
-            V_ccw[3] = &vx10;
-            PX_ccw[0] = &px11;
-            PX_ccw[1] = &px01;
-            PX_ccw[2] = &px00;
-            PX_ccw[3] = &px10;
+            V_xyx[0] = &vx11;
+            V_xyx[1] = &vx01;
+            V_xyx[2] = &vx00;
+            V_xyx[3] = &vx10;
+            PX_xyx[0] = &px11;
+            PX_xyx[1] = &px01;
+            PX_xyx[2] = &px00;
+            PX_xyx[3] = &px10;
         }
 
     } else if(px10 < px11)
     {
         pxx_min = px10;
-        V_ccw[0] = &vx10;
-        V_ccw[1] = &vx11;
-        V_ccw[2] = &vx01;
-        V_ccw[3] = &vx00;
-        PX_ccw[0] = &px10;
-        PX_ccw[1] = &px11;
-        PX_ccw[2] = &px01;
-        PX_ccw[3] = &px00;
+        V_xyx[0] = &vx10;
+        V_xyx[1] = &vx00;
+        V_xyx[2] = &vx01;
+        V_xyx[3] = &vx11;
+        PX_xyx[0] = &px10;
+        PX_xyx[1] = &px00;
+        PX_xyx[2] = &px01;
+        PX_xyx[3] = &px11;
         if(px00 > px01)
         {
             pxx_max = px00;
@@ -723,14 +723,14 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     } else if(px11 < px01)
     {
         pxx_min = px11;
-        V_ccw[0] = &vx11;
-        V_ccw[1] = &vx01;
-        V_ccw[2] = &vx00;
-        V_ccw[3] = &vx10;
-        PX_ccw[0] = &px11;
-        PX_ccw[1] = &px01;
-        PX_ccw[2] = &px00;
-        PX_ccw[3] = &px10;
+        V_xyx[0] = &vx11;
+        V_xyx[1] = &vx01;
+        V_xyx[2] = &vx00;
+        V_xyx[3] = &vx10;
+        PX_xyx[0] = &px11;
+        PX_xyx[1] = &px01;
+        PX_xyx[2] = &px00;
+        PX_xyx[3] = &px10;
         if(px00 > px01)
         {
             pxx_max = px00;
@@ -742,22 +742,22 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     {
         pxx_min = px01;
         pxx_max = px00;
-        V_ccw[0] = &vx01;
-        V_ccw[1] = &vx00;
-        V_ccw[2] = &vx10;
-        V_ccw[3] = &vx11;
-        PX_ccw[0] = &px01;
-        PX_ccw[1] = &px00;
-        PX_ccw[2] = &px10;
-        PX_ccw[3] = &px11;
+        V_xyx[0] = &vx01;
+        V_xyx[1] = &vx11;
+        V_xyx[2] = &vx10;
+        V_xyx[3] = &vx00;
+        PX_xyx[0] = &px01;
+        PX_xyx[1] = &px11;
+        PX_xyx[2] = &px10;
+        PX_xyx[3] = &px00;
     }
 
     min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + 0.5);
     max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
     if(max_PX >= 0 && min_PX < pdims.x)
     {
-        REAL3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
-        REAL3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
+        REAL vd1 = V_xyx[1]->x - V_xyx[0]->x;
+        REAL vd3 = V_xyx[3]->y - V_xyx[0]->y;
         if(max_PX <= min_PX) // These indices are in the admissible range
         {
             min_PX = convert_int_rtn(HALF * (pxx_min + pxx_max) + HALF);
@@ -778,31 +778,47 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             int I_STOP = min(max_PX, pdims.x);
             // Section of the square that corresponds to the indices < i
             // CCW and CW coordinates of the last intersection on the lines specified by the
-            // points in V_ccw
+            // points in V_xyx
+#ifdef ELEVATIONCORRECTION
+            REAL llength_next, llength_prev, corlambda;
+            exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V_xyx[0], V_xyx[1], V_xyx[2],
+                                       V_xyx[3], PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
+                                       voxelSizes, &lastInt, &llength_prev);
+#else
             lastSectionSize = exactIntersectionPoints0_extended(
-                ((REAL)I) + HALF, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
-                PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &lastInt);
+                ((REAL)I) + HALF, V_xyx[0], V_xyx[1], V_xyx[2], V_xyx[3], vd1, vd3, PX_xyx[0],
+                PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, &lastInt);
+#endif
             if(I >= 0)
             {
                 factor = value * lastSectionSize;
 #ifdef ELEVATIONCORRECTION
+                corlambda = QUARTER * llength_prev * tgelevation / voxelSizes.z;
                 exactEdgeValues0ElevationCorrection(projection, CM, lastInt, I, factor, voxelSizes,
-                                                    pdims, HALF*tgelevation);
+                                                    pdims, corlambda);
 #else
                 exactEdgeValues0(projection, CM, lastInt, I, factor, voxelSizes, pdims);
 #endif
             }
             for(I = I + 1; I < I_STOP; I++)
             {
+#ifdef ELEVATIONCORRECTION
+                exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V_xyx[0], V_xyx[1], V_xyx[2],
+                                           V_xyx[3], PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
+                                           voxelSizes, &nextInt, &llength_next);
+                corlambda = QUARTER * (llength_next + llength_prev) / voxelSizes.z;
+                llength_prev = llength_next;
+#else
                 nextSectionSize = exactIntersectionPoints0_extended(
-                    ((REAL)I) + HALF, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3, PX_ccw[0],
-                    PX_ccw[1], PX_ccw[2], PX_ccw[3], CM, &nextInt);
+                    ((REAL)I) + HALF, V_xyx[0], V_xyx[1], V_xyx[2], V_xyx[3], vd1, vd3, PX_xyx[0],
+                    PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, &nextInt);
+#endif
                 polygonSize = nextSectionSize - lastSectionSize;
                 Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
                 factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
                 exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
-                                                    pdims, HALF*tgelevation);
+                                                    pdims, HALF * tgelevation);
 #else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
 #endif
@@ -812,11 +828,12 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             if(I_STOP < pdims.x)
             {
                 polygonSize = ONE - lastSectionSize;
-                Int = ((*V_ccw[0] + *V_ccw[2]) * HALF - lastSectionSize * lastInt) / polygonSize;
+                Int = ((*V_xyx[0] + *V_xyx[2]) * HALF - lastSectionSize * lastInt) / polygonSize;
                 factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
+                corlambda = QUARTER * llength_next * tgelevation / voxelSizes.z;
                 exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
-                                                    pdims, HALF*tgelevation);
+                                                    pdims, HALF * tgelevation);
 #else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
 #endif

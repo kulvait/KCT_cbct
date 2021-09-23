@@ -484,13 +484,13 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
         {
             pxx_min = px01;
             V_ccw[0] = &vx01;
-            V_ccw[1] = &vx00;
+            V_ccw[1] = &vx11;
             V_ccw[2] = &vx10;
-            V_ccw[3] = &vx11;
+            V_ccw[3] = &vx00;
             PX_ccw[0] = &px01;
-            PX_ccw[1] = &px00;
+            PX_ccw[1] = &px11;
             PX_ccw[2] = &px10;
-            PX_ccw[3] = &px11;
+            PX_ccw[3] = &px00;
             if(px10 > px11)
             {
                 pxx_max = px10;
@@ -516,13 +516,13 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
     {
         pxx_min = px10;
         V_ccw[0] = &vx10;
-        V_ccw[1] = &vx11;
+        V_ccw[1] = &vx00;
         V_ccw[2] = &vx01;
-        V_ccw[3] = &vx00;
+        V_ccw[3] = &vx11;
         PX_ccw[0] = &px10;
-        PX_ccw[1] = &px11;
+        PX_ccw[1] = &px00;
         PX_ccw[2] = &px01;
-        PX_ccw[3] = &px00;
+        PX_ccw[3] = &px11;
         if(px00 > px01)
         {
             pxx_max = px00;
@@ -556,21 +556,21 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
         pxx_min = px01;
         pxx_max = px00;
         V_ccw[0] = &vx01;
-        V_ccw[1] = &vx00;
+        V_ccw[1] = &vx11;
         V_ccw[2] = &vx10;
-        V_ccw[3] = &vx11;
+        V_ccw[3] = &vx00;
         PX_ccw[0] = &px01;
-        PX_ccw[1] = &px00;
+        PX_ccw[1] = &px11;
         PX_ccw[2] = &px10;
-        PX_ccw[3] = &px11;
+        PX_ccw[3] = &px00;
     }
 
     min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + HALF);
     max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + HALF);
     if(max_PX >= 0 && min_PX < pdims.x)
     {
-        REAL3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
-        REAL3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
+        REAL vd1 = V_ccw[1]->x - V_ccw[0]->x;
+        REAL vd3 = V_ccw[3]->y - V_ccw[0]->y;
         if(max_PX <= min_PX) // These indices are in the admissible range
         {
             min_PX = convert_int_rtn(HALF * (pxx_min + pxx_max) + HALF);

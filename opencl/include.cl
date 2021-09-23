@@ -70,14 +70,14 @@ inline void AtomicMin_g_f(volatile __global float* adr, const float v)
     } while(tmp.u32 != adrcatch.u32);
 }
 
-
-//CVP Projector routines
-//#define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
+    // CVP Projector routines
+    //#define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
 
 #define DROPCENTEROFFPROJECTORVOXELS
 // DROPINCOMPLETEVOXELS is not implemented the same in barrier implementation
 #ifdef RELAXED
 typedef float REAL;
+typedef float2 REAL2;
 typedef float3 REAL3;
 typedef float16 REAL16;
 //__constant float ONE=1.0f;
@@ -90,9 +90,11 @@ typedef float16 REAL16;
 #define QUARTER 0.25f
 #define TWOTHIRDS 0.66666666f
 #define ONE 1.0f
+#define THREE 3.0f
 #define convert_REAL3(x) convert_float3(x)
 #else
 typedef double REAL;
+typedef double2 REAL2;
 typedef double3 REAL3;
 typedef double16 REAL16;
 //__constant double ONE=1.0;
@@ -105,6 +107,7 @@ typedef double16 REAL16;
 #define QUARTER 0.25
 #define TWOTHIRDS 0.6666666666666666
 #define ONE 1.0
+#define THREE 3.0
 #define convert_REAL3(x) convert_double3(x)
 #endif
 
@@ -255,6 +258,7 @@ inline int projectionIndexF0(private const float16 CMF, private const float3 v0,
     }
 }
 
+#ifdef ELEVATIONCORRECTION
 void inline exactEdgeValues0ElevationCorrection(
     global float* projection,
     private REAL16 CM,
@@ -358,7 +362,7 @@ void inline exactEdgeValues0ElevationCorrection(
         } else
         {
             lastCorLambda = -corlambda;
-        	Qvector = CM.s456 - (PJ_min_cor_min - HALF) * CM.s89a;
+            Qvector = CM.s456 - (PJ_min_cor_min - HALF) * CM.s89a;
         }
         for(; PJ_min_cor_min < J; PJ_min_cor_min++)
         {
@@ -531,13 +535,11 @@ void inline exactEdgeValues0ElevationCorrection(
                 if(lambda < corlambda)
                 {
                     corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier
-                            * (lambda * lambda - lastLambda * lastLambda);
+                        + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
                 } else
                 {
                     corFactor = HALF * (corlambda - lastLambda) + (lambda - corlambda)
-                        + corQuarterMultiplier 
-                            * (corlambda * corlambda - lastLambda * lastLambda);
+                        + corQuarterMultiplier * (corlambda * corlambda - lastLambda * lastLambda);
                 }
             }
             AtomicAdd_g_f(&projection[J], corFactor * value);
@@ -561,69 +563,19 @@ void inline exactEdgeValues0ElevationCorrection(
     }
 }
 
-void inline exactEdgeValues0(global float* projection,
-                             private REAL16 CM,
-                             private REAL3 v,
-                             private int PX,
-                             private REAL value,
-                             private REAL3 voxelSizes,
-                             private int2 pdims)
-{
-    projection = projection + PX * pdims.y;
-    const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
-    const REAL3 v_up = v + distanceToEdge;
-    const REAL3 v_down = v - distanceToEdge;
-    const REAL PY_up = PROJECTY0(CM, v_up);
-    const REAL PY_down = PROJECTY0(CM, v_down);
-    // const REAL3 v_diff = v_down - v_up;
-    int PJ_up = convert_int_rtn(PY_up + HALF);
-    int PJ_down = convert_int_rtn(PY_down + HALF);
-
-    int J;
-    REAL lambda;
-    REAL lastLambda = ZERO;
-    REAL leastLambda;
-    REAL3 Fvector;
-    int PJ_max;
-    if(PJ_up < PJ_down)
-    {
-#ifdef DROPINCOMPLETEVOXELS
-        if(PJ_up >= 0 && PJ_down < pdims.y)
-#else
-        if(PJ_down >= 0 && PJ_up < pdims.y)
-#endif
-        {
-            EDGEMINMAX(PJ_up, PJ_down, v_up, voxelSizes.s2);
-        }
-    } else if(PJ_down < PJ_up)
-    {
-#ifdef DROPINCOMPLETEVOXELS
-        if(PJ_down >= 0 && PJ_up < pdims.y)
-#else
-        if(PJ_up >= 0 && PJ_down < pdims.y)
-#endif
-        {
-            EDGEMINMAX(PJ_down, PJ_up, v_down, -voxelSizes.s2);
-        }
-    } else if(PJ_down >= 0 && PJ_down < pdims.y)
-    {
-        AtomicAdd_g_f(&projection[PJ_down], value);
-    }
-}
-
-inline REAL exactIntersectionPoints0_extended(const REAL PX,
-                                              const REAL3* v0,
-                                              const REAL3* v1,
-                                              const REAL3* v2,
-                                              const REAL3* v3,
-                                              const REAL3 vd1,
-                                              const REAL3 vd3,
-                                              const REAL* PX_ccw0,
-                                              const REAL* PX_ccw1,
-                                              const REAL* PX_ccw2,
-                                              const REAL* PX_ccw3,
-                                              const REAL16 CM,
-                                              REAL3* centroid)
+inline REAL exactIntersectionPoints0_extended_lengths(const REAL PX,
+                                                      const REAL3* v0,
+                                                      const REAL3* v1,
+                                                      const REAL3* v2,
+                                                      const REAL3* v3,
+                                                      const REAL3 vd1,
+                                                      const REAL3 vd3,
+                                                      const REAL* PX_ccw0,
+                                                      const REAL* PX_ccw1,
+                                                      const REAL* PX_ccw2,
+                                                      const REAL* PX_ccw3,
+                                                      const REAL16 CM,
+                                                      REAL3* centroid)
 {
     const REAL3 Fvector = CM.s012 - PX * CM.s89a;
     // const REAL3 vd1 = (*v1) - (*v0);
@@ -736,6 +688,326 @@ inline REAL exactIntersectionPoints0_extended(const REAL PX,
         w = HALF / A;
         wcomplement = TWOTHIRDS * (HALF - w);
         (*centroid) = (*v3) + (w + p * wcomplement) * vd1 - (w + q * wcomplement) * vd3;
+        return A;
+    }
+}
+#endif
+
+void inline exactEdgeValues0(global float* projection,
+                             private REAL16 CM,
+                             private REAL3 v,
+                             private int PX,
+                             private REAL value,
+                             private REAL3 voxelSizes,
+                             private int2 pdims)
+{
+    projection = projection + PX * pdims.y;
+    const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
+    const REAL3 v_up = v + distanceToEdge;
+    const REAL3 v_down = v - distanceToEdge;
+    const REAL PY_up = PROJECTY0(CM, v_up);
+    const REAL PY_down = PROJECTY0(CM, v_down);
+    // const REAL3 v_diff = v_down - v_up;
+    int PJ_up = convert_int_rtn(PY_up + HALF);
+    int PJ_down = convert_int_rtn(PY_down + HALF);
+
+    int J;
+    REAL lambda;
+    REAL lastLambda = ZERO;
+    REAL leastLambda;
+    REAL3 Fvector;
+    int PJ_max;
+    if(PJ_up < PJ_down)
+    {
+#ifdef DROPINCOMPLETEVOXELS
+        if(PJ_up >= 0 && PJ_down < pdims.y)
+#else
+        if(PJ_down >= 0 && PJ_up < pdims.y)
+#endif
+        {
+            EDGEMINMAX(PJ_up, PJ_down, v_up, voxelSizes.s2);
+        }
+    } else if(PJ_down < PJ_up)
+    {
+#ifdef DROPINCOMPLETEVOXELS
+        if(PJ_down >= 0 && PJ_up < pdims.y)
+#else
+        if(PJ_up >= 0 && PJ_down < pdims.y)
+#endif
+        {
+            EDGEMINMAX(PJ_down, PJ_up, v_down, -voxelSizes.s2);
+        }
+    } else if(PJ_down >= 0 && PJ_down < pdims.y)
+    {
+        AtomicAdd_g_f(&projection[PJ_down], value);
+    }
+}
+
+// const REAL vd1 = v1->x - v0->x; Nonzero x part
+// const REAL vd3 = v3->y - v0->y; Nonzero y part
+// polygon center of mass https://www.efunda.com/math/areas/Trapezoid.cfm to see
+inline REAL exactIntersectionPolygons0(const REAL PX,
+                                       const REAL vd1,
+                                       const REAL vd3,
+                                       const REAL3* v0,
+                                       const REAL3* v1,
+                                       const REAL3* v2,
+                                       const REAL3* v3,
+                                       const REAL* PX_xyx0,
+                                       const REAL* PX_xyx1,
+                                       const REAL* PX_xyx2,
+                                       const REAL* PX_xyx3,
+                                       const REAL16 CM,
+                                       REAL3 voxelSizes,
+                                       REAL2* centroid,
+                                       REAL* llength)
+{
+    const REAL3 Fvector = CM.s012 - PX * CM.s89a;
+    REAL Fproduct, FproductVD;
+    REAL p, q, p_complement;
+    REAL w, wcomplement, NAREA_complement;
+    REAL2 triangle;
+    REAL LINELENGTH, NAREA;
+    REAL2 CENTROID;
+    if(PX < (*PX_xyx1))
+    {
+        Fproduct = -dot(*v0, Fvector);
+        FproductVD = vd1 * Fvector.x;
+        p = Fproduct / FproductVD;
+        if(PX < (*PX_xyx3))
+        {
+            q = Fproduct / (vd3 * Fvector.y);
+            CENTROID = (REAL2)(p * vd1, q * vd3);
+            LINELENGTH = sqrt(dot(CENTROID, CENTROID));
+            CENTROID *= ONETHIRD;
+            NAREA = HALF * p * q;
+            (*centroid) = v0->s01 + CENTROID;
+            (*llength) = LINELENGTH;
+            return NAREA;
+        } else if(PX < (*PX_xyx2))
+        {
+            q = -dot(*v3, Fvector) / FproductVD;
+            NAREA = (p + q);
+            triangle = (REAL2)((q - p) * vd1, voxelSizes.y);
+            LINELENGTH = sqrt(dot(triangle, triangle));
+            CENTROID = (REAL2)(ZERO, ZERO);
+            if(NAREA > ZERO)
+            {
+                w = ONETHIRD / NAREA;
+                CENTROID = w * (REAL2)(vd1 * (NAREA * NAREA - p * q), vd3 * (NAREA + q));
+            }
+            (*centroid) = v0->s01 + CENTROID;
+            (*llength) = LINELENGTH;
+            NAREA = HALF * NAREA;
+            return NAREA;
+        } else
+        {
+            p_complement = ONE - p;
+            q = -dot(*v1, Fvector) / (vd3 * Fvector.y);
+            NAREA_complement = HALF * p_complement * q;
+            NAREA = ONE - NAREA_complement;
+            triangle = (REAL2)(p_complement * vd1, q * vd3);
+            LINELENGTH = sqrt(dot(triangle, triangle));
+            CENTROID = (ONE / NAREA)
+                * (REAL2)((HALF - (ONETHIRD * p + TWOTHIRDS) * NAREA_complement) * vd1,
+                          (HALF - ONETHIRD * q * NAREA_complement) * vd3);
+            centroid->s01 = v0->s01 + CENTROID;
+            return NAREA;
+        }
+    } else if(PX < (*PX_xyx2))
+    {
+        Fproduct = dot(*v2, Fvector);
+        FproductVD = vd3 * Fvector.y;
+        p = Fproduct / FproductVD;
+        if(PX < (*PX_xyx3))
+        {
+            (*centroid) = v0->s01;
+            p = ONE - p;
+            q = -dot(*v0, Fvector) / FproductVD;
+            triangle = (REAL2)(voxelSizes.x, (q - p) * vd1);
+            LINELENGTH = sqrt(dot(triangle, triangle));
+            NAREA = HALF * (p + q);
+            if(NAREA > ZERO)
+            {
+                w = q / NAREA;
+                wcomplement = TWOTHIRDS - ONESIXTH * w;
+                CENTROID = (REAL2)(wcomplement * vd1,
+                                   (q * wcomplement + ONETHIRD * p * (ONE - w)) * vd3);
+                centroid->s01 += CENTROID;
+            }
+            return NAREA;
+        } else
+        {
+            q = Fproduct / (vd1 * Fvector.x);
+            triangle = (REAL2)(q * vd1, p * vd3);
+            LINELENGTH = sqrt(dot(triangle, triangle));
+            NAREA = ONE - HALF * p * q;
+            w = HALF / NAREA;
+            wcomplement = TWOTHIRDS * (HALF - w);
+            CENTROID = (REAL2)(vd1, vd3)
+                + (REAL2)(-vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement));
+            (*centroid) = v0->s01 + CENTROID;
+            return NAREA;
+        }
+    } else if(PX >= *PX_xyx3)
+    {
+        NAREA = ONE;
+        LINELENGTH = ZERO;
+        CENTROID = (REAL2)(HALF * vd1, HALF * vd3);
+        (*centroid) = v0->s01 + CENTROID;
+        return ONE;
+
+    } else
+    {
+        Fproduct = dot(*v3, Fvector);
+        p = Fproduct / (vd3 * Fvector.y);
+        q = -Fproduct / (vd1 * Fvector.x);
+        NAREA = ONE - HALF * p * q;
+        triangle = (REAL2)(p * vd3, q * vd1);
+        LINELENGTH = sqrt(dot(triangle, triangle));
+        w = HALF / NAREA;
+        wcomplement = TWOTHIRDS * (HALF - w);
+        CENTROID = (REAL2)(ZERO, vd3)
+            + (REAL2)(vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement));
+        (*centroid) = v0->s01 + CENTROID;
+        return NAREA;
+    }
+}
+
+inline REAL exactIntersectionPoints0_extended(const REAL PX,
+                                              const REAL3* v0,
+                                              const REAL3* v1,
+                                              const REAL3* v2,
+                                              const REAL3* v3,
+                                              const REAL vd1,
+                                              const REAL vd3,
+                                              const REAL* PX_xyx0,
+                                              const REAL* PX_xyx1,
+                                              const REAL* PX_xyx2,
+                                              const REAL* PX_xyx3,
+                                              const REAL16 CM,
+                                              REAL3* centroid)
+{
+    const REAL3 Fvector = CM.s012 - PX * CM.s89a;
+    // const REAL3 vd1 = (*v1) - (*v0);//Nonzero x part
+    // const REAL3 vd3 = (*v3) - (*v0);//Nonzero y part
+    REAL Fproduct, FproductVD;
+    REAL p, q;
+    REAL A, w, wcomplement;
+    if(PX < (*PX_xyx1))
+    {
+        Fproduct = -dot(*v0, Fvector);
+        FproductVD = vd1 * Fvector.x; // VD1
+        p = Fproduct / FproductVD; // v0+p*(v1-v0)
+        if(PX < (*PX_xyx3))
+        {
+            q = Fproduct / (vd3 * Fvector.y);
+            (*centroid) = (*v0) + (REAL3)(ONETHIRD * p * vd1, ONETHIRD * q * vd3, ZERO);
+            return HALF * p * q;
+        } else if(PX < (*PX_xyx2))
+        {
+            q = -dot(*v3, Fvector) / FproductVD;
+            A = (p + q);
+            (*centroid) = (*v0);
+            if(A > ZERO) // Due to rounding errors equality might happen producing nan
+            {
+                // w = p / A;
+                //(*centroid) = (*v0)
+                //    + mad(p, mad(-ONE / 6.0, w, 2.0 / 3.0), mad(-q, w, q) / 3.0) * (vd1)
+                //    + mad(-ONE / 6.0, w, 2.0 / 3.0) * (vd3);
+                //(*centroid) = (*v0) + (p * (2.0 / 3.0 - w / 6.0) + q * (1 - w) / 3.0) * (vd1)
+                //    + (2.0 / 3.0 - w / 6.0) * (vd3);
+                // wcomplement = TWOTHIRDS - ONESIXTH * w;
+                // centroid->s01 += (REAL2)((p * wcomplement + ONETHIRD * q * (ONE - w)) * vd1,
+                //                         wcomplement * vd3);
+                //(*centroid) = (*v0) + (p * wcomplement + ONETHIRD * q * (ONE - w)) * (vd1)
+                //    + wcomplement * (vd3);
+                // See https://www.efunda.com/math/areas/Trapezoid.cfm to see that these formulas
+                // are correct
+                w = ONETHIRD / A; // 1/(3*(p+q))
+                centroid->s01 += w * (REAL2)(vd1 * (A * A - p * q), vd3 * (A + q));
+            }
+            return HALF * A;
+        } else
+        {
+            p = ONE - p;
+            q = -dot(*v1, Fvector) / (vd3 * Fvector.y);
+            A = ONE - HALF * p * q;
+            // w = ONE / A;
+            //(*centroid) = (*v0) - mad(HALF, w, mad(p, -w, p) / 3.0) * vd1
+            //    + mad(HALF, w, mad(q, -w, q) / 3.0) * vd3;
+            //(*centroid) = (*v1) - (HALF * w + (p * (1 - w)) / 3.0) * vd1
+            //    + (HALF * w + (q * (1 - w)) / 3.0) * vd3;
+            w = HALF / A;
+            wcomplement = TWOTHIRDS * (HALF - w);
+            (*centroid) = (*v1);
+            centroid->s01 += (REAL2)((w + p * wcomplement) * -vd1, (w + q * wcomplement) * vd3);
+            return A;
+        }
+    } else if(PX < (*PX_xyx2))
+    {
+        Fproduct = dot(*v2, Fvector);
+        FproductVD = vd3 * Fvector.y;
+        p = Fproduct / FproductVD; // V2 + p * (V1-V2)
+        if(PX < (*PX_xyx3))
+        {
+            (*centroid) = (*v0);
+            p = ONE - p; // V1 + p * (V2-V1)
+            q = -dot(*v0, Fvector) / FproductVD; // V0 + q (V3-V0)
+            A = HALF * (p + q);
+            if(A != ZERO) // Due to rounding errors equality might happen producing nan
+            {
+                w = q / A;
+                //(*centroid) = (*v0)
+                //    + mad(q, mad(-ONE / 6.0, w, 2.0 / 3.0), mad(-p, w, p) / 3.0) * (vd3)
+                //    + mad(-ONE / 6.0, w, 2.0 / 3.0) * (vd1);
+                //(*centroid) = (*v0) + (q * (2.0 / 3.0 - w / 6.0) + p * (1 - w) / 3.0) * (vd3)
+                //    + (2.0 / 3.0 - w / 6.0) * (vd1);
+                wcomplement = TWOTHIRDS - ONESIXTH * w;
+                //  (*centroid) = (*v0) + (q * wcomplement + ONETHIRD * p * (ONE - w)) * (vd3)
+                //      + wcomplement * (vd1);
+                centroid->s01 += (REAL2)(wcomplement * (vd1),
+                                         (q * wcomplement + ONETHIRD * p * (ONE - w)) * vd3);
+            }
+            return A;
+        } else
+        {
+            q = Fproduct / (vd1 * Fvector.x); // v2+q(v3-v2)
+            A = ONE - HALF * p * q;
+            // w = ONE / A;
+            //(*centroid) = (*v2) - mad(HALF, w, mad(q, -w, q) / 3.0) * vd1
+            //    - mad(HALF, w, mad(p, -w, p) / 3.0) * vd3;
+            //(*centroid) = (*v2) - (HALF * w + (q * (1 - w)) / 3.0) * vd1
+            //    - (HALF * w + (p * (1 - w)) / 3.0) * vd3;
+            w = HALF / A;
+            wcomplement = TWOTHIRDS * (HALF - w);
+            (*centroid) = (*v2) + (w + p * wcomplement) * (REAL3)(ZERO, -vd3, ZERO)
+                + (w + q * wcomplement) * (REAL3)(-vd1, ZERO, ZERO);
+            // (*centroid) = (*v2) - (w + q * wcomplement) * vd1 - (w + p * wcomplement) * vd3;
+            return A;
+        }
+    } else if(PX >= *PX_xyx3)
+    {
+        (*centroid) = HALF * ((*v0) + (*v2));
+        return ONE;
+
+    } else
+    {
+        Fproduct = dot(*v3, Fvector);
+        p = Fproduct / (vd3 * Fvector.y);
+        q = -Fproduct / (vd1 * Fvector.x);
+        A = ONE - HALF * p * q;
+        // w = ONE / A;
+        //(*centroid) = (*v3) + mad(HALF, w, mad(q, -w, q) / 3.0) * vd1
+        //    - mad(HALF, w, mad(p, -w, p) / 3.0) * vd3;
+        //(*centroid)
+        //    = (*v3) + (HALF * w + (p * (1 - w)) / 3.0) * vd1 - (HALF * w + (q * (1 - w)) / 3.0) *
+        //    vd3;
+        w = HALF / A;
+        wcomplement = TWOTHIRDS * (HALF - w);
+        //(*centroid) = (*v3) + (w + p * wcomplement) * vd1 - (w + q * wcomplement) * vd3;
+        (*centroid)
+            = (*v3) + (REAL3)(vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement), ZERO);
         return A;
     }
 }
