@@ -12,11 +12,13 @@
 // Internal libraries
 #include "AlgorithmsBarrierBuffers.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
+#include "BufferedFrame2D.hpp"
 #include "Kniha.hpp"
 #include "MATRIX/LightProjectionMatrix.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "MATRIX/utils.hpp"
 #include "OPENCL/OpenCLManager.hpp"
+#include "DEN/DenAsyncFrame2DWritter.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
 

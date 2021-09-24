@@ -724,14 +724,15 @@ void BaseReconstructor::writeVolume(cl::Buffer& X, std::string path)
 
 void BaseReconstructor::writeProjections(cl::Buffer& B, std::string path)
 {
-    uint16_t buf[3];
-    buf[0] = pdimy;
-    buf[1] = pdimx;
-    buf[2] = pdimz;
-    io::createEmptyFile(path, 0, true); // Try if this is faster
-    io::appendBytes(path, (uint8_t*)buf, 6);
     Q[0]->enqueueReadBuffer(B, CL_TRUE, 0, sizeof(float) * BDIM, b);
-    io::appendBytes(path, (uint8_t*)b, BDIM * sizeof(float));
+    io::DenAsyncFrame2DWritter<float> projectionWritter(path, pdimx, pdimy, pdimz);
+    uint64_t frameSize = pdimx * pdimy;
+    for(uint32_t k = 0; k != pdimz; k++)
+    {
+        io::BufferedFrame2D<float> transposedFrame(b + k * frameSize, pdimy, pdimx);
+        std::shared_ptr<io::Frame2DI<float>> frame = transposedFrame.transposed();
+        projectionWritter.writeFrame(*frame, k);
+    }
 }
 
 void BaseReconstructor::setTimestamp(bool finishCommandQueue)
