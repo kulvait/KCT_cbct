@@ -614,7 +614,7 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     // If all the corners of given voxel points to a common coordinate, then compute the value
     // based on the center
     REAL px00, px10, px01, px11;
-    REAL3 vx00, vx10, vx01, vx11;
+    REAL3 vx00, vx10, vx01, vx11; // Last is the voxel, where minimum PX is reached
     vx00 = voxelcenter_xyz + halfVoxelSizes * (REAL3)(-ONE, -ONE, ZERO);
     vx10 = voxelcenter_xyz + halfVoxelSizes * (REAL3)(ONE, -ONE, ZERO);
     vx01 = voxelcenter_xyz + halfVoxelSizes * (REAL3)(-ONE, ONE, ZERO);
@@ -638,21 +638,28 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 // projected
     // pxx_min = fmin(fmin(px00, px10), fmin(px01, px11));
     // pxx_max = fmax(fmax(px00, px10), fmax(px01, px11));
-    REAL3* V_xyx[4]; // Point in which minimum is achieved and counter clock wise
-                     // points
-    // from the minimum voxel
-    REAL* PX_xyx[4]; // Point in which minimum is achieved and counter clock wise
-                     // points
-
+    REAL3* V0; // Point in which PX minimum is achieved
+               // More formally we count V0, V1, V2, V3 as vertices so that VX1 is in the
+               // corner that can be traversed in V0.xy plane by changing V0.x by voxelSizes.x so
+               // that we are still on the voxel boundary
+               // In the same manner are other points definned
+               // V0, V1=V0+xshift, V2=V0+xshift+yshift, V3=V0+yshift
+               // then we set up two distances
+               // vd1 = V1->x-V0->x
+               // vd3 = V3->x-V0->x
+               // We do not define points V1, V2, V3 but just those differences
+    REAL* PX_xyx[4]; // PX values in V0, V1, V2, V3
+    REAL vd1, vd3;
+    // REAL vd1 = V_xyx[1]->x - V_xyx[0]->x;
+    // REAL vd3 = V_xyx[3]->y - V_xyx[0]->y;
     if(px00 < px10)
     {
         if(px00 < px01)
         {
             pxx_min = px00;
-            V_xyx[0] = &vx00;
-            V_xyx[1] = &vx10;
-            V_xyx[2] = &vx11;
-            V_xyx[3] = &vx01;
+            V0 = &vx00;
+            vd1 = voxelSizes.x;
+            vd3 = voxelSizes.y;
             PX_xyx[0] = &px00;
             PX_xyx[1] = &px10;
             PX_xyx[2] = &px11;
@@ -670,10 +677,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         } else if(px01 < px11)
         {
             pxx_min = px01;
-            V_xyx[0] = &vx01;
-            V_xyx[1] = &vx11;
-            V_xyx[2] = &vx10;
-            V_xyx[3] = &vx00;
+            V0 = &vx01;
+            vd1 = voxelSizes.x;
+            vd3 = -voxelSizes.y;
             PX_xyx[0] = &px01;
             PX_xyx[1] = &px11;
             PX_xyx[2] = &px10;
@@ -689,10 +695,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         {
             pxx_min = px11;
             pxx_max = px10;
-            V_xyx[0] = &vx11;
-            V_xyx[1] = &vx01;
-            V_xyx[2] = &vx00;
-            V_xyx[3] = &vx10;
+            V0 = &vx11;
+            vd1 = -voxelSizes.x;
+            vd3 = -voxelSizes.y;
             PX_xyx[0] = &px11;
             PX_xyx[1] = &px01;
             PX_xyx[2] = &px00;
@@ -702,10 +707,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     } else if(px10 < px11)
     {
         pxx_min = px10;
-        V_xyx[0] = &vx10;
-        V_xyx[1] = &vx00;
-        V_xyx[2] = &vx01;
-        V_xyx[3] = &vx11;
+        V0 = &vx10;
+        vd1 = -voxelSizes.x;
+        vd3 = voxelSizes.y;
         PX_xyx[0] = &px10;
         PX_xyx[1] = &px00;
         PX_xyx[2] = &px01;
@@ -723,10 +727,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     } else if(px11 < px01)
     {
         pxx_min = px11;
-        V_xyx[0] = &vx11;
-        V_xyx[1] = &vx01;
-        V_xyx[2] = &vx00;
-        V_xyx[3] = &vx10;
+        V0 = &vx11;
+        vd1 = -voxelSizes.x;
+        vd3 = -voxelSizes.y;
         PX_xyx[0] = &px11;
         PX_xyx[1] = &px01;
         PX_xyx[2] = &px00;
@@ -742,10 +745,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     {
         pxx_min = px01;
         pxx_max = px00;
-        V_xyx[0] = &vx01;
-        V_xyx[1] = &vx11;
-        V_xyx[2] = &vx10;
-        V_xyx[3] = &vx00;
+        V0 = &vx01;
+        vd1 = voxelSizes.x;
+        vd3 = -voxelSizes.y;
         PX_xyx[0] = &px01;
         PX_xyx[1] = &px11;
         PX_xyx[2] = &px10;
@@ -756,8 +758,6 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
     max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + 0.5);
     if(max_PX >= 0 && min_PX < pdims.x)
     {
-        REAL vd1 = V_xyx[1]->x - V_xyx[0]->x;
-        REAL vd3 = V_xyx[3]->y - V_xyx[0]->y;
         if(max_PX <= min_PX) // These indices are in the admissible range
         {
             min_PX = convert_int_rtn(HALF * (pxx_min + pxx_max) + HALF);
@@ -782,8 +782,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             REAL2 CENTROID, CENTROID_cur, CENTROID_prev;
             REAL llength_next, llength_prev, corlambda;
             lastSectionSize = exactIntersectionPolygons0(
-                ((REAL)I) + HALF, vd1, vd3, V_xyx[0], PX_xyx[0],
-                PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, voxelSizes, &CENTROID_prev, &llength_prev);
+                ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3],
+                CM, voxelSizes, &CENTROID_prev, &llength_prev);
             if(I >= 0)
             {
                 factor = value * lastSectionSize;
@@ -800,8 +800,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             for(I = I + 1; I < I_STOP; I++)
             {
                 nextSectionSize = exactIntersectionPolygons0(
-                    ((REAL)I) + HALF, vd1, vd3, V_xyx[0], PX_xyx[0],
-                    PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, voxelSizes, &CENTROID_cur, &llength_next);
+                    ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2],
+                    PX_xyx[3], CM, voxelSizes, &CENTROID_cur, &llength_next);
                 polygonSize = nextSectionSize - lastSectionSize;
                 CENTROID = (nextSectionSize * CENTROID_cur - lastSectionSize * CENTROID_prev)
                     / polygonSize;
@@ -822,9 +822,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             if(I_STOP < pdims.x)
             {
                 polygonSize = ONE - lastSectionSize;
-                CENTROID_cur = V_xyx[0]->s01 + (REAL2)(HALF * vd1, HALF * vd3);
-                CENTROID = (CENTROID_cur - lastSectionSize * CENTROID_prev)
-                    / polygonSize;
+                CENTROID_cur = V0->s01 + (REAL2)(HALF * vd1, HALF * vd3);
+                CENTROID = (CENTROID_cur - lastSectionSize * CENTROID_prev) / polygonSize;
                 Int = (REAL3)(CENTROID, vx00.z);
                 factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
