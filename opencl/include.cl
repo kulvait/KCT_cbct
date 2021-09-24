@@ -92,6 +92,7 @@ typedef float16 REAL16;
 #define ONE 1.0f
 #define THREE 3.0f
 #define convert_REAL3(x) convert_float3(x)
+#define LENGTH(x) fast_length(x)
 #else
 typedef double REAL;
 typedef double2 REAL2;
@@ -109,6 +110,7 @@ typedef double16 REAL16;
 #define ONE 1.0
 #define THREE 3.0
 #define convert_REAL3(x) convert_double3(x)
+#define LENGTH(x) length(x)
 #endif
 
 #define PROJECTX0(CM, v0) dot(v0, CM.s012) / dot(v0, CM.s89a)
@@ -761,14 +763,13 @@ void inline exactEdgeValues0(global float* projection,
 // w = HALF / NAREA;
 // w_complement = ONETHIRD * NAREA_complement / NAREA;
 // CENTROID = (REAL2)(vd1 * (ONE - w + p_complement * w_complement), vd3 * (w - q * w_complement));
+// When trying to find lambda(PX) tak, že PROJ(lambda(PX)) = PX on line v0 + lambda d
+// lambda = dot(v, Fvector)/-dot(d, Fvector)
 // clang-format on
 inline REAL exactIntersectionPolygons0(const REAL PX,
                                        const REAL vd1,
                                        const REAL vd3,
                                        const REAL3* v0,
-                                       const REAL3* v1,
-                                       const REAL3* v2,
-                                       const REAL3* v3,
                                        const REAL* PX_xyx0,
                                        const REAL* PX_xyx1,
                                        const REAL* PX_xyx2,
@@ -779,22 +780,22 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
                                        REAL* llength)
 {
     const REAL3 Fvector = CM.s012 - PX * CM.s89a;
-    REAL Fproduct, FproductVD;
+    REAL Fproduct = dot(*v0, Fvector);
+    REAL FproductVD1NEG = -vd1 * Fvector.x;
+    REAL FproductVD3NEG = -vd3 * Fvector.y;
+
     REAL p, q, p_complement;
     REAL w, wcomplement, NAREA_complement;
-    REAL2 triangle;
     REAL LINELENGTH, NAREA;
     REAL2 CENTROID;
     if(PX < (*PX_xyx1))
     {
-        Fproduct = -dot(*v0, Fvector);
-        FproductVD = vd1 * Fvector.x;
-        p = Fproduct / FproductVD;
+        p = Fproduct / FproductVD1NEG; // From v0 to v1
         if(PX < (*PX_xyx3))
         {
-            q = Fproduct / (vd3 * Fvector.y);
+            q = Fproduct / FproductVD3NEG; // From v0 to v3
             CENTROID = (REAL2)(p * vd1, q * vd3);
-            LINELENGTH = fast_length(CENTROID);
+            LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
             CENTROID *= ONETHIRD;
             NAREA = HALF * p * q;
@@ -802,9 +803,9 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             return NAREA;
         } else if(PX < (*PX_xyx2))
         {
-            q = -dot(*v3, Fvector) / FproductVD;
+            q = (Fproduct - FproductVD3NEG) / FproductVD1NEG; // From v3 to v2
             CENTROID = (REAL2)((q - p) * vd1, voxelSizes.y);
-            LINELENGTH = fast_length(CENTROID);
+            LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
             NAREA = THREE * (p + q);
             if(NAREA > ZERO)
@@ -821,30 +822,28 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
         } else
         {
             p_complement = ONE - p;
-            q = -dot(*v1, Fvector) / (vd3 * Fvector.y);
+            q = (Fproduct - FproductVD1NEG) / FproductVD3NEG; // From v1 to v2
             CENTROID = (REAL2)(p_complement * vd1, q * vd3);
-            LINELENGTH = fast_length(CENTROID);
+            LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
             NAREA_complement = HALF * p_complement * q;
             NAREA = ONE - NAREA_complement;
             w = HALF / NAREA;
-            w_complement = ONETHIRD * NAREA_complement / NAREA;
-            CENTROID = (REAL2)(vd1 * (ONE - w + p_complement * w_complement),
-                               vd3 * (w - q * w_complement));
+            wcomplement = ONETHIRD * NAREA_complement / NAREA;
+            CENTROID = (REAL2)(vd1 * (ONE - w + p_complement * wcomplement),
+                               vd3 * (w - q * wcomplement));
             (*centroid) = v0->s01 + CENTROID;
             return NAREA;
         }
     } else if(PX < (*PX_xyx2))
     {
-        Fproduct = dot(*v2, Fvector);
-        FproductVD = vd3 * Fvector.y;
-        p = Fproduct / FproductVD;
+        p = (Fproduct - FproductVD1NEG - FproductVD3NEG) / -FproductVD3NEG; // v2 to v1
         if(PX < (*PX_xyx3))
         {
-            p = ONE - p;
-            q = -dot(*v0, Fvector) / FproductVD;
+            p = ONE - p; // v1 to v2
+            q = Fproduct / FproductVD3NEG; // v0 to v3
             CENTROID = (REAL2)(voxelSizes.x, (q - p) * vd3);
-            LINELENGTH = fast_length(CENTROID);
+            LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
             NAREA = THREE * (p + q);
             if(NAREA > ZERO)
@@ -860,9 +859,9 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             return NAREA;
         } else
         {
-            q = Fproduct / (vd1 * Fvector.x);
+            q = (Fproduct - FproductVD1NEG - FproductVD3NEG) / -FproductVD1NEG; // v2 to v3
             CENTROID = (REAL2)(q * vd1, p * vd3);
-            LINELENGTH = fast_length(CENTROID);
+            LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
             NAREA_complement = HALF * p * q;
             NAREA = ONE - NAREA_complement;
@@ -884,11 +883,10 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
 
     } else
     {
-        Fproduct = dot(*v3, Fvector);
-        p = Fproduct / (vd3 * Fvector.y);
-        q = -Fproduct / (vd1 * Fvector.x);
+        p = (Fproduct - FproductVD3NEG) / -FproductVD3NEG; // v3 to v0
+        q = (Fproduct - FproductVD3NEG) / FproductVD1NEG; // v3 to v2
         CENTROID = (REAL2)(p * vd3, q * vd1);
-        LINELENGTH = fast_length(CENTROID);
+        LINELENGTH = LENGTH(CENTROID);
         (*llength) = LINELENGTH;
         NAREA_complement = HALF * p * q;
         NAREA = ONE - NAREA_complement;
