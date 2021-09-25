@@ -781,9 +781,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             // points in V_xyx
             REAL2 CENTROID, CENTROID_cur, CENTROID_prev;
             REAL llength_next, llength_prev, corlambda;
-            lastSectionSize = exactIntersectionPolygons0(
-                ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3],
-                CM, voxelSizes, &CENTROID_prev, &llength_prev);
+            lastSectionSize = exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0],
+                                                         PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
+                                                         voxelSizes, &CENTROID_prev, &llength_prev);
             if(I >= 0)
             {
                 factor = value * lastSectionSize;
@@ -800,8 +800,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             for(I = I + 1; I < I_STOP; I++)
             {
                 nextSectionSize = exactIntersectionPolygons0(
-                    ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2],
-                    PX_xyx[3], CM, voxelSizes, &CENTROID_cur, &llength_next);
+                    ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
+                    voxelSizes, &CENTROID_cur, &llength_next);
                 polygonSize = nextSectionSize - lastSectionSize;
                 CENTROID = (nextSectionSize * CENTROID_cur - lastSectionSize * CENTROID_prev)
                     / polygonSize;
@@ -819,9 +819,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                 lastSectionSize = nextSectionSize;
                 lastInt = nextInt;
             }
-            if(I_STOP < pdims.x)
+            polygonSize = ONE - lastSectionSize;
+            if(I_STOP < pdims.x && polygonSize > zeroPrecisionTolerance) // If polygonsize==0 it might trigger division by zero
             {
-                polygonSize = ONE - lastSectionSize;
                 CENTROID_cur = V0->s01 + (REAL2)(HALF * vd1, HALF * vd3);
                 CENTROID = (CENTROID_cur - lastSectionSize * CENTROID_prev) / polygonSize;
                 Int = (REAL3)(CENTROID, vx00.z);

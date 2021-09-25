@@ -37,11 +37,13 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     }
     backproject(*discrepancy_bbuf, *residualVector_xbuf);
+    //writeVolume(*residualVector_xbuf, "/tmp/initialBackprojection");
     algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
     residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
     reportTime("Backprojection 0", false, true);
     NR0 = std::sqrt(residualNorm2_old);
     project(*directionVector_xbuf, *AdirectionVector_bbuf);
+    //writeProjections(*AdirectionVector_bbuf, "/tmp/initialProjection");
     AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf);
     reportTime("Projection 1", false, true);
     alpha = residualNorm2_old / AdirectionNorm2;
