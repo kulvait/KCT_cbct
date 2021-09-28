@@ -73,6 +73,157 @@ void inline localEdgeValues0(local float* projection,
         AtomicAdd_l_f(&projection[PJ_down], value);
     }
 }
+#ifdef ELEVATIONCORRECTION
+
+void inline localEdgeValues0ElevationCorrection(
+    local float* projection,
+    private REAL16 CM,
+    private REAL3 v,
+    private int PX,
+    private REAL value,
+    private REAL3 voxelSizes,
+    private int2 pdims,
+    private REAL corLength) // corLength is scaled to the size of lambda
+{
+    projection = projection + PX * pdims.y;
+    const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
+    const REAL3 v_plus = v + distanceToEdge;
+    const REAL3 v_minus = v - distanceToEdge;
+    const REAL PY_plus = PROJECTY0(CM, v_plus);
+    const REAL PY_minus = PROJECTY0(CM, v_minus);
+    // const REAL3 v_diff = v_down - v_up;
+    int PJ_min, PJ_max;
+    int J;
+    REAL3 v_min;
+    REAL v_min_minus_v_max_y;
+    if(PY_plus < PY_minus) // Classical geometry setup
+    {
+        PJ_max = convert_int_rtn(PY_minus + HALF);
+        PJ_min = convert_int_rtn(PY_plus + HALF);
+        v_min = v_plus;
+        v_min_minus_v_max_y = voxelSizes.s2;
+    } else
+    {
+        PJ_max = convert_int_rtn(PY_plus + HALF);
+        PJ_min = convert_int_rtn(PY_minus + HALF);
+        v_min = v_minus;
+        v_min_minus_v_max_y = -voxelSizes.s2;
+    }
+    REAL lambda;
+    // To model v_min + lambda (v_max - v_min)
+    REAL lastLambda = ZERO;
+    REAL leastLambda;
+    REAL3 Fvector;
+    // We will correct just in the regions [-corLength, corLength] and [1-corLength, 1+corLength]
+    REAL corQuarterMultiplier;
+    if(corLength < zeroPrecisionTolerance)
+    {
+        corQuarterMultiplier = ZERO;
+        corLength = ZERO;
+    } else
+    {
+        corQuarterMultiplier = QUARTER / corLength;
+    }
+    // PY = (dot(CM.s456, v_min) - lambda * CM.s6 * v_min_minus_v_max_y)/(dot(CM.s89a, v_min) -
+    // lambda *CM.sa * v_min_minus_v_max_y)
+    // PY = (A + lambda * B) / (C + lamdba * D), where
+    REAL A = dot(CM.s456, v_min);
+    REAL B = -CM.s6 * v_min_minus_v_max_y;
+    REAL C = dot(CM.s89a, v_min);
+    REAL D = -CM.sa * v_min_minus_v_max_y;
+    REAL PY_min_cor_min = (A - corLength * B) / (C - corLength * D);
+    int PJ_min_cor_min = convert_int_rtn(PY_min_cor_min + HALF);
+    // REAL PY_min_cor_max = (A + corLength * B) / (C + corLength * D);
+    // int PJ_min_cor_max = convert_int_rtn(PY_min_cor_max + HALF);
+    // REAL PY_max_cor_min = (A + (ONE - corLength) * B) / (C - (ONE - corLength) * D);
+    // int PJ_max_cor_min = convert_int_rtn(PY_max_cor_min + HALF);
+    REAL PY_max_cor_max = (A + (ONE + corLength) * B) / (C + (ONE + corLength) * D);
+    int PJ_max_cor_max = convert_int_rtn(PY_max_cor_max + HALF);
+
+    REAL corFactor;
+    REAL lambdaShifted, lastLambdaShifted, lastCorMaxLambdaShifted, leastCorMaxLambdaShifted;
+    if(PJ_max_cor_max >= pdims.y)
+    {
+        PJ_max = pdims.y - 1;
+        Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;
+        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
+        leastCorMaxLambdaShifted = leastLambda - ONE;
+    } else
+    {
+        leastLambda = ONE + corLength;
+        leastCorMaxLambdaShifted = corLength;
+        PJ_max = PJ_max_cor_max;
+    }
+    if(PJ_min_cor_min < 0)
+    {
+        J = 0;
+        Fvector = CM.s456 + HALF * CM.s89a;
+        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
+        lastLambdaShifted = lastLambda - ONE;
+    } else
+    {
+        J = PJ_min_cor_min;
+        Fvector = CM.s456 - (J - HALF) * CM.s89a;
+        lastLambda = -corLength;
+        lastLambdaShifted = lastLambda - ONE;
+    }
+    for(; J < PJ_max; J++)
+    {
+        Fvector -= CM.s89a;
+        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
+        lambdaShifted = lambda - ONE;
+        if(lastLambda >= corLength && lambdaShifted <= -corLength)
+        {
+            corFactor = lambda - lastLambda;
+        } else if(lambdaShifted > -corLength)
+        {
+            if(lastLambdaShifted > -corLength)
+            {
+                corFactor = HALF * (lambda - lastLambda)
+                    + corQuarterMultiplier
+                        * (lastLambdaShifted * lastLambdaShifted - lambdaShifted * lambdaShifted);
+                lastCorMaxLambdaShifted = lambdaShifted;
+            } else
+            {
+                corFactor = (-corLength - lastLambdaShifted) + HALF * (lambdaShifted + corLength)
+                    + corQuarterMultiplier
+                        * (corLength * corLength - lambdaShifted * lambdaShifted);
+                lastCorMaxLambdaShifted = lambdaShifted;
+            }
+        } else // lastLambda < corLength
+        {
+            if(lambda < corLength)
+            {
+                corFactor = HALF * (lambda - lastLambda)
+                    + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
+            } else
+            {
+                corFactor = HALF * (corLength - lastLambda) + (lambda - corLength)
+                    + corQuarterMultiplier * (corLength * corLength - lastLambda * lastLambda);
+            }
+        }
+        AtomicAdd_l_f(&projection[J], corFactor * value);
+        lastLambda = lambda;
+        lastLambdaShifted = lastLambda - ONE;
+    }
+    if(corLength == ZERO || leastCorMaxLambdaShifted < -corLength)
+    {
+        corFactor = leastCorMaxLambdaShifted - lastLambdaShifted;
+    } else if(lastLambdaShifted > -corLength)
+    {
+        corFactor = HALF * (leastCorMaxLambdaShifted - lastLambdaShifted)
+            + corQuarterMultiplier
+                * (lastLambdaShifted * lastLambdaShifted
+                   - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+    } else
+    {
+        corFactor = (-corLength - lastLambdaShifted) + HALF * (leastCorMaxLambdaShifted + corLength)
+            + corQuarterMultiplier
+                * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+    }
+    AtomicAdd_l_f(projection + PJ_max, corFactor * value);
+}
+#endif
 
 /** Project given volume using cutting voxel projector.
  *
@@ -149,6 +300,10 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     const REAL3 volumeCenter_voxelcenter_offset
         = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
+#ifdef ELEVATIONCORRECTION
+    const REAL tgelevation = fabs(voxelcenter_xyz.z)
+        / sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
+#endif
     if(LID == 0) // Get dimension
     {
         // LID==0
@@ -478,67 +633,66 @@ px11 = PROJECTX0(CML, vx11);*/
                         // projected
             // pxx_min = fmin(fmin(px00, px10), fmin(px01, px11));
             // pxx_max = fmax(fmax(px00, px10), fmax(px01, px11));
-            REAL3* V_ccw[4]; // Point in which minimum is achieved and counter clock wise
-                             // points
-            // from the minimum voxel
-            REAL* PX_ccw[4]; // Point in which minimum is achieved and counter clock wise
-                             // points
-            // from the minimum voxel
+            REAL3* V0; // Point in which PX minimum is achieved
+                       // More formally we count V0, V1, V2, V3 as vertices so that VX1 is in the
+                       // corner that can be traversed in V0.xy plane by changing V0.x by
+                       // voxelSizes.x so that we are still on the voxel boundary In the same manner
+                       // are other points definned V0, V1=V0+xshift, V2=V0+xshift+yshift,
+                       // V3=V0+yshift then we set up two distances vd1 = V1->x-V0->x vd3 =
+                       // V3->x-V0->x We do not define points V1, V2, V3 but just those differences
+            REAL* PX_xyx[4]; // PX values in V0, V1, V2, V3
+            REAL vd1, vd3;
             if(offAxisPosition)
             {
                 if(positiveShift[0].s0 > 0)
                 {
                     if(positiveShift[0].s1 > 0)
                     {
-                        pxx_max = px11;
                         pxx_min = px00;
-                        V_ccw[0] = &vx00;
-                        V_ccw[1] = &vx10;
-                        V_ccw[2] = &vx11;
-                        V_ccw[3] = &vx01;
-                        PX_ccw[0] = &px00;
-                        PX_ccw[1] = &px10;
-                        PX_ccw[2] = &px11;
-                        PX_ccw[3] = &px01;
+                        pxx_max = px11;
+                        V0 = &vx00;
+                        vd1 = voxelSizes.x;
+                        vd3 = voxelSizes.y;
+                        PX_xyx[0] = &px00;
+                        PX_xyx[1] = &px10;
+                        PX_xyx[2] = &px11;
+                        PX_xyx[3] = &px01;
                     } else
                     {
-                        pxx_max = px10;
                         pxx_min = px01;
-                        V_ccw[0] = &vx01;
-                        V_ccw[1] = &vx00;
-                        V_ccw[2] = &vx10;
-                        V_ccw[3] = &vx11;
-                        PX_ccw[0] = &px01;
-                        PX_ccw[1] = &px00;
-                        PX_ccw[2] = &px10;
-                        PX_ccw[3] = &px11;
+                        pxx_max = px10;
+                        V0 = &vx01;
+                        vd1 = voxelSizes.x;
+                        vd3 = -voxelSizes.y;
+                        PX_xyx[0] = &px01;
+                        PX_xyx[1] = &px11;
+                        PX_xyx[2] = &px10;
+                        PX_xyx[3] = &px00;
                     }
                 } else
                 {
                     if(positiveShift[0].s1 > 0)
                     {
-                        pxx_max = px01;
                         pxx_min = px10;
-                        V_ccw[0] = &vx10;
-                        V_ccw[1] = &vx11;
-                        V_ccw[2] = &vx01;
-                        V_ccw[3] = &vx00;
-                        PX_ccw[0] = &px10;
-                        PX_ccw[1] = &px11;
-                        PX_ccw[2] = &px01;
-                        PX_ccw[3] = &px00;
+                        pxx_max = px01;
+                        V0 = &vx10;
+                        vd1 = -voxelSizes.x;
+                        vd3 = voxelSizes.y;
+                        PX_xyx[0] = &px10;
+                        PX_xyx[1] = &px00;
+                        PX_xyx[2] = &px01;
+                        PX_xyx[3] = &px11;
                     } else
                     {
-                        pxx_max = px00;
                         pxx_min = px11;
-                        V_ccw[0] = &vx11;
-                        V_ccw[1] = &vx01;
-                        V_ccw[2] = &vx00;
-                        V_ccw[3] = &vx10;
-                        PX_ccw[0] = &px11;
-                        PX_ccw[1] = &px01;
-                        PX_ccw[2] = &px00;
-                        PX_ccw[3] = &px10;
+                        pxx_max = px00;
+                        V0 = &vx11;
+                        vd1 = -voxelSizes.x;
+                        vd3 = -voxelSizes.y;
+                        PX_xyx[0] = &px11;
+                        PX_xyx[1] = &px01;
+                        PX_xyx[2] = &px00;
+                        PX_xyx[3] = &px10;
                     }
                 }
             } else
@@ -548,14 +702,13 @@ px11 = PROJECTX0(CML, vx11);*/
                     if(px00 < px01)
                     {
                         pxx_min = px00;
-                        V_ccw[0] = &vx00;
-                        V_ccw[1] = &vx10;
-                        V_ccw[2] = &vx11;
-                        V_ccw[3] = &vx01;
-                        PX_ccw[0] = &px00;
-                        PX_ccw[1] = &px10;
-                        PX_ccw[2] = &px11;
-                        PX_ccw[3] = &px01;
+                        V0 = &vx00;
+                        vd1 = voxelSizes.x;
+                        vd3 = voxelSizes.y;
+                        PX_xyx[0] = &px00;
+                        PX_xyx[1] = &px10;
+                        PX_xyx[2] = &px11;
+                        PX_xyx[3] = &px01;
                         if(px01 > px11)
                         {
                             pxx_max = px01;
@@ -569,14 +722,13 @@ px11 = PROJECTX0(CML, vx11);*/
                     } else if(px01 < px11)
                     {
                         pxx_min = px01;
-                        V_ccw[0] = &vx01;
-                        V_ccw[1] = &vx00;
-                        V_ccw[2] = &vx10;
-                        V_ccw[3] = &vx11;
-                        PX_ccw[0] = &px01;
-                        PX_ccw[1] = &px00;
-                        PX_ccw[2] = &px10;
-                        PX_ccw[3] = &px11;
+                        V0 = &vx01;
+                        vd1 = voxelSizes.x;
+                        vd3 = -voxelSizes.y;
+                        PX_xyx[0] = &px01;
+                        PX_xyx[1] = &px11;
+                        PX_xyx[2] = &px10;
+                        PX_xyx[3] = &px00;
                         if(px10 > px11)
                         {
                             pxx_max = px10;
@@ -588,27 +740,24 @@ px11 = PROJECTX0(CML, vx11);*/
                     {
                         pxx_min = px11;
                         pxx_max = px10;
-                        V_ccw[0] = &vx11;
-                        V_ccw[1] = &vx01;
-                        V_ccw[2] = &vx00;
-                        V_ccw[3] = &vx10;
-                        PX_ccw[0] = &px11;
-                        PX_ccw[1] = &px01;
-                        PX_ccw[2] = &px00;
-                        PX_ccw[3] = &px10;
+                        V0 = &vx11;
+                        vd1 = -voxelSizes.x;
+                        vd3 = -voxelSizes.y;
+                        PX_xyx[0] = &px11;
+                        PX_xyx[1] = &px01;
+                        PX_xyx[2] = &px00;
+                        PX_xyx[3] = &px10;
                     }
-
                 } else if(px10 < px11)
                 {
                     pxx_min = px10;
-                    V_ccw[0] = &vx10;
-                    V_ccw[1] = &vx11;
-                    V_ccw[2] = &vx01;
-                    V_ccw[3] = &vx00;
-                    PX_ccw[0] = &px10;
-                    PX_ccw[1] = &px11;
-                    PX_ccw[2] = &px01;
-                    PX_ccw[3] = &px00;
+                    V0 = &vx10;
+                    vd1 = -voxelSizes.x;
+                    vd3 = voxelSizes.y;
+                    PX_xyx[0] = &px10;
+                    PX_xyx[1] = &px00;
+                    PX_xyx[2] = &px01;
+                    PX_xyx[3] = &px11;
                     if(px00 > px01)
                     {
                         pxx_max = px00;
@@ -622,14 +771,13 @@ px11 = PROJECTX0(CML, vx11);*/
                 } else if(px11 < px01)
                 {
                     pxx_min = px11;
-                    V_ccw[0] = &vx11;
-                    V_ccw[1] = &vx01;
-                    V_ccw[2] = &vx00;
-                    V_ccw[3] = &vx10;
-                    PX_ccw[0] = &px11;
-                    PX_ccw[1] = &px01;
-                    PX_ccw[2] = &px00;
-                    PX_ccw[3] = &px10;
+                    V0 = &vx11;
+                    vd1 = -voxelSizes.x;
+                    vd3 = -voxelSizes.y;
+                    PX_xyx[0] = &px11;
+                    PX_xyx[1] = &px01;
+                    PX_xyx[2] = &px00;
+                    PX_xyx[3] = &px10;
                     if(px00 > px01)
                     {
                         pxx_max = px00;
@@ -641,65 +789,123 @@ px11 = PROJECTX0(CML, vx11);*/
                 {
                     pxx_min = px01;
                     pxx_max = px00;
-                    V_ccw[0] = &vx01;
-                    V_ccw[1] = &vx00;
-                    V_ccw[2] = &vx10;
-                    V_ccw[3] = &vx11;
-                    PX_ccw[0] = &px01;
-                    PX_ccw[1] = &px00;
-                    PX_ccw[2] = &px10;
-                    PX_ccw[3] = &px11;
+                    V0 = &vx01;
+                    vd1 = voxelSizes.x;
+                    vd3 = -voxelSizes.y;
+                    PX_xyx[0] = &px01;
+                    PX_xyx[1] = &px11;
+                    PX_xyx[2] = &px10;
+                    PX_xyx[3] = &px00;
                 }
             }
             min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + HALF);
             max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + HALF);
             if(max_PX >= 0 && min_PX < Lpdims.x)
             {
-                REAL3 vd1 = (*V_ccw[1]) - (*V_ccw[0]);
-                REAL3 vd3 = (*V_ccw[3]) - (*V_ccw[0]);
+#ifdef ELEVATIONCORRECTION
+                REAL corlambda, corLenEstimate;
+                // Typically voxelSizes.x == voxelSizes.y
+                const REAL corLenLimit = HALF * (voxelSizes.x + voxelSizes.y);
+#endif
                 if(max_PX <= min_PX) // These indices are in the admissible range
                 {
                     min_PX = convert_int_rtn(HALF * (pxx_min + pxx_max) + HALF);
+#ifdef ELEVATIONCORRECTION
+                    corLenEstimate = corLenLimit; // Probably better estimate might exist
+                    corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
+                    localEdgeValues0ElevationCorrection(localProjection, CML, HALF * (vx00 + vx11),
+                                                        min_PX, value, voxelSizes, Lpdims,
+                                                        corlambda);
+#else
                     localEdgeValues0(localProjection, CML, HALF * (vx00 + vx11), min_PX, value,
                                      voxelSizes, Lpdims);
+#endif
                 } else
                 {
-                    REAL lastSectionSize, nextSectionSize, polygonSize;
-                    REAL3 lastInt, nextInt, Int;
+                    REAL sectionSize_prev, sectionSize_cur, polygonSize;
+                    REAL3 Int;
                     REAL factor;
+                    REAL2 CENTROID, CENTROID_cur, CENTROID_prev;
+                    REAL llength_cur, llength_prev;
                     int I = max(-1, min_PX);
                     int I_STOP = min(max_PX, Lpdims.x);
                     // Section of the square that corresponds to the indices < i
                     // CCW and CW coordinates of the last intersection on the lines
                     // specified by the points in V_ccw
-                    lastSectionSize = exactIntersectionPoints0_extended(
-                        ((REAL)I) + HALF, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
-                        PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CML, &lastInt);
+                    sectionSize_prev = exactIntersectionPolygons0(
+                        ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3],
+                        CML, voxelSizes, &CENTROID_prev, &llength_prev);
                     if(I >= 0)
                     {
-                        factor = value * lastSectionSize;
-                        localEdgeValues0(localProjection, CML, lastInt, I, factor, voxelSizes,
-                                         Lpdims);
+                        factor = value * sectionSize_prev;
+                        Int = (REAL3)(CENTROID_prev, vx00.z);
+#ifdef ELEVATIONCORRECTION
+                        if(llength_prev < corLenLimit) // Triangle
+                        {
+                            corLenEstimate = TWOTHIRDS * llength_prev;
+                        } else // Typically not triangle
+                        {
+                            corLenEstimate = llength_prev;
+                        }
+                        corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
+                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor,
+                                                            voxelSizes, Lpdims, corlambda);
+#else
+                        localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
+#endif
                     }
                     for(I = I + 1; I < I_STOP; I++)
                     {
-                        nextSectionSize = exactIntersectionPoints0_extended(
-                            ((REAL)I) + HALF, V_ccw[0], V_ccw[1], V_ccw[2], V_ccw[3], vd1, vd3,
-                            PX_ccw[0], PX_ccw[1], PX_ccw[2], PX_ccw[3], CML, &nextInt);
-                        polygonSize = nextSectionSize - lastSectionSize;
-                        Int = (nextSectionSize * nextInt - lastSectionSize * lastInt) / polygonSize;
-                        factor = value * polygonSize;
-                        localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
-                        lastSectionSize = nextSectionSize;
-                        lastInt = nextInt;
-                    }
-                    if(I_STOP < Lpdims.x)
-                    {
-                        polygonSize = ONE - lastSectionSize;
-                        Int = ((*V_ccw[0] + *V_ccw[2]) * HALF - lastSectionSize * lastInt)
+                        sectionSize_cur = exactIntersectionPolygons0(
+                            ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2],
+                            PX_xyx[3], CML, voxelSizes, &CENTROID_cur, &llength_cur);
+                        polygonSize = sectionSize_cur - sectionSize_prev;
+                        CENTROID
+                            = (sectionSize_cur * CENTROID_cur - sectionSize_prev * CENTROID_prev)
                             / polygonSize;
+                        Int = (REAL3)(CENTROID, vx00.z);
                         factor = value * polygonSize;
+#ifdef ELEVATIONCORRECTION
+                        corLenEstimate = HALF * (llength_cur + llength_prev);
+                        if(llength_cur < ONETHIRD * corLenLimit
+                           || llength_prev < ONETHIRD * corLenLimit) // heuristic
+                        {
+                            corLenEstimate = fmax(llength_cur, llength_prev);
+                        }
+                        corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
+                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor,
+                                                            voxelSizes, Lpdims, corlambda);
+                        llength_prev = llength_cur;
+#else
                         localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
+#endif
+                        CENTROID_prev = CENTROID_cur;
+                        sectionSize_prev = sectionSize_cur;
+                    }
+                    polygonSize = ONE - sectionSize_prev;
+                    if(I_STOP < Lpdims.x && polygonSize > zeroPrecisionTolerance)
+                    {
+                        CENTROID_cur = V0->s01 + (REAL2)(HALF * vd1, HALF * vd3);
+                        CENTROID = (CENTROID_cur - sectionSize_prev * CENTROID_prev) / polygonSize;
+                        Int = (REAL3)(CENTROID, vx00.z);
+                        factor = value * polygonSize;
+#ifdef ELEVATIONCORRECTION
+                        // corlambda = QUARTER * llength_prev * tgelevation / voxelSizes.z
+                        // underestimates corlambda especially for big pixels corlambda = HALF *
+                        // llength_prev * tgelevation / voxelSizes.z; relatively good
+                        if(llength_prev < corLenLimit) // Triangle
+                        {
+                            corLenEstimate = TWOTHIRDS * llength_prev;
+                        } else // Typically not triangle
+                        {
+                            corLenEstimate = llength_prev;
+                        }
+                        corlambda = corLenEstimate * tgelevation * HALF / voxelSizes.z;
+                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor, voxelSizes, Lpdims,
+                                         corlambda);
+#else
+                        localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
+#endif
                     }
                 }
             }

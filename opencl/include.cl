@@ -570,6 +570,7 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
     }
 }
 
+//printf routines for debugging are in bbdb59
 void inline exactEdgeValues0ElevationCorrection(
     global float* projection,
     private REAL16 CM,
@@ -581,10 +582,6 @@ void inline exactEdgeValues0ElevationCorrection(
     private REAL corLength) // corLength is scaled to the size of lambda
 {
     projection = projection + PX * pdims.y;
-    if(PX >= pdims.x || PX < 0)
-    {
-        printf("SEGFAULT");
-    }
     const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
     const REAL3 v_plus = v + distanceToEdge;
     const REAL3 v_minus = v - distanceToEdge;
@@ -700,27 +697,6 @@ void inline exactEdgeValues0ElevationCorrection(
                 corFactor = HALF * (corLength - lastLambda) + (lambda - corLength)
                     + corQuarterMultiplier * (corLength * corLength - lastLambda * lastLambda);
             }
-            /*
-                        if(corLength < zeroPrecisionTolerance)
-                        {
-                             printf(
-                                 "Setting corLength to zero for PX=%d and PJ_min=%d PJ_max=%d
-               PJ_min_cor_min=%d " "PY_min_cor_min=%f PY_plus = %f PY_minus = %f v = [ %f, %f, %f
-               ]", PX, PJ_min, PJ_max, PJ_min_cor_min, PY_min_cor_min, PY_plus, PY_minus, v.x, v.y,
-               v.z); if(fabs(corFactor - (lambda - lastLambda)) > zeroPrecisionTolerance)
-                            {
-                                printf("Setting corLength to zero for PX=%d and PJ_min=%d
-               PJ_min_cor_min=%d " "PJ_max=%d PJ_max_cor_max=%d PY_max_cor_max=%f J=%d " "lambda=%f,
-               lastLambda=%f, corLength=%f, lambdaShifted=%f, " "lastLambdaShifted=%f, corFactor=%f,
-               corFactorShallbe=%f", PX, PJ_min, PJ_min_cor_min, PJ_max, PJ_max_cor_max,
-               PY_max_cor_max, J, lambda, lastLambda, corLength, lambdaShifted, lastLambdaShifted,
-                                       corFactor, lambda - lastLambda);
-                            }
-                        }*/
-        }
-        if(J >= pdims.y || J < 0)
-        {
-            printf("SEGFAULT");
         }
         AtomicAdd_g_f(&projection[J], corFactor * value);
         lastLambda = lambda;
@@ -740,28 +716,6 @@ void inline exactEdgeValues0ElevationCorrection(
         corFactor = (-corLength - lastLambdaShifted) + HALF * (leastCorMaxLambdaShifted + corLength)
             + corQuarterMultiplier
                 * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
-        if(corFactor < 0)
-        {
-            // printf("PJ_max=%d and corFactor=%f", PJ_max, corFactor);
-            printf(
-                "(-corLength - lastLambdaShifted)=%f HALF * (leastCorMaxLambdaShifted + "
-                "corLength)=%f corQuarterMultiplier*(corLength * corLength - "
-                "leastCorMaxLambdaShifted * leastCorMaxLambdaShifted)=%f\n  leastLambda=%f "
-                "leastCorMaxLambdaShifted=%f PX=%d and PJ_min=%d PJ_min_cor_min=%d "
-                "PJ_max=%d PJ_max_cor_max=%d PY_max_cor_max=%f J=%d "
-                "lambda=%f,lastLambda=%f, corLength=%f, lambdaShifted=%f, "
-                "lastLambdaShifted=%f, corFactor=%f, corFactorShallbe=%f",
-                (-corLength - lastLambdaShifted), HALF * (leastCorMaxLambdaShifted + corLength),
-                corQuarterMultiplier
-                    * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted),
-                leastLambda, leastCorMaxLambdaShifted, PX, PJ_min, PJ_min_cor_min, PJ_max,
-                PJ_max_cor_max, PY_max_cor_max, J, lambda, lastLambda, corLength, lambdaShifted,
-                lastLambdaShifted, corFactor, leastLambda - lastLambda);
-        }
-    }
-    if(PJ_max >= pdims.y || PJ_max < 0)
-    {
-        printf("SEGFAULT");
     }
     AtomicAdd_g_f(projection + PJ_max, corFactor * value);
 }
