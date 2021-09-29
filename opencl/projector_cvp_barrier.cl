@@ -109,11 +109,6 @@ void inline localEdgeValues0ElevationCorrection(
         v_min = v_minus;
         v_min_minus_v_max_y = -voxelSizes.s2;
     }
-    REAL lambda;
-    // To model v_min + lambda (v_max - v_min)
-    REAL lastLambda = ZERO;
-    REAL leastLambda;
-    REAL3 Fvector;
     // We will correct just in the regions [-corLength, corLength] and [1-corLength, 1+corLength]
     REAL corQuarterMultiplier;
     if(corLength < zeroPrecisionTolerance)
@@ -140,88 +135,99 @@ void inline localEdgeValues0ElevationCorrection(
     REAL PY_max_cor_max = (A + (ONE + corLength) * B) / (C + (ONE + corLength) * D);
     int PJ_max_cor_max = convert_int_rtn(PY_max_cor_max + HALF);
 
-    REAL corFactor;
-    REAL lambdaShifted, lastLambdaShifted, lastCorMaxLambdaShifted, leastCorMaxLambdaShifted;
-    if(PJ_max_cor_max >= pdims.y)
+    if(PJ_max_cor_max > 0 && PJ_min_cor_min < pdims.y)
     {
-        PJ_max = pdims.y - 1;
-        Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;
-        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
-        leastCorMaxLambdaShifted = leastLambda - ONE;
-    } else
-    {
-        leastLambda = ONE + corLength;
-        leastCorMaxLambdaShifted = corLength;
-        PJ_max = PJ_max_cor_max;
-    }
-    if(PJ_min_cor_min < 0)
-    {
-        J = 0;
-        Fvector = CM.s456 + HALF * CM.s89a;
-        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
-        lastLambdaShifted = lastLambda - ONE;
-    } else
-    {
-        J = PJ_min_cor_min;
-        Fvector = CM.s456 - (J - HALF) * CM.s89a;
-        lastLambda = -corLength;
-        lastLambdaShifted = lastLambda - ONE;
-    }
-    for(; J < PJ_max; J++)
-    {
-        Fvector -= CM.s89a;
-        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
-        lambdaShifted = lambda - ONE;
-        if(lastLambda >= corLength && lambdaShifted <= -corLength)
+        REAL lambda;
+        // To model v_min + lambda (v_max - v_min)
+        REAL lastLambda = ZERO;
+        REAL leastLambda;
+        REAL3 Fvector;
+        REAL corFactor;
+        REAL lambdaShifted, lastLambdaShifted, lastCorMaxLambdaShifted, leastCorMaxLambdaShifted;
+        if(PJ_max_cor_max >= pdims.y)
         {
-            corFactor = lambda - lastLambda;
-        } else if(lambdaShifted > -corLength)
+            PJ_max = pdims.y - 1;
+            Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;
+            leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
+            leastCorMaxLambdaShifted = leastLambda - ONE;
+        } else
         {
-            if(lastLambdaShifted > -corLength)
-            {
-                corFactor = HALF * (lambda - lastLambda)
-                    + corQuarterMultiplier
-                        * (lastLambdaShifted * lastLambdaShifted - lambdaShifted * lambdaShifted);
-                lastCorMaxLambdaShifted = lambdaShifted;
-            } else
-            {
-                corFactor = (-corLength - lastLambdaShifted) + HALF * (lambdaShifted + corLength)
-                    + corQuarterMultiplier
-                        * (corLength * corLength - lambdaShifted * lambdaShifted);
-                lastCorMaxLambdaShifted = lambdaShifted;
-            }
-        } else // lastLambda < corLength
-        {
-            if(lambda < corLength)
-            {
-                corFactor = HALF * (lambda - lastLambda)
-                    + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
-            } else
-            {
-                corFactor = HALF * (corLength - lastLambda) + (lambda - corLength)
-                    + corQuarterMultiplier * (corLength * corLength - lastLambda * lastLambda);
-            }
+            leastLambda = ONE + corLength;
+            leastCorMaxLambdaShifted = corLength;
+            PJ_max = PJ_max_cor_max;
         }
-        AtomicAdd_l_f(&projection[J], corFactor * value);
-        lastLambda = lambda;
-        lastLambdaShifted = lastLambda - ONE;
+        if(PJ_min_cor_min < 0)
+        {
+            J = 0;
+            Fvector = CM.s456 + HALF * CM.s89a;
+            lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
+            lastLambdaShifted = lastLambda - ONE;
+        } else
+        {
+            J = PJ_min_cor_min;
+            Fvector = CM.s456 - (J - HALF) * CM.s89a;
+            lastLambda = -corLength;
+            lastLambdaShifted = lastLambda - ONE;
+        }
+        for(; J < PJ_max; J++)
+        {
+            Fvector -= CM.s89a;
+            lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
+            lambdaShifted = lambda - ONE;
+            if(lastLambda >= corLength && lambdaShifted <= -corLength)
+            {
+                corFactor = lambda - lastLambda;
+            } else if(lambdaShifted > -corLength)
+            {
+                if(lastLambdaShifted > -corLength)
+                {
+                    corFactor = HALF * (lambda - lastLambda)
+                        + corQuarterMultiplier
+                            * (lastLambdaShifted * lastLambdaShifted
+                               - lambdaShifted * lambdaShifted);
+                    lastCorMaxLambdaShifted = lambdaShifted;
+                } else
+                {
+                    corFactor = (-corLength - lastLambdaShifted)
+                        + HALF * (lambdaShifted + corLength)
+                        + corQuarterMultiplier
+                            * (corLength * corLength - lambdaShifted * lambdaShifted);
+                    lastCorMaxLambdaShifted = lambdaShifted;
+                }
+            } else // lastLambda < corLength
+            {
+                if(lambda < corLength)
+                {
+                    corFactor = HALF * (lambda - lastLambda)
+                        + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
+                } else
+                {
+                    corFactor = HALF * (corLength - lastLambda) + (lambda - corLength)
+                        + corQuarterMultiplier * (corLength * corLength - lastLambda * lastLambda);
+                }
+            }
+            AtomicAdd_l_f(&projection[J], corFactor * value);
+            lastLambda = lambda;
+            lastLambdaShifted = lastLambda - ONE;
+        }
+        if(corLength == ZERO || leastCorMaxLambdaShifted < -corLength)
+        {
+            corFactor = leastCorMaxLambdaShifted - lastLambdaShifted;
+        } else if(lastLambdaShifted > -corLength)
+        {
+            corFactor = HALF * (leastCorMaxLambdaShifted - lastLambdaShifted)
+                + corQuarterMultiplier
+                    * (lastLambdaShifted * lastLambdaShifted
+                       - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+        } else
+        {
+            corFactor = (-corLength - lastLambdaShifted)
+                + HALF * (leastCorMaxLambdaShifted + corLength)
+                + corQuarterMultiplier
+                    * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+        }
+        AtomicAdd_l_f(projection + PJ_max, corFactor * value);
     }
-    if(corLength == ZERO || leastCorMaxLambdaShifted < -corLength)
-    {
-        corFactor = leastCorMaxLambdaShifted - lastLambdaShifted;
-    } else if(lastLambdaShifted > -corLength)
-    {
-        corFactor = HALF * (leastCorMaxLambdaShifted - lastLambdaShifted)
-            + corQuarterMultiplier
-                * (lastLambdaShifted * lastLambdaShifted
-                   - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
-    } else
-    {
-        corFactor = (-corLength - lastLambdaShifted) + HALF * (leastCorMaxLambdaShifted + corLength)
-            + corQuarterMultiplier
-                * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
-    }
-    AtomicAdd_l_f(projection + PJ_max, corFactor * value);
 }
 #endif
 
@@ -901,8 +907,8 @@ px11 = PROJECTX0(CML, vx11);*/
                             corLenEstimate = llength_prev;
                         }
                         corlambda = corLenEstimate * tgelevation * HALF / voxelSizes.z;
-                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor, voxelSizes, Lpdims,
-                                         corlambda);
+                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor,
+                                                            voxelSizes, Lpdims, corlambda);
 #else
                         localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
 #endif
