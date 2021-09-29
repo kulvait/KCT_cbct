@@ -798,6 +798,9 @@ void inline exactEdgeValues0(global float* projection,
 // When trying to find lambda(PX) tak, že PROJ(lambda(PX)) = PX on line v0 + lambda d
 // lambda = dot(v, Fvector)/-dot(d, Fvector)
 // clang-format on
+// When FproductVD1NEG or FproductVD3NEG are zero then basically all the segment is projected to
+// given index but we need to achieve p \in [0,1] and q\in[0,1] so that we have to solve it individually
+// I put it int the way to greedy select the biggest area possible
 inline REAL exactIntersectionPolygons0(const REAL PX,
                                        const REAL vd1,
                                        const REAL vd3,
@@ -822,10 +825,16 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
     REAL2 CENTROID;
     if(PX < (*PX_xyx1))
     {
-        p = Fproduct / FproductVD1NEG; // From v0 to v1
+        if(FproductVD1NEG)
+            p = Fproduct / FproductVD1NEG; // From v0 to v1
+        else
+            p = ONE;
         if(PX < (*PX_xyx3))
         {
-            q = Fproduct / FproductVD3NEG; // From v0 to v3
+            if(FproductVD3NEG)
+                q = Fproduct / FproductVD3NEG; // From v0 to v3
+            else
+                q = ONE;
             CENTROID = (REAL2)(p * vd1, q * vd3);
             LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
@@ -835,7 +844,10 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             return NAREA;
         } else if(PX < (*PX_xyx2))
         {
-            q = (Fproduct - FproductVD3NEG) / FproductVD1NEG; // From v3 to v2
+            if(FproductVD1NEG)
+                q = (Fproduct - FproductVD3NEG) / FproductVD1NEG; // From v3 to v2
+            else
+                q = ONE;
             CENTROID = (REAL2)((q - p) * vd1, voxelSizes.y);
             LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
@@ -854,7 +866,10 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
         } else
         {
             p_complement = ONE - p;
-            q = (Fproduct - FproductVD1NEG) / FproductVD3NEG; // From v1 to v2
+            if(FproductVD3NEG)
+                q = (Fproduct - FproductVD1NEG) / FproductVD3NEG; // From v1 to v2
+            else
+                q = ZERO;
             CENTROID = (REAL2)(p_complement * vd1, q * vd3);
             LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
@@ -869,11 +884,17 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
         }
     } else if(PX < (*PX_xyx2))
     {
-        p = (Fproduct - FproductVD1NEG - FproductVD3NEG) / -FproductVD3NEG; // v2 to v1
+        if(FproductVD3NEG)
+            p = (Fproduct - FproductVD1NEG - FproductVD3NEG) / -FproductVD3NEG; // v2 to v1
+        else
+            p = ZERO;
         if(PX < (*PX_xyx3))
         {
             p = ONE - p; // v1 to v2
-            q = Fproduct / FproductVD3NEG; // v0 to v3
+            if(FproductVD3NEG)
+                q = Fproduct / FproductVD3NEG; // v0 to v3
+            else
+                q = ONE;
             CENTROID = (REAL2)(voxelSizes.x, (q - p) * vd3);
             LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
@@ -891,7 +912,10 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             return NAREA;
         } else
         {
-            q = (Fproduct - FproductVD1NEG - FproductVD3NEG) / -FproductVD1NEG; // v2 to v3
+            if(FproductVD1NEG)
+                q = (Fproduct - FproductVD1NEG - FproductVD3NEG) / -FproductVD1NEG; // v2 to v3
+            else
+                q = ZERO;
             CENTROID = (REAL2)(q * vd1, p * vd3);
             LINELENGTH = LENGTH(CENTROID);
             (*llength) = LINELENGTH;
@@ -915,8 +939,14 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
 
     } else
     {
-        p = (Fproduct - FproductVD3NEG) / -FproductVD3NEG; // v3 to v0
-        q = (Fproduct - FproductVD3NEG) / FproductVD1NEG; // v3 to v2
+        if(FproductVD3NEG)
+            p = (Fproduct - FproductVD3NEG) / -FproductVD3NEG; // v3 to v0
+        else
+            p = ZERO;
+        if(FproductVD1NEG)
+            q = (Fproduct - FproductVD3NEG) / FproductVD1NEG; // v3 to v2
+        else
+            q = ZERO;
         CENTROID = (REAL2)(p * vd3, q * vd1);
         LINELENGTH = LENGTH(CENTROID);
         (*llength) = LINELENGTH;
