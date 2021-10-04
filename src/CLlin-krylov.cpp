@@ -315,7 +315,7 @@ int main(int argc, char* argv[])
     {
         Program PRG(argc, argv);
         std::string prgInfo
-            = "OpenCL implementation of CGLS and GLSQR applied on the cone beam CT operator.";
+            = "OpenCL implementation cone beam CT reconstruction operator.";
         if(version::MODIFIED_SINCE_COMMIT == true)
         {
             prgInfo = io::xprintf("%s Dirty commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
