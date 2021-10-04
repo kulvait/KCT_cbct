@@ -39,7 +39,7 @@ void findFirstPlatform()
 }
 
 /*
- *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details
+ *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details of the adjoint product test
  */
 TEST_CASE("CVP.AdjointDotProduct.nobarrier", "[adjointop][cuttingvox][NOVIZ]")
 {
@@ -135,7 +135,7 @@ TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed", "[adjointop][cuttingvox][NOVI
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
     bool exactScaling = true;
-    bool barrierCalls = false;
+    bool barrierCalls = true;
     bool elevationCorrection = false;
     glsqr->initializeCVPProjector(exactScaling, elevationCorrection, barrierCalls);
     int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
@@ -173,7 +173,139 @@ TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed", "[adjointop][cuttingvox][NOVI
     delete[] randomB;
 }
 
-TEST_CASE("PerfusionOperator AdjointDotProduct TEST", "[adjointop][cuttingvox][NOVIZ]")
+TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed_elevationcorrection", "[adjointop][cuttingvox][NOVIZ]")
+{
+    findFirstPlatform();
+    double tol = 1e-5;
+    uint32_t projectionSizeX = 616;
+    uint32_t projectionSizeY = 480;
+    uint32_t projectionSizeZ = 248;
+    uint32_t volumeSizeX = 256;
+    uint32_t volumeSizeY = 256;
+    uint32_t volumeSizeZ = 199;
+    double voxelSizeX = 1.0;
+    double voxelSizeY = 1.0;
+    double voxelSizeZ = 1.0;
+    util::RunTimeInfo rti;
+    std::string xpath = rti.getExecutableDirectoryPath(); // build dir
+    bool debug = false;
+    bool CLrelaxed = true;
+    uint32_t itemsPerWorkgroup = 256;
+    std::string startPath = "";
+    uint64_t totalVolumeSize
+        = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
+    uint64_t totalProjectionsSize
+        = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+    // BaseReconstructor is abstract class so can not be costructed
+    std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
+        projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
+        itemsPerWorkgroup);
+    bool exactScaling = true;
+    bool barrierCalls = true;
+    bool elevationCorrection = true;
+    glsqr->initializeCVPProjector(exactScaling, elevationCorrection, barrierCalls);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
+    if(ecd < 0)
+    {
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    // Pseudorandom vectors
+    std::random_device randomInts;
+    int seed;
+    seed = randomInts(); // To get random results
+    seed = 5; // Fix for tests
+    std::mt19937 engine(seed);
+    std::uniform_real_distribution<float> dis(0.0, 1.0);
+    float* randomX = new float[totalVolumeSize];
+    float* randomB = new float[totalProjectionsSize];
+    auto gen = [&dis, &engine]() { return dis(engine); };
+    std::generate(randomX, randomX + totalVolumeSize, gen);
+    std::generate(randomB, randomB + totalProjectionsSize, gen);
+    // LOGE << io::xprintf("X%f, %f, %f", randomX[0], randomX[1], randomX[totalVolumeSize - 1]);
+    // LOGE << io::xprintf("B%f, %f, %f", randomB[0], randomB[1], randomB[totalProjectionsSize -
+    // 1]);
+    std::string cameraMatrices = io::xprintf("%s/tests/files/camera.matrices", basedir().c_str());
+    std::shared_ptr<io::DenProjectionMatrixReader> cameraMatricesReader
+        = std::make_shared<io::DenProjectionMatrixReader>(cameraMatrices);
+    std::vector<std::shared_ptr<CameraI>> cameraVector
+        = BaseReconstructor::encodeProjectionMatrices(cameraMatricesReader);
+    glsqr->problemSetup(randomB, randomX, true, cameraVector, voxelSizeX, voxelSizeY, voxelSizeZ);
+    double adjointProductRatio = glsqr->adjointProductTest();
+    LOGI << io::xprintf("Ratio is %f", adjointProductRatio);
+    REQUIRE(std::abs(adjointProductRatio - 1.0) < tol);
+    delete[] randomX;
+    delete[] randomB;
+}
+
+TEST_CASE("CVP.AdjointDotProduct.nobarrier_norelaxed_elevationcorrection", "[adjointop][cuttingvox][NOVIZ]")
+{
+    findFirstPlatform();
+    double tol = 1e-5;
+    uint32_t projectionSizeX = 616;
+    uint32_t projectionSizeY = 480;
+    uint32_t projectionSizeZ = 248;
+    uint32_t volumeSizeX = 256;
+    uint32_t volumeSizeY = 256;
+    uint32_t volumeSizeZ = 199;
+    double voxelSizeX = 1.0;
+    double voxelSizeY = 1.0;
+    double voxelSizeZ = 1.0;
+    util::RunTimeInfo rti;
+    std::string xpath = rti.getExecutableDirectoryPath(); // build dir
+    bool debug = false;
+    bool CLrelaxed = false;
+    uint32_t itemsPerWorkgroup = 256;
+    std::string startPath = "";
+    uint64_t totalVolumeSize
+        = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
+    uint64_t totalProjectionsSize
+        = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+    // BaseReconstructor is abstract class so can not be costructed
+    std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
+        projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
+        itemsPerWorkgroup);
+    bool exactScaling = true;
+    bool barrierCalls = false;
+    bool elevationCorrection = true;
+    glsqr->initializeCVPProjector(exactScaling, elevationCorrection, barrierCalls);
+    int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
+    if(ecd < 0)
+    {
+        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", CLplatformID);
+        LOGE << ERR;
+        throw std::runtime_error(ERR);
+    }
+    // Pseudorandom vectors
+    std::random_device randomInts;
+    int seed;
+    seed = randomInts(); // To get random results
+    seed = 5; // Fix for tests
+    std::mt19937 engine(seed);
+    std::uniform_real_distribution<float> dis(0.0, 1.0);
+    float* randomX = new float[totalVolumeSize];
+    float* randomB = new float[totalProjectionsSize];
+    auto gen = [&dis, &engine]() { return dis(engine); };
+    std::generate(randomX, randomX + totalVolumeSize, gen);
+    std::generate(randomB, randomB + totalProjectionsSize, gen);
+    // LOGE << io::xprintf("X%f, %f, %f", randomX[0], randomX[1], randomX[totalVolumeSize - 1]);
+    // LOGE << io::xprintf("B%f, %f, %f", randomB[0], randomB[1], randomB[totalProjectionsSize -
+    // 1]);
+    std::string cameraMatrices = io::xprintf("%s/tests/files/camera.matrices", basedir().c_str());
+    std::shared_ptr<io::DenProjectionMatrixReader> cameraMatricesReader
+        = std::make_shared<io::DenProjectionMatrixReader>(cameraMatrices);
+    std::vector<std::shared_ptr<CameraI>> cameraVector
+        = BaseReconstructor::encodeProjectionMatrices(cameraMatricesReader);
+    glsqr->problemSetup(randomB, randomX, true, cameraVector, voxelSizeX, voxelSizeY, voxelSizeZ);
+    double adjointProductRatio = glsqr->adjointProductTest();
+    LOGI << io::xprintf("Ratio is %f", adjointProductRatio);
+    REQUIRE(std::abs(adjointProductRatio - 1.0) < tol);
+    delete[] randomX;
+    delete[] randomB;
+}
+
+TEST_CASE("PerfusionOperator AdjointDotProduct TEST", "[adjointop][cuttingvox][NOVIZ][.][perfusionoperator]")
 {
     findFirstPlatform();
     double tol = 1e-5;
@@ -359,7 +491,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct TA3 projector TEST", "[adjointop
 }
 
 TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TA3 projector TEST",
-          "[adjointop][TT][NOVIZ]")
+          "[adjointop][TT][NOVIZ][.][perfusionoperator]")
 {
     findFirstPlatform();
     double tol = 1e-5;
@@ -544,7 +676,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
 }
 
 TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST",
-          "[adjointop][sidon][NOVIZ]")
+          "[adjointop][sidon][NOVIZ][.][perfusionoperator]")
 {
     findFirstPlatform();
     double tol = 1e-5;
