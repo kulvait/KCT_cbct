@@ -167,7 +167,7 @@ add_executable(CLlin-projector ${CLLINPROJECTOR_SOURCES})
 set_target_properties(
     CLlin-projector
     PROPERTIES 
-        OUTPUT_NAME "cllin-projector"
+        OUTPUT_NAME "kct-projector"
         SUFFIX ""
 )
 target_link_libraries(CLlin-projector ctiol)
@@ -193,7 +193,7 @@ add_executable(CLlin-convolution ${CLLINCONVOLUTION_SOURCES})
 set_target_properties(
     CLlin-convolution
     PROPERTIES 
-        OUTPUT_NAME "cllin-convolution"
+        OUTPUT_NAME "kct-convolution"
         SUFFIX ""
 )
 target_link_libraries(CLlin-convolution ctiol)
@@ -213,7 +213,7 @@ add_executable(CLlin-backprojector ${CLLINBACKPROJECTOR_SOURCES})
 set_target_properties(
     CLlin-backprojector
     PROPERTIES 
-        OUTPUT_NAME "cllin-backprojector"
+        OUTPUT_NAME "kct-backprojector"
         SUFFIX ""
 )
 target_link_libraries(CLlin-backprojector ctiol)
@@ -249,7 +249,7 @@ add_executable(CLlin-projector-volumes ${CLLINPROJECTORVOLUMES_SOURCES})
 set_target_properties(
     CLlin-projector-volumes
     PROPERTIES 
-        OUTPUT_NAME "cllin-projector-volumes"
+        OUTPUT_NAME "kct-projector-volumes"
         SUFFIX ""
 )
 target_link_libraries(CLlin-projector-volumes ctiol)
@@ -273,7 +273,7 @@ add_executable(CLlin-krylov ${CLLINCGLS_SOURCES})
 set_target_properties(
     CLlin-krylov
     PROPERTIES 
-        OUTPUT_NAME "cllin-krylov"
+        OUTPUT_NAME "kct-krylov"
         SUFFIX ""
 )
 target_link_libraries(CLlin-krylov ctiol)
@@ -294,7 +294,7 @@ add_executable(CLlin-jacobiglsqr ${CLLINJACOBIGLSQR_SOURCES})
 set_target_properties(
     CLlin-jacobiglsqr
     PROPERTIES 
-        OUTPUT_NAME "cllin-jacobiglsqr"
+        OUTPUT_NAME "kct-jacobiglsqr"
         SUFFIX ""
 )
 target_link_libraries(CLlin-jacobiglsqr ctiol)
@@ -320,7 +320,7 @@ add_executable(CLlin-perfusion ${CLLINPERFUSION_SOURCES})
 set_target_properties(
     CLlin-perfusion
     PROPERTIES 
-        OUTPUT_NAME "cllin-perfusion"
+        OUTPUT_NAME "kct-perfusion"
         SUFFIX ""
 )
 target_link_libraries(CLlin-perfusion ctiol)
@@ -347,7 +347,7 @@ add_executable(CLlin-perfusion-projector ${CLLINPERFUSIONPROJECTOR_SOURCES})
 set_target_properties(
     CLlin-perfusion-projector
     PROPERTIES 
-        OUTPUT_NAME "cllin-perfusion-projector"
+        OUTPUT_NAME "kct-perfusion-projector"
         SUFFIX ""
 )
 target_link_libraries(CLlin-perfusion-projector ctiol)
