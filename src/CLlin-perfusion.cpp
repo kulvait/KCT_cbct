@@ -94,7 +94,7 @@ public:
                          "pixels count.");
         }
         io::DenSupportedType t = inf.getDataType();
-        if(t != io::DenSupportedType::float_)
+        if(t != io::DenSupportedType::FLOAT32)
         {
             std::string ERR
                 = io::xprintf("This program supports float projections only but the supplied "

@@ -70,8 +70,8 @@ inline void AtomicMin_g_f(volatile __global float* adr, const float v)
     } while(tmp.u32 != adrcatch.u32);
 }
 
-    // CVP Projector routines
-    //#define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
+// CVP Projector routines
+//#define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
 
 #define DROPCENTEROFFPROJECTORVOXELS
 // DROPINCOMPLETEVOXELS is not implemented the same in barrier implementation
@@ -79,6 +79,7 @@ inline void AtomicMin_g_f(volatile __global float* adr, const float v)
 typedef float REAL;
 typedef float2 REAL2;
 typedef float3 REAL3;
+typedef float8 REAL8;
 typedef float16 REAL16;
 //__constant float ONE=1.0f;
 //__constant float HALF=0.5f;
@@ -97,6 +98,7 @@ typedef float16 REAL16;
 typedef double REAL;
 typedef double2 REAL2;
 typedef double3 REAL3;
+typedef double8 REAL8;
 typedef double16 REAL16;
 //__constant double ONE=1.0;
 //__constant double HALF=0.5;
@@ -116,6 +118,10 @@ typedef double16 REAL16;
 #define PROJECTX0(CM, v0) dot(v0, CM.s012) / dot(v0, CM.s89a)
 
 #define PROJECTY0(CM, v0) dot(v0, CM.s456) / dot(v0, CM.s89a)
+
+#define PBPROJECTX(CM, v) dot(v, CM.s012) + CM.s3
+
+#define PBPROJECTY(CM, v) dot(v, CM.s456) + CM.s7
 
 #define INDEX(f) convert_int_rtn(f + HALF)
 
@@ -799,7 +805,8 @@ void inline exactEdgeValues0(global float* projection,
 // lambda = dot(v, Fvector)/-dot(d, Fvector)
 // clang-format on
 // When FproductVD1NEG or FproductVD3NEG are zero then basically all the segment is projected to
-// given index but we need to achieve p \in [0,1] and q\in[0,1] so that we have to solve it individually
+// given index but we need to achieve p \in [0,1] and q\in[0,1] so that we have to solve it
+// individually
 // I put it int the way to greedy select the biggest area possible
 inline REAL exactIntersectionPolygons0(const REAL PX,
                                        const REAL vd1,
@@ -1204,5 +1211,302 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
                                      -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
     vertexProjectionIndices[i + j * (vdims.x + 1) + k * (vdims.x + 1) * (vdims.y + 1)]
         = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
+}
+
+// Parallel beam geometry specific includes
+
+/**
+ * Used in FLOAT_pbct_cutting_voxel_project to traverse along PY
+ *
+ * @param projection
+ * @param CM
+ * @param v
+ * @param PX
+ * @param value
+ * @param voxelSizes
+ * @param pdims
+ */
+void inline PBexactEdgeValues(global float* projection,
+                              private REAL8 CM,
+                              private REAL3 v,
+                              private int PX,
+                              private REAL value,
+                              private REAL3 voxelSizes,
+                              private int2 pdims)
+{
+    projection = projection + PX * pdims.y;
+    const REAL PY_diff = CM.s6 * voxelSizes.s2;
+    REAL3 v_min;
+    REAL F, PY_min, PY_max; // PY_min + alpha F = PY for given PY
+    // for alpha=1 PY_min + F = PY_max
+    if(PY_diff > 0)
+    {
+        v_min = (REAL3)(v.x, v.y, v.z - HALF * voxelSizes.s2);
+        PY_min = PBPROJECTY(CM, v_min);
+        PY_max = PY_min + PY_diff;
+        F = PY_diff;
+    } else
+    {
+        v_min = (REAL3)(v.x, v.y, v.z + HALF * voxelSizes.s2);
+        PY_min = PBPROJECTY(CM, v_min);
+        PY_max = PY_min - PY_diff;
+        F = -PY_diff;
+    }
+    int PJ_min = convert_int_rtn(PY_min + HALF);
+    int PJ_max = convert_int_rtn(PY_max + HALF);
+#ifdef DROPINCOMPLETEVOXELS
+    if(PJ_min >= 0 && PJ_max < pdims.y)
+#else
+    if(PJ_max >= 0 && PJ_min < pdims.y)
+#endif
+    {
+        int J;
+        REAL lambda, leastLambda, lastLambda;
+        if(PJ_max >= pdims.y)
+        {
+            PJ_max = pdims.y - 1;
+            leastLambda = ((PJ_max + HALF) - PY_min) / F;
+        } else
+        {
+            leastLambda = ONE;
+        }
+        if(PJ_min < 0)
+        {
+            J = 0;
+            lastLambda = (-HALF - PY_min) / F;
+        } else
+        {
+            J = PJ_min;
+            lastLambda = ZERO;
+        }
+        for(; J < PJ_max; J++)
+        {
+            lambda = (J + HALF - PY_min) / F;
+            AtomicAdd_g_f(&projection[J], (lambda - lastLambda) * value);
+            lastLambda = lambda;
+        }
+        AtomicAdd_g_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
+    }
+}
+
+/**
+ * Used in FLOAT_pbct_cutting_voxel_backproject to traverse along PY
+ *
+ * @param projection
+ * @param CM
+ * @param v
+ * @param PX
+ * @param voxelSizes
+ * @param pdims
+ *
+ * @return
+ */
+float inline PBbackprojectExactEdgeValues(global const float* projection,
+                                          private REAL8 CM,
+                                          private REAL3 v,
+                                          private int PX,
+                                          private REAL3 voxelSizes,
+                                          private int2 pdims)
+{
+    projection = projection + PX * pdims.y;
+    const REAL PY_diff = CM.s6 * voxelSizes.s2;
+    REAL3 v_min;
+    REAL F, PY_min, PY_max; // PY_min + alpha F = PY for given PY
+    // for alpha=1 PY_min + F = PY_max
+    if(PY_diff > 0)
+    {
+        v_min = (REAL3)(v.x, v.y, v.z - HALF * voxelSizes.s2);
+        PY_min = PBPROJECTY(CM, v_min);
+        PY_max = PY_min + PY_diff;
+        F = PY_diff;
+    } else
+    {
+        v_min = (REAL3)(v.x, v.y, v.z + HALF * voxelSizes.s2);
+        PY_min = PBPROJECTY(CM, v_min);
+        PY_max = PY_min - PY_diff;
+        F = -PY_diff;
+    }
+    int PJ_min = convert_int_rtn(PY_min + HALF);
+    int PJ_max = convert_int_rtn(PY_max + HALF);
+    float ADD = 0.0f;
+#ifdef DROPINCOMPLETEVOXELS
+    if(PJ_min >= 0 && PJ_max < pdims.y)
+#else
+    if(PJ_max >= 0 && PJ_min < pdims.y)
+#endif
+    {
+        int J;
+        REAL lambda, leastLambda, lastLambda;
+        if(PJ_max >= pdims.y)
+        {
+            PJ_max = pdims.y - 1;
+            leastLambda = ((PJ_max + HALF) - PY_min) / F;
+        } else
+        {
+            leastLambda = ONE;
+        }
+        if(PJ_min < 0)
+        {
+            J = 0;
+            lastLambda = (-HALF - PY_min) / F;
+        } else
+        {
+            J = PJ_min;
+            lastLambda = ZERO;
+        }
+        for(; J < PJ_max; J++)
+        {
+            lambda = (J + HALF - PY_min) / F;
+            ADD += projection[J] * (lambda - lastLambda);
+            lastLambda = lambda;
+        }
+        ADD += projection[PJ_max] * (leastLambda - lastLambda);
+    }
+    return ADD; // Scaling by value is performed at the end
+}
+
+// clang-format off
+// const REAL vd1 = v1->x - v0->x; Nonzero x part
+// const REAL vd3 = v3->y - v0->y; Nonzero y part
+// polygon center of mass https://www.efunda.com/math/areas/Trapezoid.cfm to see
+// when I have polygon with p base and q top, then Tx=(p*p+p*q+q*q)/(3*(p+q)) Ty=(p+2q)/(3*(p+q))
+// when I take w=q/(3*(p+q)) I will have
+// Tx = p/3 + q*w Ty= 1/3 + w
+// Computation of CENTROID of rectangle with triangle cutout with p, q sides
+// NAREA_complement=(p*q)/2
+// NAREA = 1-NAREA_complement
+// In cutout corner
+// CENTROID = (0.5-p*NAREA_complement/3)/NAREA = 0.5 + (NAREA_COMPLEMENT/NAREA)(0.5 -(p/3)) = 0.5/NAREA - p*(ONETHIRD*NAREA_complement/NAREA)
+// Outside cutout corner
+// CENTROID = 0.5 - 0.5 * NAREA_COMPLEMENT/NAREA + (p/3)* NAREA_COMPLEMENT/NAREA
+// example when p_complement in oposite x corner and y coordinates of the corner are the same
+// w = HALF / NAREA;
+// w_complement = ONETHIRD * NAREA_complement / NAREA;
+// CENTROID = (REAL2)(vd1 * (ONE - w + p_complement * w_complement), vd3 * (w - q * w_complement));
+// When trying to find lambda(PX) tak, že PROJ(lambda(PX)) = PX on line v0 + lambda d
+// lambda = dot(v, Fvector)/-dot(d, Fvector)
+// clang-format on
+// When FproductVD1NEG or FproductVD3NEG are zero then basically all the segment is projected to
+// given index but we need to achieve p \in [0,1] and q\in[0,1] so that we have to solve it
+// individually
+// I put it int the way to greedy select the biggest area possible
+inline REAL PBexactIntersectionPolygons(const REAL PX,
+                                        const REAL vd1,
+                                        const REAL vd3,
+                                        const REAL3* v0,
+                                        const REAL* PX_xyx0,
+                                        const REAL* PX_xyx1,
+                                        const REAL* PX_xyx2,
+                                        const REAL* PX_xyx3,
+                                        const REAL8 CM,
+                                        REAL3 voxelSizes,
+                                        REAL2* centroid)
+{
+    REAL FX = vd1 * CM.s0;
+    REAL FY = vd3 * CM.s1;
+    REAL DST;
+    REAL p, q, p_complement;
+    REAL w, wcomplement, NAREA_complement;
+    REAL NAREA;
+    REAL2 CENTROID;
+    if(PX < (*PX_xyx1))
+    {
+        DST = PX - (*PX_xyx0);
+        if(FX)
+        {
+            p = DST / FX; // From v0 to v1
+        } else
+        {
+            p = ONE;
+        }
+        if(PX < (*PX_xyx3))
+        {
+            if(FY)
+                q = DST / FY; // From v0 to v3
+            else
+                q = ONE;
+            CENTROID = (REAL2)(p * vd1, q * vd3);
+            CENTROID *= ONETHIRD;
+            (*centroid) = v0->s01 + CENTROID;
+            NAREA = HALF * p * q;
+            return NAREA;
+        } else if(PX < (*PX_xyx2))
+        {
+            DST = PX - (*PX_xyx3);
+            if(FX)
+                q = DST / FX; // From v3 to v2
+            else
+                q = ONE;
+            CENTROID = (REAL2)((q - p) * vd1, voxelSizes.y);
+            NAREA = THREE * (p + q);
+            if(NAREA > ZERO)
+            {
+                w = q / NAREA;
+                CENTROID = (REAL2)(vd1 * (ONETHIRD * p + q * w), vd3 * (ONETHIRD + w));
+            } else
+            {
+                CENTROID = (REAL2)(ZERO, vd3 * HALF);
+            }
+            (*centroid) = v0->s01 + CENTROID;
+            NAREA = ONESIXTH * NAREA;
+            return NAREA;
+        } else
+        {
+            NAREA = ONE;
+            CENTROID = (REAL2)(HALF * vd1, HALF * vd3);
+            (*centroid) = v0->s01 + CENTROID;
+            return ONE;
+        }
+    } else if(PX < (*PX_xyx2))
+    {
+        DST = PX - (*PX_xyx2);
+        if(FY)
+            p = DST / -FY; // v2 to v1
+        else
+            p = ZERO;
+        if(PX < (*PX_xyx3))
+        {
+            p = ONE - p; // v1 to v2
+            DST = PX - (*PX_xyx0);
+            if(FY)
+                q = DST / FY; // v0 to v3
+            else
+                q = ONE;
+            CENTROID = (REAL2)(voxelSizes.x, (q - p) * vd3);
+            NAREA = THREE * (p + q);
+            if(NAREA > ZERO)
+            {
+                w = p / NAREA;
+                CENTROID = (REAL2)(vd1 * (ONETHIRD + w), vd3 * (p * w + ONETHIRD * q));
+            } else
+            {
+                CENTROID = (REAL2)(vd1 * HALF, ZERO);
+            }
+            (*centroid) = v0->s01 + CENTROID;
+            NAREA = ONESIXTH * NAREA;
+            return NAREA;
+        } else
+        {
+            if(FX)
+                q = DST / -FX; // v2 to v3
+            else
+                q = ZERO;
+            CENTROID = (REAL2)(q * vd1, p * vd3);
+            NAREA_complement = HALF * p * q;
+            NAREA = ONE - NAREA_complement;
+            w = HALF / NAREA;
+            wcomplement = ONETHIRD * NAREA_complement / NAREA;
+            CENTROID
+                = (REAL2)(vd1 * (ONE - w + q * wcomplement), vd3 * (ONE - w + p * wcomplement));
+            (*centroid) = v0->s01 + CENTROID;
+            return NAREA;
+        }
+    } else
+    {
+        NAREA = ONE;
+        CENTROID = (REAL2)(HALF * vd1, HALF * vd3);
+        (*centroid) = v0->s01 + CENTROID;
+        return ONE;
+    }
 }
 //==============================END include.cl=====================================

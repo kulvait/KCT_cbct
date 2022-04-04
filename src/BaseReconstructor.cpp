@@ -780,11 +780,11 @@ void BaseReconstructor::reportTime(std::string msg, bool finishCommandQueue, boo
 
 void BaseReconstructor::setReportingParameters(bool verbose,
                                                uint32_t reportKthIteration,
-                                               std::string progressPrefixPath)
+                                               std::string intermediatePrefix)
 {
     this->verbose = verbose;
     this->reportKthIteration = reportKthIteration;
-    this->progressPrefixPath = progressPrefixPath;
+    this->intermediatePrefix = intermediatePrefix;
 }
 
 double BaseReconstructor::adjointProductTest()

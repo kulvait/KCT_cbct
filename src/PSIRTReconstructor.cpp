@@ -75,10 +75,10 @@ int PSIRTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         // algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, alpha * p, XDIM);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
     }
     LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
@@ -141,10 +141,10 @@ int PSIRTReconstructor::reconstruct_sirt(uint32_t maxIterations, float errCondit
         // algFLOATvector_A_equals_A_plus_cB(*x_buf, *update_xbuf, alpha * p, XDIM);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
     }
     LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",

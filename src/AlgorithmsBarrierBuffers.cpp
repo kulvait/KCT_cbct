@@ -164,11 +164,12 @@ double AlgorithmsBarrierBuffers::normBBuffer_barrier_double(cl::Buffer& B)
         KCTERR(err);
     }*/
     algvector_NormSquarePartial_barrier(B, *tmp_b_red1, BDIM, BDIM_ALIGNED, workGroupSize);
-/*
-    cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
-*/
+    /*
+        cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
+                                   cl::NDRange(workGroupSize));
+        (*vector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize,
+       BDIM_REDUCED1);
+    */
     algvector_SumPartial_barrier(*tmp_b_red1, *tmp_b_red2, BDIM_REDUCED1, BDIM_REDUCED1_ALIGNED,
                                  workGroupSize);
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
@@ -312,41 +313,81 @@ float AlgorithmsBarrierBuffers::normBBuffer_barrier(cl::Buffer& B)
     return sum;
 }
 
-/**
- * Copy given float vector into the buffer. The buffer must have appropriate size.
- *
- * @param X Buffer
- * @param v vector
- * @param size size
- *
- * @return
- */
-int AlgorithmsBarrierBuffers::vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size)
+int AlgorithmsBarrierBuffers::arrayIntoBuffer(float* c_array, cl::Buffer cl_buffer, uint64_t size)
 {
-    cl_int err = CL_SUCCESS;
-    std::string e;
-    std::size_t bufferSize;
-    X.getInfo(CL_MEM_SIZE, &bufferSize);
-    std::size_t totalSize = size * sizeof(float);
-    e = io::xprintf("The buffer is %d bytes to represent vector of size %d that is %d bytes.",
-                    bufferSize, size, totalSize);
-    LOGE << e;
-    if(bufferSize >= totalSize)
+    std::string msg;
+    if(c_array != nullptr)
     {
-        err = Q[0]->enqueueWriteBuffer(X, CL_TRUE, 0, totalSize, (void*)v);
-        if(err != CL_SUCCESS)
+        uint64_t arrayByteSize = size * sizeof(float);
+        uint64_t bufferSize;
+        cl_int err = CL_SUCCESS;
+        cl_buffer.getInfo(CL_MEM_SIZE, &bufferSize);
+        if(bufferSize >= arrayByteSize)
         {
-            e = io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
-            LOGE << e;
-            throw std::runtime_error(e);
+            if(bufferSize != arrayByteSize)
+            {
+                msg = io::xprintf(
+                    "The buffer of %lu bytes is larger than array of size %lu that is %lu bytes.",
+                    bufferSize, size, arrayByteSize);
+                LOGD << msg;
+            }
+            // Actual code here
+            err = Q[0]->enqueueWriteBuffer(cl_buffer, CL_TRUE, 0, arrayByteSize, (void*)c_array);
+            if(err != CL_SUCCESS)
+            {
+                msg = io::xprintf("Failed arrayIntoBuffer with code %d!", err);
+                KCTERR(msg);
+            }
+        } else
+        {
+            msg = io::xprintf("The buffer of %lu bytes is too small to represent vector of size "
+                              "%lu that is %lu bytes.",
+                              bufferSize, size, arrayByteSize);
+            KCTERR(msg);
         }
     } else
     {
-        e = io::xprintf(
-            "The buffer is too small %d bytes to represent vector of size %d that is %d bytes.",
-            bufferSize, size, totalSize);
-        LOGE << e;
-        throw std::runtime_error(e);
+        KCTERR("Null pointer exception!");
+    }
+    return 0;
+}
+
+int AlgorithmsBarrierBuffers::bufferIntoArray(cl::Buffer cl_buffer, float* c_array, uint64_t size)
+{
+    std::string msg;
+    if(c_array != nullptr)
+    {
+        uint64_t arrayByteSize = size * sizeof(float);
+        uint64_t bufferSize;
+        cl_int err = CL_SUCCESS;
+        cl_buffer.getInfo(CL_MEM_SIZE, &bufferSize);
+        if(bufferSize <= arrayByteSize)
+        {
+            if(bufferSize != arrayByteSize)
+            {
+                msg = io::xprintf(
+                    "The buffer of %lu bytes is smaller than array of size %lu that is %lu bytes.",
+                    bufferSize, size, arrayByteSize);
+                LOGD << msg;
+            }
+            // Actual code here
+            err = Q[0]->enqueueReadBuffer(cl_buffer, CL_TRUE, 0, arrayByteSize, (void*)c_array);
+            if(err != CL_SUCCESS)
+            {
+                std::string msg = io::xprintf("Failed bufferIntoArray with code %d!", err);
+                KCTERR(msg);
+            }
+        } else
+        {
+            msg = io::xprintf(
+                "The buffer of %lu bytes is too big to be written to the vector of size "
+                "%lu that is %lu bytes.",
+                bufferSize, size, arrayByteSize);
+            KCTERR(msg);
+        }
+    } else
+    {
+        KCTERR("Null pointer exception!");
     }
     return 0;
 }

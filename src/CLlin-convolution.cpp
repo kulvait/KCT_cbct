@@ -33,6 +33,7 @@
 
 using namespace KCT;
 using namespace KCT::util;
+using namespace KCT::io;
 
 /**Arguments parsed by the main function.
  */
@@ -84,9 +85,9 @@ public:
             return -1;
         }
         io::DenSupportedType t = inf.getDataType();
-        if(t != io::DenSupportedType::float_)
+        if(t != io::DenSupportedType::FLOAT32)
         {
-            ERR = io::xprintf("This program supports float volumes only but the supplied "
+            ERR = io::xprintf("This program supports FLOAT32 volumes only but the supplied "
                               "projection file %s is "
                               "of type %s",
                               inputVolume.c_str(), io::DenSupportedTypeToString(t).c_str());
@@ -220,11 +221,14 @@ int main(int argc, char* argv[])
         std::string gx = io::xprintf("%s_x", ARG.outputVolume.c_str());
         std::string gy = io::xprintf("%s_y", ARG.outputVolume.c_str());
         std::string gz = io::xprintf("%s_z", ARG.outputVolume.c_str());
-        io::DenFileInfo::createDenHeader(gx, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
+        io::DenFileInfo::create3DDenHeader(gx, DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                           ARG.volumeSizeY, ARG.volumeSizeZ);
         io::appendBytes(gx, (uint8_t*)vx, totalArraySize);
-        io::DenFileInfo::createDenHeader(gy, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
+        io::DenFileInfo::create3DDenHeader(gy, DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                           ARG.volumeSizeY, ARG.volumeSizeZ);
         io::appendBytes(gy, (uint8_t*)vy, totalArraySize);
-        io::DenFileInfo::createDenHeader(gz, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
+        io::DenFileInfo::create3DDenHeader(gz, DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                           ARG.volumeSizeY, ARG.volumeSizeZ);
         io::appendBytes(gz, (uint8_t*)vz, totalArraySize);
         delete[] vx;
         delete[] vy;
@@ -247,8 +251,8 @@ int main(int argc, char* argv[])
             std::string kernelName = "Laplace";
             VCO.convolve(kernelName, volume);
         }
-        io::DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                         ARG.volumeSizeZ);
+        io::DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
+                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
         uint64_t totalArraySize = ARG.totalVolumeSize * sizeof(float);
         io::appendBytes(ARG.outputVolume, (uint8_t*)volume, totalArraySize);
         delete[] volume;

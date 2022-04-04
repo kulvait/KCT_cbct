@@ -17,16 +17,17 @@
 
 // Internal libraries
 #include "CArmArguments.hpp"
-#include "CuttingVoxelProjector.hpp"
 #include "DEN/DenAsyncFrame2DWritter.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
+#include "DEN/DenGeometry3DParallelReader.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "MATRIX/LightProjectionMatrix.hpp"
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/ArgumentsFramespec.hpp"
 #include "PROG/Program.hpp"
+#include "ParallelBeamProjector.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
 using namespace KCT;
@@ -57,6 +58,9 @@ public:
         }
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
+        // Number of projections equals the size of the frames vector
+        fillFramesVector(pmi.dimz());
+        projectionSizeZ = frames.size();
         io::DenFileInfo inf(inputVolume);
         volumeSizeX = inf.dimx();
         volumeSizeY = inf.dimy();
@@ -87,7 +91,6 @@ public:
             return -1;
         }
         parsePlatformString();
-        fillFramesVector(pmi.dimz());
         return 0;
     }
     void defineArguments();
@@ -99,6 +102,7 @@ public:
     bool noFrameOffset = false;
     std::string inputVolume;
     std::string inputProjectionMatrices;
+    std::string inputDetectorTilts;
     std::string outputProjection;
     std::string rightHandSide = "";
 };
@@ -112,17 +116,24 @@ public:
  */
 void Args::defineArguments()
 {
-
-    cliApp->add_option("input_volume", inputVolume, "Volume to project")
+    std::string optstr;
+    cliApp
+        ->add_option("input_volume", inputVolume, "Volume to project FLOAT32 [sizex, sizey, sizez]")
         ->required()
         ->check(CLI::ExistingFile);
     cliApp
         ->add_option("input_projection_matrices", inputProjectionMatrices,
-                     "Projection matrices to be input of the computation."
-                     "Files in a DEN format that contains projection matricess to process.")
+                     "Projection matrices of parallel ray geometry to be input of the computation."
+                     "Files in FLOAT64 DEN format that contains projection matricess to process "
+                     "with the dimensions [4,2,dimz].")
         ->required()
         ->check(CLI::ExistingFile);
     cliApp->add_option("output_projection", outputProjection, "Output projection")->required();
+    optstr = "Detector tilt encoded as positive cosine between normal to the detector and surface "
+             "orthogonal to incomming rays. FLOAT64 file of the dimensions (1, 1, dimz). If no "
+             "file is supplied, orthogonality of incomming rays to the detector is assumed, that "
+             "effectivelly means all these parameters are 1.0.";
+    cliApp->add_option("--detectorTilt", inputDetectorTilts, optstr);
     addForceArgs();
     addFramespecArgs();
     addCuttingVoxelProjectorArgs(true);
@@ -146,7 +157,8 @@ int main(int argc, char* argv[])
 {
     using namespace KCT::util;
     Program PRG(argc, argv);
-    std::string prgInfo = "OpenCL implementation of the cutting voxel projector.";
+    std::string prgInfo
+        = "OpenCL implementation of the PBCVP and other projectors for parallel rays geometry.";
     if(version::MODIFIED_SINCE_COMMIT == true)
     {
         prgInfo = io::xprintf("%s Dirty commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
@@ -165,109 +177,79 @@ int main(int argc, char* argv[])
     }
     PRG.startLog(true);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
-    std::shared_ptr<io::DenProjectionMatrixReader> dr
-        = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
+    std::shared_ptr<io::DenGeometry3DParallelReader> geometryReader
+        = std::make_shared<io::DenGeometry3DParallelReader>(ARG.inputProjectionMatrices,
+                                                            ARG.inputDetectorTilts);
+    std::vector<std::shared_ptr<geometry::Geometry3DParallelI>> geometryVector;
+    std::shared_ptr<geometry::Geometry3DParallelI> geometry;
+    for(uint32_t i = 0; i != ARG.frames.size(); i++)
+    {
+        uint32_t k = ARG.frames[i];
+        geometry = std::make_shared<geometry::Geometry3DParallel>(geometryReader->readGeometry(k));
+        geometryVector.emplace_back(geometry);
+    }
     cl::NDRange projectorLocalNDRange = cl::NDRange(
         ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1], ARG.projectorLocalNDRange[2]);
+    cl::NDRange backprojectorLocalNDRange
+        = cl::NDRange(ARG.backprojectorLocalNDRange[0], ARG.backprojectorLocalNDRange[1],
+                      ARG.backprojectorLocalNDRange[2]);
 
     // Construct projector and initialize OpenCL
-    CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX,
-                              ARG.volumeSizeY, ARG.voxelSizeZ, projectorLocalNDRange);
-    // CVP.initializeAllAlgorithms();
+    ParallelBeamProjector PBCVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ,
+                                ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
+                                ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
+                                backprojectorLocalNDRange);
+    // PBCVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {
-        CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        PBCVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
     } else if(ARG.useTTProjector)
     {
 
-        CVP.initializeTTProjector();
+        PBCVP.initializeTTProjector();
     } else
     {
-        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
-                                   ARG.useBarrierCalls, ARG.barrierArraySize);
+        PBCVP.initializeCVPProjector(ARG.useBarrierCalls, ARG.barrierArraySize);
     }
-    int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
-                                   xpath, ARG.CLdebug, ARG.CLrelaxed);
+    int ecd = PBCVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
+                                     xpath, ARG.CLdebug, ARG.CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
         KCTERR(ERR);
     }
-    CVP.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
-                     ARG.volumeCenterY, ARG.volumeCenterZ);
-    // Write individual submatrices
-    LOGD << io::xprintf("Number of projections to process is %d.", ARG.frames.size());
-    // End parsing arguments
+    PBCVP.problemSetup(geometryVector, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
+                       ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
     float* volume = new float[ARG.totalVolumeSize];
+    LOGE << io::xprintf("Allocating projection array of the size %lu elements and %lu bytes.",
+                        ARG.totalProjectionSize, ARG.totalProjectionSize * 4);
+    float* projection = new float[ARG.totalProjectionSize];
+    float* projection_rhs = nullptr;
     io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
     bool readxmajor = true;
     inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
-    CVP.initializeOrUpdateVolumeBuffer(ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, volume);
-    CVP.initializeOrUpdateProjectionBuffer(ARG.projectionSizeX, ARG.projectionSizeY, 1);
-    uint32_t projectionElementsCount = ARG.projectionSizeX * ARG.projectionSizeY;
-    float* projection = new float[projectionElementsCount]();
-    uint16_t buf[3];
-    buf[0] = ARG.projectionSizeY;
-    buf[1] = ARG.projectionSizeX;
-    buf[2] = ARG.frames.size();
-    io::createEmptyFile(ARG.outputProjection, 0, true); // Try if this is faster
-    io::appendBytes(ARG.outputProjection, (uint8_t*)buf, (uint64_t)6);
-    double normSquare = 0;
-    double normSquareDifference = 0;
-    std::shared_ptr<io::DenFrame2DReader<float>> dpr = nullptr;
     if(!ARG.rightHandSide.empty())
     {
-        LOGD << io::xprintf("Initialize RHS");
-        dpr = std::make_shared<io::DenFrame2DReader<float>>(ARG.rightHandSide);
-    }
-    io::DenAsyncFrame2DWritter<float> projectionWritter(ARG.outputProjection, ARG.projectionSizeX,
-                                                        ARG.projectionSizeY, ARG.frames.size());
-    for(uint32_t i = 0; i != ARG.frames.size(); i++)
+        LOGD << io::xprintf(io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
+        projection_rhs = new float[ARG.totalProjectionSize];
+        io::DenFileInfo rhsInfo(ARG.rightHandSide);
+        readxmajor = false; // Projections are y-major
+        rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
+        PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
+    } else
     {
-        uint32_t f = ARG.frames[i];
-        using namespace KCT::matrix;
-        std::shared_ptr<CameraI> P = std::make_shared<LightProjectionMatrix>(dr->readMatrix(f));
-        if(ARG.useSidonProjector)
-        {
-            CVP.projectSidon(projection, P);
-        } else if(ARG.useTTProjector)
-        {
-            CVP.projectTA3(projection, P);
-        } else
-        {
-            if(ARG.useCosScaling)
-            {
-                CVP.projectCos(projection, P);
-            } else if(ARG.useNoScaling)
-            {
-                CVP.projectorWithoutScaling(projection, P);
-            } else
-            {
-                CVP.projectExact(projection, P);
-            }
-        }
-        if(dpr != nullptr)
-        {
-            std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(f);
-            normSquare += CVP.normSquare((float*)fr->getDataPointer(), ARG.projectionSizeX,
-                                         ARG.projectionSizeY);
-            normSquareDifference += CVP.normSquareDifference(
-                (float*)fr->getDataPointer(), ARG.projectionSizeX, ARG.projectionSizeY);
-        }
-        io::BufferedFrame2D<float> transposedFrame(projection, ARG.projectionSizeY,
-                                                   ARG.projectionSizeX);
-        std::shared_ptr<io::Frame2DI<float>> frame = transposedFrame.transposed();
-        projectionWritter.writeFrame(*frame, i);
-        std::fill_n(projection, projectionElementsCount, float(0.0));
+        PBCVP.project(volume, projection);
     }
+    bool projectionxmajor = false;
+    bool writexmajor = true;
+    io::DenFileInfo::create3DDenFileFromArray(
+        projection, projectionxmajor, ARG.outputProjection, io::DenSupportedType::FLOAT32,
+        ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, writexmajor);
     delete[] volume;
     delete[] projection;
-    if(dpr != nullptr)
+    if(projection_rhs != nullptr)
     {
-        LOGI << io::xprintf(
-            "Initial norm is %f, norm of the difference  is %f that is %f%% of the initial norm.",
-            std::sqrt(normSquare), std::sqrt(normSquareDifference),
-            std::sqrt(normSquareDifference / normSquare) * 100);
+        delete[] projection_rhs;
     }
     PRG.endLog(true);
 }

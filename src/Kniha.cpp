@@ -724,6 +724,31 @@ void Kniha::CLINCLUDEconvolution()
     });
 }
 
+void Kniha::CLINCLUDEpbct_cvp()
+{
+    insertCLFile("opencl/pbct_cvp.cl");
+    callbacks.emplace_back([this](cl::Program program) {
+        {
+            auto& ptr = FLOAT_pbct_cutting_voxel_project;
+            std::string str = "FLOAT_pbct_cutting_voxel_project";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOAT_pbct_cutting_voxel_backproject;
+            std::string str = "FLOAT_pbct_cutting_voxel_backproject";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+    });
+}
+
 void Kniha::insertCLFile(std::string f)
 {
     if(std::find(CLFiles.begin(), CLFiles.end(), f) == CLFiles.end())
@@ -1441,6 +1466,86 @@ int Kniha::algFLOATvector_isotropicBackDz(cl::Buffer& F,
     };
 
     auto exe = (*FLOATvector_isotropicBackDz)(*eargs, F, DZ, vdims, voxelSizes);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOAT_pbct_cutting_voxel_project(
+    cl::Buffer& volume,
+    cl::Buffer& projection,
+    unsigned long& projectionOffset,
+    cl_double8& CM,
+    cl_int3& vdims,
+    cl_double3& voxelSizes,
+    cl_double3& volumeCenter,
+    cl_int2& pdims,
+    float globalScalingMultiplier,
+    cl::NDRange& globalRange,
+    std::shared_ptr<cl::NDRange> localRange, // default nullptr
+    bool blocking) // default false
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
+    auto exe = (*FLOAT_pbct_cutting_voxel_project)(*eargs, volume, projection, projectionOffset, CM,
+                                                   vdims, voxelSizes, volumeCenter, pdims,
+                                                   globalScalingMultiplier);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOAT_pbct_cutting_voxel_backproject(
+    cl::Buffer& volume,
+    cl::Buffer& projection,
+    unsigned long& projectionOffset,
+    cl_double8& CM,
+    cl_int3& vdims,
+    cl_double3& voxelSizes,
+    cl_double3& volumeCenter,
+    cl_int2& pdims,
+    float globalScalingMultiplier,
+    cl::NDRange& globalRange,
+    std::shared_ptr<cl::NDRange> localRange, // default nullptr
+    bool blocking) // default false
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
+    auto exe = (*FLOAT_pbct_cutting_voxel_backproject)(*eargs, volume, projection, projectionOffset,
+                                                       CM, vdims, voxelSizes, volumeCenter, pdims,
+                                                       globalScalingMultiplier);
     exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)
     {

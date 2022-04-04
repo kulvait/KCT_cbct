@@ -16,9 +16,9 @@
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "MATRIX/utils.hpp"
 #include "OPENCL/OpenCLManager.hpp"
+#include "PROG/KCTException.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
-#include "PROG/KCTException.hpp"
 
 using namespace KCT::matrix;
 namespace KCT {
@@ -27,12 +27,12 @@ class AlgorithmsBarrierBuffers : public virtual Kniha
 {
 public:
     AlgorithmsBarrierBuffers(uint32_t pdimx,
-                            uint32_t pdimy,
-                            uint32_t pdimz,
-                            uint32_t vdimx,
-                            uint32_t vdimy,
-                            uint32_t vdimz,
-                            uint32_t workGroupSize = 256)
+                             uint32_t pdimy,
+                             uint32_t pdimz,
+                             uint32_t vdimx,
+                             uint32_t vdimy,
+                             uint32_t vdimz,
+                             uint32_t workGroupSize = 256)
         : pdimx(pdimx)
         , pdimy(pdimy)
         , pdimz(pdimz)
@@ -111,15 +111,25 @@ protected:
     double scalarProductXBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B);
 
     /**
-     * Copy given float vector into the buffer. The buffer must have appropriate size.
+     * Copy float* array of size elements into the CL::buffer. The buffer must have appropriate size.
      *
-     * @param X Buffer
-     * @param v vector
-     * @param size size
+     * @param c_array Block of C memory
+     * @param cl_buffer Block of OpenCL memory
+     * @param size number of elements in c_array
      *
-     * @return
+     * @return 0 on success
      */
-    int vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size);
+    int arrayIntoBuffer(float* c_array, cl::Buffer cl_buffer, uint64_t size);
+    /**
+     * Copy CL:buffer into the float* array of size elements. The buffer must have appropriate size.
+     *
+     * @param cl_buffer Block of OpenCL memory
+     * @param c_array Block of C memory
+     * @param size number of elements in c_array
+     *
+     * @return 0 on success
+     */
+    int bufferIntoArray(cl::Buffer cl_buffer, float* c_array, uint64_t size);
 
     std::shared_ptr<cl::Buffer> tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
     std::shared_ptr<cl::Buffer> tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;

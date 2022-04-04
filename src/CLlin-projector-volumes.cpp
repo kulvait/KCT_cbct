@@ -102,7 +102,7 @@ int Args::postParse()
     {
         inf = io::DenFileInfo(inputVolumes[i]);
         io::DenSupportedType t = inf.getDataType();
-        if(t != io::DenSupportedType::float_)
+        if(t != io::DenSupportedType::FLOAT32)
         {
             std::string msg = io::xprintf("This program supports float volumes only but the "
                                           "supplied volume is of type %s!",

@@ -103,10 +103,10 @@ int OSSARTReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
                                   iteration, norm, 100.0 * norm / NB0);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
     }
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);

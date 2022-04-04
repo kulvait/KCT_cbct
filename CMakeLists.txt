@@ -143,6 +143,7 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl opencl/projector_tt.cl
 configure_file(${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl opencl/rescaleProjections.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/convolution.cl opencl/convolution.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/pbct_cvp.cl opencl/pbct_cvp.cl COPYONLY)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
@@ -160,6 +161,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/convolution.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/pbct_cvp.cl DESTINATION opencl)
 
 
 SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
@@ -287,6 +289,43 @@ target_compile_definitions(CLlin-krylov PUBLIC CL_TARGET_OPENCL_VERSION=120)
 target_git_version_init(CLlin-krylov)
 install (TARGETS CLlin-krylov RUNTIME DESTINATION .)
 
+SET(CLLINCGLS_SOURCES src/kct-pb-krylov.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/BasePBCTOperator.cpp)
+add_executable(kct-pb-krylov ${CLLINCGLS_SOURCES})
+set_target_properties(
+    kct-pb-krylov
+    PROPERTIES 
+        OUTPUT_NAME "kct-pb-krylov"
+        SUFFIX ""
+)
+target_link_libraries(kct-pb-krylov ctiol)
+target_link_libraries(kct-pb-krylov ctmal)
+target_link_libraries(kct-pb-krylov OpenCL::OpenCL)
+target_link_libraries(kct-pb-krylov CTIOL_OPENCL)
+#target_link_libraries (kct-pb-krylov ${CMAKE_THREAD_LIBS_INIT})
+target_include_directories(kct-pb-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(kct-pb-krylov PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_compile_definitions(kct-pb-krylov PUBLIC CL_TARGET_OPENCL_VERSION=120)
+target_git_version_init(kct-pb-krylov)
+install (TARGETS kct-pb-krylov RUNTIME DESTINATION .)
+
+SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp)
+add_executable(kct-pb-projector ${CLLINCGLS_SOURCES})
+set_target_properties(
+    kct-pb-projector
+    PROPERTIES 
+        OUTPUT_NAME "kct-pb-projector"
+        SUFFIX ""
+)
+target_link_libraries(kct-pb-projector ctiol)
+target_link_libraries(kct-pb-projector ctmal)
+target_link_libraries(kct-pb-projector OpenCL::OpenCL)
+target_link_libraries(kct-pb-projector CTIOL_OPENCL)
+#target_link_libraries (kct-pb-projector ${CMAKE_THREAD_LIBS_INIT})
+target_include_directories(kct-pb-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(kct-pb-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_compile_definitions(kct-pb-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)
+target_git_version_init(kct-pb-projector)
+install (TARGETS kct-pb-projector RUNTIME DESTINATION .)
 
 
 SET(CLLINJACOBIGLSQR_SOURCES src/JacobiGLSQRReconstructor.cpp src/CLlin-jacobiglsqr.cpp)

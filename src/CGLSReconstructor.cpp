@@ -54,10 +54,10 @@ int CGLSReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         // DEBUG
         if(iteration % 1000 == 0)
@@ -537,10 +537,10 @@ int CGLSReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCond
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         // DEBUG
         if(iteration % 1000 == 0)
@@ -710,10 +710,10 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         // DEBUG
         if(iteration % 10 == 0)
@@ -737,11 +737,11 @@ int CGLSReconstructor::reconstructDiagonalPreconditioner(
                                     *preconditionedResidualVector_xbuf, XDIM);
         //        writeVolume(
         //            *residualVector_xbuf,
-        //            io::xprintf("%sresidualVector_xbuf_it%02d.den", progressPrefixPath.c_str(),
+        //            io::xprintf("%sresidualVector_xbuf_it%02d.den", intermediatePrefix.c_str(),
         //            iteration));
         //        writeVolume(*preconditionedResidualVector_xbuf,
         //                    io::xprintf("%spreconditionedResidualVector_xbuf_it%02d.den",
-        //                                progressPrefixPath.c_str(), iteration));
+        //                                intermediatePrefix.c_str(), iteration));
         reportTime(io::xprintf("Backprojection %d", iteration), blockingReport, true);
         residualNorm2_now = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
                                                                 *preconditionedResidualVector_xbuf);
@@ -792,8 +792,8 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     reportTime("CGLS INIT", false, true);
     if(verbose)
     {
-        // writeProjections(*b_buf, io::xprintf("%sb.den", progressPrefixPath.c_str()));
-        // writeVolume(*x_buf, io::xprintf("%sx_0.den", progressPrefixPath.c_str()));
+        // writeProjections(*b_buf, io::xprintf("%sb.den", intermediatePrefix.c_str()));
+        // writeVolume(*x_buf, io::xprintf("%sx_0.den", intermediatePrefix.c_str()));
     }
     uint32_t iteration = 0;
     double norm, vnorm2_old, vnorm2_now, dnorm2_old, alpha, beta;
@@ -850,7 +850,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     reportTime("v_0 backprojection", false, true);
     if(verbose)
     {
-        // writeVolume(*v_buf, io::xprintf("%sv_0.den", progressPrefixPath.c_str()));
+        // writeVolume(*v_buf, io::xprintf("%sv_0.den", intermediatePrefix.c_str()));
     }
     vnorm2_old = normXBuffer_barrier_double(*v_buf);
     // EXPERIMENTAL
@@ -867,7 +867,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     // EXPERIMENTAL
     if(verbose)
     {
-        // writeVolume(*w_buf, io::xprintf("%sw_0.den", progressPrefixPath.c_str()));
+        // writeVolume(*w_buf, io::xprintf("%sw_0.den", intermediatePrefix.c_str()));
     }
     project(*w_buf, *d_buf);
     // Experimental
@@ -879,7 +879,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     reportTime("d_0 projection", false, true);
     if(verbose)
     {
-        // writeProjections(*d_buf, io::xprintf("%sd_0.den", progressPrefixPath.c_str()));
+        // writeProjections(*d_buf, io::xprintf("%sd_0.den", intermediatePrefix.c_str()));
     }
     dnorm2_old = normBBuffer_barrier_double(*d_buf);
     while(norm / NB0 > errCondition && iteration < maxIterations)
@@ -895,13 +895,13 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         // EXPERIMENTAL
         if(verbose)
         {
-            writeVolume(*x_buf, io::xprintf("%sx_%d.den", progressPrefixPath.c_str(), iteration));
+            writeVolume(*x_buf, io::xprintf("%sx_%d.den", intermediatePrefix.c_str(), iteration));
         }
         addIntoFirstVectorSecondVectorScaled(*c_buf, *d_buf, -alpha, BDIM);
         if(verbose)
         {
             //    writeProjections(*c_buf,
-            //                     io::xprintf("%sc_%d.den", progressPrefixPath.c_str(),
+            //                     io::xprintf("%sc_%d.den", intermediatePrefix.c_str(),
             //                     iteration));
         }
         backproject(*c_buf, *v_buf);
@@ -916,7 +916,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
 
         if(verbose)
         {
-            //    writeVolume(*v_buf, io::xprintf("%sv_%d.den", progressPrefixPath.c_str(),
+            //    writeVolume(*v_buf, io::xprintf("%sv_%d.den", intermediatePrefix.c_str(),
             //    iteration));
         }
         vnorm2_now = normXBuffer_barrier_double(*v_buf);
@@ -936,7 +936,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         // EXPERIMENTAL
         if(verbose)
         {
-            //    writeVolume(*w_buf, io::xprintf("%sw_%d.den", progressPrefixPath.c_str(),
+            //    writeVolume(*w_buf, io::xprintf("%sw_%d.den", intermediatePrefix.c_str(),
             //    iteration));
         }
         addIntoFirstVectorSecondVectorScaled(*tmp_b_buf, *d_buf, alpha, BDIM);
@@ -951,7 +951,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         if(verbose)
         {
             //    writeProjections(*d_buf,
-            //                     io::xprintf("%sd_%d.den", progressPrefixPath.c_str(),
+            //                     io::xprintf("%sd_%d.den", intermediatePrefix.c_str(),
             //                     iteration));
         }
         dnorm2_old = normBBuffer_barrier_double(*d_buf);
@@ -988,12 +988,12 @@ int CGLSReconstructor::reconstructJacobi(uint32_t maxIterations, float errCondit
         // TODO: Is the following line neccessarry?
         // Without this problematic
         algFLOATvector_substitute_greater_than(*minmax_xbuf, 0.0, 1.0, XDIM);
-        writeVolume(*minmax_xbuf, io::xprintf("%sx_minmax.den", progressPrefixPath.c_str()));
+        writeVolume(*minmax_xbuf, io::xprintf("%sx_minmax.den", intermediatePrefix.c_str()));
         algFLOATvector_A_equals_A_times_B(*preconditioner_xbuf, *minmax_xbuf, XDIM);
     }
-    LOGD << io::xprintf("Writing file %s_preconditioner.inv", progressPrefixPath.c_str());
+    LOGD << io::xprintf("Writing file %s_preconditioner.inv", intermediatePrefix.c_str());
     writeVolume(*preconditioner_xbuf,
-                io::xprintf("%sx_preconditioner.inv", progressPrefixPath.c_str()));
+                io::xprintf("%sx_preconditioner.inv", intermediatePrefix.c_str()));
     reconstructDiagonalPreconditioner(preconditioner_xbuf, maxIterations, errCondition);
     return 0;
 }
@@ -1017,8 +1017,8 @@ void CGLSReconstructor::precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffe
                                                          normalToDetector, vdims, voxelSizes,
                                                          volumeCenter, pdims, scalingFactor);
     }
-    LOGD << io::xprintf("Writing file %s_preconditioner.den", progressPrefixPath.c_str());
-    writeVolume(*X, io::xprintf("%sx_preconditioner.den", progressPrefixPath.c_str()));
+    LOGD << io::xprintf("Writing file %s_preconditioner.den", intermediatePrefix.c_str());
+    writeVolume(*X, io::xprintf("%sx_preconditioner.den", intermediatePrefix.c_str()));
 }
 
 int CGLSReconstructor::reconstructDiagonalPreconditioner(float* invertedpreconditioner,

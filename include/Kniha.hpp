@@ -67,9 +67,10 @@ public:
     void CLINCLUDErescaleProjections();
     void CLINCLUDEutils();
     void CLINCLUDEconvolution();
+    void CLINCLUDEpbct_cvp();
 
 protected:
-    const cl_float FLOATZERO = 0.0;
+    const cl_float FLOATZERO = 0.0f;
     const cl_double DOUBLEZERO = 0.0;
     float FLOATONE = 1.0f;
 
@@ -591,6 +592,53 @@ protected:
                                        cl::NDRange& globalRange,
                                        std::shared_ptr<cl::NDRange> localRange = nullptr,
                                        bool blocking = false);
+
+    // pbct_cvp.cl
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned long&,
+                                    cl_double8&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOAT_pbct_cutting_voxel_project;
+    int algFLOAT_pbct_cutting_voxel_project(cl::Buffer& volume,
+                                            cl::Buffer& projection,
+                                            unsigned long& projectionOffset,
+                                            cl_double8& CM,
+                                            cl_int3& vdims,
+                                            cl_double3& voxelSizes,
+                                            cl_double3& volumeCenter,
+                                            cl_int2& pdims,
+                                            float globalScalingMultiplier,
+                                            cl::NDRange& globalRange,
+                                            std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                            bool blocking = false);
+
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned long&,
+                                    cl_double8&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOAT_pbct_cutting_voxel_backproject;
+    int algFLOAT_pbct_cutting_voxel_backproject(cl::Buffer& volume,
+                                                cl::Buffer& projection,
+                                                unsigned long& projectionOffset,
+                                                cl_double8& CM,
+                                                cl_int3& vdims,
+                                                cl_double3& voxelSizes,
+                                                cl_double3& volumeCenter,
+                                                cl_int2& pdims,
+                                                float globalScalingMultiplier,
+                                                cl::NDRange& globalRange,
+                                                std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                                bool blocking = false);
 
 private:
     /**

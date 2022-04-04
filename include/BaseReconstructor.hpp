@@ -540,7 +540,7 @@ public:
 
     void setReportingParameters(bool verbose,
                                 uint32_t reportKthIteration = 0,
-                                std::string progressPrefixPath = "");
+                                std::string intermediatePrefix = "");
 
 protected:
     const cl_float FLOATZERO = 0.0;
@@ -651,7 +651,7 @@ protected:
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
 
     bool verbose = false;
-    std::string progressPrefixPath = "";
+    std::string intermediatePrefix = "";
     uint32_t reportKthIteration = 0;
 };
 

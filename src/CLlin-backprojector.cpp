@@ -91,15 +91,15 @@ public:
             return 1;
         }
         io::DenSupportedType t = inf.getDataType();
-        if(t != io::DenSupportedType::float_)
+        if(t != io::DenSupportedType::FLOAT32)
         {
             std::string ERR
-                = io::xprintf("This program supports float projections only but the supplied "
+                = io::xprintf("This program supports FLOAT32 projections only but the supplied "
                               "projection file %s is "
                               "of type %s",
                               inputProjection.c_str(), io::DenSupportedTypeToString(t).c_str());
             LOGE << ERR;
-            throw std::runtime_error(ERR);
+            return -1;
         }
         parsePlatformString();
         fillFramesVector(pmi.dimz());
@@ -204,7 +204,8 @@ int main(int argc, char* argv[])
         CVP.initializeTTProjector();
     } else
     {
-        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection, ARG.useBarrierCalls, ARG.barrierArraySize);
+        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
+                                   ARG.useBarrierCalls, ARG.barrierArraySize);
     }
     int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
                                    xpath, ARG.CLdebug, ARG.CLrelaxed);

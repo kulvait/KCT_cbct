@@ -95,9 +95,9 @@ public:
             return -1;
         }
         io::DenSupportedType t = inf.getDataType();
-        if(t != io::DenSupportedType::float_)
+        if(t != io::DenSupportedType::FLOAT32)
         {
-            ERR = io::xprintf("This program supports float projections only but the supplied "
+            ERR = io::xprintf("This program supports FLOAT32 projections only but the supplied "
                               "projection file %s is "
                               "of type %s",
                               inputProjections.c_str(), io::DenSupportedTypeToString(t).c_str());
@@ -119,11 +119,11 @@ public:
                 return -1;
             }
             DenSupportedType dataType = x0inf.getDataType();
-            if(dataType != DenSupportedType::float_)
+            if(dataType != DenSupportedType::FLOAT32)
             {
                 std::string ERR
                     = io::xprintf("The file %s has declared data type %s but this implementation "
-                                  "only supports floats!",
+                                  "only supports FLOAT32 files.",
                                   initialVectorX0.c_str(), DenSupportedTypeToString(dataType));
                 LOGE << ERR;
                 return -1;
@@ -144,10 +144,10 @@ public:
                 return -1;
             }
             DenSupportedType dataType = x0inf.getDataType();
-            if(dataType != DenSupportedType::float_)
+            if(dataType != DenSupportedType::FLOAT32)
             {
                 ERR = io::xprintf("The file %s has declared data type %s but this implementation "
-                                  "only supports floats!",
+                                  "only supports FLOAT32 files.",
                                   diagonalPreconditioner.c_str(),
                                   DenSupportedTypeToString(dataType));
                 LOGE << ERR;
@@ -314,8 +314,7 @@ int main(int argc, char* argv[])
     try
     {
         Program PRG(argc, argv);
-        std::string prgInfo
-            = "OpenCL implementation cone beam CT reconstruction operator.";
+        std::string prgInfo = "OpenCL implementation cone beam CT reconstruction operator.";
         if(version::MODIFIED_SINCE_COMMIT == true)
         {
             prgInfo = io::xprintf("%s Dirty commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
@@ -365,12 +364,12 @@ int main(int argc, char* argv[])
         {
             volume = new float[ARG.totalVolumeSize]();
         }
-        std::string startPath;
-        startPath = io::getParent(ARG.outputVolume);
+        std::string intermediatePrefix;
+        intermediatePrefix = io::getParent(ARG.outputVolume);
         std::string bname = io::getBasename(ARG.outputVolume);
         bname = bname.substr(0, bname.find_last_of("."));
-        startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
-        LOGI << io::xprintf("startpath=%s", startPath.c_str());
+        intermediatePrefix = io::xprintf("%s/%s_", intermediatePrefix.c_str(), bname.c_str());
+        LOGI << io::xprintf("startpath=%s", intermediatePrefix.c_str());
 
         if(ARG.cgls)
         {
@@ -384,7 +383,7 @@ int main(int argc, char* argv[])
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
                 ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
                 backprojectorLocalNDRange);
-            cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+            cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
             // testing
             //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
             if(ARG.useSidonProjector)
@@ -451,8 +450,8 @@ int main(int argc, char* argv[])
                     cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
                 }
             }
-            DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                         ARG.volumeSizeZ);
+            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
+                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
             io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
                             ARG.totalVolumeSize * sizeof(float));
             delete[] volume;
@@ -462,7 +461,7 @@ int main(int argc, char* argv[])
             std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
                 ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
-            glsqr->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+            glsqr->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
             if(ARG.useSidonProjector)
             {
                 glsqr->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -507,8 +506,8 @@ int main(int argc, char* argv[])
                 glsqr->reconstructTikhonov(ARG.tikhonovLambdaL2, ARG.maxIterationCount,
                                            ARG.stoppingRelativeError);
             }
-            DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                         ARG.volumeSizeZ);
+            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
+                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
             io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
                             ARG.totalVolumeSize * sizeof(float));
             delete[] volume;
@@ -518,7 +517,7 @@ int main(int argc, char* argv[])
             std::shared_ptr<PSIRTReconstructor> psirt = std::make_shared<PSIRTReconstructor>(
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
                 ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
-            psirt->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+            psirt->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
             if(ARG.useSidonProjector)
             {
                 psirt->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -557,8 +556,8 @@ int main(int argc, char* argv[])
             }
             psirt->setup(1.99); // 10.1109/TMI.2008.923696
             psirt->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-            DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                         ARG.volumeSizeZ);
+            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
+                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
             io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
                             ARG.totalVolumeSize * sizeof(float));
             delete[] volume;
@@ -568,7 +567,7 @@ int main(int argc, char* argv[])
             std::shared_ptr<PSIRTReconstructor> psirt = std::make_shared<PSIRTReconstructor>(
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
                 ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
-            psirt->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+            psirt->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
             if(ARG.useSidonProjector)
             {
                 psirt->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -607,8 +606,8 @@ int main(int argc, char* argv[])
             }
             psirt->setup(1.00); // 10.1109/TMI.2008.923696
             psirt->reconstruct_sirt(ARG.maxIterationCount, ARG.stoppingRelativeError);
-            DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                         ARG.volumeSizeZ);
+            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
+                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
             io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
                             ARG.totalVolumeSize * sizeof(float));
             delete[] volume;
@@ -627,7 +626,7 @@ int main(int argc, char* argv[])
             {
                 ossart->addUpperBoxCondition(ARG.upperBoxCondition, ARG.upperBoxCondition);
             }
-            ossart->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+            ossart->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
             if(ARG.useSidonProjector)
             {
                 ossart->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
@@ -666,8 +665,8 @@ int main(int argc, char* argv[])
                 throw std::runtime_error(ERR);
             }
             ossart->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-            DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                         ARG.volumeSizeZ);
+            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
+                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
             io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
                             ARG.totalVolumeSize * sizeof(float));
             delete[] volume;

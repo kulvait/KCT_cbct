@@ -16,12 +16,12 @@
 #include "ctpl_stl.h" //Threadpool
 
 // Internal libraries
-#include "PROG/parseArgs.h"
 #include "CGLSReconstructor.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
 #include "JacobiGLSQRReconstructor.hpp"
+#include "PROG/parseArgs.h"
 
 using namespace KCT;
 
@@ -129,15 +129,15 @@ int Args::parseArguments(int argc, char* argv[])
     try
     {
         app.parse(argc, argv);
+        std::string ERR;
         // If force is not set, then check if output file does not exist
         if(!force)
         {
             if(io::pathExists(outputVolume))
             {
-                std::string msg
-                    = "Error: output file already exists, use --force to force overwrite.";
-                LOGE << msg;
-                return 1;
+                ERR = "Error: output file already exists, use --force to force overwrite.";
+                LOGE << ERR;
+                return -1;
             }
         }
         // How many projection matrices is there in total
@@ -151,33 +151,36 @@ int Args::parseArguments(int argc, char* argv[])
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
         if(inf.dimz() != pmi.dimz())
         {
-            std::string ERR = io::xprintf(
+            ERR = io::xprintf(
                 "Projection matrices z dimension %d is different from projections z dimension %d.",
                 pmi.dimz(), inf.dimz());
             LOGE << ERR;
-            io::throwerr(ERR);
+            return -1;
         }
         if(totalVolumeSize > INT_MAX)
         {
-            io::throwerr(
-                "Implement indexing by uint64_t matrix dimension overflow of voxels count.");
+            ERR = "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
+            LOGE << ERR;
+            return -1;
         }
         // End parsing arguments
         if(totalProjectionsSize > INT_MAX)
         {
-            io::throwerr("Implement indexing by uint64_t matrix dimension overflow of projection "
-                         "pixels count.");
+            ERR = "Implement indexing by uint64_t matrix dimension overflow of projection "
+                  "pixels count.";
+            LOGE << ERR;
+            return -1;
         }
         io::DenSupportedType t = inf.getDataType();
-        if(t != io::DenSupportedType::float_)
+        if(t != io::DenSupportedType::FLOAT32)
         {
             std::string ERR
-                = io::xprintf("This program supports float projections only but the supplied "
+                = io::xprintf("This program supports FLOAT32 projections only but the supplied "
                               "projection file %s is "
                               "of type %s",
                               inputProjections.c_str(), io::DenSupportedTypeToString(t).c_str());
             LOGE << ERR;
-            io::throwerr(ERR);
+            return -1;
         }
     } catch(const CLI::CallForHelp& e)
     {

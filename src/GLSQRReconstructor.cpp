@@ -189,10 +189,10 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_cur,
-                        io::xprintf("%sx_it%02d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
     }
     Q[0]->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
@@ -416,10 +416,10 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
                             iteration, std::abs(varphi_hat), 100.0 * std::abs(varphi_hat) / NB0);
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%03d.den", progressPrefixPath.c_str(),
+            LOGD << io::xprintf("Writing file %sx_it%03d.den", intermediatePrefix.c_str(),
                                 iteration);
             writeVolume(*x_cur,
-                        io::xprintf("%sx_it%03d.den", progressPrefixPath.c_str(), iteration));
+                        io::xprintf("%sx_it%03d.den", intermediatePrefix.c_str(), iteration));
         }
     }
     Q[0]->enqueueReadBuffer(*x_cur, CL_TRUE, 0, sizeof(float) * XDIM, x);
