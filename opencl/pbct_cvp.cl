@@ -34,7 +34,7 @@ void kernel FLOAT_pbct_cutting_voxel_project(global const float* restrict volume
     projection += projectionOffset;
 //_normalToDetector is not used in this implementation
 #ifdef RELAXED
-    const float16 CM = convert_float8(_CM);
+    const float8 CM = convert_float8(_CM);
     const float3 voxelSizes = convert_float3(_voxelSizes);
     const float3 volumeCenter = convert_float3(_volumeCenter);
 #else
@@ -263,7 +263,7 @@ void kernel FLOAT_pbct_cutting_voxel_backproject(global float* restrict volume,
     projection += projectionOffset;
 //_normalToDetector is not used in this implementation
 #ifdef RELAXED
-    const float16 CM = convert_float16(_CM);
+    const float8 CM = convert_float8(_CM);
     const float3 voxelSizes = convert_float3(_voxelSizes);
     const float3 volumeCenter = convert_float3(_volumeCenter);
 #else
