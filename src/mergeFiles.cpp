@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
             {
                 if(!readers[k]->atEnd())
                 {
-                    LOGD << io::xprintf("Not at end in %f.", a_unsortedDoubles[k]);
+                    LOGD << io::xprintf("Not at end in %s.", a_unsortedDoubles[k].c_str());
                 }
             }
             break;

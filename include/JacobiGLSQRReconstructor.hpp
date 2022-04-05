@@ -129,8 +129,7 @@ public:
                     float errCondition = 0.01);
 
 private:
-    const cl_float FLOATZERO = 0.0;
-    const cl_double DOUBLEZERO = 0.0;
+    const cl_float FLOATZERO = 0.0f;
     // Constructor defined variables
     const uint32_t pdimx, pdimy, pdimz;
     const double pixelSpacingX, pixelSpacingY;

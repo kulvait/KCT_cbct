@@ -165,10 +165,7 @@ public:
                            uint64_t baseOffset = 0);
 
 private:
-    const cl_float FLOATZERO = 0.0f;
-    const cl_double DOUBLEZERO = 0.0;
     float FLOATONE = 1.0f;
-    float* volume = nullptr;
     uint32_t pdimx, pdimy, pdimz;
     uint32_t vdimx, vdimy, vdimz;
     uint64_t totalVoxelNum, totalVolumeBufferSize;
@@ -177,7 +174,6 @@ private:
     cl::NDRange projectorLocalNDRange;
     cl::NDRange projectorLocalNDRangeBarrier;
 
-    bool centerVoxelProjector = false;
     cl_int3 vdims;
     cl_int2 pdims;
     cl_uint2 pdims_uint;

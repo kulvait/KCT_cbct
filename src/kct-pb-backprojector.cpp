@@ -21,7 +21,9 @@
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
 #include "DEN/DenGeometry3DParallelReader.hpp"
+#include "DEN/DenProjectionMatrixReader.hpp"
 #include "DEN/DenSupportedType.hpp"
+#include "MATRIX/LightProjectionMatrix.hpp"
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/ArgumentsFramespec.hpp"
 #include "PROG/Program.hpp"
@@ -47,7 +49,7 @@ public:
         std::string ERR;
         if(!force)
         {
-            if(io::pathExists(outputProjection))
+            if(io::pathExists(outputVolume))
             {
                 ERR = "Error: output file already exists, use --force to force overwrite.";
                 LOGE << ERR;
@@ -56,52 +58,64 @@ public:
         }
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
+        io::DenFileInfo inf(inputProjection);
         // Number of projections equals the size of the frames vector
         fillFramesVector(pmi.dimz());
+        projectionSizeX = inf.dimx();
+        projectionSizeY = inf.dimy();
         projectionSizeZ = frames.size();
-        io::DenFileInfo inf(inputVolume);
-        volumeSizeX = inf.dimx();
-        volumeSizeY = inf.dimy();
-        volumeSizeZ = inf.dimz();
+        if(pmi.dimz() != inf.dimz())
+        {
+            ERR = io::xprintf("Incompatible number of %d projections with %d projection matrices",
+                              inf.dimz(), pmi.dimz());
+        }
+        // How many projection matrices is there in total
+        projectionFrameSize = projectionSizeX * projectionSizeY;
         totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
         totalProjectionSize
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
         if(totalVolumeSize > INT_MAX)
         {
-            LOGE << "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
-            return -1;
+            ERR = "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
+            LOGE << ERR;
+            return 1;
         }
         // End parsing arguments
         if(totalProjectionSize > INT_MAX)
         {
-            LOGE << "Implement indexing by uint64_t matrix dimension overflow of projection "
-                    "pixels count.";
-            return -1;
+            ERR = "Implement indexing by uint64_t matrix dimension overflow of projection "
+                  "pixels count.";
+            LOGE << ERR;
+            return 1;
         }
         io::DenSupportedType t = inf.getDataType();
         if(t != io::DenSupportedType::FLOAT32)
         {
-            ERR = io::xprintf("This program supports FLOAT32 volumes only but the supplied "
+            std::string ERR
+                = io::xprintf("This program supports FLOAT32 volumes only but the supplied "
                               "projection file %s is "
                               "of type %s",
-                              inputVolume.c_str(), io::DenSupportedTypeToString(t).c_str());
+                              inputProjection.c_str(), io::DenSupportedTypeToString(t).c_str());
             LOGE << ERR;
             return -1;
         }
         parsePlatformString();
+        fillFramesVector(pmi.dimz());
         return 0;
     }
     void defineArguments();
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     // Here (0,0,0) is in the center of the volume
     uint64_t totalVolumeSize;
+    uint64_t projectionFrameSize;
     uint64_t totalProjectionSize;
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
-    std::string inputVolume;
+    bool useMinMaxBackprojector = false;
+    std::string inputProjection;
+    std::string outputVolume;
     std::string inputProjectionMatrices;
     std::string inputDetectorTilts;
-    std::string outputProjection;
     std::string rightHandSide = "";
 };
 
@@ -116,7 +130,8 @@ void Args::defineArguments()
 {
     std::string optstr;
     cliApp
-        ->add_option("input_volume", inputVolume, "Volume to project FLOAT32 [sizex, sizey, sizez]")
+        ->add_option("input_projection", inputProjection,
+                     "Input projection FLOAT32[projx, projy, dimz]")
         ->required()
         ->check(CLI::ExistingFile);
     cliApp
@@ -126,7 +141,10 @@ void Args::defineArguments()
                      "with the dimensions [4,2,dimz].")
         ->required()
         ->check(CLI::ExistingFile);
-    cliApp->add_option("output_projection", outputProjection, "Output projection")->required();
+    cliApp
+        ->add_option("output_volume", outputVolume,
+                     "Volume to project FLOAT32 [sizex, sizey, sizez]")
+        ->required();
     optstr = "Detector tilt encoded as positive cosine between normal to the detector and surface "
              "orthogonal to incomming rays. FLOAT64 file of the dimensions (1, 1, dimz). If no "
              "file is supplied, orthogonality of incomming rays to the detector is assumed, that "
@@ -143,8 +161,7 @@ void Args::defineArguments()
         "--right-hand-side", rightHandSide,
         "If the parameter is specified, then we also compute the norm of the right hand "
         "side from the projected vector.");
-    addProjectionSizeArgs();
-    addProjectorLocalNDRangeArgs();
+    addVolumeSizeArgs();
     addVolumeCenterArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
@@ -156,7 +173,7 @@ int main(int argc, char* argv[])
     using namespace KCT::util;
     Program PRG(argc, argv);
     std::string prgInfo
-        = "OpenCL implementation of the PBCVP and other projectors for parallel rays geometry.";
+        = "OpenCL implementation of the PBCVP and other backprojectors for parallel rays geometry.";
     if(version::MODIFIED_SINCE_COMMIT == true)
     {
         prgInfo = io::xprintf("%s Dirty commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
@@ -186,6 +203,7 @@ int main(int argc, char* argv[])
         geometry = std::make_shared<geometry::Geometry3DParallel>(geometryReader->readGeometry(k));
         geometryVector.emplace_back(geometry);
     }
+
     cl::NDRange projectorLocalNDRange = cl::NDRange(
         ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1], ARG.projectorLocalNDRange[2]);
     cl::NDRange backprojectorLocalNDRange
@@ -221,26 +239,15 @@ int main(int argc, char* argv[])
     float* volume = new float[ARG.totalVolumeSize];
     float* projection = new float[ARG.totalProjectionSize];
     float* projection_rhs = nullptr;
-    io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
-    bool readxmajor = true;
-    inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
-    if(!ARG.rightHandSide.empty())
-    {
-        LOGD << io::xprintf(io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
-        projection_rhs = new float[ARG.totalProjectionSize];
-        io::DenFileInfo rhsInfo(ARG.rightHandSide);
-        readxmajor = false; // Projections are y-major
-        rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
-        PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
-    } else
-    {
-        PBCVP.project(volume, projection);
-    }
-    bool projectionxmajor = false;
+    io::DenFileInfo inputProjectionInfo(ARG.inputProjection);
+    bool readxmajor = false;
+    inputProjectionInfo.readIntoArray<float>(projection, readxmajor);
+    PBCVP.backproject(projection, volume);
+    bool volumexmajor = true;
     bool writexmajor = true;
-    io::DenFileInfo::create3DDenFileFromArray(
-        projection, projectionxmajor, ARG.outputProjection, io::DenSupportedType::FLOAT32,
-        ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, writexmajor);
+    io::DenFileInfo::create3DDenFileFromArray(volume, volumexmajor, ARG.outputVolume,
+                                              io::DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                              ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
     delete[] volume;
     delete[] projection;
     if(projection_rhs != nullptr)

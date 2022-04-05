@@ -206,12 +206,6 @@ int main(int argc, char* argv[])
     CVP.initializeOrUpdateProjectionBuffer(ARG.projectionSizeX, ARG.projectionSizeY, 1);
     uint32_t projectionElementsCount = ARG.projectionSizeX * ARG.projectionSizeY;
     float* projection = new float[projectionElementsCount]();
-    uint16_t buf[3];
-    buf[0] = ARG.projectionSizeY;
-    buf[1] = ARG.projectionSizeX;
-    buf[2] = ARG.frames.size();
-    io::createEmptyFile(ARG.outputProjection, 0, true); // Try if this is faster
-    io::appendBytes(ARG.outputProjection, (uint8_t*)buf, (uint64_t)6);
     double normSquare = 0;
     double normSquareDifference = 0;
     std::shared_ptr<io::DenFrame2DReader<float>> dpr = nullptr;

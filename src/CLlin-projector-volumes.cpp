@@ -114,7 +114,7 @@ int Args::postParse()
         {
             std::string msg = io::xprintf("Dimensions of file %s of (%d, %d, %d) are "
                                           "incompatible with the dimensions (%d, %d, %d).",
-                                          inputVolumes[i], inf.dimx(), inf.dimy(), inf.dimz(),
+                                          inputVolumes[i].c_str(), inf.dimx(), inf.dimy(), inf.dimz(),
                                           voxelNumX, voxelNumY, voxelNumZ);
             LOGE << msg;
             return -1;

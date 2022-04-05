@@ -27,7 +27,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
     //    writeVolume(*v_next, io::xprintf("v_init.den"));
     double vnextnorm = std::sqrt(normXBuffer_barrier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
-    scaleFloatVector(*v_next, float(1.0 / vnextnorm), XDIM);
+    algFLOATvector_scale(*v_next, float(1.0 / vnextnorm), XDIM);
     bool initializedByScaledBackprojectedRightSide = true;
 
     double d = 0.0;
@@ -42,7 +42,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 
     u_next = getBBuffer(1);
     Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
-    addIntoFirstVectorSecondVectorScaled(*u_next, *b_buf, float(1.0 / varphi_hat), BDIM);
+    algFLOATvector_A_equals_A_plus_cB(*u_next, *b_buf, float(1.0 / varphi_hat), BDIM);
 
     x_cur = x_buf;
     Q[0]->enqueueFillBuffer<cl_float>(*x_cur, FLOATZERO, 0, XDIM * sizeof(float));
@@ -103,7 +103,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 
         backproject(*u_cur, *XZ);
         sigma_prev = scalarProductXBuffer_barrier_double(*XZ, *v_prev);
-        addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*XZ, *v_prev, float(-sigma_prev), XDIM);
         v_next = v_prev;
         LOGI << io::xprintf("sigma_prev=%f", sigma_prev);
 
@@ -111,7 +111,7 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         {
             LOGI << "d=0.0";
             sigma_cur = scalarProductXBuffer_barrier_double(*XZ, *v_cur);
-            addIntoFirstVectorSecondVectorScaled(*XZ, *v_cur, float(-sigma_cur), XDIM);
+            algFLOATvector_A_equals_A_plus_cB(*XZ, *v_cur, float(-sigma_cur), XDIM);
 
             sigma_next = std::sqrt(normXBuffer_barrier_double(*XZ));
             LOGI << io::xprintf("sigma_next=%f", sigma_next);
@@ -147,11 +147,11 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
 
         project(*v_cur, *BZ);
         tau_prev = scalarProductBBuffer_barrier_double(*BZ, *u_prev);
-        addIntoFirstVectorSecondVectorScaled(*BZ, *u_prev, float(-tau_prev), BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*BZ, *u_prev, float(-tau_prev), BDIM);
         u_next = u_prev;
 
         tau_cur = scalarProductBBuffer_barrier_double(*BZ, *u_cur);
-        addIntoFirstVectorSecondVectorScaled(*BZ, *u_cur, float(-tau_cur), BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*BZ, *u_cur, float(-tau_cur), BDIM);
         tau_next = std::sqrt(normBBuffer_barrier_double(*BZ));
         LOGE << io::xprintf("tau_prev=%f, tau_cur=%f, tau_next=%f", tau_prev, tau_cur, tau_next);
 
@@ -174,11 +174,11 @@ int GLSQRReconstructor::reconstruct(uint32_t maxIterations, float errCondition)
         varphi_hat = s_cur * varphi_hat;
         // 25
         w_cur = w_prev_prev;
-        addIntoFirstVectorScaledSecondVector(*w_cur, *v_cur, float(-gamma / rho_prev_prev), XDIM);
-        addIntoFirstVectorSecondVectorScaled(*w_cur, *w_prev, float(-theta / rho_prev), XDIM);
+        algFLOATvector_A_equals_Ac_plus_B(*w_cur, *v_cur, float(-gamma / rho_prev_prev), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*w_cur, *w_prev, float(-theta / rho_prev), XDIM);
 
         // 26
-        addIntoFirstVectorSecondVectorScaled(*x_cur, *w_cur, float(varphi / rho_cur), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*x_cur, *w_cur, float(varphi / rho_cur), XDIM);
         if(tau_next == 0)
         {
             LOGI << "Ending due to the convergence";
@@ -226,7 +226,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
     backproject(*b_buf, *v_next); // Backprojection of zero is obviously zero for potential b_buf_x
     double vnextnorm = std::sqrt(normXBuffer_barrier_double(*v_next));
     LOGI << io::xprintf("vnextnorm=%f", vnextnorm);
-    scaleFloatVector(*v_next, float(1.0 / vnextnorm), XDIM);
+    algFLOATvector_scale(*v_next, float(1.0 / vnextnorm), XDIM);
     bool initializedByScaledBackprojectedRightSide = true;
 
     double d = 0.0;
@@ -245,7 +245,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
     Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
     u_next_x = getXBuffer(3);
     Q[0]->enqueueFillBuffer<cl_float>(*u_next_x, FLOATZERO, 0, XDIM * sizeof(float));
-    addIntoFirstVectorSecondVectorScaled(*u_next, *b_buf, float(1.0 / varphi_hat), BDIM);
+    algFLOATvector_A_equals_A_plus_cB(*u_next, *b_buf, float(1.0 / varphi_hat), BDIM);
 
     x_cur = x_buf;
     Q[0]->enqueueFillBuffer<cl_float>(*x_cur, FLOATZERO, 0, XDIM * sizeof(float));
@@ -317,9 +317,9 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         rho_prev = rho_cur;
 
         backproject(*u_cur, *XZ);
-        addIntoFirstVectorSecondVectorScaled(*XZ, *u_cur_x, lambda, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*XZ, *u_cur_x, lambda, XDIM);
         sigma_prev = scalarProductXBuffer_barrier_double(*XZ, *v_prev);
-        addIntoFirstVectorSecondVectorScaled(*XZ, *v_prev, float(-sigma_prev), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*XZ, *v_prev, float(-sigma_prev), XDIM);
         v_next = v_prev; // We don't need the buffer v_pref anymore
         LOGI << io::xprintf("sigma_prev=%f", sigma_prev);
 
@@ -327,7 +327,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         {
             LOGI << "d=0.0";
             sigma_cur = scalarProductXBuffer_barrier_double(*XZ, *v_cur);
-            addIntoFirstVectorSecondVectorScaled(*XZ, *v_cur, float(-sigma_cur), XDIM);
+            algFLOATvector_A_equals_A_plus_cB(*XZ, *v_cur, float(-sigma_cur), XDIM);
 
             sigma_next = std::sqrt(normXBuffer_barrier_double(*XZ));
             LOGI << io::xprintf("sigma_next=%f", sigma_next);
@@ -341,7 +341,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
             if(sigma_next > sigma_tol)
             {
                 Q[0]->enqueueFillBuffer<cl_float>(*v_next, FLOATZERO, 0, XDIM * sizeof(float));
-                addIntoFirstVectorSecondVectorScaled(*v_next, *XZ, float(1.0 / sigma_next), XDIM);
+                algFLOATvector_A_equals_A_plus_cB(*v_next, *XZ, float(1.0 / sigma_next), XDIM);
             } else
             {
                 d = 1.0;
@@ -355,7 +355,7 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
             if(sigma_cur > sigma_tol)
             {
                 Q[0]->enqueueFillBuffer<cl_float>(*v_cur, FLOATZERO, 0, XDIM * sizeof(float));
-                addIntoFirstVectorSecondVectorScaled(*v_cur, *XZ, float(1.0 / sigma_cur), XDIM);
+                algFLOATvector_A_equals_A_plus_cB(*v_cur, *XZ, float(1.0 / sigma_cur), XDIM);
             } else
             {
                 LOGI << "Ending due to the convergence";
@@ -364,19 +364,19 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         }
 
         project(*v_cur, *BZ);
-        copyFloatVector(*v_cur, *BZ_x, XDIM);
-        scaleFloatVector(*BZ_x, lambda, XDIM);
+        algFLOATvector_copy(*v_cur, *BZ_x, XDIM);
+        algFLOATvector_scale(*BZ_x, lambda, XDIM);
         tau_prev = scalarProductBBuffer_barrier_double(*BZ, *u_prev);
         tau_prev += scalarProductXBuffer_barrier_double(*BZ_x, *u_prev_x);
-        addIntoFirstVectorSecondVectorScaled(*BZ, *u_prev, float(-tau_prev), BDIM);
-        addIntoFirstVectorSecondVectorScaled(*BZ_x, *u_prev_x, float(-tau_prev), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*BZ, *u_prev, float(-tau_prev), BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*BZ_x, *u_prev_x, float(-tau_prev), XDIM);
         u_next = u_prev;
         u_next_x = u_prev_x;
 
         tau_cur = scalarProductBBuffer_barrier_double(*BZ, *u_cur);
         tau_cur += scalarProductXBuffer_barrier_double(*BZ_x, *u_cur_x);
-        addIntoFirstVectorSecondVectorScaled(*BZ, *u_cur, float(-tau_cur), BDIM);
-        addIntoFirstVectorSecondVectorScaled(*BZ_x, *u_cur_x, float(-tau_cur), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*BZ, *u_cur, float(-tau_cur), BDIM);
+        algFLOATvector_A_equals_A_plus_cB(*BZ_x, *u_cur_x, float(-tau_cur), XDIM);
         tau_next = std::sqrt(normBBuffer_barrier_double(*BZ) + normXBuffer_barrier_double(*BZ_x));
         LOGE << io::xprintf("tau_prev=%f, tau_cur=%f, tau_next=%f", tau_prev, tau_cur, tau_next);
 
@@ -384,8 +384,8 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         {
             Q[0]->enqueueFillBuffer<cl_float>(*u_next, FLOATZERO, 0, BDIM * sizeof(float));
             Q[0]->enqueueFillBuffer<cl_float>(*u_next_x, FLOATZERO, 0, XDIM * sizeof(float));
-            addIntoFirstVectorSecondVectorScaled(*u_next, *BZ, float(1 / tau_next), BDIM);
-            addIntoFirstVectorSecondVectorScaled(*u_next_x, *BZ_x, float(1 / tau_next), XDIM);
+            algFLOATvector_A_equals_A_plus_cB(*u_next, *BZ, float(1 / tau_next), BDIM);
+            algFLOATvector_A_equals_A_plus_cB(*u_next_x, *BZ_x, float(1 / tau_next), XDIM);
         }
 
         gamma = s_prev_prev * tau_prev;
@@ -402,10 +402,10 @@ int GLSQRReconstructor::reconstructTikhonov(double lambda,
         varphi_hat = s_cur * varphi_hat;
         // 25
         w_cur = w_prev_prev;
-        addIntoFirstVectorScaledSecondVector(*w_cur, *v_cur, float(-gamma / rho_prev_prev), XDIM);
-        addIntoFirstVectorSecondVectorScaled(*w_cur, *w_prev, float(-theta / rho_prev), XDIM);
+        algFLOATvector_A_equals_Ac_plus_B(*w_cur, *v_cur, float(-gamma / rho_prev_prev), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*w_cur, *w_prev, float(-theta / rho_prev), XDIM);
         // 26
-        addIntoFirstVectorSecondVectorScaled(*x_cur, *w_cur, float(varphi / rho_cur), XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*x_cur, *w_cur, float(varphi / rho_cur), XDIM);
         if(tau_next == 0)
         {
             LOGI << "Ending due to the convergence";

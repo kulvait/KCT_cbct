@@ -17,10 +17,7 @@
 #include "gitversion/version.h"
 
 // Reconstructors
-#include "CGLSReconstructor.hpp"
-#include "GLSQRReconstructor.hpp"
-#include "OSSARTReconstructor.hpp"
-#include "PSIRTReconstructor.hpp"
+#include "CGLSPBCTReconstructor.hpp"
 
 // Internal libraries
 #include "CArmArguments.hpp"
@@ -38,8 +35,6 @@ using namespace KCT;
 using namespace KCT::util;
 using namespace KCT::io;
 
-void populateVoume(float* volume, std::string volumeFile);
-
 /**Arguments parsed by the main function.
  */
 class Args : public CArmArguments, public ArgumentsForce
@@ -52,33 +47,39 @@ public:
     int preParse() { return 0; };
     int postParse()
     {
+        std::string ERR;
         if(!force)
         {
             if(io::pathExists(outputVolume))
             {
-                std::string msg
+                std::string ERR
                     = "Error: output file already exists, use --force to force overwrite.";
-                LOGE << msg;
-                return 1;
+                LOGE << ERR;
+                return -1;
             }
         }
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
         io::DenFileInfo inf(inputProjections);
+        if(pmi.dimz() != inf.dimz())
+        {
+            ERR = io::xprintf("Incompatible number of %d projections with %d projection matrices",
+                              inf.dimz(), pmi.dimz());
+        }
         projectionSizeX = inf.dimx();
         projectionSizeY = inf.dimy();
         projectionSizeZ = inf.dimz();
         totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
+        projectionFrameSize = projectionSizeX * projectionSizeY;
         totalProjectionSize
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
-        std::string ERR;
         if(inf.dimz() != pmi.dimz())
         {
             ERR = io::xprintf(
-                "Projection matrices z dimension %d is different from projections z dimension %d.",
+                "Projection matrices count %d is different from number of projections %d.",
                 pmi.dimz(), inf.dimz());
             LOGE << ERR;
-            return 1;
+            return -1;
         }
         if(totalVolumeSize > INT_MAX)
         {
@@ -125,7 +126,7 @@ public:
                 std::string ERR
                     = io::xprintf("The file %s has declared data type %s but this implementation "
                                   "only supports FLOAT32 files.",
-                                  initialVectorX0.c_str(), DenSupportedTypeToString(dataType));
+                                  initialVectorX0.c_str(), DenSupportedTypeToString(dataType).c_str());
                 LOGE << ERR;
                 return -1;
             }
@@ -150,7 +151,7 @@ public:
                 ERR = io::xprintf("The file %s has declared data type %s but this implementation "
                                   "only supports FLOAT32.",
                                   diagonalPreconditioner.c_str(),
-                                  DenSupportedTypeToString(dataType));
+                                  DenSupportedTypeToString(dataType).c_str());
                 LOGE << ERR;
                 return -1;
             }
@@ -163,6 +164,7 @@ public:
     int threads = 1;
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint64_t totalProjectionSize;
+    uint64_t projectionFrameSize;
     uint64_t totalVolumeSize;
     uint32_t baseOffset = 0;
     double tikhonovLambdaL2 = std::numeric_limits<float>::quiet_NaN();
@@ -357,24 +359,22 @@ int main(int argc, char* argv[])
                 = std::make_shared<geometry::Geometry3DParallel>(geometryReader->readGeometry(k));
             geometryVector.emplace_back(geometry);
         }
+        cl::NDRange projectorLocalNDRange
+            = cl::NDRange(ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1],
+                          ARG.projectorLocalNDRange[2]);
+        cl::NDRange backprojectorLocalNDRange
+            = cl::NDRange(ARG.backprojectorLocalNDRange[0], ARG.backprojectorLocalNDRange[1],
+                          ARG.backprojectorLocalNDRange[2]);
         float* projection = new float[ARG.totalProjectionSize];
-        io::DenFrame2DReader<float> inputProjectionsReader(ARG.inputProjections);
-        uint64_t projectionFrameSize = ARG.projectionSizeX * ARG.projectionSizeY;
-        for(uint32_t z = 0; z != ARG.projectionSizeZ; z++)
-        {
-            inputProjectionsReader.readFrameIntoBuffer(z, projection + (z * projectionFrameSize),
-                                                       false);
-        }
-        float* volume;
+        io::DenFileInfo inputProjectionInfo(ARG.inputProjections);
+        bool readxmajor = false;
+        inputProjectionInfo.readIntoArray<float>(projection, readxmajor);
+        float* volume = new float[ARG.totalVolumeSize];
         if(ARG.initialVectorX0 != "")
         {
-            volume = new float[ARG.totalVolumeSize];
             io::DenFileInfo iv(ARG.initialVectorX0);
-            io::readBytesFrom(ARG.initialVectorX0, iv.getOffset(), (uint8_t*)volume,
-                              ARG.totalVolumeSize * 4);
-        } else
-        {
-            volume = new float[ARG.totalVolumeSize]();
+            readxmajor = false;
+            iv.readIntoArray(volume, readxmajor);
         }
         std::string startPath;
         startPath = io::getParent(ARG.outputVolume);
@@ -382,319 +382,103 @@ int main(int argc, char* argv[])
         bname = bname.substr(0, bname.find_last_of("."));
         startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
         LOGI << io::xprintf("startpath=%s", startPath.c_str());
-        /*TODO
-        cl::NDRange projectorLocalNDRange
-            = cl::NDRange(ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1],
-                          ARG.projectorLocalNDRange[2]);
-        cl::NDRange backprojectorLocalNDRange
-            = cl::NDRange(ARG.backprojectorLocalNDRange[0], ARG.backprojectorLocalNDRange[1],
-                          ARG.backprojectorLocalNDRange[2]);
-                if(ARG.cgls)
+        if(ARG.cgls)
+        {
+            std::shared_ptr<CGLSPBCTReconstructor> cgls = std::make_shared<CGLSPBCTReconstructor>(
+                ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+                ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
+                backprojectorLocalNDRange);
+            cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+            // testing
+            //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
+            //       4);
+            if(ARG.useSidonProjector)
+            {
+                cgls->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+            } else if(ARG.useTTProjector)
+            {
+
+                cgls->initializeTTProjector();
+            } else
+            {
+                cgls->initializeCVPProjector(ARG.useBarrierCalls, ARG.barrierArraySize);
+            }
+            if(!std::isnan(ARG.tikhonovLambdaL2) || !std::isnan(ARG.tikhonovLambdaV2)
+               || !std::isnan(ARG.tikhonovLambdaLaplace2D))
+            {
+                cgls->initializeVolumeConvolution();
+                cgls->addTikhonovRegularization(ARG.tikhonovLambdaL2, ARG.tikhonovLambdaV2,
+                                                ARG.tikhonovLambdaLaplace2D);
+                cgls->useGradient3D(!ARG.gradient2D);
+                cgls->useLaplace3D(!ARG.laplace2D);
+            }
+            if(ARG.useJacobiPreconditioning)
+            {
+                cgls->useJacobiVectorCLCode();
+            }
+            int ecd
+                = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
+            if(ecd < 0)
+            {
+                std::string ERR
+                    = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+                LOGE << ERR;
+                throw std::runtime_error(ERR);
+            }
+            bool X0initialized = ARG.initialVectorX0 != "";
+            cgls->problemSetup(geometryVector, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
+                               ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
+            ecd = cgls->initializeVectors(projection, volume, X0initialized);
+            if(ecd != 0)
+            {
+                std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+                LOGE << ERR;
+                throw std::runtime_error(ERR);
+            }
+            if(ARG.useJacobiPreconditioning)
+            {
+                cgls->reconstructJacobi(ARG.maxIterationCount, ARG.stoppingRelativeError);
+            } else
+            {
+                if(ARG.diagonalPreconditioner != "")
                 {
-                    std::shared_ptr<CGLSReconstructor> cgls = std::make_shared<CGLSReconstructor>(
-                        ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ,
-           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup,
-           projectorLocalNDRange, backprojectorLocalNDRange);
-                    cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
-                    // testing
-                    //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
-                   4);
-                   if(ARG.useSidonProjector)
-                   {
-                       cgls->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
-                   } else if(ARG.useTTProjector)
-                   {
-
-                       cgls->initializeTTProjector();
-                   } else
-                   {
-                       cgls->initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
-                                                    ARG.useBarrierCalls, ARG.barrierArraySize);
-                   }
-                   if(!std::isnan(ARG.tikhonovLambdaL2) || !std::isnan(ARG.tikhonovLambdaV2)
-                      || !std::isnan(ARG.tikhonovLambdaLaplace2D))
-                   {
-                       cgls->initializeVolumeConvolution();
-                       cgls->addTikhonovRegularization(ARG.tikhonovLambdaL2, ARG.tikhonovLambdaV2,
-                                                       ARG.tikhonovLambdaLaplace2D);
-                       cgls->useGradient3D(!ARG.gradient2D);
-                       cgls->useLaplace3D(!ARG.laplace2D);
-                   }
-                   if(ARG.useJacobiPreconditioning)
-                   {
-                       cgls->useJacobiVectorCLCode();
-                   }
-                   int ecd
-                       = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                                ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
-           ARG.CLrelaxed); if(ecd < 0)
-                   {
-                       std::string ERR
-                           = io::xprintf("Could not initialize OpenCL platform %d.",
-           ARG.CLplatformID); LOGE << ERR; throw std::runtime_error(ERR);
-                   }
-                   bool X0initialized = ARG.initialVectorX0 != "";
-                   ecd = cgls->problemSetup(projection, volume, X0initialized, cameraVector,
-           ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
-           ARG.volumeCenterZ); if(ecd != 0)
-                   {
-                       std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                       LOGE << ERR;
-                       throw std::runtime_error(ERR);
-                   }
-                   if(ARG.useJacobiPreconditioning)
-                   {
-                       cgls->reconstructJacobi(ARG.maxIterationCount, ARG.stoppingRelativeError);
-                   } else
-                   {
-                       if(ARG.diagonalPreconditioner != "")
-                       {
-                           float* preconditionerVolume = new float[ARG.totalVolumeSize];
-                           io::DenFileInfo dpInfo(ARG.diagonalPreconditioner);
-                           io::readBytesFrom(ARG.diagonalPreconditioner, dpInfo.getOffset(),
-                                             (uint8_t*)preconditionerVolume, ARG.totalVolumeSize *
-           4); cgls->reconstructDiagonalPreconditioner( preconditionerVolume, ARG.maxIterationCount,
-           ARG.stoppingRelativeError); delete[] preconditionerVolume; } else
-                       {
-                           cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-                       }
-                   }
-                   DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                                ARG.volumeSizeZ);
-                   io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize *
-           sizeof(float)); delete[] volume; delete[] projection; } else if(ARG.glsqr)
+                    float* preconditionerVolume = new float[ARG.totalVolumeSize];
+                    io::DenFileInfo dpInfo(ARG.diagonalPreconditioner);
+                    io::readBytesFrom(ARG.diagonalPreconditioner, dpInfo.getOffset(),
+                                      (uint8_t*)preconditionerVolume, ARG.totalVolumeSize * 4);
+                    cgls->reconstructDiagonalPreconditioner(
+                        preconditionerVolume, ARG.maxIterationCount, ARG.stoppingRelativeError);
+                    delete[] preconditionerVolume;
+                } else
                 {
-                    std::shared_ptr<GLSQRReconstructor> glsqr =
-           std::make_shared<GLSQRReconstructor>( ARG.projectionSizeX, ARG.projectionSizeY,
-           ARG.projectionSizeZ, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
-           ARG.CLitemsPerWorkgroup); glsqr->setReportingParameters(ARG.verbose,
-           ARG.reportKthIteration, startPath); if(ARG.useSidonProjector)
-                    {
-                        glsqr->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
-                    } else if(ARG.useTTProjector)
-                    {
-
-                        glsqr->initializeTTProjector();
-                    } else
-                    {
-                        glsqr->initializeCVPProjector(ARG.useExactScaling,
-           ARG.useElevationCorrection, ARG.useBarrierCalls, ARG.barrierArraySize);
-                    }
-                    int ecd = glsqr->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                                      ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
-                                                      ARG.CLrelaxed);
-                    if(ecd < 0)
-                    {
-                        std::string ERR
-                            = io::xprintf("Could not initialize OpenCL platform %d.",
-           ARG.CLplatformID); LOGE << ERR; throw std::runtime_error(ERR);
-                    }
-                    float* volume = new float[ARG.totalVolumeSize]();
-                    // testing
-                    //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
-                   4);
-
-                   bool X0initialized = ARG.initialVectorX0 != "";
-                   ecd = glsqr->problemSetup(projection, volume, X0initialized, cameraVector,
-                                             ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-                                             ARG.volumeCenterX, ARG.volumeCenterY,
-           ARG.volumeCenterZ); if(ecd != 0)
-                   {
-                       std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                       LOGE << ERR;
-                       throw std::runtime_error(ERR);
-                   }
-                   if(!std::isnan(ARG.tikhonovLambdaL2))
-                   {
-                       glsqr->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-                   } else
-                   {
-                       glsqr->reconstructTikhonov(ARG.tikhonovLambdaL2, ARG.maxIterationCount,
-                                                  ARG.stoppingRelativeError);
-                   }
-                   DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                                ARG.volumeSizeZ);
-                   io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize *
-           sizeof(float)); delete[] volume; delete[] projection; } else if(ARG.psirt)
-                {
-                    std::shared_ptr<PSIRTReconstructor> psirt =
-           std::make_shared<PSIRTReconstructor>( ARG.projectionSizeX, ARG.projectionSizeY,
-           ARG.projectionSizeZ, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
-           ARG.CLitemsPerWorkgroup); psirt->setReportingParameters(ARG.verbose,
-           ARG.reportKthIteration, startPath); if(ARG.useSidonProjector)
-                    {
-                        psirt->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
-                    } else if(ARG.useTTProjector)
-                    {
-
-                        psirt->initializeTTProjector();
-                    } else
-                    {
-                        psirt->initializeCVPProjector(ARG.useExactScaling,
-           ARG.useElevationCorrection, ARG.useBarrierCalls, ARG.barrierArraySize);
-                    }
-                    int ecd = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                                      ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
-                                                      ARG.CLrelaxed);
-                    if(ecd < 0)
-                    {
-                        std::string ERR
-                            = io::xprintf("Could not initialize OpenCL platform %d.",
-           ARG.CLplatformID); LOGE << ERR; throw std::runtime_error(ERR);
-                    }
-                    float* volume = new float[ARG.totalVolumeSize]();
-                    // testing
-                    //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
-                   4);
-
-                   bool X0initialized = ARG.initialVectorX0 != "";
-                   ecd = psirt->problemSetup(projection, volume, X0initialized, cameraVector,
-                                             ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-                                             ARG.volumeCenterX, ARG.volumeCenterY,
-           ARG.volumeCenterZ); if(ecd != 0)
-                   {
-                       std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                       LOGE << ERR;
-                       throw std::runtime_error(ERR);
-                   }
-                   psirt->setup(1.99); // 10.1109/TMI.2008.923696
-                   psirt->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-                   DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                                ARG.volumeSizeZ);
-                   io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize *
-           sizeof(float)); delete[] volume; delete[] projection; } else if(ARG.sirt)
-                {
-                    std::shared_ptr<PSIRTReconstructor> psirt =
-           std::make_shared<PSIRTReconstructor>( ARG.projectionSizeX, ARG.projectionSizeY,
-           ARG.projectionSizeZ, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
-           ARG.CLitemsPerWorkgroup); psirt->setReportingParameters(ARG.verbose,
-           ARG.reportKthIteration, startPath); if(ARG.useSidonProjector)
-                    {
-                        psirt->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
-                    } else if(ARG.useTTProjector)
-                    {
-
-                        psirt->initializeTTProjector();
-                    } else
-                    {
-                        psirt->initializeCVPProjector(ARG.useExactScaling,
-           ARG.useElevationCorrection, ARG.useBarrierCalls, ARG.barrierArraySize);
-                    }
-                    int ecd = psirt->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                                      ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
-                                                      ARG.CLrelaxed);
-                    if(ecd < 0)
-                    {
-                        std::string ERR
-                            = io::xprintf("Could not initialize OpenCL platform %d.",
-           ARG.CLplatformID); LOGE << ERR; throw std::runtime_error(ERR);
-                    }
-                    float* volume = new float[ARG.totalVolumeSize]();
-                    // testing
-                    //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
-                   4);
-
-                   bool X0initialized = ARG.initialVectorX0 != "";
-                   ecd = psirt->problemSetup(projection, volume, X0initialized, cameraVector,
-                                             ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-                                             ARG.volumeCenterX, ARG.volumeCenterY,
-           ARG.volumeCenterZ); if(ecd != 0)
-                   {
-                       std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                       LOGE << ERR;
-                       throw std::runtime_error(ERR);
-                   }
-                   psirt->setup(1.00); // 10.1109/TMI.2008.923696
-                   psirt->reconstruct_sirt(ARG.maxIterationCount, ARG.stoppingRelativeError);
-                   DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                                ARG.volumeSizeZ);
-                   io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize *
-           sizeof(float)); delete[] volume; delete[] projection; } else if(ARG.ossart)
-                {
-                    std::shared_ptr<OSSARTReconstructor> ossart =
-           std::make_shared<OSSARTReconstructor>( ARG.projectionSizeX, ARG.projectionSizeY,
-           ARG.projectionSizeZ, ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
-           ARG.CLitemsPerWorkgroup); ossart->setup(ARG.relaxationParameter, ARG.ossartSubsetCount);
-                    if(!std::isnan(ARG.lowerBoxCondition))
-                    {
-                        ossart->addLowerBoxCondition(ARG.lowerBoxCondition, ARG.lowerBoxCondition);
-                    }
-                    if(!std::isnan(ARG.upperBoxCondition))
-                    {
-                        ossart->addUpperBoxCondition(ARG.upperBoxCondition, ARG.upperBoxCondition);
-                    }
-                    ossart->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
-                    if(ARG.useSidonProjector)
-                    {
-                        ossart->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
-                    } else if(ARG.useTTProjector)
-                    {
-
-                        ossart->initializeTTProjector();
-                    } else
-                    {
-                        ossart->initializeCVPProjector(ARG.useExactScaling,
-           ARG.useElevationCorrection, ARG.useBarrierCalls, ARG.barrierArraySize);
-                    }
-                    int ecd = ossart->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                                       ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
-                                                       ARG.CLrelaxed);
-
-                    if(ecd < 0)
-                    {
-                        std::string ERR
-                            = io::xprintf("Could not initialize OpenCL platform %d.",
-           ARG.CLplatformID); LOGE << ERR; throw std::runtime_error(ERR);
-                    }
-                    float* volume = new float[ARG.totalVolumeSize]();
-                    // testing
-                    //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
-                   4);
-
-                   bool X0initialized = ARG.initialVectorX0 != "";
-                   ecd = ossart->problemSetup(projection, volume, X0initialized, cameraVector,
-                                              ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-                                              ARG.volumeCenterX, ARG.volumeCenterY,
-           ARG.volumeCenterZ); if(ecd != 0)
-                   {
-                       std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                       LOGE << ERR;
-                       throw std::runtime_error(ERR);
-                   }
-                   ossart->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-                   DenFileInfo::createDenHeader(ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY,
-                                                ARG.volumeSizeZ);
-                   io::appendBytes(ARG.outputVolume, (uint8_t*)volume, ARG.totalVolumeSize *
-           sizeof(float)); delete[] volume; delete[] projection;
+                    cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
                 }
-        */
+            }
+            bool volumexmajor = true;
+            bool writexmajor = true;
+            io::DenFileInfo::create3DDenFileFromArray(
+                volume, volumexmajor, ARG.outputVolume, io::DenSupportedType::FLOAT32,
+                ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
+            delete[] volume;
+            delete[] projection;
+        } else if(ARG.glsqr)
+        {
+            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+        } else if(ARG.psirt)
+        {
+            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+        } else if(ARG.sirt)
+        {
+            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+        } else if(ARG.ossart)
+        {
+            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+        }
         PRG.endLog(true);
     } catch(KCTException& ex)
     {
         std::cerr << io::xprintf_red("%s", ex.what()) << std::endl;
         return 1;
     }
-}
-
-void populateVoume(float* volume, std::string volumeFile)
-{
-
-    DenFileInfo fileInf(volumeFile);
-    DenSupportedType dataType = fileInf.getDataType();
-    uint64_t offset = fileInf.getOffset();
-    uint64_t elementByteSize = fileInf.elementByteSize();
-    uint64_t position;
-    uint64_t frameSize = fileInf.dimx() * fileInf.dimy();
-    uint8_t* buffer = new uint8_t[elementByteSize * frameSize];
-    for(uint64_t frameID = 0; frameID != fileInf.dimz(); frameID++)
-    {
-        position = offset + uint64_t(frameID) * elementByteSize * frameSize;
-        io::readBytesFrom(volumeFile, position, buffer, elementByteSize * frameSize);
-        for(uint64_t pos = 0; pos != frameSize; pos++)
-        {
-            volume[frameID * frameSize + pos]
-                = util::getNextElement<float>(buffer + pos * elementByteSize, dataType);
-        }
-    }
-    delete[] buffer;
 }

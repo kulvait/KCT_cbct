@@ -48,6 +48,8 @@ public:
         timestamp = std::chrono::steady_clock::now();
     }
 
+    virtual ~BasePerfusionReconstructor() = default;
+
     void initializeCVPProjector(bool useExactScaling);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
@@ -79,7 +81,8 @@ public:
                           bool volumeContainsX0);
 
     virtual int
-    reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01, bool blocking = false) = 0;
+    reconstruct(uint32_t maxIterations = 100, float errCondition = 0.01, bool blocking = false)
+        = 0;
 
     void setReportingParameters(bool verbose,
                                 uint32_t reportKthIteration = 0,
@@ -148,9 +151,9 @@ protected:
     double normBBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& B);
     double normXBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& X);
     double scalarProductXBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& A,
-                                              std::vector<std::shared_ptr<cl::Buffer>>& B);
+                                               std::vector<std::shared_ptr<cl::Buffer>>& B);
     double scalarProductBBuffer_barrier_double(std::vector<std::shared_ptr<cl::Buffer>>& A,
-                                              std::vector<std::shared_ptr<cl::Buffer>>& B);
+                                               std::vector<std::shared_ptr<cl::Buffer>>& B);
     int scaleFloatVector(std::vector<std::shared_ptr<cl::Buffer>>& A, float c, unsigned int size);
     void setTimepoint();
 
@@ -182,7 +185,7 @@ protected:
                                    std::vector<std::shared_ptr<cl::Buffer>>& B,
                                    float f,
                                    unsigned int size,
-                                   bool blocking=false);
+                                   bool blocking = false);
     std::vector<matrix::ProjectionMatrix>
     encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
     std::vector<float> computeScalingFactors(std::vector<matrix::ProjectionMatrix> PM);

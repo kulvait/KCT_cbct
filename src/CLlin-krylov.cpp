@@ -124,7 +124,7 @@ public:
                 std::string ERR
                     = io::xprintf("The file %s has declared data type %s but this implementation "
                                   "only supports FLOAT32 files.",
-                                  initialVectorX0.c_str(), DenSupportedTypeToString(dataType));
+                                  initialVectorX0.c_str(), DenSupportedTypeToString(dataType).c_str());
                 LOGE << ERR;
                 return -1;
             }
@@ -149,7 +149,7 @@ public:
                 ERR = io::xprintf("The file %s has declared data type %s but this implementation "
                                   "only supports FLOAT32 files.",
                                   diagonalPreconditioner.c_str(),
-                                  DenSupportedTypeToString(dataType));
+                                  DenSupportedTypeToString(dataType).c_str());
                 LOGE << ERR;
                 return -1;
             }

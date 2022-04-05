@@ -17,7 +17,7 @@ void OSSARTReconstructor::addUpperBoxCondition(float upperBound, float upperBoun
 
 void OSSARTReconstructor::removeUpperBoxCondition() { this->upperBoxCondition = false; }
 
-void OSSARTReconstructor::addLowerBoxCondition(float lowerBound, float lowerBoxSubstitution)
+void OSSARTReconstructor::addLowerBoxCondition(float lowerBound, float lowerBoundSubstitution)
 {
     this->lowerBoxCondition = true;
     this->lowerBound = lowerBound;

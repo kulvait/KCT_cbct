@@ -76,22 +76,6 @@ protected:
 
     std::vector<std::string> optstrings;
 
-    // Functions to manipulate with buffers
-    int multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size);
-    int vectorA_multiple_B_equals_C(cl::Buffer& A, cl::Buffer& B, cl::Buffer& C, uint64_t size);
-    int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
-    int scaleFloatVector(cl::Buffer& v, float f, unsigned int size);
-    int copyFloatVectorOffset(cl::Buffer& from,
-                              unsigned int from_offset,
-                              cl::Buffer& to,
-                              unsigned int to_offset,
-                              unsigned int size);
-    int
-    addIntoFirstVectorSecondVectorScaled(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
-    int
-    addIntoFirstVectorScaledSecondVector(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
-    int invertFloatVector(cl::Buffer& X, unsigned int size);
-
     // OpenCL objects
     std::shared_ptr<cl::Platform> platform = nullptr;
     std::vector<cl::Device> devices;

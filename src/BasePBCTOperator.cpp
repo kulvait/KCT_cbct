@@ -130,58 +130,6 @@ int BasePBCTOperator::problemSetup(
     return 0;
 }
 
-/**
- * @brief
- *
- * @param projections The b vector to invert.
- * @param volume Allocated memory to store x. Might contain the initial guess.
- *
- * @return
- */
-int BasePBCTOperator::initializeVectors(float* projections,
-                                        float* volume,
-                                        bool useVolumeAsInitialX0)
-{
-    this->useVolumeAsInitialX0 = useVolumeAsInitialX0;
-    this->b = projections;
-    this->x = volume;
-    cl_int err;
-
-    // Initialize buffers
-    if(useVolumeAsInitialX0)
-    {
-        x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                             sizeof(float) * XDIM, (void*)volume, &err);
-    } else
-    {
-        x_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM,
-                                             nullptr, &err);
-    }
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
-
-    b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                         sizeof(float) * BDIM, (void*)projections, &err);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
-
-    tmp_b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
-                                             nullptr, &err);
-    if(err != CL_SUCCESS)
-    {
-        LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
-        return -1;
-    }
-
-    return 0;
-}
-
 int BasePBCTOperator::allocateXBuffers(uint32_t xBufferCount)
 {
     cl_int err;
@@ -400,19 +348,6 @@ int BasePBCTOperator::project(cl::Buffer& X,
     return 0;
 }
 
-std::vector<std::shared_ptr<CameraI>>
-BasePBCTOperator::encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm)
-{
-    std::vector<std::shared_ptr<CameraI>> v;
-    std::shared_ptr<CameraI> P;
-    for(std::size_t i = 0; i != pm->count(); i++)
-    {
-        P = std::make_shared<LightProjectionMatrix>(pm->readMatrix(i));
-        v.emplace_back(P);
-    }
-    return v;
-}
-
 // Scaling factor is a expression f*f/(px*py), where f is source to detector distance and pixel
 // sizes are (px and py)  Focal length http://ksimek.github.io/2013/08/13/intrinsic/
 std::vector<float> BasePBCTOperator::computeScalingFactors()
@@ -430,29 +365,22 @@ std::vector<float> BasePBCTOperator::computeScalingFactors()
     return scalingFactors;
 }
 
-void BasePBCTOperator::writeVolume(cl::Buffer& X, std::string path)
+void BasePBCTOperator::writeVolume(cl::Buffer& X, float* x, std::string path)
 {
-    uint16_t buf[3];
-    buf[0] = vdimy;
-    buf[1] = vdimx;
-    buf[2] = vdimz;
-    io::createEmptyFile(path, 0, true); // Try if this is faster
-    io::appendBytes(path, (uint8_t*)buf, 6);
-    Q[0]->enqueueReadBuffer(X, CL_TRUE, 0, sizeof(float) * XDIM, x);
-    io::appendBytes(path, (uint8_t*)x, XDIM * sizeof(float));
+    bufferIntoArray(X, x, XDIM);
+    bool arrayxmajor = true;
+    bool outxmajor = true;
+    io::DenFileInfo::create3DDenFileFromArray(x, arrayxmajor, path, io::DenSupportedType::FLOAT32,
+                                              vdimx, vdimy, vdimz, outxmajor);
 }
 
-void BasePBCTOperator::writeProjections(cl::Buffer& B, std::string path)
+void BasePBCTOperator::writeProjections(cl::Buffer& B, float* b, std::string path)
 {
-    Q[0]->enqueueReadBuffer(B, CL_TRUE, 0, sizeof(float) * BDIM, b);
-    io::DenAsyncFrame2DWritter<float> projectionWritter(path, pdimx, pdimy, pdimz);
-    uint64_t frameSize = pdimx * pdimy;
-    for(uint32_t k = 0; k != pdimz; k++)
-    {
-        io::BufferedFrame2D<float> transposedFrame(b + k * frameSize, pdimy, pdimx);
-        std::shared_ptr<io::Frame2DI<float>> frame = transposedFrame.transposed();
-        projectionWritter.writeFrame(*frame, k);
-    }
+    bufferIntoArray(B, b, BDIM);
+    bool arrayxmajor = false;
+    bool outxmajor = true;
+    io::DenFileInfo::create3DDenFileFromArray(b, arrayxmajor, path, io::DenSupportedType::FLOAT32,
+                                              pdimx, pdimy, pdimz, outxmajor);
 }
 
 void BasePBCTOperator::setTimestamp(bool finishCommandQueue)
@@ -498,28 +426,68 @@ void BasePBCTOperator::reportTime(std::string msg, bool finishCommandQueue, bool
     }
 }
 
-void BasePBCTOperator::setReportingParameters(bool verbose,
-                                              uint32_t reportKthIteration,
-                                              std::string intermediatePrefix)
+void BasePBCTOperator::setVerbose(bool verbose, std::string intermediatePrefix)
 {
     this->verbose = verbose;
-    this->reportKthIteration = reportKthIteration;
     this->intermediatePrefix = intermediatePrefix;
 }
 
-double BasePBCTOperator::adjointProductTest()
+double BasePBCTOperator::adjointProductTest(float* x, float* b)
 {
-    std::shared_ptr<cl::Buffer> xa_buf; // X buffers
-    allocateXBuffers(1);
-    xa_buf = getXBuffer(0);
-    allocateBBuffers(1);
-    std::shared_ptr<cl::Buffer> ba_buf; // B buffers
-    ba_buf = getBBuffer(0);
+    std::shared_ptr<cl::Buffer> x_buf, xa_buf; // X buffers
+    allocateXBuffers(2);
+    x_buf = getXBuffer(0);
+    arrayIntoBuffer(x, *x_buf, XDIM);
+    xa_buf = getXBuffer(1);
+    allocateBBuffers(2);
+    std::shared_ptr<cl::Buffer> b_buf, ba_buf; // B buffers
+    b_buf = getBBuffer(0);
+    arrayIntoBuffer(b, *b_buf, BDIM);
+    ba_buf = getBBuffer(1);
     project(*x_buf, *ba_buf);
     backproject(*b_buf, *xa_buf);
     double bdotAx = scalarProductBBuffer_barrier_double(*b_buf, *ba_buf);
     double ATbdotx = scalarProductXBuffer_barrier_double(*x_buf, *xa_buf);
     return (bdotAx / ATbdotx);
+}
+
+cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
+{
+    cl::NDRange projectorLocalNDRange;
+    if(barrierCalls)
+    {
+
+        if(vdimx % 64 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
+        } else
+        {
+            projectorLocalNDRange = cl::NDRange();
+        }
+    } else
+    {
+        if(vdimz % 4 == 0 && vdimy % 64 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
+        } else
+        {
+            projectorLocalNDRange = cl::NDRange();
+        }
+    }
+    return projectorLocalNDRange;
+}
+
+cl::NDRange BasePBCTOperator::guessBackprojectorLocalNDRange()
+{
+    cl::NDRange backprojectorLocalNDRange;
+    if(vdimx % 4 == 0 && vdimy % 16 == 0 && workGroupSize >= 64)
+    {
+        backprojectorLocalNDRange = cl::NDRange(4, 16, 1); // 4.05 RELAXED
+    } else
+    {
+        backprojectorLocalNDRange = cl::NDRange();
+    }
+    return backprojectorLocalNDRange;
 }
 
 } // namespace KCT

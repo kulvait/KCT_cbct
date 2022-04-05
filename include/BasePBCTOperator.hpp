@@ -29,44 +29,8 @@ namespace KCT {
 class BasePBCTOperator : public virtual Kniha, public AlgorithmsBarrierBuffers
 {
 public:
-    cl::NDRange guessProjectionLocalNDRange(bool barrierCalls)
-    {
-        cl::NDRange projectorLocalNDRange;
-        if(barrierCalls)
-        {
-
-            if(vdimx % 64 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
-            {
-                projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
-            } else
-            {
-                projectorLocalNDRange = cl::NDRange();
-            }
-        } else
-        {
-            if(vdimz % 4 == 0 && vdimy % 64 == 0 && workGroupSize >= 256)
-            {
-                projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
-            } else
-            {
-                projectorLocalNDRange = cl::NDRange();
-            }
-        }
-        return projectorLocalNDRange;
-    }
-
-    cl::NDRange guessBackprojectorLocalNDRange()
-    {
-        cl::NDRange backprojectorLocalNDRange;
-        if(vdimx % 4 == 0 && vdimy % 16 == 0 && workGroupSize >= 64)
-        {
-            backprojectorLocalNDRange = cl::NDRange(4, 16, 1); // 4.05 RELAXED
-        } else
-        {
-            backprojectorLocalNDRange = cl::NDRange();
-        }
-        return backprojectorLocalNDRange;
-    }
+    cl::NDRange guessProjectionLocalNDRange(bool barrierCalls);
+    cl::NDRange guessBackprojectorLocalNDRange();
 
     BasePBCTOperator(uint32_t pdimx,
                      uint32_t pdimy,
@@ -182,14 +146,9 @@ public:
     std::shared_ptr<cl::Buffer> getTmpBBuffer(uint32_t i);
     std::shared_ptr<cl::Buffer> getTmpXBuffer(uint32_t i);
 
-    double adjointProductTest();
+    double adjointProductTest(float* x, float* b);
 
-    static std::vector<std::shared_ptr<CameraI>>
-    encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm);
-
-    void setReportingParameters(bool verbose,
-                                uint32_t reportKthIteration = 0,
-                                std::string intermediatePrefix = "");
+    void setVerbose(bool verbose, std::string intermediatePrefix = "");
 
     std::vector<float> computeScalingFactors();
 
@@ -222,9 +181,22 @@ protected:
     uint32_t xBufferCount, bBufferCount, tmpXBufferCount, tmpBBufferCount;
 
     // Class functions
-    int initializeVectors(float* projection, float* volume, bool volumeContainsX0);
-    void writeVolume(cl::Buffer& X, std::string path);
-    void writeProjections(cl::Buffer& B, std::string path);
+    /**
+     * Write volume of the size XDIM into the DEN file.
+     *
+     * @param X buffer to write
+     * @param x auxiliary vector to store float data from X
+     * @param path output DEN file
+     */
+    void writeVolume(cl::Buffer& X, float* x, std::string path);
+    /**
+     * Write projections of the size BDIM into DEN file.
+     *
+     * @param B buffer to write
+     * @param b auxiliary vector to store float data from B
+     * @param path output DEN file
+     */
+    void writeProjections(cl::Buffer& B, float* b, std::string path);
     std::vector<cl_double16> inverseProjectionMatrices();
 
     // Printing and reporting
@@ -268,21 +240,12 @@ protected:
                 uint32_t initialProjectionIndex = 0,
                 uint32_t projectionIncrement = 1);
 
-    float* x = nullptr; // Volume data
-    float* b = nullptr; // Projection data
-
-    // OpenCL buffers
-    std::shared_ptr<cl::Buffer> b_buf = nullptr;
-    std::shared_ptr<cl::Buffer> x_buf = nullptr;
-    // tmp_b_buf for rescaling, tmp_x_buf for LSQR
-    std::shared_ptr<cl::Buffer> tmp_x_buf = nullptr, tmp_b_buf = nullptr;
     std::vector<std::shared_ptr<cl::Buffer>> x_buffers, tmp_x_buffers;
     std::vector<std::shared_ptr<cl::Buffer>> b_buffers, tmp_b_buffers;
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
 
     bool verbose = false;
     std::string intermediatePrefix = "";
-    uint32_t reportKthIteration = 0;
 };
 
 } // namespace KCT

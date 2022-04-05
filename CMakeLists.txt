@@ -6,11 +6,13 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 set(CMAKE_INSTALL_PREFIX $ENV{HOME}/KCT_bin CACHE PATH "Path to install binaries of the CBCT" FORCE)
 ENDIF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-set(CMAKE_CXX_STANDARD 14)#Supported values are 98, 11 and 14.
+set(CMAKE_CXX_STANDARD 17)#KCT C++ 17
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra")
 message("Current value of flags is ${CMAKE_CXX_FLAGS} and debug is ${CMAKE_CXX_FLAGS_DEBUG} and release is ${CMAKE_CXX_FLAGS_RELEASE}")
 #Default CMAKE_CXX_FLAGS are empty, default for CMAKE_CXX_FLAGS_DEBUG is -g and CMAKE_CXX_FLAGS_RELEASE are not empty
 set(CMAKE_CXX_FLAGS "-Wall -Wno-ignored-attributes -Wno-deprecated-copy")
+#See https://stackoverflow.com/questions/13905200/is-it-wise-to-ignore-gcc-clangs-wmissing-braces-warning
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-braces")
 #Turn -Werror or -Wextra to see problems
 #Set -Wno-ignored-attributes due to the OpenCL Nvidia libraries
 #Is it also possible to set it target specific using target_compile_options https://www.foonathan.net/2018/10/cmake-warnings/
@@ -289,7 +291,7 @@ target_compile_definitions(CLlin-krylov PUBLIC CL_TARGET_OPENCL_VERSION=120)
 target_git_version_init(CLlin-krylov)
 install (TARGETS CLlin-krylov RUNTIME DESTINATION .)
 
-SET(CLLINCGLS_SOURCES src/kct-pb-krylov.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/BasePBCTOperator.cpp)
+SET(CLLINCGLS_SOURCES src/kct-pb-krylov.cpp src/Kniha.cpp src/BasePBCTReconstructor.cpp src/BasePBCTOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCTReconstructor.cpp)
 add_executable(kct-pb-krylov ${CLLINCGLS_SOURCES})
 set_target_properties(
     kct-pb-krylov
@@ -308,7 +310,7 @@ target_compile_definitions(kct-pb-krylov PUBLIC CL_TARGET_OPENCL_VERSION=120)
 target_git_version_init(kct-pb-krylov)
 install (TARGETS kct-pb-krylov RUNTIME DESTINATION .)
 
-SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp)
+SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp)
 add_executable(kct-pb-projector ${CLLINCGLS_SOURCES})
 set_target_properties(
     kct-pb-projector
@@ -327,6 +329,24 @@ target_compile_definitions(kct-pb-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)
 target_git_version_init(kct-pb-projector)
 install (TARGETS kct-pb-projector RUNTIME DESTINATION .)
 
+SET(CLLINCGLS_SOURCES src/kct-pb-backprojector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp)
+add_executable(kct-pb-backprojector ${CLLINCGLS_SOURCES})
+set_target_properties(
+    kct-pb-backprojector
+    PROPERTIES 
+        OUTPUT_NAME "kct-pb-backprojector"
+        SUFFIX ""
+)
+target_link_libraries(kct-pb-backprojector ctiol)
+target_link_libraries(kct-pb-backprojector ctmal)
+target_link_libraries(kct-pb-backprojector OpenCL::OpenCL)
+target_link_libraries(kct-pb-backprojector CTIOL_OPENCL)
+#target_link_libraries (kct-pb-backprojector ${CMAKE_THREAD_LIBS_INIT})
+target_include_directories(kct-pb-backprojector PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(kct-pb-backprojector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_compile_definitions(kct-pb-backprojector PUBLIC CL_TARGET_OPENCL_VERSION=120)
+target_git_version_init(kct-pb-backprojector)
+install (TARGETS kct-pb-backprojector RUNTIME DESTINATION .)
 
 SET(CLLINJACOBIGLSQR_SOURCES src/JacobiGLSQRReconstructor.cpp src/CLlin-jacobiglsqr.cpp)
 add_executable(CLlin-jacobiglsqr ${CLLINJACOBIGLSQR_SOURCES})
