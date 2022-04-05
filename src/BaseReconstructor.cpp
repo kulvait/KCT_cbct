@@ -399,41 +399,6 @@ std::shared_ptr<cl::Buffer> BaseReconstructor::getTmpBBuffer(uint32_t i)
     }
 }
 
-int BaseReconstructor::B_equals_A_plus_B_offsets(cl::Buffer& from,
-                                                 unsigned int from_offset,
-                                                 cl::Buffer& to,
-                                                 unsigned int to_offset,
-                                                 unsigned int size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_B_equals_A_plus_B_offsets)(eargs, from, from_offset, to, to_offset).wait();
-    return 0;
-}
-
-int BaseReconstructor::invertFloatVector(cl::Buffer& X, unsigned int size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_invert_except_zero)(eargs, X).wait();
-    return 0;
-}
-
-int BaseReconstructor::vectorA_multiple_B_equals_C(cl::Buffer& A,
-                                                   cl::Buffer& B,
-                                                   cl::Buffer& C,
-                                                   uint64_t size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_C_equals_A_times_B)(eargs, A, B, C).wait();
-    return 0;
-}
-
-int BaseReconstructor::multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_A_equals_A_times_B)(eargs, A, B).wait();
-    return 0;
-}
-
 /**
  * @param initialProjectionIndex For OS SART 0 by default
  * @param projectionIncrement For OS SART 1 by default
@@ -651,40 +616,6 @@ int BaseReconstructor::project(cl::Buffer& X,
     return 0;
 }
 
-int BaseReconstructor::copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_copy)(eargs, from, to).wait();
-    return 0;
-}
-
-int BaseReconstructor::scaleFloatVector(cl::Buffer& v, float f, unsigned int size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_scale)(eargs, v, f).wait();
-    return 0;
-}
-
-int BaseReconstructor::addIntoFirstVectorSecondVectorScaled(cl::Buffer& a,
-                                                            cl::Buffer& b,
-                                                            float f,
-                                                            unsigned int size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_A_equals_A_plus_cB)(eargs, a, b, f).wait();
-    return 0;
-}
-
-int BaseReconstructor::addIntoFirstVectorScaledSecondVector(cl::Buffer& a,
-                                                            cl::Buffer& b,
-                                                            float f,
-                                                            unsigned int size)
-{
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
-    (*FLOATvector_A_equals_Ac_plus_B)(eargs, a, b, f).wait();
-    return 0;
-}
-
 std::vector<std::shared_ptr<CameraI>>
 BaseReconstructor::encodeProjectionMatrices(std::shared_ptr<io::DenProjectionMatrixReader> pm)
 {
@@ -714,14 +645,11 @@ std::vector<float> BaseReconstructor::computeScalingFactors()
 
 void BaseReconstructor::writeVolume(cl::Buffer& X, std::string path)
 {
-    uint16_t buf[3];
-    buf[0] = vdimy;
-    buf[1] = vdimx;
-    buf[2] = vdimz;
-    io::createEmptyFile(path, 0, true); // Try if this is faster
-    io::appendBytes(path, (uint8_t*)buf, 6);
-    Q[0]->enqueueReadBuffer(X, CL_TRUE, 0, sizeof(float) * XDIM, x);
-    io::appendBytes(path, (uint8_t*)x, XDIM * sizeof(float));
+    bufferIntoArray(X, x, XDIM);
+    bool arrayxmajor = true;
+    bool outxmajor = true;
+    io::DenFileInfo::create3DDenFileFromArray(x, arrayxmajor, path, io::DenSupportedType::FLOAT32,
+                                              vdimx, vdimy, vdimz, outxmajor);
 }
 
 void BaseReconstructor::writeProjections(cl::Buffer& B, std::string path)

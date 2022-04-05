@@ -209,17 +209,6 @@ protected:
     void reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp);
 
     // Functions to manipulate with buffers
-    int multiplyVectorsIntoFirstVector(cl::Buffer& A, cl::Buffer& B, uint64_t size);
-    int vectorA_multiple_B_equals_C(cl::Buffer& A, cl::Buffer& B, cl::Buffer& C, uint64_t size);
-    int copyFloatVector(cl::Buffer& from, cl::Buffer& to, unsigned int size);
-    int scaleFloatVector(cl::Buffer& v, float f, unsigned int size);
-    int B_equals_A_plus_B_offsets(
-        cl::Buffer& A, unsigned int ao, cl::Buffer& B, unsigned int bo, unsigned int size);
-    int
-    addIntoFirstVectorSecondVectorScaled(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
-    int
-    addIntoFirstVectorScaledSecondVector(cl::Buffer& a, cl::Buffer& b, float f, unsigned int size);
-    int invertFloatVector(cl::Buffer& X, unsigned int size);
     std::vector<float> computeScalingFactors();
 
     cl::NDRange projectorLocalNDRange;
