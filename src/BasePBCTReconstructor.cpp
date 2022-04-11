@@ -34,23 +34,20 @@ int BasePBCTReconstructor::initializeVectors(float* projections,
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-
-    b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                         sizeof(float) * BDIM, (void*)projections, &err);
+    size_t BDIM_bs = sizeof(float) * uint64_t(BDIM);
+    b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, BDIM_bs,
+                                         (void*)projections, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-
-    tmp_b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
-                                             nullptr, &err);
+    tmp_b_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, BDIM_bs, nullptr, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-
     return 0;
 }
 

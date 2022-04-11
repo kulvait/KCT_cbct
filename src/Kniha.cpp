@@ -758,30 +758,187 @@ void Kniha::insertCLFile(std::string f)
     }
 }
 
+std::string Kniha::infoString(cl_int cl_info_id)
+{
+    // See https://github.com/KhronosGroup/OpenCL-Headers/blob/main/CL/cl.h
+    if(cl_info_id == CL_COMPLETE)
+    {
+        return "CL_COMPLETE";
+    } else if(cl_info_id == CL_RUNNING)
+    {
+        return "CL_RUNNING";
+    } else if(cl_info_id == CL_SUBMITTED)
+    {
+        return "CL_SUBMITTED";
+    } else if(cl_info_id == CL_QUEUED)
+    {
+        return "CL_QUEUED";
+    } else if(cl_info_id == CL_INVALID_VALUE)
+    {
+        return "CL_INVALID_VALUE";
+    } else if(cl_info_id == CL_INVALID_CONTEXT)
+    {
+        return "CL_INVALID_CONTEXT";
+    } else if(cl_info_id == CL_INVALID_EVENT)
+    {
+        return "CL_INVALID_EVENT";
+    } else if(cl_info_id == CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST)
+    {
+        return "CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST";
+    } else if(cl_info_id == CL_OUT_OF_RESOURCES)
+    {
+        return "CL_OUT_OF_RESOURCES";
+    } else if(cl_info_id == CL_OUT_OF_HOST_MEMORY)
+    {
+        return "CL_OUT_OF_HOST_MEMORY";
+    } else if(cl_info_id == CL_COMMAND_NDRANGE_KERNEL)
+    {
+        return "CL_COMMAND_NDRANGE_KERNEL";
+    } else if(cl_info_id == CL_COMMAND_TASK)
+    {
+        return "CL_COMMAND_TASK";
+    } else if(cl_info_id == CL_COMMAND_NATIVE_KERNEL)
+    {
+        return "CL_COMMAND_NATIVE_KERNEL";
+    } else if(cl_info_id == CL_COMMAND_READ_BUFFER)
+    {
+        return "CL_COMMAND_READ_BUFFER";
+    } else if(cl_info_id == CL_COMMAND_WRITE_BUFFER)
+    {
+        return "CL_COMMAND_WRITE_BUFFER";
+    } else if(cl_info_id == CL_COMMAND_COPY_BUFFER)
+    {
+        return "CL_COMMAND_COPY_BUFFER";
+    } else if(cl_info_id == CL_COMMAND_READ_IMAGE)
+    {
+        return "CL_COMMAND_READ_IMAGE";
+    } else if(cl_info_id == CL_COMMAND_WRITE_IMAGE)
+    {
+        return "CL_COMMAND_WRITE_IMAGE";
+    } else if(cl_info_id == CL_COMMAND_COPY_IMAGE)
+    {
+        return "CL_COMMAND_COPY_IMAGE";
+    } else if(cl_info_id == CL_COMMAND_COPY_IMAGE_TO_BUFFER)
+    {
+        return "CL_COMMAND_COPY_IMAGE_TO_BUFFER";
+    } else if(cl_info_id == CL_COMMAND_COPY_BUFFER_TO_IMAGE)
+    {
+        return "CL_COMMAND_COPY_BUFFER_TO_IMAGE";
+    } else if(cl_info_id == CL_COMMAND_MAP_BUFFER)
+    {
+        return "CL_COMMAND_MAP_BUFFER";
+    } else if(cl_info_id == CL_COMMAND_MAP_IMAGE)
+    {
+        return "CL_COMMAND_MAP_IMAGE";
+    } else if(cl_info_id == CL_COMMAND_UNMAP_MEM_OBJECT)
+    {
+        return "CL_COMMAND_UNMAP_MEM_OBJECT";
+    } else if(cl_info_id == CL_COMMAND_MARKER)
+    {
+        return "CL_COMMAND_MARKER";
+    } else if(cl_info_id == CL_COMMAND_ACQUIRE_GL_OBJECTS)
+    {
+        return "CL_COMMAND_ACQUIRE_GL_OBJECTS";
+    } else if(cl_info_id == CL_COMMAND_RELEASE_GL_OBJECTS)
+    {
+        return "CL_COMMAND_RELEASE_GL_OBJECTS";
+    } else if(cl_info_id == CL_COMMAND_READ_BUFFER_RECT)
+    {
+        return "CL_COMMAND_READ_BUFFER_RECT";
+    } else if(cl_info_id == CL_COMMAND_WRITE_BUFFER_RECT)
+    {
+        return "CL_COMMAND_WRITE_BUFFER_RECT";
+    } else if(cl_info_id == CL_COMMAND_COPY_BUFFER_RECT)
+    {
+        return "CL_COMMAND_COPY_BUFFER_RECT";
+    } else if(cl_info_id == CL_COMMAND_USER)
+    {
+        return "CL_COMMAND_USER";
+    } else if(cl_info_id == CL_COMMAND_BARRIER)
+    {
+        return "CL_COMMAND_BARRIER";
+    } else if(cl_info_id == CL_COMMAND_MIGRATE_MEM_OBJECTS)
+    {
+        return "CL_COMMAND_MIGRATE_MEM_OBJECTS";
+    } else if(cl_info_id == CL_COMMAND_FILL_BUFFER)
+    {
+        return "CL_COMMAND_FILL_BUFFER";
+    } else if(cl_info_id == CL_COMMAND_FILL_IMAGE)
+    {
+        return "CL_COMMAND_FILL_IMAGE";
+    } else if(cl_info_id == CL_COMMAND_SVM_FREE)
+    {
+        return "CL_COMMAND_SVM_FREE";
+    } else if(cl_info_id == CL_COMMAND_SVM_MEMCPY)
+    {
+        return "CL_COMMAND_SVM_MEMCPY";
+    } else if(cl_info_id == CL_COMMAND_SVM_MEMFILL)
+    {
+        return "CL_COMMAND_SVM_MEMFILL";
+    } else if(cl_info_id == CL_COMMAND_SVM_MAP)
+    {
+        return "CL_COMMAND_SVM_MAP";
+    } else if(cl_info_id == CL_COMMAND_SVM_UNMAP)
+    {
+        return "CL_COMMAND_SVM_UNMAP";
+    } else
+    {
+        return io::xprintf("Unknown ID %d=0x%x, see "
+                           "https://github.com/KhronosGroup/OpenCL-Headers/blob/main/CL/cl.h",
+                           cl_info_id, cl_info_id);
+    }
+}
+
 int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& errout)
 {
     cl_int inf;
     std::string kernelName;
     if(blocking)
     {
-        exe.wait();
+        inf = exe.wait();
+    } else
+    {
+        exe.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &inf);
     }
-    exe.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &inf);
     if(blocking)
     {
         if(inf != CL_COMPLETE)
         {
-            exe.getInfo(CL_KERNEL_FUNCTION_NAME, &kernelName);
+            if(inf == CL_INVALID_EVENT)
+            {
+
+                cl_int command_type_int;
+                inf = exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
+                if(inf == CL_INVALID_EVENT)
+                {
+                    errout = "Event wait and info CL_EVENT_COMMAND_TYPE returned CL_INVALID_EVENT";
+                } else
+                {
+                    std::string command_type_string = infoString(command_type_int);
+                    errout = io::xprintf(
+                        "Event wait returned CL_INVALID_EVENT, CL_EVENT_COMMAND_TYPE=%s",
+                        command_type_string.c_str());
+                }
+                return 1;
+            }
+            cl_int command_type_int;
+            exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
+            std::string command_type_string = infoString(command_type_int);
+            std::string status = infoString(inf);
             errout = io::xprintf(
-                "Kernel %s COMMAND_EXECUTION_STATUS is %d that is different from CL_COMPLETE!",
-                kernelName.c_str(), inf);
+                "Event %s COMMAND_EXECUTION_STATUS is %s that is different from CL_COMPLETE!",
+                command_type_string.c_str(), status.c_str());
             return 1;
         }
     } else if(inf != CL_COMPLETE && inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING)
     {
-        exe.getInfo(CL_KERNEL_FUNCTION_NAME, &kernelName);
-        errout = io::xprintf("Kernel %s COMMAND_EXECUTION_STATUS is %d implying an error!",
-                             kernelName.c_str(), inf);
+        cl_int command_type_int;
+        exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
+        std::string command_type_string = infoString(command_type_int);
+        std::string status = infoString(inf);
+        errout = io::xprintf(
+            "Event %s COMMAND_EXECUTION_STATUS is %s that is different from CL_COMPLETE!",
+            command_type_string.c_str(), status.c_str());
         return 2;
     }
     return 0;
@@ -868,9 +1025,10 @@ int Kniha::algFLOATvector_copy(cl::Buffer& A, cl::Buffer& B, uint64_t size, bool
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_copy)(eargs, A, B);
-    if(blocking)
+    std::string err;
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }

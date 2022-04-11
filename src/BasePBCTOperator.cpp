@@ -154,8 +154,8 @@ int BasePBCTOperator::allocateBBuffers(uint32_t bBufferCount)
     std::shared_ptr<cl::Buffer> bbufptr;
     while(this->b_buffers.size() < bBufferCount)
     {
-        bbufptr = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM,
-                                               nullptr, &err);
+        uint64_t size = uint64_t(sizeof(float)) * uint64_t(BDIM);
+        bbufptr = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, size, nullptr, &err);
         if(err != CL_SUCCESS)
         {
             LOGE << io::xprintf("Unsucessful initialization of B buffer with error code %d!", err);

@@ -69,6 +69,8 @@ public:
     void CLINCLUDEconvolution();
     void CLINCLUDEpbct_cvp();
 
+    static std::string infoString(cl_int cl_info_id);
+
 protected:
     const cl_float FLOATZERO = 0.0f;
     const cl_double DOUBLEZERO = 0.0;

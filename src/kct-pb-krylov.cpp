@@ -73,6 +73,8 @@ public:
         projectionFrameSize = projectionSizeX * projectionSizeY;
         totalProjectionSize
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+        LOGD << io::xprintf("Projection (x,y,z) = (%d, %d, %d), totalProjectionSize=%lu",
+                            projectionSizeX, projectionSizeY, projectionSizeZ, totalProjectionSize);
         if(inf.dimz() != pmi.dimz())
         {
             ERR = io::xprintf(
@@ -123,10 +125,10 @@ public:
             DenSupportedType dataType = x0inf.getDataType();
             if(dataType != DenSupportedType::FLOAT32)
             {
-                std::string ERR
-                    = io::xprintf("The file %s has declared data type %s but this implementation "
-                                  "only supports FLOAT32 files.",
-                                  initialVectorX0.c_str(), DenSupportedTypeToString(dataType).c_str());
+                std::string ERR = io::xprintf(
+                    "The file %s has declared data type %s but this implementation "
+                    "only supports FLOAT32 files.",
+                    initialVectorX0.c_str(), DenSupportedTypeToString(dataType).c_str());
                 LOGE << ERR;
                 return -1;
             }
