@@ -891,32 +891,25 @@ std::string Kniha::infoString(cl_int cl_info_id)
 
 int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& errout)
 {
-    cl_int inf;
-    std::string kernelName;
+    cl_int inf, ing;
     if(blocking)
     {
         inf = exe.wait();
-    } else
-    {
-        exe.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &inf);
-    }
-    if(blocking)
-    {
         if(inf != CL_COMPLETE)
         {
             if(inf == CL_INVALID_EVENT)
             {
-
                 cl_int command_type_int;
                 inf = exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
                 if(inf == CL_INVALID_EVENT)
                 {
-                    errout = "Event wait and info CL_EVENT_COMMAND_TYPE returned CL_INVALID_EVENT";
+                    errout = "Blocking event wait and info CL_EVENT_COMMAND_TYPE returned "
+                             "CL_INVALID_EVENT, might be out of memory.";
                 } else
                 {
                     std::string command_type_string = infoString(command_type_int);
                     errout = io::xprintf(
-                        "Event wait returned CL_INVALID_EVENT, CL_EVENT_COMMAND_TYPE=%s",
+                        "Blocking event wait returned CL_INVALID_EVENT, CL_EVENT_COMMAND_TYPE=%s, might be out of memory.",
                         command_type_string.c_str());
                 }
                 return 1;
@@ -925,21 +918,43 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
             exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
             std::string command_type_string = infoString(command_type_int);
             std::string status = infoString(inf);
-            errout = io::xprintf(
-                "Event %s COMMAND_EXECUTION_STATUS is %s that is different from CL_COMPLETE!",
-                command_type_string.c_str(), status.c_str());
+            errout = io::xprintf("Blocking CL_EVENT_COMMAND_TYPE=%s, COMMAND_EXECUTION_STATUS=%s that is "
+                                 "different from CL_COMPLETE!",
+                                 command_type_string.c_str(), status.c_str());
             return 1;
         }
-    } else if(inf != CL_COMPLETE && inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING)
+    } else
     {
-        cl_int command_type_int;
-        exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
-        std::string command_type_string = infoString(command_type_int);
-        std::string status = infoString(inf);
-        errout = io::xprintf(
-            "Event %s COMMAND_EXECUTION_STATUS is %s that is different from CL_COMPLETE!",
-            command_type_string.c_str(), status.c_str());
-        return 2;
+        ing = exe.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &inf);
+        if(ing != CL_COMPLETE)
+        {
+            errout = io::xprintf("Unblocking event request to CL_EVENT_COMMAND_EXECUTION_STATUS "
+                                 "failed with error code %s, might be out of memory.",
+                                 infoString(ing).c_str());
+            return 1;
+        }
+        if(inf != CL_COMPLETE && inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING)
+        {
+            cl_int command_type_int;
+            ing = exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
+            std::string command_type_string = infoString(command_type_int);
+            std::string status = infoString(inf);
+            if(ing == CL_COMPLETE)
+            {
+                errout
+                    = io::xprintf("Unblocking CL_EVENT_COMMAND_TYPE=%s, "
+                                  "COMMAND_EXECUTION_STATUS=%s that is different from CL_COMPLETE!",
+                                  command_type_string.c_str(), status.c_str());
+            } else
+            {
+
+                errout = io::xprintf(
+                    "Unblocking COMMAND_EXECUTION_STATUS=%s that is different from CL_COMPLETE. "
+                    "Request to CL_EVENT_COMMAND_TYPE failed with code %s!",
+                    status.c_str(), infoString(ing).c_str());
+            }
+            return 2;
+        }
     }
     return 0;
 }
