@@ -68,6 +68,7 @@ public:
     void CLINCLUDEutils();
     void CLINCLUDEconvolution();
     void CLINCLUDEpbct_cvp();
+    void CLINCLUDEpbct_cvp_barrier();
 
     static std::string infoString(cl_int cl_info_id);
 
@@ -625,6 +626,33 @@ protected:
                                                 cl::NDRange& globalRange,
                                                 std::shared_ptr<cl::NDRange> localRange = nullptr,
                                                 bool blocking = false);
+
+    // pbct_cvp_barrier.cl
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl::LocalSpaceArg&,
+                                    unsigned long&,
+                                    cl_double8&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double3&,
+                                    cl_int2&,
+                                    float&>>
+        FLOAT_pbct_cutting_voxel_project_barrier;
+    int algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
+                                                    cl::Buffer& projection,
+                                                    unsigned long& projectionOffset,
+                                                    cl_double8& CM,
+                                                    cl_int3& vdims,
+                                                    cl_double3& voxelSizes,
+                                                    cl_double3& volumeCenter,
+                                                    cl_int2& pdims,
+                                                    float globalScalingMultiplier,
+                                                    unsigned int LOCALARRAYSIZE,
+                                                    cl::NDRange& globalRange,
+                                                    std::shared_ptr<cl::NDRange> localRange
+                                                    = nullptr,
+                                                    bool blocking = false);
 
 private:
     /**

@@ -749,6 +749,22 @@ void Kniha::CLINCLUDEpbct_cvp()
     });
 }
 
+void Kniha::CLINCLUDEpbct_cvp_barrier()
+{
+    insertCLFile("opencl/pbct_cvp_barrier.cl");
+    callbacks.emplace_back([this](cl::Program program) {
+        {
+            auto& ptr = FLOAT_pbct_cutting_voxel_project_barrier;
+            std::string str = "FLOAT_pbct_cutting_voxel_project_barrier";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+    });
+}
+
 void Kniha::insertCLFile(std::string f)
 {
     if(std::find(CLFiles.begin(), CLFiles.end(), f) == CLFiles.end())
@@ -908,9 +924,9 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
                 } else
                 {
                     std::string command_type_string = infoString(command_type_int);
-                    errout = io::xprintf(
-                        "Blocking event wait returned CL_INVALID_EVENT, CL_EVENT_COMMAND_TYPE=%s, might be out of memory.",
-                        command_type_string.c_str());
+                    errout = io::xprintf("Blocking event wait returned CL_INVALID_EVENT, "
+                                         "CL_EVENT_COMMAND_TYPE=%s, might be out of memory.",
+                                         command_type_string.c_str());
                 }
                 return 1;
             }
@@ -918,9 +934,10 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
             exe.getInfo(CL_EVENT_COMMAND_TYPE, &command_type_int);
             std::string command_type_string = infoString(command_type_int);
             std::string status = infoString(inf);
-            errout = io::xprintf("Blocking CL_EVENT_COMMAND_TYPE=%s, COMMAND_EXECUTION_STATUS=%s that is "
-                                 "different from CL_COMPLETE!",
-                                 command_type_string.c_str(), status.c_str());
+            errout = io::xprintf(
+                "Blocking CL_EVENT_COMMAND_TYPE=%s, COMMAND_EXECUTION_STATUS=%s that is "
+                "different from CL_COMPLETE!",
+                command_type_string.c_str(), status.c_str());
             return 1;
         }
     } else
@@ -1719,6 +1736,47 @@ int Kniha::algFLOAT_pbct_cutting_voxel_backproject(
     auto exe = (*FLOAT_pbct_cutting_voxel_backproject)(*eargs, volume, projection, projectionOffset,
                                                        CM, vdims, voxelSizes, volumeCenter, pdims,
                                                        globalScalingMultiplier);
+    exe.setCallback(CL_COMPLETE, lambda);
+    if(blocking)
+    {
+        exe.wait();
+    }
+    return 0;
+}
+
+int Kniha::algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
+                                                       cl::Buffer& projection,
+                                                       unsigned long& projectionOffset,
+                                                       cl_double8& CM,
+                                                       cl_int3& vdims,
+                                                       cl_double3& voxelSizes,
+                                                       cl_double3& volumeCenter,
+                                                       cl_int2& pdims,
+                                                       float globalScalingMultiplier,
+                                                       unsigned int LOCALARRAYSIZE,
+                                                       cl::NDRange& globalRange,
+                                                       std::shared_ptr<cl::NDRange> localRange,
+                                                       bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    if(localRange != nullptr)
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+    } else
+    {
+        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
+    }
+    cl::LocalSpaceArg localProjection = cl::Local(LOCALARRAYSIZE * sizeof(float));
+    auto lambda = [](cl_event e, cl_int status, void* data) {
+        if(status != CL_COMPLETE)
+        {
+            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
+        }
+    };
+
+    auto exe = (*FLOAT_pbct_cutting_voxel_project_barrier)(
+        *eargs, volume, projection, localProjection, projectionOffset, CM, vdims, voxelSizes,
+        volumeCenter, pdims, globalScalingMultiplier);
     exe.setCallback(CL_COMPLETE, lambda);
     if(blocking)
     {

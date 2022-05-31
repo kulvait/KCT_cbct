@@ -16,7 +16,8 @@ void BasePBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOC
         {
             addOptString(io::xprintf("-DLOCALARRAYSIZE=%d", LOCALARRAYSIZE));
             this->LOCALARRAYSIZE = LOCALARRAYSIZE;
-            KCTERR("No barrier implementation of PBCVP yet.");
+            CLINCLUDEpbct_cvp();
+            CLINCLUDEpbct_cvp_barrier();
         } else
         {
             CLINCLUDEpbct_cvp();
@@ -310,7 +311,6 @@ int BasePBCTOperator::project(cl::Buffer& X,
                               uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
-    cl::NDRange globalRange(vdimz, vdimy, vdimx);
     std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
     // clang-format off
     // cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
@@ -336,9 +336,13 @@ int BasePBCTOperator::project(cl::Buffer& X,
         {
             if(useBarrierImplementation)
             {
-                KCTERR("Barrier implementation of CVP projector is not yet implemented for PBCT.");
+                cl::NDRange globalRange(vdimx, vdimy, vdimz);
+                algFLOAT_pbct_cutting_voxel_project_barrier(
+                    X, B, offset, CM, vdims, voxelSizes, volumeCenter, pdims, scalingFactor,
+                    LOCALARRAYSIZE, globalRange, localRange);
             } else
             {
+                cl::NDRange globalRange(vdimz, vdimy, vdimx);
                 algFLOAT_pbct_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
                                                     volumeCenter, pdims, scalingFactor, globalRange,
                                                     localRange);

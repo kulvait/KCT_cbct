@@ -165,7 +165,8 @@ int main(int argc, char* argv[])
         prgInfo = io::xprintf("%s Git commit %s", prgInfo.c_str(), version::GIT_COMMIT_ID);
     }
     Args ARG(argc, argv, prgInfo);
-    int parseResult = ARG.parse();
+    bool helpOnError = false;
+    int parseResult = ARG.parse(helpOnError);
     if(parseResult > 0)
     {
         return 0; // Exited sucesfully, help message printed

@@ -339,7 +339,8 @@ int main(int argc, char* argv[])
         }
         Args ARG(argc, argv, prgInfo);
         // Argument parsing
-        int parseResult = ARG.parse();
+        bool helpOnError = false;
+        int parseResult = ARG.parse(helpOnError);
         if(parseResult > 0)
         {
             return 0; // Exited sucesfully, help message printed

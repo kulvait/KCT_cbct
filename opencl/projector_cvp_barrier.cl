@@ -336,30 +336,30 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             offAxisPosition = true;
             const REAL3 CMX_CROSS = cross(CM.s012, CM.s89a);
             const REAL3 CMY_CROSS = cross(CM.s456, CM.s89a);
-            if(voxelcenter_local_xyz.y * CMX_CROSS.z - voxelcenter_local_xyz.z * CMX_CROSS.y < 0)
+            if(voxelcenter_local_xyz.y * CMX_CROSS.z - voxelcenter_local_xyz.z * CMX_CROSS.y < ZERO)
             {
-                positiveShift[0].x = -positiveShift[0].x;
+                positiveShift[0].x *= MINUSONE;
             }
-            if(voxelcenter_local_xyz.z * CMX_CROSS.x - voxelcenter_local_xyz.x * CMX_CROSS.z < 0)
+            if(voxelcenter_local_xyz.z * CMX_CROSS.x - voxelcenter_local_xyz.x * CMX_CROSS.z < ZERO)
             {
-                positiveShift[0].y = -positiveShift[0].y;
+                positiveShift[0].y *= MINUSONE;
             }
-            if(voxelcenter_local_xyz.x * CMX_CROSS.y - voxelcenter_local_xyz.y * CMX_CROSS.x < 0)
+            if(voxelcenter_local_xyz.x * CMX_CROSS.y - voxelcenter_local_xyz.y * CMX_CROSS.x < ZERO)
             {
-                positiveShift[0].z = -positiveShift[0].z;
+                positiveShift[0].z *= MINUSONE;
             }
 
-            if(voxelcenter_local_xyz.y * CMY_CROSS.z - voxelcenter_local_xyz.z * CMY_CROSS.y < 0)
+            if(voxelcenter_local_xyz.y * CMY_CROSS.z - voxelcenter_local_xyz.z * CMY_CROSS.y < ZERO)
             {
-                positiveShift[1].x *= -1.0;
+                positiveShift[1].x *= MINUSONE;
             }
-            if(voxelcenter_local_xyz.z * CMY_CROSS.x - voxelcenter_local_xyz.x * CMY_CROSS.z < 0)
+            if(voxelcenter_local_xyz.z * CMY_CROSS.x - voxelcenter_local_xyz.x * CMY_CROSS.z < ZERO)
             {
-                positiveShift[1].y *= -1.0;
+                positiveShift[1].y *= MINUSONE;
             }
-            if(voxelcenter_local_xyz.x * CMY_CROSS.y - voxelcenter_local_xyz.y * CMY_CROSS.x < 0)
+            if(voxelcenter_local_xyz.x * CMY_CROSS.y - voxelcenter_local_xyz.y * CMY_CROSS.x < ZERO)
             {
-                positiveShift[1].z *= -1.0;
+                positiveShift[1].z *= MINUSONE;
             }
             REAL nvI = dot(CM.s012, voxelcenter_local_xyz);
             REAL n0I = dot(CM.s012, positiveShift[0]);
@@ -469,7 +469,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     {
         dropVoxel = true;
     }
-#ifdef DROPCENTEROFFPROJECTORVOXELS
+#ifdef DROPINCOMPLETEVOXELS
     if(partlyOffProjectorPosition)
     {
         int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
@@ -479,8 +479,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             dropVoxel = true;
         }
     }
-#endif
-#ifdef DROPINCOMPLETEVOXELS
+#elif defined DROPCENTEROFFPROJECTORVOXELS // Here I need to do less, previous code sufficient
     if(partlyOffProjectorPosition)
     {
         int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
@@ -804,8 +803,8 @@ px11 = PROJECTX0(CML, vx11);*/
                     PX_xyx[3] = &px00;
                 }
             }
-            min_PX = convert_int_rtn(pxx_min + zeroPrecisionTolerance + HALF);
-            max_PX = convert_int_rtn(pxx_max - zeroPrecisionTolerance + HALF);
+            min_PX = INDEX(pxx_min + zeroPrecisionTolerance);
+            max_PX = INDEX(pxx_max - zeroPrecisionTolerance);
             if(max_PX >= 0 && min_PX < Lpdims.x)
             {
 #ifdef ELEVATIONCORRECTION
@@ -819,7 +818,7 @@ px11 = PROJECTX0(CML, vx11);*/
 #ifdef ELEVATIONCORRECTION
                     corLenEstimate = corLenLimit; // Probably better estimate might exist
                     corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-                    localEdgeValues0ElevationCorrection(localProjection, CML, HALF * (vx00 + vx11),
+                    localEdgeValues0ElevationCorrection(localProjection, CML, voxelCenter_xyz,
                                                         min_PX, value, voxelSizes, Lpdims,
                                                         corlambda);
 #else

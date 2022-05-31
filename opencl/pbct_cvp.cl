@@ -52,15 +52,14 @@ void kernel FLOAT_pbct_cutting_voxel_project(global const float* restrict volume
     {
         return;
     }
-#ifdef DROPCENTEROFFPROJECTORVOXELS
+#ifdef DROPINCOMPLETEVOXELS
     int xindex = INDEX(PBPROJECTX(CM, voxelcenter_xyz));
     int yindex = INDEX(PBPROJECTY(CM, voxelcenter_xyz));
     if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)
     {
         return;
-    }
-#elif defined DROPINCOMPLETEVOXELS // Here I need to do more but when the previous code was executed
-                                   // there is no need to do it twice
+    } // More do further
+#elif defined DROPCENTEROFFPROJECTORVOXELS // Here I need to do less, previous code sufficient
     int xindex = INDEX(PBPROJECTX(CM, voxelcenter_xyz));
     int yindex = INDEX(PBPROJECTY(CM, voxelcenter_xyz));
     if(xindex < 0 || yindex < 0 || xindex >= pdims.x || yindex >= pdims.y)

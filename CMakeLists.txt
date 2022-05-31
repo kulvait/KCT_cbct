@@ -146,6 +146,7 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl opencl/rescalePr
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/convolution.cl opencl/convolution.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/pbct_cvp.cl opencl/pbct_cvp.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/pbct_cvp_barrier.cl opencl/pbct_cvp_barrier.cl COPYONLY)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
@@ -164,6 +165,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION openc
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/convolution.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/pbct_cvp.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/pbct_cvp_barrier.cl DESTINATION opencl)
 
 
 SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
@@ -547,8 +549,9 @@ target_compile_definitions(test_all PUBLIC CL_TARGET_OPENCL_VERSION=120)
 
 
 
-#Documentation target
-find_package(Doxygen)
+#Documentation target, used workaround described in https://gitlab.kitware.com/cmake/cmake/-/issues/18708
+set(DOXYGEN_EXECUTABLE "")
+find_package(Doxygen QUIET)
 if (DOXYGEN_FOUND)
     # set input and output files
     set(DOXYGEN_IN ${CMAKE_SOURCE_DIR}/doc/doxygen.conf.in)

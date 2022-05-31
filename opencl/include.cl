@@ -91,6 +91,8 @@ typedef float16 REAL16;
 #define QUARTER 0.25f
 #define TWOTHIRDS 0.66666666f
 #define ONE 1.0f
+#define TWO 2.0f
+#define MINUSONE -1.0f
 #define THREE 3.0f
 #define convert_REAL3(x) convert_float3(x)
 #define LENGTH(x) fast_length(x)
@@ -110,6 +112,8 @@ typedef double16 REAL16;
 #define QUARTER 0.25
 #define TWOTHIRDS 0.6666666666666666
 #define ONE 1.0
+#define TWO 2.0
+#define MINUSONE -1.0
 #define THREE 3.0
 #define convert_REAL3(x) convert_double3(x)
 #define LENGTH(x) length(x)
