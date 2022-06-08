@@ -43,18 +43,13 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
     // Shift projection array by offset
     projection += projectionOffset;
     uint LOCSIZE = lis * ljs * lks;
-    uint LID = li * ljs * lks + lj * lks + lk;
+    uint LID = li * ljs + lj + lk * lis * ljs;
     uint LIDRANGE, fillStart, fillStop;
     int2 Lpdims;
-    uint mappedLocalRange, Jrange, ILocalRange; // Memory used only in cornerWorkItem
-    local bool partlyOffProjectorPosition; // If true, some vertices of the local cuboid are
-                                           // projected outside the projector
-    local bool fullyOffProjectorPosition; // If true, shall end the execution
-    local bool stopNextIteration_local;
+    uint mappedLocalRange;
+    // PJLocalRange,
+    //    PILocalRange_memoryMapped; // Memory used only in cornerWorkItem
     bool stopNextIteration;
-    local REAL8 CML;
-    local int projectorLocalRange[7]; //
-    int PILocalMin, PILocalMax, PJLocalMin, PJLocalMax;
 #ifdef RELAXED
     const float8 CM = convert_float8(_CM);
     const float3 voxelSizes = convert_float3(_voxelSizes);
@@ -68,9 +63,19 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
     const REAL3 volumeCenter_voxelcenter_offset
         = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset;
+    local bool partlyOffProjectorPosition; // If true, some vertices of the local cuboid are
+                                           // projected outside the projector
+    local bool fullyOffProjectorPosition; // If true, shall end the execution
+    local bool stopNextIteration_local;
+    local REAL8 CML;
+    local int PILocalMin, PILocalMax, PILocalStart_memoryMapped, PJLocalMin, PJLocalMax;
+    local int PILocalRange_memoryMapped, PJLocalRange;
+    // local int projectorLocalRange[7]; //
     if(LID == 0) // Get dimension
     {
         // LID==0
+        partlyOffProjectorPosition = false;
+        fullyOffProjectorPosition = false;
         const REAL3 volumeCenter_localVoxelcenter_offset
             = (REAL3)(2 * i + lis - vdims.x, 2 * j + ljs - vdims.y, 2 * k + lks - vdims.z)
             * halfVoxelSizes;
@@ -88,75 +93,66 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
         REAL LPXinc = dot(fabs(CM.s012), halfLocalSizes);
         REAL LPYinc = dot(fabs(CM.s456), halfLocalSizes);
         PILocalMin = INDEX(LPX - LPXinc);
-        PILocalMax = INDEX(LPX + LPXinc);
+        PILocalMax = INDEX(LPX + LPXinc) + 1;
         PJLocalMin = INDEX(LPY - LPYinc);
-        PJLocalMax = INDEX(LPY + LPYinc);
-        if(PILocalMax < 0 || PILocalMin >= pdims.x || PJLocalMax < 0 || PJLocalMin >= pdims.y)
+        PJLocalMax = INDEX(LPY + LPYinc) + 1;
+        if(PILocalMax <= 0 || PILocalMin >= pdims.x || PJLocalMax <= 0 || PJLocalMin >= pdims.y)
         {
+            stopNextIteration_local = true;
             fullyOffProjectorPosition = true;
             partlyOffProjectorPosition = true;
-        } else if(PILocalMin < 0 || PILocalMax >= pdims.x || PJLocalMin < 0
-                  || PJLocalMax >= pdims.y)
-        {
-            fullyOffProjectorPosition = false;
-            partlyOffProjectorPosition = true;
-            projectorLocalRange[0] = max(0, PILocalMin);
-            projectorLocalRange[1] = min(pdims.x, PILocalMax + 1);
-            projectorLocalRange[2] = max(0, PJLocalMin);
-            projectorLocalRange[3] = min(pdims.y, PJLocalMax + 1);
         } else
         {
-            fullyOffProjectorPosition = false;
-            partlyOffProjectorPosition = false;
-            projectorLocalRange[0] = PILocalMin;
-            projectorLocalRange[1] = PILocalMax + 1;
-            projectorLocalRange[2] = PJLocalMin;
-            projectorLocalRange[3] = PJLocalMax + 1;
-        }
-        // Prepare local memory
-        if(!fullyOffProjectorPosition)
-        {
-            uint Irange = projectorLocalRange[1] - projectorLocalRange[0];
-            uint Jrange = projectorLocalRange[3] - projectorLocalRange[2];
-            uint FullLocalRange = Irange * Jrange;
+            if(PILocalMin < 0)
+            {
+                partlyOffProjectorPosition = true;
+                PILocalMin = 0;
+            }
+            if(PILocalMax > pdims.x)
+            {
+                partlyOffProjectorPosition = true;
+                PILocalMax = pdims.x;
+            }
+            if(PJLocalMin < 0)
+            {
+                partlyOffProjectorPosition = true;
+                PJLocalMin = 0;
+            }
+            if(PJLocalMax > pdims.y)
+            {
+                partlyOffProjectorPosition = true;
+                PJLocalMax = pdims.y;
+            }
+            // Prepare local memory
+            PILocalStart_memoryMapped = PILocalMin;
+            PILocalRange_memoryMapped
+                = PILocalMax - PILocalMin; // How many columns fits to local memory
+            PJLocalRange = PJLocalMax - PJLocalMin;
+            uint FullLocalRange = PILocalRange_memoryMapped * PJLocalRange;
             if(FullLocalRange <= LOCALARRAYSIZE)
             {
-                ILocalRange = Irange; // How many columns fits to local memory
                 stopNextIteration_local = true;
             } else
             {
-                ILocalRange = LOCALARRAYSIZE / Jrange;
+                PILocalRange_memoryMapped
+                    = LOCALARRAYSIZE / PJLocalRange; // How many columns fits to local memory
                 stopNextIteration_local = false;
-                // printf("%zu %zu %zu", i, j, k);
-                // printf("FullLocalRange=%zu exceeds range\n", FullLocalRange);
             }
-            projectorLocalRange[4] = ILocalRange;
-            projectorLocalRange[5] = Jrange;
-            projectorLocalRange[6]
-                = projectorLocalRange[0]; // Where current local array has start IRange
 
-            // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5 .. PJMAX-PJMIN, 6
-            // CurrentPISTART
+            // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. PILocalRange_memoryMapped, 5 ..
+            // PJMAX-PJMIN, 6 CurrentPISTART
             CML = CM;
-            CML.s3 -= projectorLocalRange[0];
-            CML.s7 -= projectorLocalRange[2];
-        } else
-        {
-            projectorLocalRange[1] = -1;
-            projectorLocalRange[2] = 0;
-            projectorLocalRange[3] = 0;
-            projectorLocalRange[4] = 0;
-            projectorLocalRange[5] = 0;
-            projectorLocalRange[6] = 0;
-            stopNextIteration_local = true;
+            CML.s3 -= PILocalMin;
+            CML.s7 -= PJLocalMin;
         }
     }
     barrier(CLK_LOCAL_MEM_FENCE); // Cutting voxel projector
-                                  // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5
+                                  // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 ..
+                                  // PILocalRange_memoryMapped, 5
                                   // .. PJMAX-PJMIN, 6 CurrentPISTART
     if(fullyOffProjectorPosition)
         return;
-    Lpdims = (int2)(projectorLocalRange[4], projectorLocalRange[5]);
+    Lpdims = (int2)(PILocalRange_memoryMapped, PJLocalRange);
     mappedLocalRange = Lpdims.x * Lpdims.y;
     LIDRANGE = (mappedLocalRange + LOCSIZE - 1) / LOCSIZE;
     fillStart = min(LID * LIDRANGE, mappedLocalRange);
@@ -199,7 +195,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
     do
     {
         stopNextIteration = stopNextIteration_local;
-        prevStartRange = projectorLocalRange[6];
+        prevStartRange = PILocalStart_memoryMapped;
         // printf("i,j,k=%d,%d,%d", i, j, k);
         // Start CVP
         if(!dropVoxel)
@@ -306,9 +302,9 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
                     int I = max(-1, PIL_min);
                     int I_STOP = min(PIL_max, Lpdims.x);
                     // Section of the square that corresponds to the indices < i
-                    sectionSize_prev = PBexactIntersectionPolygons(
-                        ((REAL)I) + HALF, vd1, vd3, &V0, &PX_xyx0, &PX_xyx1, &PX_xyx2, &PX_xyx3,
-                        CML, voxelSizes, &CENTROID_prev);
+                    sectionSize_prev = PBintersectionPolygons(
+                        ((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1, PX_xyx2, PX_xyx3,
+                        CML, voxelSizes);
                     if(I >= 0)
                     {
                         factor = value * sectionSize_prev;
@@ -333,9 +329,9 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
                     }
                     for(I = I + 1; I < I_STOP; I++)
                     {
-                        sectionSize_cur = PBexactIntersectionPolygons(
-                            ((REAL)I) + HALF, vd1, vd3, &V0, &PX_xyx0, &PX_xyx1, &PX_xyx2, &PX_xyx3,
-                            CML, voxelSizes, &CENTROID_cur);
+                        sectionSize_cur = PBintersectionPolygons(
+                            ((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1, PX_xyx2, PX_xyx3,
+                            CML, voxelSizes);
                         polygonSize = sectionSize_cur - sectionSize_prev;
                         factor = value * polygonSize;
                         // Unfolded localEdgeValues
@@ -386,11 +382,11 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
             }
         }
         // End CVP
-        // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5 .. PJMAX-PJMIN, 6
-        // CurrentPISTART
+        // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. PILocalRange_memoryMapped, 5 ..
+        // PJMAX-PJMIN, 6 CurrentPISTART
         barrier(CLK_LOCAL_MEM_FENCE); // Local to global copy
         uint LI, LJ, globalIndex;
-        uint globalOffset = prevStartRange * pdims.y + projectorLocalRange[2];
+        uint globalOffset = prevStartRange * pdims.y + PJLocalMin;
         for(int IND = fillStart; IND != fillStop; IND++)
         // for(int IND = LID; IND < mappedLocalRange; IND+=LIDRANGE)
         {
@@ -401,15 +397,15 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
         }
         if(LID == 0)
         {
-            CML.s3 -= projectorLocalRange[4];
+            CML.s3 -= PILocalRange_memoryMapped;
             // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. PIMAX-PIMIN, 5 .. PJMAX-PJMIN, 6
             // CurrentPISTART
-            projectorLocalRange[6] += projectorLocalRange[4];
-            if(projectorLocalRange[6] < projectorLocalRange[1])
+            PILocalStart_memoryMapped += PILocalRange_memoryMapped;
+            if(PILocalStart_memoryMapped < PILocalMax)
             {
-                if(projectorLocalRange[1] - projectorLocalRange[6] <= projectorLocalRange[4])
+                if(PILocalMax - PILocalStart_memoryMapped <= PILocalRange_memoryMapped)
                 {
-                    projectorLocalRange[4] = projectorLocalRange[1] - projectorLocalRange[6];
+                    PILocalRange_memoryMapped = PILocalMax - PILocalStart_memoryMapped;
                     stopNextIteration_local = true;
                 }
             }
@@ -418,7 +414,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
         if(!stopNextIteration)
         {
             barrier(CLK_LOCAL_MEM_FENCE);
-            Lpdims = (int2)(projectorLocalRange[4], projectorLocalRange[5]);
+            Lpdims = (int2)(PILocalRange_memoryMapped, PJLocalRange);
             mappedLocalRange = Lpdims.x * Lpdims.y;
             fillStart = min(fillStart, mappedLocalRange);
             fillStop = min(fillStop, mappedLocalRange);
@@ -429,7 +425,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
             }
             barrier(CLK_LOCAL_MEM_FENCE); // Cutting voxel projector
                                           // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 ..
-                                          // ILocalRange, 5
+                                          // PILocalRange_memoryMapped, 5
                                           // .. PJMAX-PJMIN, 6 CurrentPISTART
 
             // printf("Next %d %d %d. \n", i, j, k);

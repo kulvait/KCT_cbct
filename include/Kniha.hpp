@@ -662,10 +662,12 @@ private:
      * @param blocking
      */
     int handleKernelExecution(cl::Event exe, bool blocking, std::string& errout);
+    cl::NDRange assignLocalRange(std::shared_ptr<cl::NDRange> localRange, cl::NDRange globalRange);
     bool openCLInitialized = false;
     void insertCLFile(std::string f);
     std::vector<std::string> CLFiles;
     std::vector<std::function<void(cl::Program)>> callbacks;
+    std::shared_ptr<cl::Program> program;
 };
 
 } // namespace KCT

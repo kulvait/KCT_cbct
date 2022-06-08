@@ -79,8 +79,8 @@ int Kniha::initializeOpenCL(uint32_t platformId,
         clFilesXpath.push_back(io::xprintf("%s/%s", xpath.c_str(), f.c_str()));
     }
     io::concatenateTextFiles(clFile, true, clFilesXpath);
-    std::string projectorSource = io::fileToString(clFile);
-    cl::Program program(*context, projectorSource);
+    std::string allSources = io::fileToString(clFile);
+    program = std::make_shared<cl::Program>(*context, allSources);
     if(relaxed)
     {
         optstrings.emplace_back("-DRELAXED");
@@ -100,7 +100,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
                               return B.empty() ? A : (A.empty() ? B : A + " " + B);
                           });
     LOGI << io::xprintf("Building file %s with options : %s", clFile.c_str(), options.c_str());
-    cl_int inf = program.build(devices, options.c_str());
+    cl_int inf = program->build(devices, options.c_str());
     if(inf != CL_SUCCESS)
     {
         // Error codes can be found here
@@ -123,7 +123,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
                             inf);
         for(cl::Device dev : devices)
         {
-            cl_build_status s = program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(dev);
+            cl_build_status s = program->getBuildInfo<CL_PROGRAM_BUILD_STATUS>(dev);
             std::string status = "";
             if(s == CL_BUILD_NONE)
             {
@@ -142,7 +142,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
                 status = io::xprintf("Status code %d", s);
             }
             std::string name = dev.getInfo<CL_DEVICE_NAME>();
-            std::string buildlog = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(dev);
+            std::string buildlog = program->getBuildInfo<CL_PROGRAM_BUILD_LOG>(dev);
             LOGE << io::xprintf("Device %s, status %s LOG:", name.c_str(), status.c_str())
                  << std::endl
                  << buildlog << std::endl;
@@ -166,7 +166,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     // https://stackoverflow.com/questions/23992369/what-should-i-use-instead-of-clkernelfunctor/54344990#54344990
     for(std::function<void(cl::Program)> f : callbacks)
     {
-        f(program);
+        f(*program);
     }
     for(uint32_t i = 0; i != devices.size(); i++)
     {
@@ -897,6 +897,180 @@ std::string Kniha::infoString(cl_int cl_info_id)
     } else if(cl_info_id == CL_COMMAND_SVM_UNMAP)
     {
         return "CL_COMMAND_SVM_UNMAP";
+    } else if(cl_info_id == CL_DEVICE_NOT_FOUND)
+    {
+        return "CL_DEVICE_NOT_FOUND";
+    } else if(cl_info_id == CL_DEVICE_NOT_AVAILABLE)
+    {
+        return "CL_DEVICE_NOT_AVAILABLE";
+    } else if(cl_info_id == CL_COMPILER_NOT_AVAILABLE)
+    {
+        return "CL_COMPILER_NOT_AVAILABLE";
+    } else if(cl_info_id == CL_MEM_OBJECT_ALLOCATION_FAILURE)
+    {
+        return "CL_MEM_OBJECT_ALLOCATION_FAILURE";
+    } else if(cl_info_id == CL_OUT_OF_RESOURCES)
+    {
+        return "CL_OUT_OF_RESOURCES";
+    } else if(cl_info_id == CL_OUT_OF_HOST_MEMORY)
+    {
+        return "CL_OUT_OF_HOST_MEMORY";
+    } else if(cl_info_id == CL_PROFILING_INFO_NOT_AVAILABLE)
+    {
+        return "CL_PROFILING_INFO_NOT_AVAILABLE";
+    } else if(cl_info_id == CL_MEM_COPY_OVERLAP)
+    {
+        return "CL_MEM_COPY_OVERLAP";
+    } else if(cl_info_id == CL_IMAGE_FORMAT_MISMATCH)
+    {
+        return "CL_IMAGE_FORMAT_MISMATCH";
+    } else if(cl_info_id == CL_IMAGE_FORMAT_NOT_SUPPORTED)
+    {
+        return "CL_IMAGE_FORMAT_NOT_SUPPORTED";
+    } else if(cl_info_id == CL_BUILD_PROGRAM_FAILURE)
+    {
+        return "CL_BUILD_PROGRAM_FAILURE";
+    } else if(cl_info_id == CL_MAP_FAILURE)
+    {
+        return "CL_MAP_FAILURE";
+    } else if(cl_info_id == CL_MISALIGNED_SUB_BUFFER_OFFSET)
+    {
+        return "CL_MISALIGNED_SUB_BUFFER_OFFSET";
+    } else if(cl_info_id == CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST)
+    {
+        return "CL_EXEC_STATUS_ERROR_FOR_EVENTS_IN_WAIT_LIST";
+    } else if(cl_info_id == CL_COMPILE_PROGRAM_FAILURE)
+    {
+        return "CL_COMPILE_PROGRAM_FAILURE";
+    } else if(cl_info_id == CL_LINKER_NOT_AVAILABLE)
+    {
+        return "CL_LINKER_NOT_AVAILABLE";
+    } else if(cl_info_id == CL_LINK_PROGRAM_FAILURE)
+    {
+        return "CL_LINK_PROGRAM_FAILURE";
+    } else if(cl_info_id == CL_DEVICE_PARTITION_FAILED)
+    {
+        return "CL_DEVICE_PARTITION_FAILED";
+    } else if(cl_info_id == CL_KERNEL_ARG_INFO_NOT_AVAILABLE)
+    {
+        return "CL_KERNEL_ARG_INFO_NOT_AVAILABLE";
+    } else if(cl_info_id == CL_INVALID_VALUE)
+    {
+        return "CL_INVALID_VALUE";
+    } else if(cl_info_id == CL_INVALID_DEVICE_TYPE)
+    {
+        return "CL_INVALID_DEVICE_TYPE";
+    } else if(cl_info_id == CL_INVALID_PLATFORM)
+    {
+        return "CL_INVALID_PLATFORM";
+    } else if(cl_info_id == CL_INVALID_DEVICE)
+    {
+        return "CL_INVALID_DEVICE";
+    } else if(cl_info_id == CL_INVALID_CONTEXT)
+    {
+        return "CL_INVALID_CONTEXT";
+    } else if(cl_info_id == CL_INVALID_QUEUE_PROPERTIES)
+    {
+        return "CL_INVALID_QUEUE_PROPERTIES";
+    } else if(cl_info_id == CL_INVALID_COMMAND_QUEUE)
+    {
+        return "CL_INVALID_COMMAND_QUEUE";
+    } else if(cl_info_id == CL_INVALID_HOST_PTR)
+    {
+        return "CL_INVALID_HOST_PTR";
+    } else if(cl_info_id == CL_INVALID_MEM_OBJECT)
+    {
+        return "CL_INVALID_MEM_OBJECT";
+    } else if(cl_info_id == CL_INVALID_IMAGE_FORMAT_DESCRIPTOR)
+    {
+        return "CL_INVALID_IMAGE_FORMAT_DESCRIPTOR";
+    } else if(cl_info_id == CL_INVALID_IMAGE_SIZE)
+    {
+        return "CL_INVALID_IMAGE_SIZE";
+    } else if(cl_info_id == CL_INVALID_SAMPLER)
+    {
+        return "CL_INVALID_SAMPLER";
+    } else if(cl_info_id == CL_INVALID_BINARY)
+    {
+        return "CL_INVALID_BINARY";
+    } else if(cl_info_id == CL_INVALID_BUILD_OPTIONS)
+    {
+        return "CL_INVALID_BUILD_OPTIONS";
+    } else if(cl_info_id == CL_INVALID_PROGRAM)
+    {
+        return "CL_INVALID_PROGRAM";
+    } else if(cl_info_id == CL_INVALID_PROGRAM_EXECUTABLE)
+    {
+        return "CL_INVALID_PROGRAM_EXECUTABLE";
+    } else if(cl_info_id == CL_INVALID_KERNEL_NAME)
+    {
+        return "CL_INVALID_KERNEL_NAME";
+    } else if(cl_info_id == CL_INVALID_KERNEL_DEFINITION)
+    {
+        return "CL_INVALID_KERNEL_DEFINITION";
+    } else if(cl_info_id == CL_INVALID_KERNEL)
+    {
+        return "CL_INVALID_KERNEL";
+    } else if(cl_info_id == CL_INVALID_ARG_INDEX)
+    {
+        return "CL_INVALID_ARG_INDEX";
+    } else if(cl_info_id == CL_INVALID_ARG_VALUE)
+    {
+        return "CL_INVALID_ARG_VALUE";
+    } else if(cl_info_id == CL_INVALID_ARG_SIZE)
+    {
+        return "CL_INVALID_ARG_SIZE";
+    } else if(cl_info_id == CL_INVALID_KERNEL_ARGS)
+    {
+        return "CL_INVALID_KERNEL_ARGS";
+    } else if(cl_info_id == CL_INVALID_WORK_DIMENSION)
+    {
+        return "CL_INVALID_WORK_DIMENSION";
+    } else if(cl_info_id == CL_INVALID_WORK_GROUP_SIZE)
+    {
+        return "CL_INVALID_WORK_GROUP_SIZE";
+    } else if(cl_info_id == CL_INVALID_WORK_ITEM_SIZE)
+    {
+        return "CL_INVALID_WORK_ITEM_SIZE";
+    } else if(cl_info_id == CL_INVALID_GLOBAL_OFFSET)
+    {
+        return "CL_INVALID_GLOBAL_OFFSET";
+    } else if(cl_info_id == CL_INVALID_EVENT_WAIT_LIST)
+    {
+        return "CL_INVALID_EVENT_WAIT_LIST";
+    } else if(cl_info_id == CL_INVALID_EVENT)
+    {
+        return "CL_INVALID_EVENT";
+    } else if(cl_info_id == CL_INVALID_OPERATION)
+    {
+        return "CL_INVALID_OPERATION";
+    } else if(cl_info_id == CL_INVALID_GL_OBJECT)
+    {
+        return "CL_INVALID_GL_OBJECT";
+    } else if(cl_info_id == CL_INVALID_BUFFER_SIZE)
+    {
+        return "CL_INVALID_BUFFER_SIZE";
+    } else if(cl_info_id == CL_INVALID_MIP_LEVEL)
+    {
+        return "CL_INVALID_MIP_LEVEL";
+    } else if(cl_info_id == CL_INVALID_GLOBAL_WORK_SIZE)
+    {
+        return "CL_INVALID_GLOBAL_WORK_SIZE";
+    } else if(cl_info_id == CL_INVALID_PROPERTY)
+    {
+        return "CL_INVALID_PROPERTY";
+    } else if(cl_info_id == CL_INVALID_IMAGE_DESCRIPTOR)
+    {
+        return "CL_INVALID_IMAGE_DESCRIPTOR";
+    } else if(cl_info_id == CL_INVALID_COMPILER_OPTIONS)
+    {
+        return "CL_INVALID_COMPILER_OPTIONS";
+    } else if(cl_info_id == CL_INVALID_LINKER_OPTIONS)
+    {
+        return "CL_INVALID_LINKER_OPTIONS";
+    } else if(cl_info_id == CL_INVALID_DEVICE_PARTITION_COUNT)
+    {
+        return "CL_INVALID_DEVICE_PARTITION_COUNT";
     } else
     {
         return io::xprintf("Unknown ID %d=0x%x, see "
@@ -974,6 +1148,41 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
         }
     }
     return 0;
+}
+
+cl::NDRange Kniha::assignLocalRange(std::shared_ptr<cl::NDRange> localRange,
+                                    cl::NDRange globalRange)
+{
+    if(localRange != nullptr && *localRange != cl::NullRange)
+    {
+        std::string err;
+        size_t dim = globalRange.dimensions();
+        if(dim != localRange->dimensions())
+        {
+            err = "Dimension mismatch between globalRange and localRange";
+            KCTERR(err);
+        }
+        for(int i = 0; i < dim; i++)
+        {
+            if(globalRange[i] < (*localRange)[i])
+            {
+                err = io::xprintf("globalRange[%d] < *localRange[i]  %d<%d.", i, globalRange[i],
+                                  (*localRange)[i]);
+                KCTERR(err);
+            }
+            if(globalRange[i] % (*localRange)[i] != 0)
+            {
+                err = io::xprintf("Global work size need to be multiple of work group size, see "
+                                  "https://stackoverflow.com/questions/3147940/"
+                                  "does-global-work-size-need-to-be-multiple-of-work-group-size-in-"
+                                  "opencl, but globalRange[%d]=%d, localRange[i]=%d.",
+                                  i, globalRange[i], (*localRange)[i]);
+                KCTERR(err);
+            }
+        }
+        return *localRange;
+    }
+    return cl::NullRange;
 }
 
 int Kniha::algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
@@ -1755,32 +1964,53 @@ int Kniha::algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
                                                        float globalScalingMultiplier,
                                                        unsigned int LOCALARRAYSIZE,
                                                        cl::NDRange& globalRange,
-                                                       std::shared_ptr<cl::NDRange> localRange,
+                                                       std::shared_ptr<cl::NDRange> _localRange,
                                                        bool blocking)
 {
+    std::string err;
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    /*
+    cl::NDRange localRange = *_localRange;
+    if(*_localRange == nullptr)
     {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
+        localRange = cl::NullRange;
     } else
     {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
+        localRange = *_localRange;
+    }*/
     cl::LocalSpaceArg localProjection = cl::Local(LOCALARRAYSIZE * sizeof(float));
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
-
-    auto exe = (*FLOAT_pbct_cutting_voxel_project_barrier)(
-        *eargs, volume, projection, localProjection, projectionOffset, CM, vdims, voxelSizes,
-        volumeCenter, pdims, globalScalingMultiplier);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    /*eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
+        auto exe = (*FLOAT_pbct_cutting_voxel_project_barrier)(
+            *eargs, volume, projection, localProjection, projectionOffset, CM, vdims, voxelSizes,
+            volumeCenter, pdims, globalScalingMultiplier);*/
+    cl::Kernel kernel = cl::Kernel(*program, "FLOAT_pbct_cutting_voxel_project_barrier");
+    kernel.setArg(0, volume);
+    kernel.setArg(1, projection);
+    kernel.setArg(2, localProjection);
+    kernel.setArg(3, projectionOffset);
+    kernel.setArg(4, CM);
+    kernel.setArg(5, vdims);
+    kernel.setArg(6, voxelSizes);
+    kernel.setArg(7, volumeCenter);
+    kernel.setArg(8, pdims);
+    kernel.setArg(9, globalScalingMultiplier);
+    cl::NDRange nulloffset = cl::NullRange;
+    cl::Event exe;
+    cl_int cl_info_id
+        = Q[0]->enqueueNDRangeKernel(kernel, nulloffset, globalRange, localRange, nullptr, &exe);
+    if(cl_info_id != CL_SUCCESS)
     {
-        exe.wait();
+        std::string command_type_string = infoString(cl_info_id);
+        err = io::xprintf(
+            "Error in enqueueNDRangeKernel FLOAT_pbct_cutting_voxel_project_barrier cl_info_id=%d, "
+            "command_type_string=%s!",
+            cl_info_id, command_type_string.c_str());
+        KCTERR(err);
+    }
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
     }
     return 0;
 }

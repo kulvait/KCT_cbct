@@ -1513,4 +1513,112 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
         return ONE;
     }
 }
+
+// clang-format off
+// const REAL vd1 = v1->x - v0->x; Nonzero x part
+// const REAL vd3 = v3->y - v0->y; Nonzero y part
+// polygon center of mass https://www.efunda.com/math/areas/Trapezoid.cfm to see
+// when I have polygon with p base and q top, then Tx=(p*p+p*q+q*q)/(3*(p+q)) Ty=(p+2q)/(3*(p+q))
+// when I take w=q/(3*(p+q)) I will have
+// Tx = p/3 + q*w Ty= 1/3 + w
+// Computation of CENTROID of rectangle with triangle cutout with p, q sides
+// NAREA_complement=(p*q)/2
+// NAREA = 1-NAREA_complement
+// In cutout corner
+// CENTROID = (0.5-p*NAREA_complement/3)/NAREA = 0.5 + (NAREA_COMPLEMENT/NAREA)(0.5 -(p/3)) = 0.5/NAREA - p*(ONETHIRD*NAREA_complement/NAREA)
+// Outside cutout corner
+// CENTROID = 0.5 - 0.5 * NAREA_COMPLEMENT/NAREA + (p/3)* NAREA_COMPLEMENT/NAREA
+// example when p_complement in oposite x corner and y coordinates of the corner are the same
+// w = HALF / NAREA;
+// w_complement = ONETHIRD * NAREA_complement / NAREA;
+// CENTROID = (REAL2)(vd1 * (ONE - w + p_complement * w_complement), vd3 * (w - q * w_complement));
+// When trying to find lambda(PX) tak, že PROJ(lambda(PX)) = PX on line v0 + lambda d
+// lambda = dot(v, Fvector)/-dot(d, Fvector)
+// clang-format on
+// When FproductVD1NEG or FproductVD3NEG are zero then basically all the segment is projected to
+// given index but we need to achieve p \in [0,1] and q\in[0,1] so that we have to solve it
+// individually
+// I put it int the way to greedy select the biggest area possible
+// simplified version, no computation of centroid
+inline REAL PBintersectionPolygons(const REAL PX,
+                                        const REAL vd1,
+                                        const REAL vd3,
+                                        const REAL PX_xyx0,
+                                        const REAL PX_xyx1,
+                                        const REAL PX_xyx2,
+                                        const REAL PX_xyx3,
+                                        const REAL8 CM,
+                                        REAL3 voxelSizes)
+{
+    REAL FX = vd1 * CM.s0;
+    REAL FY = vd3 * CM.s1;
+    REAL DST;
+    REAL p, q, p_complement;
+    REAL NAREA_complement;
+    REAL NAREA;
+    if(PX < PX_xyx1)
+    {
+        DST = PX - PX_xyx0;
+        if(FX)
+        {
+            p = DST / FX; // From v0 to v1
+        } else
+        {
+            p = ONE;
+        }
+        if(PX < PX_xyx3)
+        {
+            if(FY)
+                q = DST / FY; // From v0 to v3
+            else
+                q = ONE;
+            NAREA = HALF * p * q;
+            return NAREA;
+        } else if(PX < PX_xyx2)
+        {
+            DST = PX - PX_xyx3;
+            if(FX)
+                q = DST / FX; // From v3 to v2
+            else
+                q = ONE;
+            NAREA = HALF * (p + q);
+            return NAREA;
+        } else
+        {
+            NAREA = ONE;
+            return ONE;
+        }
+    } else if(PX < PX_xyx2)
+    {
+        DST = PX - PX_xyx2;
+        if(FY)
+            p = DST / -FY; // v2 to v1
+        else
+            p = ZERO;
+        if(PX < PX_xyx3)
+        {
+            p = ONE - p; // v1 to v2
+            DST = PX - PX_xyx0;
+            if(FY)
+                q = DST / FY; // v0 to v3
+            else
+                q = ONE;
+            NAREA = HALF * (p + q);
+            return NAREA;
+        } else
+        {
+            if(FX)
+                q = DST / -FX; // v2 to v3
+            else
+                q = ZERO;
+            NAREA_complement = HALF * p * q;
+            NAREA = ONE - NAREA_complement;
+            return NAREA;
+        }
+    } else
+    {
+        NAREA = ONE;
+        return ONE;
+    }
+}
 //==============================END include.cl=====================================
