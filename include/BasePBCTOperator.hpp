@@ -39,8 +39,8 @@ public:
                      uint32_t vdimy,
                      uint32_t vdimz,
                      uint32_t workGroupSize = 256,
-                     cl::NDRange projectorLocalNDRange = cl::NDRange(),
-                     cl::NDRange backprojectorLocalNDRange = cl::NDRange())
+                     cl::NDRange projectorLocalNDRange = cl::NullRange,
+                     cl::NDRange backprojectorLocalNDRange = cl::NullRange)
         : AlgorithmsBarrierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
     {
         pdims = cl_int2({ int(pdimx), int(pdimy) });
@@ -54,8 +54,8 @@ public:
             if(projectorLocalNDRange[0] == 0 && projectorLocalNDRange[1] == 0
                && projectorLocalNDRange[2] == 0)
             {
-                this->projectorLocalNDRange = cl::NDRange();
-                this->projectorLocalNDRangeBarrier = cl::NDRange();
+                this->projectorLocalNDRange = cl::NullRange;
+                this->projectorLocalNDRangeBarrier = cl::NullRange;
             } else if(projectorLocalNDRange[0] == 0 || projectorLocalNDRange[1] == 0
                       || projectorLocalNDRange[2] == 0)
             {
@@ -81,7 +81,7 @@ public:
             if(backprojectorLocalNDRange[0] == 0 && backprojectorLocalNDRange[1] == 0
                && backprojectorLocalNDRange[2] == 0)
             {
-                this->backprojectorLocalNDRange = cl::NDRange();
+                this->backprojectorLocalNDRange = cl::NullRange;
             } else if(backprojectorLocalNDRange[0] == 0 || backprojectorLocalNDRange[1] == 0
                       || backprojectorLocalNDRange[2] == 0)
             {

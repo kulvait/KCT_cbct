@@ -311,7 +311,14 @@ int BasePBCTOperator::project(cl::Buffer& X,
                               uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    std::shared_ptr<cl::NDRange> localRange;
+    if(useBarrierImplementation)
+    {
+        localRange = std::make_shared<cl::NDRange>(projectorLocalNDRangeBarrier);
+    } else
+    {
+        localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    }
     // clang-format off
     // cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
     // std::shared_ptr<cl::NDRange> barrierLocalRange
@@ -466,7 +473,7 @@ cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
             projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
     } else
     {
@@ -475,7 +482,7 @@ cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
             projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
     }
     return projectorLocalNDRange;
@@ -489,7 +496,7 @@ cl::NDRange BasePBCTOperator::guessBackprojectorLocalNDRange()
         backprojectorLocalNDRange = cl::NDRange(4, 16, 1); // 4.05 RELAXED
     } else
     {
-        backprojectorLocalNDRange = cl::NDRange();
+        backprojectorLocalNDRange = cl::NullRange;
     }
     return backprojectorLocalNDRange;
 }

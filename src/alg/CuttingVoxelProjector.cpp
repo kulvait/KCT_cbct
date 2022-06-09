@@ -12,7 +12,7 @@ cl::NDRange CuttingVoxelProjector::guessProjectionLocalNDRange(bool barrierCalls
             projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
     } else
     {
@@ -21,7 +21,7 @@ cl::NDRange CuttingVoxelProjector::guessProjectionLocalNDRange(bool barrierCalls
             projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
     }
     return projectorLocalNDRange;

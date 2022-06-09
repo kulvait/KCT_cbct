@@ -739,7 +739,7 @@ cl::NDRange BaseReconstructor::guessProjectionLocalNDRange(bool barrierCalls)
             projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
     } else
     {
@@ -748,7 +748,7 @@ cl::NDRange BaseReconstructor::guessProjectionLocalNDRange(bool barrierCalls)
             projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
         /*
                     // ZYX
@@ -933,7 +933,7 @@ cl::NDRange BaseReconstructor::guessBackprojectorLocalNDRange()
         backprojectorLocalNDRange = cl::NDRange(4, 16, 1); // 4.05 RELAXED
     } else
     {
-        backprojectorLocalNDRange = cl::NDRange();
+        backprojectorLocalNDRange = cl::NullRange;
     }
     return backprojectorLocalNDRange;
     /*

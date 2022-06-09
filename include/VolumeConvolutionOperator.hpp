@@ -35,7 +35,7 @@ public:
     VolumeConvolutionOperator(uint64_t vdimx,
                               uint64_t vdimy,
                               uint64_t vdimz,
-                              cl::NDRange projectorLocalNDRange = cl::NDRange())
+                              cl::NDRange projectorLocalNDRange = cl::NullRange)
         : vdimx(vdimx)
         , vdimy(vdimy)
         , vdimz(vdimz)
@@ -50,8 +50,8 @@ public:
             if(projectorLocalNDRange[0] == 0 && projectorLocalNDRange[1] == 0
                && projectorLocalNDRange[2] == 0)
             {
-                this->projectorLocalNDRange = cl::NDRange();
-                this->projectorLocalNDRangeBarrier = cl::NDRange();
+                this->projectorLocalNDRange = cl::NullRange;
+                this->projectorLocalNDRangeBarrier = cl::NullRange;
             } else if(projectorLocalNDRange[0] == 0 || projectorLocalNDRange[1] == 0
                       || projectorLocalNDRange[2] == 0)
             {

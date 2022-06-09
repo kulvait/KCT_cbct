@@ -1153,31 +1153,39 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
 cl::NDRange Kniha::assignLocalRange(std::shared_ptr<cl::NDRange> localRange,
                                     cl::NDRange globalRange)
 {
+    size_t dim = globalRange.dimensions();
     if(localRange != nullptr && *localRange != cl::NullRange)
     {
         std::string err;
-        size_t dim = globalRange.dimensions();
-        if(dim != localRange->dimensions())
+        if(localRange->dimensions() == 0)
         {
-            err = "Dimension mismatch between globalRange and localRange";
+            LOGW << io::xprintf("Variable localRange has zero dimension, in this situation might "
+                                "be more apropriate to use cl::NullRange literal.");
+        } else if(dim != localRange->dimensions())
+        {
+            err = io::xprintf("Dimension mismatch between globalRange=%d and localRange=%d", dim,
+                              localRange->dimensions());
             KCTERR(err);
-        }
-        for(int i = 0; i < dim; i++)
+        } else
         {
-            if(globalRange[i] < (*localRange)[i])
+            for(int i = 0; i < dim; i++)
             {
-                err = io::xprintf("globalRange[%d] < *localRange[i]  %d<%d.", i, globalRange[i],
-                                  (*localRange)[i]);
-                KCTERR(err);
-            }
-            if(globalRange[i] % (*localRange)[i] != 0)
-            {
-                err = io::xprintf("Global work size need to be multiple of work group size, see "
-                                  "https://stackoverflow.com/questions/3147940/"
-                                  "does-global-work-size-need-to-be-multiple-of-work-group-size-in-"
-                                  "opencl, but globalRange[%d]=%d, localRange[i]=%d.",
-                                  i, globalRange[i], (*localRange)[i]);
-                KCTERR(err);
+                if(globalRange[i] < (*localRange)[i])
+                {
+                    err = io::xprintf("globalRange[%d] < *localRange[i]  %d<%d.", i, globalRange[i],
+                                      (*localRange)[i]);
+                    KCTERR(err);
+                }
+                if(globalRange[i] % (*localRange)[i] != 0)
+                {
+                    err = io::xprintf(
+                        "Global work size need to be multiple of work group size, see "
+                        "https://stackoverflow.com/questions/3147940/"
+                        "does-global-work-size-need-to-be-multiple-of-work-group-size-in-"
+                        "opencl, but globalRange[%d]=%d, localRange[i]=%d.",
+                        i, globalRange[i], (*localRange)[i]);
+                    KCTERR(err);
+                }
             }
         }
         return *localRange;

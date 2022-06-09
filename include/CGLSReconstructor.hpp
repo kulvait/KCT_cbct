@@ -40,8 +40,8 @@ public:
                       uint32_t vdimy,
                       uint32_t vdimz,
                       uint32_t workGroupSize = 256,
-                      cl::NDRange projectorLocalNDRange = cl::NDRange(),
-                      cl::NDRange backprojectorLocalNDRange = cl::NDRange())
+                      cl::NDRange projectorLocalNDRange = cl::NullRange,
+                      cl::NDRange backprojectorLocalNDRange = cl::NullRange)
         : BaseReconstructor(pdimx,
                             pdimy,
                             pdimz,

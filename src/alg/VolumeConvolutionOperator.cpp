@@ -12,7 +12,7 @@ cl::NDRange VolumeConvolutionOperator::guessProjectionLocalNDRange(bool barrierC
             projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
     } else
     {
@@ -21,7 +21,7 @@ cl::NDRange VolumeConvolutionOperator::guessProjectionLocalNDRange(bool barrierC
             projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
         } else
         {
-            projectorLocalNDRange = cl::NDRange();
+            projectorLocalNDRange = cl::NullRange;
         }
     }
     return projectorLocalNDRange;
@@ -41,8 +41,7 @@ void VolumeConvolutionOperator::initializeConvolution()
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR(err);
     }
 }
 
