@@ -273,8 +273,7 @@ int BasePBCTOperator::backproject(cl::Buffer& B,
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange
-        = std::make_shared<cl::NDRange>(backprojectorLocalNDRange);
+    cl::NDRange localRange = backprojectorLocalNDRange;
     cl_double8 CM;
     float scalingFactor;
     unsigned long frameSize = pdimx * pdimy;
@@ -311,13 +310,13 @@ int BasePBCTOperator::project(cl::Buffer& X,
                               uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
-    std::shared_ptr<cl::NDRange> localRange;
+    cl::NDRange localRange;
     if(useBarrierImplementation)
     {
-        localRange = std::make_shared<cl::NDRange>(projectorLocalNDRangeBarrier);
+        localRange = projectorLocalNDRangeBarrier;
     } else
     {
-        localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+        localRange = projectorLocalNDRange;
     }
     // clang-format off
     // cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);

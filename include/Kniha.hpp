@@ -125,8 +125,8 @@ protected:
                                                 cl_double3& volumeCenter,
                                                 cl_int2& pdims,
                                                 float globalScalingMultiplier,
-                                                cl::NDRange& globalRange,
-                                                std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                                cl::NDRange globalRange,
+                                                cl::NDRange localRange = cl::NullRange,
                                                 bool blocking = false);
 
     // backprojector_sidon.cl
@@ -254,8 +254,8 @@ protected:
                                               cl_int2& pdims,
                                               float globalScalingMultiplier,
                                               unsigned int LOCALARRAYSIZE,
-                                              cl::NDRange& globalRange,
-                                              std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                              cl::NDRange globalRange,
+                                              cl::NDRange localRange = cl::NullRange,
                                               bool blocking = false);
 
     // projector_old.cl
@@ -456,36 +456,36 @@ protected:
                                         cl::Buffer& B,
                                         cl_int3& vdims,
                                         cl_float16& convolutionKernel,
-                                        cl::NDRange& globalRange,
-                                        std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                        cl::NDRange globalRange,
+                                        cl::NDRange localRange = cl::NullRange,
                                         bool blocking = false);
 
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary;
-    int algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
-        cl::Buffer& F,
-        cl::Buffer& GX,
-        cl::Buffer& GY,
-        cl::Buffer& GZ,
-        cl_int3& vdims,
-        cl_float3& voxelSizes,
-        cl::NDRange& globalRange,
-        std::shared_ptr<cl::NDRange> localRange = nullptr,
-        bool blocking = false);
+    int algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(cl::Buffer& F,
+                                                                           cl::Buffer& GX,
+                                                                           cl::Buffer& GY,
+                                                                           cl::Buffer& GZ,
+                                                                           cl_int3& vdims,
+                                                                           cl_float3& voxelSizes,
+                                                                           cl::NDRange globalRange,
+                                                                           cl::NDRange localRange
+                                                                           = cl::NullRange,
+                                                                           bool blocking = false);
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary;
-    int algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-        cl::Buffer& F,
-        cl::Buffer& GX,
-        cl::Buffer& GY,
-        cl::Buffer& GZ,
-        cl_int3& vdims,
-        cl_float3& voxelSizes,
-        cl::NDRange& globalRange,
-        std::shared_ptr<cl::NDRange> localRange = nullptr,
-        bool blocking = false);
+    int algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(cl::Buffer& F,
+                                                                     cl::Buffer& GX,
+                                                                     cl::Buffer& GY,
+                                                                     cl::Buffer& GZ,
+                                                                     cl_int3& vdims,
+                                                                     cl_float3& voxelSizes,
+                                                                     cl::NDRange globalRange,
+                                                                     cl::NDRange localRange
+                                                                     = cl::NullRange,
+                                                                     bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     cl::Buffer&,
@@ -501,9 +501,8 @@ protected:
                                                        cl_int3& vdims,
                                                        cl_float3& voxelSizes,
                                                        int reflectionBoundary,
-                                                       cl::NDRange& globalRange,
-                                                       std::shared_ptr<cl::NDRange> localRange
-                                                       = nullptr,
+                                                       cl::NDRange globalRange,
+                                                       cl::NDRange localRange = cl::NullRange,
                                                        bool blocking = false);
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&, int&>>
@@ -514,9 +513,8 @@ protected:
                                                      cl_int3& vdims,
                                                      cl_float3& voxelSizes,
                                                      int reflectionBoundary,
-                                                     cl::NDRange& globalRange,
-                                                     std::shared_ptr<cl::NDRange> localRange
-                                                     = nullptr,
+                                                     cl::NDRange globalRange,
+                                                     cl::NDRange localRange = cl::NullRange,
                                                      bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionLaplaceZeroBoundary;
@@ -524,9 +522,8 @@ protected:
                                                         cl::Buffer& B,
                                                         cl_int3& vdims,
                                                         cl_float3& voxelSizes,
-                                                        cl::NDRange& globalRange,
-                                                        std::shared_ptr<cl::NDRange> localRange
-                                                        = nullptr,
+                                                        cl::NDRange globalRange,
+                                                        cl::NDRange localRange = cl::NullRange,
                                                         bool blocking = false);
 
     std::shared_ptr<
@@ -538,8 +535,8 @@ protected:
                                            cl::Buffer& GZ,
                                            cl_int3& vdims,
                                            cl_float3& voxelSizes,
-                                           cl::NDRange& globalRange,
-                                           std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                           cl::NDRange globalRange,
+                                           cl::NDRange localRange = cl::NullRange,
                                            bool blocking = false);
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
@@ -549,8 +546,8 @@ protected:
                                            cl::Buffer& GY,
                                            cl_int3& vdims,
                                            cl_float3& voxelSizes,
-                                           cl::NDRange& globalRange,
-                                           std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                           cl::NDRange globalRange,
+                                           cl::NDRange localRange = cl::NullRange,
                                            bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_isotropicBackDx;
@@ -558,8 +555,8 @@ protected:
                                        cl::Buffer& DX,
                                        cl_int3& vdims,
                                        cl_float3& voxelSizes,
-                                       cl::NDRange& globalRange,
-                                       std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                       cl::NDRange globalRange,
+                                       cl::NDRange localRange = cl::NullRange,
                                        bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_isotropicBackDy;
@@ -567,8 +564,8 @@ protected:
                                        cl::Buffer& DY,
                                        cl_int3& vdims,
                                        cl_float3& voxelSizes,
-                                       cl::NDRange& globalRange,
-                                       std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                       cl::NDRange globalRange,
+                                       cl::NDRange localRange = cl::NullRange,
                                        bool blocking = false);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_isotropicBackDz;
@@ -576,8 +573,8 @@ protected:
                                        cl::Buffer& DZ,
                                        cl_int3& vdims,
                                        cl_float3& voxelSizes,
-                                       cl::NDRange& globalRange,
-                                       std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                       cl::NDRange globalRange,
+                                       cl::NDRange localRange = cl::NullRange,
                                        bool blocking = false);
 
     // pbct_cvp.cl
@@ -600,8 +597,8 @@ protected:
                                             cl_double3& volumeCenter,
                                             cl_int2& pdims,
                                             float globalScalingMultiplier,
-                                            cl::NDRange& globalRange,
-                                            std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                            cl::NDRange globalRange,
+                                            cl::NDRange localRange = cl::NullRange,
                                             bool blocking = false);
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
@@ -623,8 +620,8 @@ protected:
                                                 cl_double3& volumeCenter,
                                                 cl_int2& pdims,
                                                 float globalScalingMultiplier,
-                                                cl::NDRange& globalRange,
-                                                std::shared_ptr<cl::NDRange> localRange = nullptr,
+                                                cl::NDRange globalRange,
+                                                cl::NDRange localRange = cl::NullRange,
                                                 bool blocking = false);
 
     // pbct_cvp_barrier.cl
@@ -649,9 +646,8 @@ protected:
                                                     cl_int2& pdims,
                                                     float globalScalingMultiplier,
                                                     unsigned int LOCALARRAYSIZE,
-                                                    cl::NDRange& globalRange,
-                                                    std::shared_ptr<cl::NDRange> localRange
-                                                    = nullptr,
+                                                    cl::NDRange globalRange,
+                                                    cl::NDRange localRange = cl::NullRange,
                                                     bool blocking = false);
 
 private:
@@ -662,7 +658,7 @@ private:
      * @param blocking
      */
     int handleKernelExecution(cl::Event exe, bool blocking, std::string& errout);
-    cl::NDRange assignLocalRange(std::shared_ptr<cl::NDRange> localRange, cl::NDRange globalRange);
+    cl::NDRange assignLocalRange(cl::NDRange localRange, cl::NDRange globalRange);
     bool openCLInitialized = false;
     void insertCLFile(std::string f);
     std::vector<std::string> CLFiles;

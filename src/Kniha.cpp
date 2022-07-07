@@ -1150,45 +1150,44 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
     return 0;
 }
 
-cl::NDRange Kniha::assignLocalRange(std::shared_ptr<cl::NDRange> localRange,
-                                    cl::NDRange globalRange)
+cl::NDRange Kniha::assignLocalRange(cl::NDRange localRange, cl::NDRange globalRange)
 {
     size_t dim = globalRange.dimensions();
-    if(localRange != nullptr && *localRange != cl::NullRange)
+    if(localRange != cl::NullRange)
     {
         std::string err;
-        if(localRange->dimensions() == 0)
+        if(localRange.dimensions() == 0)
         {
             LOGW << io::xprintf("Variable localRange has zero dimension, in this situation might "
-                                "be more apropriate to use cl::NullRange literal.");
-        } else if(dim != localRange->dimensions())
+                                "be more apropriate to declare it as cl::NullRange.");
+        } else if(dim != localRange.dimensions())
         {
             err = io::xprintf("Dimension mismatch between globalRange=%d and localRange=%d", dim,
-                              localRange->dimensions());
+                              localRange.dimensions());
             KCTERR(err);
         } else
         {
             for(int i = 0; i < dim; i++)
             {
-                if(globalRange[i] < (*localRange)[i])
+                if(globalRange[i] < localRange[i])
                 {
                     err = io::xprintf("globalRange[%d] < *localRange[i]  %d<%d.", i, globalRange[i],
-                                      (*localRange)[i]);
+                                      localRange[i]);
                     KCTERR(err);
                 }
-                if(globalRange[i] % (*localRange)[i] != 0)
+                if(globalRange[i] % localRange[i] != 0)
                 {
                     err = io::xprintf(
                         "Global work size need to be multiple of work group size, see "
                         "https://stackoverflow.com/questions/3147940/"
                         "does-global-work-size-need-to-be-multiple-of-work-group-size-in-"
                         "opencl, but globalRange[%d]=%d, localRange[i]=%d.",
-                        i, globalRange[i], (*localRange)[i]);
+                        i, globalRange[i], localRange[i]);
                     KCTERR(err);
                 }
             }
         }
-        return *localRange;
+        return localRange;
     }
     return cl::NullRange;
 }
@@ -1204,8 +1203,8 @@ int Kniha::algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
                                                    cl_double3& volumeCenter,
                                                    cl_int2& pdims,
                                                    float globalScalingMultiplier,
-                                                   cl::NDRange& globalRange,
-                                                   std::shared_ptr<cl::NDRange> localRange,
+                                                   cl::NDRange globalRange,
+                                                   cl::NDRange localRange,
                                                    bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1239,8 +1238,8 @@ int Kniha::algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
                                                  cl_int2& pdims,
                                                  float globalScalingMultiplier,
                                                  unsigned int LOCALARRAYSIZE,
-                                                 cl::NDRange& globalRange,
-                                                 std::shared_ptr<cl::NDRange> localRange,
+                                                 cl::NDRange globalRange,
+                                                 cl::NDRange localRange,
                                                  bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1521,8 +1520,8 @@ int Kniha::algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
                                            cl::Buffer& B,
                                            cl_int3& vdims,
                                            cl_float16& convolutionKernel,
-                                           cl::NDRange& globalRange,
-                                           std::shared_ptr<cl::NDRange> localRange,
+                                           cl::NDRange globalRange,
+                                           cl::NDRange localRange,
                                            bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1556,8 +1555,8 @@ int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
     cl::Buffer& GZ,
     cl_int3& vdims,
     cl_float3& voxelSizes,
-    cl::NDRange& globalRange,
-    std::shared_ptr<cl::NDRange> localRange,
+    cl::NDRange globalRange,
+    cl::NDRange localRange,
     bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1591,8 +1590,8 @@ int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
     cl::Buffer& GZ,
     cl_int3& vdims,
     cl_float3& voxelSizes,
-    cl::NDRange& globalRange,
-    std::shared_ptr<cl::NDRange> localRange,
+    cl::NDRange globalRange,
+    cl::NDRange localRange,
     bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1626,8 +1625,8 @@ int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5(cl::Buffer& F,
                                                           cl_int3& vdims,
                                                           cl_float3& voxelSizes,
                                                           int reflectionBoundary,
-                                                          cl::NDRange& globalRange,
-                                                          std::shared_ptr<cl::NDRange> localRange,
+                                                          cl::NDRange globalRange,
+                                                          cl::NDRange localRange,
                                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1660,8 +1659,8 @@ int Kniha::algFLOATvector_2DconvolutionGradientFarid5x5(cl::Buffer& F,
                                                         cl_int3& vdims,
                                                         cl_float3& voxelSizes,
                                                         int reflectionBoundary,
-                                                        cl::NDRange& globalRange,
-                                                        std::shared_ptr<cl::NDRange> localRange,
+                                                        cl::NDRange globalRange,
+                                                        cl::NDRange localRange,
                                                         bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1692,8 +1691,8 @@ int Kniha::algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
                                                            cl::Buffer& B,
                                                            cl_int3& vdims,
                                                            cl_float3& voxelSizes,
-                                                           cl::NDRange& globalRange,
-                                                           std::shared_ptr<cl::NDRange> localRange,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange,
                                                            bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1726,8 +1725,8 @@ int Kniha::algFLOATvector_3DisotropicGradient(cl::Buffer& F,
                                               cl::Buffer& GZ,
                                               cl_int3& vdims,
                                               cl_float3& voxelSizes,
-                                              cl::NDRange& globalRange,
-                                              std::shared_ptr<cl::NDRange> localRange,
+                                              cl::NDRange globalRange,
+                                              cl::NDRange localRange,
                                               bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1758,8 +1757,8 @@ int Kniha::algFLOATvector_2DisotropicGradient(cl::Buffer& F,
                                               cl::Buffer& GY,
                                               cl_int3& vdims,
                                               cl_float3& voxelSizes,
-                                              cl::NDRange& globalRange,
-                                              std::shared_ptr<cl::NDRange> localRange,
+                                              cl::NDRange globalRange,
+                                              cl::NDRange localRange,
                                               bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1789,8 +1788,8 @@ int Kniha::algFLOATvector_isotropicBackDx(cl::Buffer& F,
                                           cl::Buffer& DX,
                                           cl_int3& vdims,
                                           cl_float3& voxelSizes,
-                                          cl::NDRange& globalRange,
-                                          std::shared_ptr<cl::NDRange> localRange,
+                                          cl::NDRange globalRange,
+                                          cl::NDRange localRange,
                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1821,8 +1820,8 @@ int Kniha::algFLOATvector_isotropicBackDy(cl::Buffer& F,
                                           cl::Buffer& DY,
                                           cl_int3& vdims,
                                           cl_float3& voxelSizes,
-                                          cl::NDRange& globalRange,
-                                          std::shared_ptr<cl::NDRange> localRange,
+                                          cl::NDRange globalRange,
+                                          cl::NDRange localRange,
                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1853,8 +1852,8 @@ int Kniha::algFLOATvector_isotropicBackDz(cl::Buffer& F,
                                           cl::Buffer& DZ,
                                           cl_int3& vdims,
                                           cl_float3& voxelSizes,
-                                          cl::NDRange& globalRange,
-                                          std::shared_ptr<cl::NDRange> localRange,
+                                          cl::NDRange globalRange,
+                                          cl::NDRange localRange,
                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1891,8 +1890,8 @@ int Kniha::algFLOAT_pbct_cutting_voxel_project(
     cl_double3& volumeCenter,
     cl_int2& pdims,
     float globalScalingMultiplier,
-    cl::NDRange& globalRange,
-    std::shared_ptr<cl::NDRange> localRange, // default nullptr
+    cl::NDRange globalRange,
+    cl::NDRange localRange, // default cl::NullRange
     bool blocking) // default false
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1931,8 +1930,8 @@ int Kniha::algFLOAT_pbct_cutting_voxel_backproject(
     cl_double3& volumeCenter,
     cl_int2& pdims,
     float globalScalingMultiplier,
-    cl::NDRange& globalRange,
-    std::shared_ptr<cl::NDRange> localRange, // default nullptr
+    cl::NDRange globalRange,
+    cl::NDRange localRange, // default cl::NullRange
     bool blocking) // default false
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
@@ -1971,22 +1970,13 @@ int Kniha::algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
                                                        cl_int2& pdims,
                                                        float globalScalingMultiplier,
                                                        unsigned int LOCALARRAYSIZE,
-                                                       cl::NDRange& globalRange,
-                                                       std::shared_ptr<cl::NDRange> _localRange,
+                                                       cl::NDRange globalRange,
+                                                       cl::NDRange _localRange,
                                                        bool blocking)
 {
     std::string err;
     std::shared_ptr<cl::EnqueueArgs> eargs;
     cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
-    /*
-    cl::NDRange localRange = *_localRange;
-    if(*_localRange == nullptr)
-    {
-        localRange = cl::NullRange;
-    } else
-    {
-        localRange = *_localRange;
-    }*/
     cl::LocalSpaceArg localProjection = cl::Local(LOCALARRAYSIZE * sizeof(float));
     /*eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
         auto exe = (*FLOAT_pbct_cutting_voxel_project_barrier)(

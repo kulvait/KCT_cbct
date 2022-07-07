@@ -227,7 +227,7 @@ int VolumeConvolutionOperator::fillVolumeBufferByConstant(float constant)
 int VolumeConvolutionOperator::convolve(std::string kernelName, float* outputVolume)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl::NDRange localRange = projectorLocalNDRange;
     initializeOrUpdateOutputBuffer();
     cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                      0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
@@ -246,7 +246,7 @@ int VolumeConvolutionOperator::convolve(std::string kernelName, float* outputVol
 int VolumeConvolutionOperator::laplace3D(cl_float3 voxelSizes, float* outputVolume)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl::NDRange localRange = projectorLocalNDRange;
     initializeOrUpdateOutputBuffer();
     algFLOATvector_3DconvolutionLaplaceZeroBoundary(*volumeBuffer, *outputBuffer, vdims, voxelSizes,
                                                     globalRange, localRange);
@@ -264,8 +264,7 @@ int VolumeConvolutionOperator::faridGradient3D(
     cl_float3 voxelSizes, float* outputX, float* outputY, float* outputZ, bool reflectionBoundary)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
-    localRange = nullptr;
+    cl::NDRange localRange = cl::NullRange;
     initializeOrUpdateGradientOutputBuffers();
     algFLOATvector_3DconvolutionGradientFarid5x5x5(
         *volumeBuffer, *outputGradientX, *outputGradientY, *outputGradientZ, vdims, voxelSizes,
@@ -302,8 +301,7 @@ int VolumeConvolutionOperator::sobelGradient3D(cl_float3 voxelSizes,
                                                bool reflectionBoundaryConditions)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
-    localRange = nullptr;
+    cl::NDRange localRange = cl::NullRange;
     initializeOrUpdateGradientOutputBuffers();
     if(reflectionBoundaryConditions)
     {
@@ -347,8 +345,7 @@ int VolumeConvolutionOperator::isotropicGradient3D(cl_float3 voxelSizes,
                                                    float* outputZ)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
-    localRange = nullptr;
+    cl::NDRange localRange = cl::NullRange;
     initializeOrUpdateGradientOutputBuffers();
     algFLOATvector_3DisotropicGradient(*volumeBuffer, *outputGradientX, *outputGradientY,
                                        *outputGradientZ, vdims, voxelSizes, globalRange,

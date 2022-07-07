@@ -553,8 +553,7 @@ int BaseReconstructor::project(cl::Buffer& X,
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), projectorLocalNDRange);
     cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> barrierLocalRange
-        = std::make_shared<cl::NDRange>(projectorLocalNDRangeBarrier);
+    cl::NDRange barrierLocalRange = projectorLocalNDRangeBarrier;
     cl::EnqueueArgs eargs2(*Q[0], cl::NDRange(pdimx, pdimy));
     cl_double16 CM;
     cl_double16 ICM;

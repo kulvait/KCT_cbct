@@ -170,7 +170,7 @@ void CGLSReconstructor::removeTikhonovRegularization() { this->tikhonovRegulariz
 void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl::NDRange localRange = projectorLocalNDRange;
     cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
@@ -217,7 +217,7 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
 void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl::NDRange localRange = projectorLocalNDRange;
     cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
@@ -264,7 +264,7 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
     cl::Buffer residualVector)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    std::shared_ptr<cl::NDRange> localRange = std::make_shared<cl::NDRange>(projectorLocalNDRange);
+    cl::NDRange localRange = projectorLocalNDRange;
     cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
