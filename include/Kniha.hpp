@@ -77,6 +77,8 @@ protected:
     const cl_double DOUBLEZERO = 0.0;
     float FLOATONE = 1.0f;
 
+    std::string err;
+
     std::vector<std::string> optstrings;
 
     // OpenCL objects

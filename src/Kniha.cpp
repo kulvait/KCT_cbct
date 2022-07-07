@@ -20,9 +20,8 @@ int Kniha::initializeOpenCL(uint32_t platformId,
 {
     if(openCLInitialized)
     {
-        std::string err = "Could not initialize OpenCL platform twice.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        err = "Could not initialize OpenCL platform twice.";
+        KCTERR(err);
     }
     // Select the first available platform.
     platform = util::OpenCLManager::getPlatform(platformId, true);
@@ -1153,14 +1152,9 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
 cl::NDRange Kniha::assignLocalRange(cl::NDRange localRange, cl::NDRange globalRange)
 {
     size_t dim = globalRange.dimensions();
-    if(localRange != cl::NullRange)
+    if(localRange.dimensions() != 0)
     {
-        std::string err;
-        if(localRange.dimensions() == 0)
-        {
-            LOGW << io::xprintf("Variable localRange has zero dimension, in this situation might "
-                                "be more apropriate to declare it as cl::NullRange.");
-        } else if(dim != localRange.dimensions())
+        if(dim != localRange.dimensions())
         {
             err = io::xprintf("Dimension mismatch between globalRange=%d and localRange=%d", dim,
                               localRange.dimensions());
@@ -1204,24 +1198,19 @@ int Kniha::algFLOATcutting_voxel_minmaxbackproject(cl::Buffer& volume,
                                                    cl_int2& pdims,
                                                    float globalScalingMultiplier,
                                                    cl::NDRange globalRange,
-                                                   cl::NDRange localRange,
+                                                   cl::NDRange _localRange,
                                                    bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
     cl_int2 dummy;
     auto exe = (*FLOATcutting_voxel_minmaxbackproject)(
         *eargs, volume, projection, projectionOffset, CM, sourcePosition, normalToDetector, vdims,
         voxelSizes, volumeCenter, pdims, globalScalingMultiplier, dummy);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1239,32 +1228,20 @@ int Kniha::algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
                                                  float globalScalingMultiplier,
                                                  unsigned int LOCALARRAYSIZE,
                                                  cl::NDRange globalRange,
-                                                 cl::NDRange localRange,
+                                                 cl::NDRange _localRange,
                                                  bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
     cl::LocalSpaceArg localProjection = cl::Local(LOCALARRAYSIZE * sizeof(float));
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
 
     auto exe = (*FLOATcutting_voxel_project_barrier)(
         *eargs, volume, projection, localProjection, projectionOffset, CM, sourcePosition,
         normalToDetector, vdims, voxelSizes, volumeCenter, pdims, globalScalingMultiplier);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1273,7 +1250,6 @@ int Kniha::algFLOATvector_copy(cl::Buffer& A, cl::Buffer& B, uint64_t size, bool
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_copy)(eargs, A, B);
-    std::string err;
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);
@@ -1286,9 +1262,9 @@ int Kniha::algFLOATvector_copy_offset(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_copy_offset)(eargs, A, B, offset);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1298,9 +1274,9 @@ int Kniha::algFLOATvector_copy_offsets(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_copy_offsets)(eargs, A, oA, B, oB);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1309,9 +1285,9 @@ int Kniha::algFLOATvector_A_equals_cB(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_cB)(eargs, A, B, c);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1320,9 +1296,9 @@ int Kniha::algFLOATvector_A_equals_A_plus_cB(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_plus_cB)(eargs, A, B, c);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1331,9 +1307,9 @@ int Kniha::algFLOATvector_A_equals_Ac_plus_B(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_Ac_plus_B)(eargs, A, B, c);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1343,9 +1319,9 @@ int Kniha::algFLOATvector_A_equals_A_plus_cB_offset(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_plus_cB_offset)(eargs, A, B, c, offset);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1354,9 +1330,9 @@ int Kniha::algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking)
 
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_zero)(eargs, A);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1364,9 +1340,9 @@ int Kniha::algFLOATvector_zero_infinite_values(cl::Buffer& A, uint64_t size, boo
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_zero_infinite_values)(eargs, A);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1374,9 +1350,9 @@ int Kniha::algFLOATvector_scale(cl::Buffer& A, float c, uint64_t size, bool bloc
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_scale)(eargs, A, c);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1390,9 +1366,9 @@ int Kniha::algFLOATvector_A_equals_A_plus_cB_offsets(cl::Buffer& A,
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_plus_cB_offsets)(eargs, A, oA, B, oB, c);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1401,9 +1377,9 @@ int Kniha::algFLOATvector_B_equals_A_plus_B_offsets(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_B_equals_A_plus_B_offsets)(eargs, A, oA, B, oB);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1411,9 +1387,9 @@ int Kniha::algFLOATvector_invert(cl::Buffer& A, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_invert)(eargs, A);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1421,9 +1397,9 @@ int Kniha::algFLOATvector_invert_except_zero(cl::Buffer& A, uint64_t size, bool 
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_invert_except_zero)(eargs, A);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1432,9 +1408,9 @@ int Kniha::algFLOATvector_substitute_greater_than(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_substitute_greater_than)(eargs, A, maxValue, substitution);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1443,9 +1419,9 @@ int Kniha::algFLOATvector_substitute_lower_than(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_substitute_lower_than)(eargs, A, minValue, substitution);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1456,9 +1432,9 @@ int Kniha::algFLOATvector_A_equals_A_times_B(cl::Buffer& A,
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_times_B)(eargs, A, B);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1467,9 +1443,9 @@ int Kniha::algFLOATvector_C_equals_A_times_B(
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_C_equals_A_times_B)(eargs, A, B, C);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1483,7 +1459,6 @@ int Kniha::algvector_NormSquarePartial_barrier(cl::Buffer& V,
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
     auto exe = (*vector_NormSquarePartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
-    std::string err;
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);
@@ -1497,20 +1472,11 @@ int Kniha::algvector_SumPartial_barrier(cl::Buffer& V,
                                         uint32_t workGroupSize,
                                         bool blocking)
 {
-    cl_int inf;
-    std::string err;
     cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
     cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
     auto exe = (*vector_SumPartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
-    }
-    exe.getInfo(CL_EVENT_COMMAND_EXECUTION_STATUS, &inf);
-    if((blocking && inf != CL_COMPLETE)
-       || (inf != CL_QUEUED && inf != CL_SUBMITTED && inf != CL_RUNNING))
-    {
-        err = io::xprintf("COMMAND_EXECUTION_STATUS is %d", inf);
         KCTERR(err);
     }
     return 0;
@@ -1521,29 +1487,16 @@ int Kniha::algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
                                            cl_int3& vdims,
                                            cl_float16& convolutionKernel,
                                            cl::NDRange globalRange,
-                                           cl::NDRange localRange,
+                                           cl::NDRange _localRange,
                                            bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
-
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
     auto exe = (*FLOATvector_2Dconvolution3x3)(*eargs, A, B, vdims, convolutionKernel);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1556,64 +1509,40 @@ int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary(
     cl_int3& vdims,
     cl_float3& voxelSizes,
     cl::NDRange globalRange,
-    cl::NDRange localRange,
+    cl::NDRange _localRange,
     bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
     auto exe = (*FLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary)(
         *eargs, F, GX, GY, GZ, vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
 
-int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(
-    cl::Buffer& F,
-    cl::Buffer& GX,
-    cl::Buffer& GY,
-    cl::Buffer& GZ,
-    cl_int3& vdims,
-    cl_float3& voxelSizes,
-    cl::NDRange globalRange,
-    cl::NDRange localRange,
-    bool blocking)
+int Kniha::algFLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(cl::Buffer& F,
+                                                                        cl::Buffer& GX,
+                                                                        cl::Buffer& GY,
+                                                                        cl::Buffer& GZ,
+                                                                        cl_int3& vdims,
+                                                                        cl_float3& voxelSizes,
+                                                                        cl::NDRange globalRange,
+                                                                        cl::NDRange _localRange,
+                                                                        bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
+
     auto exe = (*FLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary)(*eargs, F, GX, GY, GZ,
                                                                             vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1626,29 +1555,18 @@ int Kniha::algFLOATvector_3DconvolutionGradientFarid5x5x5(cl::Buffer& F,
                                                           cl_float3& voxelSizes,
                                                           int reflectionBoundary,
                                                           cl::NDRange globalRange,
-                                                          cl::NDRange localRange,
+                                                          cl::NDRange _localRange,
                                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
+
     auto exe = (*FLOATvector_3DconvolutionGradientFarid5x5x5)(*eargs, F, GX, GY, GZ, vdims,
                                                               voxelSizes, reflectionBoundary);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1660,29 +1578,18 @@ int Kniha::algFLOATvector_2DconvolutionGradientFarid5x5(cl::Buffer& F,
                                                         cl_float3& voxelSizes,
                                                         int reflectionBoundary,
                                                         cl::NDRange globalRange,
-                                                        cl::NDRange localRange,
+                                                        cl::NDRange _localRange,
                                                         bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
+
     auto exe = (*FLOATvector_2DconvolutionGradientFarid5x5)(*eargs, F, GX, GY, vdims, voxelSizes,
                                                             reflectionBoundary);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1692,29 +1599,17 @@ int Kniha::algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
                                                            cl_int3& vdims,
                                                            cl_float3& voxelSizes,
                                                            cl::NDRange globalRange,
-                                                           cl::NDRange localRange,
+                                                           cl::NDRange _localRange,
                                                            bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
 
     auto exe = (*FLOATvector_3DconvolutionLaplaceZeroBoundary)(*eargs, A, B, vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1726,28 +1621,16 @@ int Kniha::algFLOATvector_3DisotropicGradient(cl::Buffer& F,
                                               cl_int3& vdims,
                                               cl_float3& voxelSizes,
                                               cl::NDRange globalRange,
-                                              cl::NDRange localRange,
+                                              cl::NDRange _localRange,
                                               bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
     auto exe = (*FLOATvector_3DisotropicGradient)(*eargs, F, GX, GY, GZ, vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1758,28 +1641,16 @@ int Kniha::algFLOATvector_2DisotropicGradient(cl::Buffer& F,
                                               cl_int3& vdims,
                                               cl_float3& voxelSizes,
                                               cl::NDRange globalRange,
-                                              cl::NDRange localRange,
+                                              cl::NDRange _localRange,
                                               bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
     auto exe = (*FLOATvector_2DisotropicGradient)(*eargs, F, GX, GY, vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1789,29 +1660,17 @@ int Kniha::algFLOATvector_isotropicBackDx(cl::Buffer& F,
                                           cl_int3& vdims,
                                           cl_float3& voxelSizes,
                                           cl::NDRange globalRange,
-                                          cl::NDRange localRange,
+                                          cl::NDRange _localRange,
                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
 
     auto exe = (*FLOATvector_isotropicBackDx)(*eargs, F, DX, vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1821,29 +1680,17 @@ int Kniha::algFLOATvector_isotropicBackDy(cl::Buffer& F,
                                           cl_int3& vdims,
                                           cl_float3& voxelSizes,
                                           cl::NDRange globalRange,
-                                          cl::NDRange localRange,
+                                          cl::NDRange _localRange,
                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
 
     auto exe = (*FLOATvector_isotropicBackDy)(*eargs, F, DY, vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1853,109 +1700,71 @@ int Kniha::algFLOATvector_isotropicBackDz(cl::Buffer& F,
                                           cl_int3& vdims,
                                           cl_float3& voxelSizes,
                                           cl::NDRange globalRange,
-                                          cl::NDRange localRange,
+                                          cl::NDRange _localRange,
                                           bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
 
     auto exe = (*FLOATvector_isotropicBackDz)(*eargs, F, DZ, vdims, voxelSizes);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
 
-int Kniha::algFLOAT_pbct_cutting_voxel_project(
-    cl::Buffer& volume,
-    cl::Buffer& projection,
-    unsigned long& projectionOffset,
-    cl_double8& CM,
-    cl_int3& vdims,
-    cl_double3& voxelSizes,
-    cl_double3& volumeCenter,
-    cl_int2& pdims,
-    float globalScalingMultiplier,
-    cl::NDRange globalRange,
-    cl::NDRange localRange, // default cl::NullRange
-    bool blocking) // default false
+int Kniha::algFLOAT_pbct_cutting_voxel_project(cl::Buffer& volume,
+                                               cl::Buffer& projection,
+                                               unsigned long& projectionOffset,
+                                               cl_double8& CM,
+                                               cl_int3& vdims,
+                                               cl_double3& voxelSizes,
+                                               cl_double3& volumeCenter,
+                                               cl_int2& pdims,
+                                               float globalScalingMultiplier,
+                                               cl::NDRange globalRange,
+                                               cl::NDRange _localRange, // default cl::NullRange
+                                               bool blocking) // default false
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
 
     auto exe = (*FLOAT_pbct_cutting_voxel_project)(*eargs, volume, projection, projectionOffset, CM,
                                                    vdims, voxelSizes, volumeCenter, pdims,
                                                    globalScalingMultiplier);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
 
-int Kniha::algFLOAT_pbct_cutting_voxel_backproject(
-    cl::Buffer& volume,
-    cl::Buffer& projection,
-    unsigned long& projectionOffset,
-    cl_double8& CM,
-    cl_int3& vdims,
-    cl_double3& voxelSizes,
-    cl_double3& volumeCenter,
-    cl_int2& pdims,
-    float globalScalingMultiplier,
-    cl::NDRange globalRange,
-    cl::NDRange localRange, // default cl::NullRange
-    bool blocking) // default false
+int Kniha::algFLOAT_pbct_cutting_voxel_backproject(cl::Buffer& volume,
+                                                   cl::Buffer& projection,
+                                                   unsigned long& projectionOffset,
+                                                   cl_double8& CM,
+                                                   cl_int3& vdims,
+                                                   cl_double3& voxelSizes,
+                                                   cl_double3& volumeCenter,
+                                                   cl_int2& pdims,
+                                                   float globalScalingMultiplier,
+                                                   cl::NDRange globalRange,
+                                                   cl::NDRange _localRange, // default cl::NullRange
+                                                   bool blocking) // default false
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
-    if(localRange != nullptr)
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, *localRange);
-    } else
-    {
-        eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange);
-    }
-    auto lambda = [](cl_event e, cl_int status, void* data) {
-        if(status != CL_COMPLETE)
-        {
-            LOGE << io::xprintf("Terminated with the status different than CL_COMPLETE");
-        }
-    };
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
 
     auto exe = (*FLOAT_pbct_cutting_voxel_backproject)(*eargs, volume, projection, projectionOffset,
                                                        CM, vdims, voxelSizes, volumeCenter, pdims,
                                                        globalScalingMultiplier);
-    exe.setCallback(CL_COMPLETE, lambda);
-    if(blocking)
+    if(handleKernelExecution(exe, blocking, err))
     {
-        exe.wait();
+        KCTERR(err);
     }
     return 0;
 }
@@ -1974,7 +1783,6 @@ int Kniha::algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
                                                        cl::NDRange _localRange,
                                                        bool blocking)
 {
-    std::string err;
     std::shared_ptr<cl::EnqueueArgs> eargs;
     cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
     cl::LocalSpaceArg localProjection = cl::Local(LOCALARRAYSIZE * sizeof(float));

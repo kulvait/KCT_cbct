@@ -100,6 +100,7 @@ public:
             this->backprojectorLocalNDRange = guessBackprojectorLocalNDRange();
         }
         projectorLocalNDRangeDim = this->projectorLocalNDRange.dimensions();
+        std::size_t projectorLocalNDRangeBarrierDim = this->projectorLocalNDRangeBarrier.dimensions();
         backprojectorLocalNDRangeDim = this->backprojectorLocalNDRange.dimensions();
         if(projectorLocalNDRangeDim == 0)
         {
@@ -109,6 +110,15 @@ public:
             LOGD << io::xprintf("projectorLocalNDRange = cl::NDRange(%d, %d, %d)",
                                 this->projectorLocalNDRange[0], this->projectorLocalNDRange[1],
                                 this->projectorLocalNDRange[2]);
+        }
+        if(projectorLocalNDRangeBarrierDim == 0)
+        {
+            LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange()");
+        } else
+        {
+            LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange(%d, %d, %d)",
+                                this->projectorLocalNDRangeBarrier[0], this->projectorLocalNDRangeBarrier[1],
+                                this->projectorLocalNDRangeBarrier[2]);
         }
         if(backprojectorLocalNDRangeDim == 0)
         {
