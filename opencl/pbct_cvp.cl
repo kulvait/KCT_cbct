@@ -1,7 +1,4 @@
 //==============================pbct_cvp.cl=====================================
-#ifndef zeroPrecisionTolerance
-#define zeroPrecisionTolerance 1e-10
-#endif
 
 /** Project given volume using cutting voxel projector and parallel rays geometry.
  *

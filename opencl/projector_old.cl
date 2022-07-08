@@ -1,7 +1,4 @@
 //==============================projector_old.cl=====================================
-#ifndef zeroPrecisionTolerance
-#define zeroPrecisionTolerance 1e-10
-#endif
 
 /// insertEdgeValues(factor, V, P, projection, pdims);
 void inline insertEdgeValues(global float* projection,

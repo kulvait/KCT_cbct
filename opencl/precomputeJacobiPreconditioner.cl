@@ -1,7 +1,4 @@
 //==============================precomputeJacobiPreconditioner.cl=====================================
-#ifndef zeroPrecisionTolerance
-#define zeroPrecisionTolerance 1e-10
-#endif
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline exactJacobiValues(private double16 CM,
                                private double3 v,

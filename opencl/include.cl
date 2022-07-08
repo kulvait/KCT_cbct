@@ -1,6 +1,10 @@
 //==============================include.cl=====================================
 #ifndef zeroPrecisionTolerance
+#ifdef RELAXED
+#define zeroPrecisionTolerance 1e-7
+#else
 #define zeroPrecisionTolerance 1e-10
+#endif
 #endif
 
 // Atomic operations

@@ -1,8 +1,4 @@
 //==============================backprojector_minmax.cl=====================================
-#ifndef zeroPrecisionTolerance
-#define zeroPrecisionTolerance 1e-10
-#endif
-
 #define DROPNOTIRRADIATED
 
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);

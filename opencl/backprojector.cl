@@ -1,8 +1,4 @@
 //==============================backprojector.cl=====================================
-#ifndef zeroPrecisionTolerance
-#define zeroPrecisionTolerance 1e-10
-#endif
-
 //#ifndef RELAXED
 //#define RELAXED
 //#endif

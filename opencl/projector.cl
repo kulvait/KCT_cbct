@@ -1,7 +1,4 @@
 //==============================projector.cl=====================================
-#ifndef zeroPrecisionTolerance
-#define zeroPrecisionTolerance 1e-10
-#endif
 /**
  * We parametrize the line segment from A to B by parameter t such that t=0 for A and t=1 for B.
  * Then we will find the t corresponding to the point v = t*B+(1-t)A  that maps to the coordinate PX

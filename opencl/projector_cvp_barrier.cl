@@ -1,7 +1,4 @@
 //==============================projector_cvp_barrier.cl=====================================
-#ifndef zeroPrecisionTolerance
-#define zeroPrecisionTolerance 1e-10
-#endif
 
 #define LOCALMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                    \
     if(PJ_max >= pdims.y)                                                                          \
