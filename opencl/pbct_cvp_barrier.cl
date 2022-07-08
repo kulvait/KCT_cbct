@@ -218,25 +218,32 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
             if(PIL_max >= 0 && PIL_min < Lpdims.x && PJL_max >= 0 && PJL_min < Lpdims.y)
             {
                 int PJL_min_eff, PJL_max_eff;
-                float lambdaIncrement, firstLambdaIncrement, leastLambdaIncrement;
-                lambdaIncrement = HALF / PYinc;
+                // F = 2*PYinc = PY(edge)
+                // PY(v_min + lambda (v_max-v_min)) = PY_min + lambda PY(edge) = PY_min + lambda F
+                // lambda = (PY(v) - PY_min)/F
+                // We can define mu = PY(v)/F , where lambda = mu - PY_min/F, mu \in [PY_min/F,
+                // PY_min/F +  1] but differences remains the same
+                // 	firstMu is PYL_min/F or 0-HALF/F so the parameter value of the voxel begin
+                // edge that projects to given range and leastMu parametrizes exit from the voxel
+                float mu, prevMu, firstMu, leastMu, F;
+                F = TWO * PYinc; // Meaning of F
                 if(PJL_max >= Lpdims.y)
                 {
                     PJL_max_eff = Lpdims.y - 1;
-                    leastLambdaIncrement = lambdaIncrement;
+                    leastMu = (PJL_max_eff + HALF) / F;
                 } else
                 {
                     PJL_max_eff = PJL_max;
-                    leastLambdaIncrement = (PYL_max - (PJL_max - HALF)) / (TWO * PYinc);
+                    leastMu = PYL_min / F + ONE;
                 }
                 if(PJL_min < 0)
                 {
                     PJL_min_eff = 0;
-                    firstLambdaIncrement = lambdaIncrement;
+                    firstMu = -HALF / F;
                 } else
                 {
                     PJL_min_eff = PJL_min;
-                    firstLambdaIncrement = (PJL_min + HALF - PYL_min) / (TWO * PYinc);
+                    firstMu = PYL_min / F;
                 }
                 if(PIL_max
                    <= PIL_min) // These indices are in the admissible range, effectivelly same index
@@ -244,22 +251,14 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
                     PIL_min = INDEX(PXL);
                     // Unfolded localEdgeValues
                     localProjectionColumn = localProjection + PIL_min * Lpdims.y;
-                    if(PJL_max <= PJL_min) // These indices are in the admissible range,
-                                           // effectivelly same index
+                    prevMu = firstMu;
+                    for(J = PJL_min_eff; J < PJL_max_eff; J++)
                     {
-                        PJL_min = INDEX(PYL);
-                        AtomicAdd_l_f(localProjectionColumn + PJL_min, value);
-                    } else
-                    {
-                        J = PJL_min_eff;
-                        AtomicAdd_l_f(localProjectionColumn + J, firstLambdaIncrement * value);
-                        for(J = J + 1; J < PJL_max_eff; J++)
-                        {
-                            AtomicAdd_l_f(localProjectionColumn + J, lambdaIncrement * value);
-                        }
-                        AtomicAdd_l_f(localProjectionColumn + PJL_max_eff,
-                                      leastLambdaIncrement * value);
+                        mu = (J + HALF) / F;
+                        AtomicAdd_l_f(localProjectionColumn + J, (mu - prevMu) * value);
+                        prevMu = mu;
                     }
+                    AtomicAdd_l_f(localProjectionColumn + PJL_max_eff, (leastMu - prevMu) * value);
                 } else
                 {
                     REAL vd1, vd3;
@@ -302,56 +301,42 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
                     int I = max(-1, PIL_min);
                     int I_STOP = min(PIL_max, Lpdims.x);
                     // Section of the square that corresponds to the indices < i
-                    sectionSize_prev = PBintersectionPolygons(
-                        ((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1, PX_xyx2, PX_xyx3,
-                        CML, voxelSizes);
+                    sectionSize_prev
+                        = PBintersectionPolygons(((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1,
+                                                 PX_xyx2, PX_xyx3, CML, voxelSizes);
                     if(I >= 0)
                     {
                         factor = value * sectionSize_prev;
                         // Unfolded localEdgeValues
                         localProjectionColumn = localProjection + I * Lpdims.y;
-                        if(PJL_max <= PJL_min) // These indices are in the admissible range,
-                                               // effectivelly same index
+                        prevMu = firstMu;
+                        for(J = PJL_min_eff; J < PJL_max_eff; J++)
                         {
-                            PJL_min = INDEX(PYL);
-                            AtomicAdd_l_f(localProjectionColumn + PJL_min, factor);
-                        } else
-                        {
-                            J = PJL_min_eff;
-                            AtomicAdd_l_f(localProjectionColumn + J, firstLambdaIncrement * factor);
-                            for(J = J + 1; J < PJL_max_eff; J++)
-                            {
-                                AtomicAdd_l_f(localProjectionColumn + J, lambdaIncrement * factor);
-                            }
-                            AtomicAdd_l_f(localProjectionColumn + PJL_max_eff,
-                                          leastLambdaIncrement * factor);
+                            mu = (J + HALF) / F;
+                            AtomicAdd_l_f(localProjectionColumn + J, (mu - prevMu) * factor);
+                            prevMu = mu;
                         }
+                        AtomicAdd_l_f(localProjectionColumn + PJL_max_eff,
+                                      (leastMu - prevMu) * factor);
                     }
                     for(I = I + 1; I < I_STOP; I++)
                     {
-                        sectionSize_cur = PBintersectionPolygons(
-                            ((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1, PX_xyx2, PX_xyx3,
-                            CML, voxelSizes);
+                        sectionSize_cur
+                            = PBintersectionPolygons(((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1,
+                                                     PX_xyx2, PX_xyx3, CML, voxelSizes);
                         polygonSize = sectionSize_cur - sectionSize_prev;
                         factor = value * polygonSize;
                         // Unfolded localEdgeValues
                         localProjectionColumn = localProjection + I * Lpdims.y;
-                        if(PJL_max <= PJL_min) // These indices are in the admissible range,
-                                               // effectivelly same index
+                        prevMu = firstMu;
+                        for(J = PJL_min_eff; J < PJL_max_eff; J++)
                         {
-                            PJL_min = INDEX(PYL);
-                            AtomicAdd_l_f(localProjectionColumn + PJL_min, factor);
-                        } else
-                        {
-                            J = PJL_min_eff;
-                            AtomicAdd_l_f(localProjectionColumn + J, firstLambdaIncrement * factor);
-                            for(J = J + 1; J < PJL_max_eff; J++)
-                            {
-                                AtomicAdd_l_f(localProjectionColumn + J, lambdaIncrement * factor);
-                            }
-                            AtomicAdd_l_f(localProjectionColumn + PJL_max_eff,
-                                          leastLambdaIncrement * factor);
+                            mu = (J + HALF) / F;
+                            AtomicAdd_l_f(localProjectionColumn + J, (mu - prevMu) * factor);
+                            prevMu = mu;
                         }
+                        AtomicAdd_l_f(localProjectionColumn + PJL_max_eff,
+                                      (leastMu - prevMu) * factor);
                         sectionSize_prev = sectionSize_cur;
                     }
                     polygonSize = ONE - sectionSize_prev;
@@ -361,22 +346,15 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
                         factor = value * polygonSize;
                         // Unfolded localEdgeValues
                         localProjectionColumn = localProjection + PIL_max * Lpdims.y;
-                        if(PJL_max <= PJL_min) // These indices are in the admissible range,
-                                               // effectivelly same index
+                        prevMu = firstMu;
+                        for(J = PJL_min_eff; J < PJL_max_eff; J++)
                         {
-                            PJL_min = INDEX(PYL);
-                            AtomicAdd_l_f(localProjectionColumn + PJL_min, factor);
-                        } else
-                        {
-                            J = PJL_min_eff;
-                            AtomicAdd_l_f(localProjectionColumn + J, firstLambdaIncrement * factor);
-                            for(J = J + 1; J < PJL_max_eff; J++)
-                            {
-                                AtomicAdd_l_f(localProjectionColumn + J, lambdaIncrement * factor);
-                            }
-                            AtomicAdd_l_f(localProjectionColumn + PJL_max_eff,
-                                          leastLambdaIncrement * factor);
+                            mu = (J + HALF) / F;
+                            AtomicAdd_l_f(localProjectionColumn + J, (mu - prevMu) * factor);
+                            prevMu = mu;
                         }
+                        AtomicAdd_l_f(localProjectionColumn + PJL_max_eff,
+                                      (leastMu - prevMu) * factor);
                     }
                 }
             }
