@@ -1070,6 +1070,9 @@ std::string Kniha::infoString(cl_int cl_info_id)
     } else if(cl_info_id == CL_INVALID_DEVICE_PARTITION_COUNT)
     {
         return "CL_INVALID_DEVICE_PARTITION_COUNT";
+    } else if(cl_info_id == -9999)
+    {
+        return "Illegal read or write to a buffer on clEnqueueNDRangeKernel, NVIDIA specific error";
     } else
     {
         return io::xprintf("Unknown ID %d=0x%x, see "

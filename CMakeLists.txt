@@ -370,6 +370,7 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl open
 configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl opencl/jacobiPreconditionedProjector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedBackprojector.cl opencl/jacobiPreconditionedBackprojector.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+target_git_version_init(CLlin-jacobiglsqr)
 install (TARGETS CLlin-jacobiglsqr RUNTIME DESTINATION .)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/precomputeJacobiPreconditioner.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/jacobiPreconditionedProjector.cl DESTINATION opencl)

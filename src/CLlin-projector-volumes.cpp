@@ -66,14 +66,10 @@ public:
 
 int Args::postParse()
 {
-    if(!force)
+    int e = handleFileExistence(outputProjection, force, force);
+    if(e != 0)
     {
-        if(io::pathExists(outputProjection))
-        {
-            std::string msg = "Error: output file already exists, use --force to force overwrite.";
-            LOGE << msg;
-            return 1;
-        }
+        return e;
     }
     // How many projection matrices is there in total
     io::DenFileInfo di(inputProjectionMatrices);
@@ -101,7 +97,7 @@ int Args::postParse()
     for(uint32_t i = 0; i != inputVolumes.size(); i++)
     {
         inf = io::DenFileInfo(inputVolumes[i]);
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             std::string msg = io::xprintf("This program supports float volumes only but the "
@@ -114,8 +110,8 @@ int Args::postParse()
         {
             std::string msg = io::xprintf("Dimensions of file %s of (%d, %d, %d) are "
                                           "incompatible with the dimensions (%d, %d, %d).",
-                                          inputVolumes[i].c_str(), inf.dimx(), inf.dimy(), inf.dimz(),
-                                          voxelNumX, voxelNumY, voxelNumZ);
+                                          inputVolumes[i].c_str(), inf.dimx(), inf.dimy(),
+                                          inf.dimz(), voxelNumX, voxelNumY, voxelNumZ);
             LOGE << msg;
             return -1;
         }
@@ -231,17 +227,10 @@ int main(int argc, char* argv[])
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     uint32_t frameSize = ARG.projectionSizeX * ARG.projectionSizeY;
     float* projection = new float[frameSize]; //();
-    uint16_t buf[3];
-    buf[0] = ARG.projectionSizeY;
-    buf[1] = ARG.projectionSizeX;
-    buf[2] = ARG.frames.size();
-    io::createEmptyFile(ARG.outputProjection, 0, true); // Try if this is faster
-    io::appendBytes(ARG.outputProjection, (uint8_t*)buf, (uint64_t)6);
     double normSquare = 0;
     double normSquareDifference = 0;
     std::shared_ptr<io::DenFrame2DReader<float>> dpr = nullptr;
@@ -253,10 +242,11 @@ int main(int argc, char* argv[])
                      ARG.volumeCenterY, ARG.volumeCenterZ);
     io::DenAsyncFrame2DWritter<float> projectionWritter(ARG.outputProjection, ARG.projectionSizeX,
                                                         ARG.projectionSizeY, ARG.frames.size());
+    bool readxmajor = true;
     for(uint32_t i = 0; i != ARG.frames.size(); i++)
     {
-        io::readBytesFrom(ARG.inputVolumes[i], 6, (uint8_t*)volume,
-                          ARG.totalVoxelNum * sizeof(float));
+        io::DenFileInfo volumeInfo(ARG.inputVolumes[i]);
+        volumeInfo.readIntoArray<float>(volume, readxmajor);
         CVP.initializeOrUpdateVolumeBuffer(volume);
         std::shared_ptr<matrix::CameraI> pm = cameraVector[i];
         int success = 0;

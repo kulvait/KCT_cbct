@@ -46,14 +46,10 @@ public:
     int postParse()
     {
         std::string ERR;
-        if(!force)
+        int e = handleFileExistence(outputProjection, force, force);
+        if(e != 0)
         {
-            if(io::pathExists(outputProjection))
-            {
-                ERR = "Error: output file already exists, use --force to force overwrite.";
-                LOGE << ERR;
-                return -1;
-            }
+            return e;
         }
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
@@ -76,7 +72,7 @@ public:
                     "pixels count.";
             return -1;
         }
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             ERR = io::xprintf("This program supports FLOAT32 volumes only but the supplied "

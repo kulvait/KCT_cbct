@@ -270,7 +270,9 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
     projection += projectionOffset;
     // initialize localProjection in given workGroup
     uint LOCSIZE = lis * ljs * lks;
-    uint LID = li * ljs * lks + lj * lks + lk;
+    //    uint LID = li * ljs * lks + lj * lks + lk;
+    // uint LID = lk * ljs * lis + lj * lis + li;
+    uint LID = li * ljs + lj + lk * lis * ljs;
     uint LIDRANGE, fillStart, fillStop;
     int2 Lpdims;
     uint mappedLocalRange, Jrange, ILocalRange; // Memory used only in cornerWorkItem
@@ -449,6 +451,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
         return;
     Lpdims = (int2)(projectorLocalRange[4], projectorLocalRange[5]);
     mappedLocalRange = Lpdims.x * Lpdims.y;
+
     LIDRANGE = (mappedLocalRange + LOCSIZE - 1) / LOCSIZE;
     fillStart = min(LID * LIDRANGE, mappedLocalRange);
     // minimum for LIDRANGE=1 and LID >= mappedLocalRange
@@ -927,7 +930,28 @@ px11 = PROJECTX0(CML, vx11);*/
             LI = IND / Lpdims.y;
             LJ = IND % Lpdims.y;
             globalIndex = globalOffset + LI * pdims.y + LJ;
+            // clang-format off
+/* DEBUG CODE
+            if(globalIndex >= pdims.x * pdims.y)
+            {
+                uint Irange = projectorLocalRange[1] - projectorLocalRange[0];
+                uint Jrange = projectorLocalRange[3] - projectorLocalRange[2];
+                uint FullLocalRange = Irange * Jrange;
+                printf("i=%d j=%d k=%d Irange=%d Jrange=%d,FullLocalRange=%d, "
+                       "projectorLocalRange=(%d, %d, %d, %d, %d, %d, %d) prevStartRange=%d "
+                       "globalIndex=%d IND=%d LI=%d LJ=%d globalOffset=%d pdims=(%d, %d) "
+                       "LPDIMS=(%d, %d)\n",
+                       i, j, k, Irange, Jrange, FullLocalRange, projectorLocalRange[0],
+                       projectorLocalRange[1], projectorLocalRange[2], projectorLocalRange[3],
+                       projectorLocalRange[4], projectorLocalRange[5], projectorLocalRange[6],
+                       prevStartRange, globalIndex, IND, LI, LJ, globalOffset, pdims.x, pdims.y,
+                       Lpdims.x, Lpdims.y);
+            } else
+		    {
+END DEBUG CODE */
+            // clang-format on
             AtomicAdd_g_f(projection + globalIndex, localProjection[IND]);
+            //}
         }
         if(LID == 0)
         {

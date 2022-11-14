@@ -48,14 +48,10 @@ public:
     int postParse()
     {
         std::string msg;
-        if(!force)
+        int e = handleFileExistence(outputVolume, force, force);
+        if(e != 0)
         {
-            if(io::pathExists(outputVolume))
-            {
-                msg = "Error: output file already exists, use --force to force overwrite.";
-                LOGE << msg;
-                return 1;
-            }
+            return e;
         }
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
@@ -90,7 +86,7 @@ public:
             LOGE << msg;
             return 1;
         }
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             std::string ERR

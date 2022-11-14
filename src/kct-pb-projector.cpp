@@ -78,7 +78,7 @@ public:
                     "pixels count.";
             return -1;
         }
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             ERR = io::xprintf("This program supports FLOAT32 volumes only but the supplied "

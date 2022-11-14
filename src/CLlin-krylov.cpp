@@ -51,15 +51,10 @@ public:
     int preParse() { return 0; };
     int postParse()
     {
-        if(!force)
+        int e = handleFileExistence(outputVolume, force, force);
+        if(e != 0)
         {
-            if(io::pathExists(outputVolume))
-            {
-                std::string msg
-                    = "Error: output file already exists, use --force to force overwrite.";
-                LOGE << msg;
-                return 1;
-            }
+            return e;
         }
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
@@ -94,7 +89,7 @@ public:
             LOGE << ERR;
             return -1;
         }
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             ERR = io::xprintf("This program supports FLOAT32 projections only but the supplied "
@@ -118,13 +113,13 @@ public:
                 LOGE << ERR;
                 return -1;
             }
-            DenSupportedType dataType = x0inf.getDataType();
+            DenSupportedType dataType = x0inf.getElementType();
             if(dataType != DenSupportedType::FLOAT32)
             {
-                std::string ERR
-                    = io::xprintf("The file %s has declared data type %s but this implementation "
-                                  "only supports FLOAT32 files.",
-                                  initialVectorX0.c_str(), DenSupportedTypeToString(dataType).c_str());
+                std::string ERR = io::xprintf(
+                    "The file %s has declared data type %s but this implementation "
+                    "only supports FLOAT32 files.",
+                    initialVectorX0.c_str(), DenSupportedTypeToString(dataType).c_str());
                 LOGE << ERR;
                 return -1;
             }
@@ -143,7 +138,7 @@ public:
                 LOGE << ERR;
                 return -1;
             }
-            DenSupportedType dataType = x0inf.getDataType();
+            DenSupportedType dataType = x0inf.getElementType();
             if(dataType != DenSupportedType::FLOAT32)
             {
                 ERR = io::xprintf("The file %s has declared data type %s but this implementation "
@@ -354,15 +349,18 @@ int main(int argc, char* argv[])
                                                        false);
         }
         float* volume;
+        bool X0initialized;
         if(ARG.initialVectorX0 != "")
         {
             volume = new float[ARG.totalVolumeSize];
-            io::DenFileInfo iv(ARG.initialVectorX0);
-            io::readBytesFrom(ARG.initialVectorX0, iv.getOffset(), (uint8_t*)volume,
-                              ARG.totalVolumeSize * 4);
+            io::DenFileInfo initialVectorInfo(ARG.initialVectorX0);
+            bool readxmajor = false;
+            initialVectorInfo.readIntoArray<float>(volume, readxmajor);
+            X0initialized = true;
         } else
         {
             volume = new float[ARG.totalVolumeSize]();
+            X0initialized = false;
         }
         std::string intermediatePrefix;
         intermediatePrefix = io::getParent(ARG.outputVolume);
@@ -418,8 +416,7 @@ int main(int argc, char* argv[])
             {
                 std::string ERR
                     = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             bool X0initialized = ARG.initialVectorX0 != "";
             ecd = cgls->problemSetup(projection, volume, X0initialized, cameraVector,
@@ -440,8 +437,8 @@ int main(int argc, char* argv[])
                 {
                     float* preconditionerVolume = new float[ARG.totalVolumeSize];
                     io::DenFileInfo dpInfo(ARG.diagonalPreconditioner);
-                    io::readBytesFrom(ARG.diagonalPreconditioner, dpInfo.getOffset(),
-                                      (uint8_t*)preconditionerVolume, ARG.totalVolumeSize * 4);
+                    bool readxmajor = false;
+                    dpInfo.readIntoArray<float>(preconditionerVolume, readxmajor);
                     cgls->reconstructDiagonalPreconditioner(
                         preconditionerVolume, ARG.maxIterationCount, ARG.stoppingRelativeError);
                     delete[] preconditionerVolume;
@@ -450,12 +447,6 @@ int main(int argc, char* argv[])
                     cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
                 }
             }
-            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
-                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
-            io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
-                            ARG.totalVolumeSize * sizeof(float));
-            delete[] volume;
-            delete[] projection;
         } else if(ARG.glsqr)
         {
             std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
@@ -495,8 +486,7 @@ int main(int argc, char* argv[])
             if(ecd != 0)
             {
                 std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             if(!std::isnan(ARG.tikhonovLambdaL2))
             {
@@ -506,12 +496,6 @@ int main(int argc, char* argv[])
                 glsqr->reconstructTikhonov(ARG.tikhonovLambdaL2, ARG.maxIterationCount,
                                            ARG.stoppingRelativeError);
             }
-            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
-                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
-            io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
-                            ARG.totalVolumeSize * sizeof(float));
-            delete[] volume;
-            delete[] projection;
         } else if(ARG.psirt)
         {
             std::shared_ptr<PSIRTReconstructor> psirt = std::make_shared<PSIRTReconstructor>(
@@ -537,31 +521,18 @@ int main(int argc, char* argv[])
             {
                 std::string ERR
                     = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
-            float* volume = new float[ARG.totalVolumeSize]();
-            // testing
-            //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
-
-            bool X0initialized = ARG.initialVectorX0 != "";
             ecd = psirt->problemSetup(projection, volume, X0initialized, cameraVector,
                                       ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
                                       ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
             if(ecd != 0)
             {
                 std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             psirt->setup(1.99); // 10.1109/TMI.2008.923696
             psirt->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
-                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
-            io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
-                            ARG.totalVolumeSize * sizeof(float));
-            delete[] volume;
-            delete[] projection;
         } else if(ARG.sirt)
         {
             std::shared_ptr<PSIRTReconstructor> psirt = std::make_shared<PSIRTReconstructor>(
@@ -587,31 +558,18 @@ int main(int argc, char* argv[])
             {
                 std::string ERR
                     = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
-            float* volume = new float[ARG.totalVolumeSize]();
-            // testing
-            //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
-
-            bool X0initialized = ARG.initialVectorX0 != "";
             ecd = psirt->problemSetup(projection, volume, X0initialized, cameraVector,
                                       ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
                                       ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
             if(ecd != 0)
             {
                 std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             psirt->setup(1.00); // 10.1109/TMI.2008.923696
             psirt->reconstruct_sirt(ARG.maxIterationCount, ARG.stoppingRelativeError);
-            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
-                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
-            io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
-                            ARG.totalVolumeSize * sizeof(float));
-            delete[] volume;
-            delete[] projection;
         } else if(ARG.ossart)
         {
             std::shared_ptr<OSSARTReconstructor> ossart = std::make_shared<OSSARTReconstructor>(
@@ -647,31 +605,25 @@ int main(int argc, char* argv[])
             {
                 std::string ERR
                     = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
-            float* volume = new float[ARG.totalVolumeSize]();
-            // testing
-            //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
-
-            bool X0initialized = ARG.initialVectorX0 != "";
             ecd = ossart->problemSetup(projection, volume, X0initialized, cameraVector,
                                        ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
                                        ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
             if(ecd != 0)
             {
                 std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             ossart->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
-            DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
-                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
-            io::appendBytes(ARG.outputVolume, (uint8_t*)volume,
-                            ARG.totalVolumeSize * sizeof(float));
-            delete[] volume;
-            delete[] projection;
         }
+        bool volumexmajor = true;
+        bool writexmajor = true;
+        io::DenFileInfo::create3DDenFileFromArray(volume, volumexmajor, ARG.outputVolume,
+                                                  io::DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                                  ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
+        delete[] volume;
+        delete[] projection;
         PRG.endLog(true);
     } catch(KCTException& ex)
     {
@@ -684,9 +636,9 @@ void populateVoume(float* volume, std::string volumeFile)
 {
 
     DenFileInfo fileInf(volumeFile);
-    DenSupportedType dataType = fileInf.getDataType();
+    DenSupportedType dataType = fileInf.getElementType();
     uint64_t offset = fileInf.getOffset();
-    uint64_t elementByteSize = fileInf.elementByteSize();
+    uint64_t elementByteSize = fileInf.getElementByteSize();
     uint64_t position;
     uint64_t frameSize = fileInf.dimx() * fileInf.dimy();
     uint8_t* buffer = new uint8_t[elementByteSize * frameSize];

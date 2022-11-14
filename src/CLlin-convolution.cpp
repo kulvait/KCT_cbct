@@ -47,28 +47,34 @@ public:
     int preParse() { return 0; };
     int postParse()
     {
+        int e = 0;
         std::string ERR;
-        if(!force)
+        if(sobelGradient3DZeroBoundary || sobelGradient3DReflectionBoundary)
         {
-            if(sobelGradient3DZeroBoundary || sobelGradient3DReflectionBoundary)
+            std::string gx = io::xprintf("%s_x", outputVolume.c_str());
+            std::string gy = io::xprintf("%s_y", outputVolume.c_str());
+            std::string gz = io::xprintf("%s_z", outputVolume.c_str());
+            e = handleFileExistence(gx, force, force);
+            if(e != 0)
             {
-                std::string gx = io::xprintf("%s_x", outputVolume.c_str());
-                std::string gy = io::xprintf("%s_y", outputVolume.c_str());
-                std::string gz = io::xprintf("%s_z", outputVolume.c_str());
-                if(io::pathExists(gx) || io::pathExists(gy) || io::pathExists(gz))
-                {
-                    ERR = "Error: output file already exists, use --force to force overwrite.";
-                    LOGE << ERR;
-                    return -1;
-                }
-            } else
+                return e;
+            }
+            e = handleFileExistence(gy, force, force);
+            if(e != 0)
             {
-                if(io::pathExists(outputVolume))
-                {
-                    ERR = "Error: output file already exists, use --force to force overwrite.";
-                    LOGE << ERR;
-                    return -1;
-                }
+                return e;
+            }
+            e = handleFileExistence(gz, force, force);
+            if(e != 0)
+            {
+                return e;
+            }
+        } else
+        {
+            e = handleFileExistence(outputVolume, force, force);
+            if(e != 0)
+            {
+                return e;
             }
         }
         // How many projection matrices is there in total
@@ -84,7 +90,7 @@ public:
             LOGE << ERR;
             return -1;
         }
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             ERR = io::xprintf("This program supports FLOAT32 volumes only but the supplied "

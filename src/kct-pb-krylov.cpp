@@ -48,15 +48,10 @@ public:
     int postParse()
     {
         std::string ERR;
-        if(!force)
+        int e = handleFileExistence(outputVolume, force, force);
+        if(e != 0)
         {
-            if(io::pathExists(outputVolume))
-            {
-                std::string ERR
-                    = "Error: output file already exists, use --force to force overwrite.";
-                LOGE << ERR;
-                return -1;
-            }
+            return e;
         }
         // How many projection matrices is there in total
         io::DenFileInfo pmi(inputProjectionMatrices);
@@ -98,7 +93,7 @@ public:
             LOGE << ERR;
             return -1;
         }
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             ERR = io::xprintf("This program supports FLOAT32 projections only but the supplied "
@@ -122,7 +117,7 @@ public:
                 LOGE << ERR;
                 return -1;
             }
-            DenSupportedType dataType = x0inf.getDataType();
+            DenSupportedType dataType = x0inf.getElementType();
             if(dataType != DenSupportedType::FLOAT32)
             {
                 std::string ERR = io::xprintf(
@@ -147,7 +142,7 @@ public:
                 LOGE << ERR;
                 return -1;
             }
-            DenSupportedType dataType = x0inf.getDataType();
+            DenSupportedType dataType = x0inf.getElementType();
             if(dataType != DenSupportedType::FLOAT32)
             {
                 ERR = io::xprintf("The file %s has declared data type %s but this implementation "

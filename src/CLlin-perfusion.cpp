@@ -26,6 +26,7 @@
 #include "FUN/StepFunction.hpp"
 #include "PROG/Program.hpp"
 #include "PROG/RunTimeInfo.hpp"
+#include "PROG/ArgumentsForce.hpp"
 #include "Perfusion/CGLSPerfusionReconstructor.hpp"
 #include "Perfusion/GLSQRPerfusionReconstructor.hpp"
 
@@ -34,12 +35,13 @@ using namespace KCT::util;
 
 /**Arguments parsed by the main function.
  */
-class Args : public CArmArguments
+class Args : public CArmArguments, public ArgumentsForce
 {
 public:
     Args(int argc, char** argv, std::string programName)
         : Arguments(argc, argv, programName)
-        , CArmArguments(argc, argv, programName){};
+        , CArmArguments(argc, argv, programName)
+        , ArgumentsForce(argc, argv, programName){};
     void defineArguments();
     int preParse()
     {
@@ -49,20 +51,15 @@ public:
     };
     int postParse()
     {
-        if(!force)
+        int e;
+        std::string f;
+        for(uint32_t i = 0; i != basisSize; i++)
         {
-            std::string f;
-            for(uint32_t i = 0; i != basisSize; i++)
+            f = getVolumeName(i);
+            e = handleFileExistence(f, force, force);
+            if(e != 0)
             {
-                f = getVolumeName(i);
-                if(io::pathExists(f))
-                {
-                    std::string msg = io::xprintf(
-                        "Error: output file %f already exists, use --force to force overwrite it.",
-                        f.c_str());
-                    LOGE << msg;
-                    return 1;
-                }
+                return e;
             }
         }
         // How many projection matrices is there in total
@@ -93,7 +90,7 @@ public:
             io::throwerr("Implement indexing by uint64_t matrix dimension overflow of projection "
                          "pixels count.");
         }
-        io::DenSupportedType t = inf.getDataType();
+        io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
         {
             std::string ERR
@@ -125,7 +122,6 @@ public:
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
-    bool force = false;
     bool glsqr = false;
     std::string initialVectorX0;
     /** Frame Time. (0018, 1063) Nominal time (in msec) per individual frame.
