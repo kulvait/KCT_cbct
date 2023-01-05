@@ -224,15 +224,36 @@ int VolumeConvolutionOperator::fillVolumeBufferByConstant(float constant)
     return Q[0]->enqueueFillBuffer<cl_float>(*volumeBuffer, constant, 0, totalVolumeBufferSize);
 }
 
-int VolumeConvolutionOperator::convolve(std::string kernelName, float* outputVolume)
+int VolumeConvolutionOperator::convolve(std::string kernelName,
+                                        float* outputVolume,
+                                        bool reflectionBoundaryConditions)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     cl::NDRange localRange = projectorLocalNDRange;
     initializeOrUpdateOutputBuffer();
-    cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                                     0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-    algFLOATvector_2Dconvolution3x3(*volumeBuffer, *outputBuffer, vdims, convolutionKernel,
-                                    globalRange, localRange);
+    cl_float16 convolutionKernel;
+    if(kernelName == "Laplace2D5ps")
+    {
+        convolutionKernel = { 0.0f, 1.0f, 0.0f, 1.0f, -4.0f, 1.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f };
+    } else if(kernelName == "Laplace2D9ps")
+    {
+        convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
+                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
+    } else
+    {
+        std::string err = io::xprintf("Unknown kernelName %s", kernelName.c_str());
+        KCTERR(err);
+    }
+    if(reflectionBoundaryConditions)
+    {
+        algFLOATvector_2Dconvolution3x3ReflectionBoundary(
+            *volumeBuffer, *outputBuffer, vdims, convolutionKernel, globalRange, localRange);
+    } else
+    {
+        algFLOATvector_2Dconvolution3x3ZeroBoundary(*volumeBuffer, *outputBuffer, vdims,
+                                                    convolutionKernel, globalRange, localRange);
+    }
     cl_int err
         = Q[0]->enqueueReadBuffer(*outputBuffer, CL_TRUE, 0, totalVolumeBufferSize, outputVolume);
     if(err != CL_SUCCESS)

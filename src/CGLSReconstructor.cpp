@@ -207,8 +207,9 @@ void CGLSReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
         {
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-            algFLOATvector_2Dconvolution3x3(XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims,
-                                            convolutionKernel, globalRange, localRange);
+            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *AdirectionVector_bbuf_xpart_Laplace,
+                                                        vdims, convolutionKernel, globalRange,
+                                                        localRange);
         }
         algFLOATvector_scale(*AdirectionVector_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
@@ -253,7 +254,7 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
         {
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-            algFLOATvector_2Dconvolution3x3(XIN, *discrepancy_bbuf_xpart_Laplace, vdims,
+            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *discrepancy_bbuf_xpart_Laplace, vdims,
                                             convolutionKernel, globalRange, localRange);
         }
         algFLOATvector_scale(*discrepancy_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
@@ -316,7 +317,7 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
         {
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-            algFLOATvector_2Dconvolution3x3(*discrepancy_bbuf_xpart_Laplace,
+            algFLOATvector_2Dconvolution3x3ZeroBoundary(*discrepancy_bbuf_xpart_Laplace,
                                             *residualVector_xbuf_Laplaceadd, vdims,
                                             convolutionKernel, globalRange, localRange);
         }

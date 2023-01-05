@@ -1,11 +1,43 @@
 //==============================convolution.cl=====================================
 // see https://www.evl.uic.edu/kreda/gpu/image-convolution/
-#define VOXELINDEX(i, j, k, vdims) i + (j + (k)*vdims.y) * vdims.x
+#define VOXELINDEX(i, j, k, vdims) {(i) + ((j) + (k)*vdims.y) * vdims.x}
 
-void kernel FLOATvector_2Dconvolution3x3(global const float* restrict A,
-                                         global float* restrict B,
-                                         private int3 vdims,
-                                         float16 _convolutionKernel)
+#define REFLECTION33BOUNDARY()                                                                     \
+    {                                                                                              \
+        if(i == 0)                                                                                 \
+        {                                                                                          \
+            for(int lj = 0; lj < 3; lj++)                                                          \
+            {                                                                                      \
+                cube[0][lj] = cube[2][lj];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(i + 1 == vdims.x)                                                                       \
+        {                                                                                          \
+            for(int lj = 0; lj < 3; lj++)                                                          \
+            {                                                                                      \
+                cube[2][lj] = cube[0][lj];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(j == 0)                                                                                 \
+        {                                                                                          \
+            for(int li = 0; li < 3; li++)                                                          \
+            {                                                                                      \
+                cube[li][0] = cube[li][2];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+        if(j + 1 == vdims.y)                                                                       \
+        {                                                                                          \
+            for(int li = 0; li < 3; li++)                                                          \
+            {                                                                                      \
+                cube[li][2] = cube[li][0];                                                         \
+            }                                                                                      \
+        }                                                                                          \
+    }
+
+void kernel FLOATvector_2Dconvolution3x3ZeroBoundary(global const float* restrict A,
+                                                     global float* restrict B,
+                                                     private int3 vdims,
+                                                     float16 _convolutionKernel)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -36,6 +68,51 @@ void kernel FLOATvector_2Dconvolution3x3(global const float* restrict A,
         }
         index += yskip;
         localIndex += ylocalskip;
+    }
+    B[IND] = sum;
+}
+
+void kernel FLOATvector_2Dconvolution3x3ReflectionBoundary(global const float* restrict A,
+                                                           global float* restrict B,
+                                                           private int3 vdims,
+                                                           float16 _convolutionKernel)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    const int convolutionKernelRadius = 1;
+    const int convolutionKernelSize = 3;
+    const int LIMIN = -min(i - convolutionKernelRadius, 0);
+    const int LJMIN = -min(j - convolutionKernelRadius, 0);
+    const int ILIMIT
+        = convolutionKernelSize + vdims.x - max(i + convolutionKernelRadius + 1, vdims.x);
+    const int JLIMIT
+        = convolutionKernelSize + vdims.y - max(j + convolutionKernelRadius + 1, vdims.y);
+    const int JSKIP = vdims.x - (ILIMIT - LIMIN);
+    float cube[3][3]; // First fill this object where possible
+    int index = VOXELINDEX(i + LIMIN - convolutionKernelRadius, j + LJMIN - convolutionKernelRadius,
+                           k, vdims);
+    for(int lj = LJMIN; lj < JLIMIT; lj++)
+    {
+        for(int li = LIMIN; li < ILIMIT; li++)
+        {
+            cube[li][lj] = A[index];
+            index++;
+        }
+        index += JSKIP;
+    }
+    REFLECTION33BOUNDARY();
+    float sum = 0.0f;
+    float* convolutionKernel = (float*)&_convolutionKernel;
+    int localIndex = 0;
+    for(int lj = 0; lj < convolutionKernelSize; lj++)
+    {
+        for(int li = 0; li < convolutionKernelSize; li++)
+        {
+            sum += cube[li][lj] * convolutionKernel[localIndex];
+            localIndex++;
+        }
     }
     B[IND] = sum;
 }

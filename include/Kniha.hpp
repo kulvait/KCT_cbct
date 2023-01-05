@@ -453,8 +453,8 @@ protected:
     // convolution.cl
     // FLOATvector_2Dconvolution3x3
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float16&>>
-        FLOATvector_2Dconvolution3x3;
-    int algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
+        FLOATvector_2Dconvolution3x3ZeroBoundary;
+    int algFLOATvector_2Dconvolution3x3ZeroBoundary(cl::Buffer& A,
                                         cl::Buffer& B,
                                         cl_int3& vdims,
                                         cl_float16& convolutionKernel,
@@ -462,6 +462,15 @@ protected:
                                         cl::NDRange localRange = cl::NullRange,
                                         bool blocking = false);
 
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float16&>>
+        FLOATvector_2Dconvolution3x3ReflectionBoundary;
+    int algFLOATvector_2Dconvolution3x3ReflectionBoundary(cl::Buffer& A,
+                                        cl::Buffer& B,
+                                        cl_int3& vdims,
+                                        cl_float16& convolutionKernel,
+                                        cl::NDRange globalRange,
+                                        cl::NDRange localRange = cl::NullRange,
+                                        bool blocking = false);
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary;

@@ -622,8 +622,17 @@ void Kniha::CLINCLUDEconvolution()
     insertCLFile("opencl/convolution.cl");
     callbacks.emplace_back([this](cl::Program program) {
         {
-            auto& ptr = FLOATvector_2Dconvolution3x3;
-            std::string str = "FLOATvector_2Dconvolution3x3";
+            auto& ptr = FLOATvector_2Dconvolution3x3ZeroBoundary;
+            std::string str = "FLOATvector_2Dconvolution3x3ZeroBoundary";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_2Dconvolution3x3ReflectionBoundary;
+            std::string str = "FLOATvector_2Dconvolution3x3ReflectionBoundary";
             if(ptr == nullptr)
             {
                 ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -1485,7 +1494,7 @@ int Kniha::algvector_SumPartial_barrier(cl::Buffer& V,
     return 0;
 }
 // convolution.cl
-int Kniha::algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
+int Kniha::algFLOATvector_2Dconvolution3x3ZeroBoundary(cl::Buffer& A,
                                            cl::Buffer& B,
                                            cl_int3& vdims,
                                            cl_float16& convolutionKernel,
@@ -1496,7 +1505,26 @@ int Kniha::algFLOATvector_2Dconvolution3x3(cl::Buffer& A,
     std::shared_ptr<cl::EnqueueArgs> eargs;
     cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
     eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
-    auto exe = (*FLOATvector_2Dconvolution3x3)(*eargs, A, B, vdims, convolutionKernel);
+    auto exe = (*FLOATvector_2Dconvolution3x3ZeroBoundary)(*eargs, A, B, vdims, convolutionKernel);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_2Dconvolution3x3ReflectionBoundary(cl::Buffer& A,
+                                           cl::Buffer& B,
+                                           cl_int3& vdims,
+                                           cl_float16& convolutionKernel,
+                                           cl::NDRange globalRange,
+                                           cl::NDRange _localRange,
+                                           bool blocking)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
+    auto exe = (*FLOATvector_2Dconvolution3x3ReflectionBoundary)(*eargs, A, B, vdims, convolutionKernel);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

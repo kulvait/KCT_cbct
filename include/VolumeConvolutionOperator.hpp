@@ -109,13 +109,17 @@ public:
     int initializeOrUpdateOutputBuffer();
     int initializeOrUpdateGradientOutputBuffers();
 
-    int convolve(std::string kernelName, float* volume);
+    int convolve(std::string kernelName, float* volume, bool reflectionBoundaryConditions = false);
     int sobelGradient3D(cl_float3 voxelSizes,
                         float* vx,
                         float* vy,
                         float* vz,
                         bool reflectionBoundaryConditions = false);
-    int faridGradient3D(cl_float3 voxelSizes, float* vx, float* vy, float* vz, bool reflectionBoundary);
+    int faridGradient3D(cl_float3 voxelSizes,
+                        float* vx,
+                        float* vy,
+                        float* vz,
+                        bool reflectionBoundaryConditions = false);
     int isotropicGradient3D(cl_float3 voxelSizes, float* outputX, float* outputY, float* outputZ);
     int laplace3D(cl_float3 voxelSizes, float* outputVolume);
 

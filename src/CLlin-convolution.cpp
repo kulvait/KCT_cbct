@@ -113,6 +113,10 @@ public:
     bool sobelGradient3DReflectionBoundary = false;
     bool isotropicGradient3D = false;
     bool laplace3D = false;
+    bool laplace_2d_5ps_zero = false;
+    bool laplace_2d_9ps_zero = false;
+    bool laplace_2d_5ps_reflection = false;
+    bool laplace_2d_9ps_reflection = false;
     std::string inputVolume;
     std::string outputVolume;
 };
@@ -131,24 +135,34 @@ void Args::defineArguments()
         ->required()
         ->check(CLI::ExistingFile);
     cliApp->add_option("output_volume", outputVolume, "Output projection")->required();
-    CLI::Option* srb = cliApp->add_flag("--sobel-gradient-3d-reflection-boundary",
-                                        sobelGradient3DReflectionBoundary, "3D gradient.");
-    CLI::Option* szb = cliApp->add_flag("--sobel-gradient-3d-zero-boundary",
-                                        sobelGradient3DZeroBoundary, "3D gradient.");
-    CLI::Option* f53zb = cliApp->add_flag("--farid5-gradient-3d-zero-boundary",
-                                          farid5Gradient3DZeroBoundary, "3D gradient.");
-    CLI::Option* f53rb = cliApp->add_flag("--farid5-gradient-3d-reflection-boundary",
-                                          farid5Gradient3DReflectionBoundary, "3D gradient.");
-    CLI::Option* ig3
-        = cliApp->add_flag("--isotropic-gradient-3d", isotropicGradient3D, "3D gradient.");
-    CLI::Option* l3d = cliApp->add_flag("--laplace-3d", laplace3D, "3D Laplace operator.");
-    srb->excludes(szb)->excludes(l3d)->excludes(f53zb)->excludes(ig3)->excludes(f53rb);
-    szb->excludes(l3d)->excludes(srb)->excludes(f53zb)->excludes(ig3)->excludes(f53rb);
-    l3d->excludes(srb)->excludes(szb)->excludes(f53zb)->excludes(ig3)->excludes(f53rb);
-    f53zb->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(ig3)->excludes(f53rb);
-    ig3->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(f53zb)->excludes(f53rb);
-    f53rb->excludes(srb)->excludes(szb)->excludes(l3d)->excludes(ig3)->excludes(f53zb);
-
+    CLI::Option_group* op_clg = cliApp->add_option_group("Operation", "Convolution operator type.");
+    // CLI::Option* srb =
+    op_clg->add_flag("--sobel-gradient-3d-reflection-boundary", sobelGradient3DReflectionBoundary,
+                     "3D gradient.");
+    // CLI::Option* szb =
+    op_clg->add_flag("--sobel-gradient-3d-zero-boundary", sobelGradient3DZeroBoundary,
+                     "3D gradient.");
+    // CLI::Option* f53zb =
+    op_clg->add_flag("--farid5-gradient-3d-zero-boundary", farid5Gradient3DZeroBoundary,
+                     "3D gradient.");
+    // CLI::Option* f53rb =
+    op_clg->add_flag("--farid5-gradient-3d-reflection-boundary", farid5Gradient3DReflectionBoundary,
+                     "3D gradient.");
+    // CLI::Option* ig3 =
+    op_clg->add_flag("--isotropic-gradient-3d", isotropicGradient3D, "3D gradient.");
+    // CLI::Option* l3d =
+    op_clg->add_flag("--laplace-3d", laplace3D, "3D Laplace operator.");
+    // CLI::Option* l2d5ps =
+    op_clg->add_flag("--laplace-2d-5ps-zero-boundary", laplace_2d_5ps_zero,
+                     "2D Laplace operator, 5 point stencil, zero boundary conditions.");
+    op_clg->add_flag("--laplace-2d-5ps-reflection-boundary", laplace_2d_5ps_reflection,
+                     "2D Laplace operator, 5 point stencil, reflection boundary conditions.");
+    // CLI::Option* l2d9ps =
+    op_clg->add_flag("--laplace-2d-9ps-zero-boundary", laplace_2d_9ps_zero,
+                     "3D Laplace operator, 9 point stencil, zero boundary conditions.");
+    op_clg->add_flag("--laplace-2d-9ps-reflection-boundary", laplace_2d_9ps_reflection,
+                     "3D Laplace operator, 9 point stencil, reflection boundary conditions.");
+    op_clg->require_option(1);
     addForceArgs();
     addVoxelSizeArgs();
     addCLSettingsArgs();
@@ -223,19 +237,20 @@ int main(int argc, char* argv[])
         {
             VCO.isotropicGradient3D(voxelSizes, vx, vy, vz);
         }
-        uint64_t totalArraySize = ARG.totalVolumeSize * sizeof(float);
+        bool volumexmajor = true;
+        bool writexmajor = true;
         std::string gx = io::xprintf("%s_x", ARG.outputVolume.c_str());
         std::string gy = io::xprintf("%s_y", ARG.outputVolume.c_str());
         std::string gz = io::xprintf("%s_z", ARG.outputVolume.c_str());
-        io::DenFileInfo::create3DDenHeader(gx, DenSupportedType::FLOAT32, ARG.volumeSizeX,
-                                           ARG.volumeSizeY, ARG.volumeSizeZ);
-        io::appendBytes(gx, (uint8_t*)vx, totalArraySize);
-        io::DenFileInfo::create3DDenHeader(gy, DenSupportedType::FLOAT32, ARG.volumeSizeX,
-                                           ARG.volumeSizeY, ARG.volumeSizeZ);
-        io::appendBytes(gy, (uint8_t*)vy, totalArraySize);
-        io::DenFileInfo::create3DDenHeader(gz, DenSupportedType::FLOAT32, ARG.volumeSizeX,
-                                           ARG.volumeSizeY, ARG.volumeSizeZ);
-        io::appendBytes(gz, (uint8_t*)vz, totalArraySize);
+        io::DenFileInfo::create3DDenFileFromArray(vx, volumexmajor, gx,
+                                                  io::DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                                  ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
+        io::DenFileInfo::create3DDenFileFromArray(vy, volumexmajor, gy,
+                                                  io::DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                                  ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
+        io::DenFileInfo::create3DDenFileFromArray(vz, volumexmajor, gz,
+                                                  io::DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                                  ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
         delete[] vx;
         delete[] vy;
         delete[] vz;
@@ -254,13 +269,36 @@ int main(int argc, char* argv[])
             VCO.laplace3D(voxelSizes, volume);
         } else
         {
-            std::string kernelName = "Laplace";
-            VCO.convolve(kernelName, volume);
+            std::string kernelName;
+            bool reflectionBoundaryConditions;
+            if(ARG.laplace_2d_5ps_zero)
+            {
+                kernelName = "Laplace2D5ps";
+                reflectionBoundaryConditions = false;
+            } else if(ARG.laplace_2d_5ps_reflection)
+            {
+                kernelName = "Laplace2D5ps";
+                reflectionBoundaryConditions = true;
+
+            } else if(ARG.laplace_2d_9ps_zero)
+            {
+                kernelName = "Laplace2D9ps";
+                reflectionBoundaryConditions = false;
+            } else if(ARG.laplace_2d_9ps_reflection)
+            {
+                kernelName = "Laplace2D9ps";
+                reflectionBoundaryConditions = true;
+            } else
+            {
+                KCTERR("Unknown operator specification");
+            }
+            VCO.convolve(kernelName, volume, reflectionBoundaryConditions);
         }
-        io::DenFileInfo::create3DDenHeader(ARG.outputVolume, DenSupportedType::FLOAT32,
-                                           ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ);
-        uint64_t totalArraySize = ARG.totalVolumeSize * sizeof(float);
-        io::appendBytes(ARG.outputVolume, (uint8_t*)volume, totalArraySize);
+        bool volumexmajor = true;
+        bool writexmajor = true;
+        io::DenFileInfo::create3DDenFileFromArray(volume, volumexmajor, ARG.outputVolume,
+                                                  io::DenSupportedType::FLOAT32, ARG.volumeSizeX,
+                                                  ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
         delete[] volume;
     }
     PRG.endLog(true);
