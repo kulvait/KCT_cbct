@@ -109,7 +109,11 @@ public:
     int initializeOrUpdateOutputBuffer();
     int initializeOrUpdateGradientOutputBuffers();
 
-    int convolve(std::string kernelName, float* volume, bool reflectionBoundaryConditions = false);
+    int convolve(std::string kernelName,
+                 float* volume,
+                 double hx = 1.0,
+                 double hy = 1.0,
+                 bool reflectionBoundaryConditions = false);
     int sobelGradient3D(cl_float3 voxelSizes,
                         float* vx,
                         float* vy,

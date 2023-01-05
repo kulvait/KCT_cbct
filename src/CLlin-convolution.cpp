@@ -292,7 +292,7 @@ int main(int argc, char* argv[])
             {
                 KCTERR("Unknown operator specification");
             }
-            VCO.convolve(kernelName, volume, reflectionBoundaryConditions);
+            VCO.convolve(kernelName, volume, ARG.volumeSizeX, ARG.volumeSizeY, reflectionBoundaryConditions);
         }
         bool volumexmajor = true;
         bool writexmajor = true;

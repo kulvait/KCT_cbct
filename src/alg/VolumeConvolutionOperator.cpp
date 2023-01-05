@@ -143,8 +143,7 @@ int VolumeConvolutionOperator::initializeOrUpdateOutputBuffer()
     {
         ERR = io::xprintf(
             "Volume buffer must be initialized before calling initializeOrUpdateOutputBuffer!");
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     if(outputBuffer != nullptr)
     {
@@ -163,8 +162,7 @@ int VolumeConvolutionOperator::initializeOrUpdateOutputBuffer()
     if(err != CL_SUCCESS)
     {
         ERR = io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     return 0;
 }
@@ -177,8 +175,7 @@ int VolumeConvolutionOperator::initializeOrUpdateGradientOutputBuffers()
     {
         ERR = io::xprintf(
             "Volume buffer must be initialized before calling initializeOrUpdateOutputBuffer!");
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     if(outputGradientX != nullptr)
     {
@@ -226,20 +223,35 @@ int VolumeConvolutionOperator::fillVolumeBufferByConstant(float constant)
 
 int VolumeConvolutionOperator::convolve(std::string kernelName,
                                         float* outputVolume,
+                                        double hx,
+                                        double hy,
                                         bool reflectionBoundaryConditions)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     cl::NDRange localRange = projectorLocalNDRange;
     initializeOrUpdateOutputBuffer();
     cl_float16 convolutionKernel;
+    float hx2 = hx * hx;
+    float hy2 = hy * hy;
     if(kernelName == "Laplace2D5ps")
     {
-        convolutionKernel = { 0.0f, 1.0f, 0.0f, 1.0f, -4.0f, 1.0f, 0.0f, 1.0f,
-                              0.0f, 0.0f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f };
+        // clang-format off
+		//du/dx=u(x-hx)-2u(x)+u(x+hx) / hx^2
+        // https://users.cs.northwestern.edu/~jet/Teach/2004_3spr_IBMR/poisson.pdf
+        convolutionKernel
+            = { 0.0f,        1.0f / hy2,               0.0f,       
+                1.0f / hx2, -2.0f / hx2 - 2.0f / hx2, 1.0f / hx2, 
+                0.0f,        1.0f / hy2,              0.0f,
+                0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
     } else if(kernelName == "Laplace2D9ps")
     {
-        convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
+		//see https://core.ac.uk/download/pdf/81936845.pdf
+        float h2 = hx*hy;
+        convolutionKernel = { 1.0f/h2,   4.0f/h2, 1.0f/h2, 
+                              4.0f/h2, -20.0f/h2, 4.0f/h2, 
+                              1.0f/h2,   4.0f/h2, 1.0f/h2, 
+                              0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
+        // clang-format on
     } else
     {
         std::string err = io::xprintf("Unknown kernelName %s", kernelName.c_str());
