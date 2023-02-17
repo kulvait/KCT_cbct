@@ -818,7 +818,7 @@ px11 = PROJECTX0(CML, vx11);*/
 #ifdef ELEVATIONCORRECTION
                     corLenEstimate = corLenLimit; // Probably better estimate might exist
                     corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-                    localEdgeValues0ElevationCorrection(localProjection, CML, voxelCenter_xyz,
+                    localEdgeValues0ElevationCorrection(localProjection, CML, voxelcenter_xyz,
                                                         min_PX, value, voxelSizes, Lpdims,
                                                         corlambda);
 #else

@@ -68,15 +68,14 @@ public:
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
         if(totalVolumeSize > INT_MAX)
         {
-            LOGE << "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
-            return -1;
+            LOGW << io::xprintf("Volume size %lu is bigger than INT_MAX=%lu.", totalVolumeSize,
+                                INT_MAX);
         }
         // End parsing arguments
         if(totalProjectionSize > INT_MAX)
         {
-            LOGE << "Implement indexing by uint64_t matrix dimension overflow of projection "
-                    "pixels count.";
-            return -1;
+            LOGW << io::xprintf("Total projection size %lu is bigger than INT_MAX=%lu.",
+                                totalProjectionSize, INT_MAX);
         }
         io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)

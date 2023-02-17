@@ -44,26 +44,10 @@ public:
         const uint32_t UINT32_MAXXX = ((uint32_t)-1);
         const uint64_t xdim = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
         const uint64_t bdim = uint64_t(pdimx) * uint64_t(pdimy) * uint64_t(pdimz);
+        const uint64_t xframesize = uint64_t(vdimx) * uint64_t(vdimy);
+        const uint64_t bframesize = uint64_t(pdimx) * uint64_t(pdimy);
         const uint64_t xdim_aligned = xdim + (workGroupSize - xdim % workGroupSize) % workGroupSize;
         const uint64_t bdim_aligned = bdim + (workGroupSize - bdim % workGroupSize) % workGroupSize;
-        if(xdim_aligned > UINT32_MAXXX)
-        {
-            std::string err = "Too big dimensions";
-            LOGE << err;
-            throw std::runtime_error(err);
-        } else if(xdim_aligned * 4 > UINT32_MAXXX)
-        {
-            LOGI << "Beware buffer overflows for x buffer.";
-        }
-        if(bdim_aligned > UINT32_MAXXX)
-        {
-            std::string err = "Too big dimensions";
-            LOGE << err;
-            throw std::runtime_error(err);
-        } else if(bdim_aligned * 4 > UINT32_MAXXX)
-        {
-            LOGI << "Beware buffer overflows for b buffer.";
-        }
         XDIM = xdim;
         XDIM_ALIGNED = xdim_aligned;
         XDIM_REDUCED1 = xdim_aligned / workGroupSize;
@@ -80,13 +64,71 @@ public:
         BDIM_REDUCED2 = BDIM_REDUCED1_ALIGNED / workGroupSize;
         BDIM_REDUCED2_ALIGNED
             = BDIM_REDUCED2 + (workGroupSize - BDIM_REDUCED2 % workGroupSize) % workGroupSize;
+        std::string err;
+        if(xframesize > UINT32_MAXXX)
+        {
+            err = io::xprintf(
+                "Algorithms are based on the assumption that the x y volume slice can be "
+                "indexed by uint32_t but xframesize=%lu that is bigger than UINT32_MAXXX=%lu",
+                xframesize, UINT32_MAXXX);
+            KCTERR(err);
+        }
+        if(bframesize > UINT32_MAXXX)
+        {
+            err = io ::xprintf(
+                "Algorithms are based on the assumption that the projection size can be "
+                "indexed by uint32_t but bframesize=%lu that is bigger than UINT32_MAXXX=%lu",
+                bframesize, UINT32_MAXXX);
+            KCTERR(err);
+        }
+        if(XDIM_REDUCED2 > UINT32_MAXXX)
+        {
+            err = io::xprintf(
+                "Barrier algorithms are based on the assumption that XDIM_REDUCED2=%lu fits into "
+                "UINT32_MAXXX=%u. In the last step they call algFLOATvector_SumPartial.",
+                XDIM_REDUCED2, UINT32_MAXXX);
+            KCTERR(err);
+        }
+        if(BDIM_REDUCED2 > UINT32_MAXXX)
+        {
+            err = io::xprintf("BDIM_REDUCED2_ALIGNED * 8=%lu is bigger than UINT32_MAXXX=%u",
+                              BDIM_REDUCED2_ALIGNED, UINT32_MAXXX);
+            KCTERR(err);
+        }
+        if(xdim_aligned > UINT32_MAXXX)
+        {
+            err = io::xprintf(
+                "Size of the volume buffer xdim_aligned=%lu is bigger than UINT32_MAXXX=%u",
+                xdim_aligned, UINT32_MAXXX);
+            LOGW << err;
+        } else if(xdim_aligned * 4 > UINT32_MAXXX)
+        {
+            err = io::xprintf(
+                "Byte size of the volume buffer xdim_aligned=%lu is bigger than UINT32_MAXXX=%u",
+                4 * xdim_aligned, UINT32_MAXXX);
+            LOGW << err;
+        }
+        if(bdim_aligned > UINT32_MAXXX)
+        {
+            err = io::xprintf(
+                "Size of the projection buffer bdim_aligned=%lu is bigger than UINT32_MAXXX=%u",
+                bdim_aligned, UINT32_MAXXX);
+            LOGW << err;
+        } else if(bdim_aligned * 4 > UINT32_MAXXX)
+        {
+            err = io::xprintf("Byte size of the projection buffer bdim_aligned=%lu is bigger than "
+                              "UINT32_MAXXX=%u",
+                              4 * bdim_aligned, UINT32_MAXXX);
+            LOGW << err;
+        }
+
         CLINCLUDEutils();
     }
 
 protected:
     const uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
     const uint32_t workGroupSize = 256;
-    uint32_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
+    uint64_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
         XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
         XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
 
@@ -111,7 +153,8 @@ protected:
     double scalarProductXBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B);
 
     /**
-     * Copy float* array of size elements into the CL::buffer. The buffer must have appropriate size.
+     * Copy float* array of size elements into the CL::buffer. The buffer must have appropriate
+     * size.
      *
      * @param c_array Block of C memory
      * @param cl_buffer Block of OpenCL memory

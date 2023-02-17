@@ -12,12 +12,12 @@ namespace KCT {
 double AlgorithmsBarrierBuffers::normXBuffer_frame_double(cl::Buffer& X)
 {
     double sum;
-    cl::EnqueueArgs eargs0(*Q[0], cl::NDRange(vdimz));
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
-    uint32_t framesize = vdimx * vdimy;
-    (*vector_NormSquarePartial)(eargs0, X, *tmp_x_red1, framesize);
-    unsigned int arg = vdimz;
-    (*vector_SumPartial)(eargs1, *tmp_x_red1, *tmp_x_red2, arg);
+    uint32_t partialFrameSize = vdimx * vdimy;
+    uint32_t partialFrameCount = vdimz;
+    algvector_NormSquarePartial(X, *tmp_x_red1, partialFrameSize, partialFrameCount);
+    partialFrameSize = vdimz;
+    partialFrameCount = 1;
+    algvector_SumPartial(*tmp_x_red1, *tmp_x_red2, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -32,12 +32,12 @@ double AlgorithmsBarrierBuffers::normXBuffer_frame_double(cl::Buffer& X)
 double AlgorithmsBarrierBuffers::normBBuffer_frame_double(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     double sum;
-    uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
-    (*vector_NormSquarePartial)(eargs1, B, *tmp_b_red1, framesize);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    unsigned int arg = pdimz;
-    (*vector_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg);
+    uint32_t partialFrameSize = pdimx * pdimy;
+    uint32_t partialFrameCount = pdimz;
+    algvector_NormSquarePartial(B, *tmp_b_red1, partialFrameSize, partialFrameCount);
+    partialFrameSize = pdimz;
+    partialFrameCount = 1;
+    algvector_SumPartial(*tmp_b_red1, *tmp_b_red2, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -59,8 +59,9 @@ float AlgorithmsBarrierBuffers::sumXBuffer_barrier_float(cl::Buffer& X)
                                cl::NDRange(workGroupSize));
     (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize,
                                       XDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
+    uint32_t partialFrameSize = XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_x_red2, *tmp_x_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -75,8 +76,9 @@ float AlgorithmsBarrierBuffers::maxXBuffer_barrier_float(cl::Buffer& X)
                                cl::NDRange(workGroupSize));
     (*FLOATvector_MaxPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize,
                                       XDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_MaxPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
+    uint32_t partialFrameSize = XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_MaxPartial(*tmp_x_red2, *tmp_x_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -97,8 +99,9 @@ double AlgorithmsBarrierBuffers::normXBuffer_barrier_double(cl::Buffer& X)
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
     (*vector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
+    uint32_t partialFrameSize = XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algvector_SumPartial(*tmp_x_red2, *tmp_x_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -120,8 +123,9 @@ float AlgorithmsBarrierBuffers::sumBBuffer_barrier_float(cl::Buffer& B)
                                cl::NDRange(workGroupSize));
     (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize,
                                       BDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
+    uint32_t partialFrameSize = BDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_b_red2, *tmp_b_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -136,8 +140,9 @@ float AlgorithmsBarrierBuffers::maxBBuffer_barrier_float(cl::Buffer& B)
                                cl::NDRange(workGroupSize));
     (*FLOATvector_MaxPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize,
                                       BDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_MaxPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
+    uint32_t partialFrameSize = BDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_MaxPartial(*tmp_b_red2, *tmp_b_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -172,8 +177,9 @@ double AlgorithmsBarrierBuffers::normBBuffer_barrier_double(cl::Buffer& B)
     */
     algvector_SumPartial_barrier(*tmp_b_red1, *tmp_b_red2, BDIM_REDUCED1, BDIM_REDUCED1_ALIGNED,
                                  workGroupSize);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
+    uint32_t partialFrameSize = BDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algvector_SumPartial(*tmp_b_red2, *tmp_b_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -196,8 +202,9 @@ double AlgorithmsBarrierBuffers::scalarProductXBuffer_barrier_double(cl::Buffer&
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(XDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
     (*vector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize, XDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
+    uint32_t partialFrameSize = XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algvector_SumPartial(*tmp_x_red2, *tmp_x_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -220,8 +227,9 @@ double AlgorithmsBarrierBuffers::scalarProductBBuffer_barrier_double(cl::Buffer&
     cl::EnqueueArgs eargs_red2(*Q[0], cl::NDRange(BDIM_REDUCED1_ALIGNED),
                                cl::NDRange(workGroupSize));
     (*vector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize, BDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*vector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
+    uint32_t partialFrameSize = BDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algvector_SumPartial(*tmp_b_red2, *tmp_b_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(double), &sum);
     return sum;
 }
@@ -236,12 +244,12 @@ double AlgorithmsBarrierBuffers::scalarProductBBuffer_barrier_double(cl::Buffer&
 float AlgorithmsBarrierBuffers::normXBuffer_frame(cl::Buffer& X)
 {
     float sum;
-    uint32_t framesize = vdimx * vdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(vdimz));
-    (*FLOATvector_NormSquarePartial)(eargs1, X, *tmp_x_red1, framesize);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    unsigned int arg = vdimz;
-    (*FLOATvector_SumPartial)(eargs, *tmp_x_red1, *tmp_x_red2, arg);
+    uint32_t partialFrameSize = vdimx * vdimy;
+    uint32_t partialFrameCount = vdimz;
+    algFLOATvector_NormSquarePartial(X, *tmp_x_red1, partialFrameSize, partialFrameCount);
+    partialFrameSize = vdimz;
+    partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_x_red1, *tmp_x_red2, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red2, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -256,12 +264,12 @@ float AlgorithmsBarrierBuffers::normXBuffer_frame(cl::Buffer& X)
 float AlgorithmsBarrierBuffers::normBBuffer_frame(cl::Buffer& B)
 { // Use workGroupSize that is private constant default to 256
     float sum;
-    uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(pdimz));
-    (*FLOATvector_NormSquarePartial)(eargs1, B, *tmp_b_red1, framesize);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    unsigned int arg = pdimz;
-    (*FLOATvector_SumPartial)(eargs, *tmp_b_red1, *tmp_b_red2, arg);
+    uint32_t partialFrameSize = pdimx * pdimy;
+    uint32_t partialFrameCount = pdimz;
+    algFLOATvector_NormSquarePartial(B, *tmp_b_red1, partialFrameSize, partialFrameCount);
+    partialFrameSize = pdimz;
+    partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_b_red1, *tmp_b_red2, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_b_red2, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -284,8 +292,9 @@ float AlgorithmsBarrierBuffers::normXBuffer_barrier(cl::Buffer& X)
                                cl::NDRange(workGroupSize));
     (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_x_red1, *tmp_x_red2, localsize,
                                       XDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_SumPartial)(eargs, *tmp_x_red2, *tmp_x_red1, XDIM_REDUCED2);
+    uint32_t partialFrameSize = XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_x_red2, *tmp_x_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
@@ -307,8 +316,9 @@ float AlgorithmsBarrierBuffers::normBBuffer_barrier(cl::Buffer& B)
                                cl::NDRange(workGroupSize));
     (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_b_red1, *tmp_b_red2, localsize,
                                       BDIM_REDUCED1);
-    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(1));
-    (*FLOATvector_SumPartial)(eargs, *tmp_b_red2, *tmp_b_red1, BDIM_REDUCED2);
+    uint32_t partialFrameSize = BDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_b_red2, *tmp_b_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_b_red1, CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }

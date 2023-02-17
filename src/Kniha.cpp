@@ -1257,6 +1257,116 @@ int Kniha::algFLOATcutting_voxel_project_barrier(cl::Buffer& volume,
     }
     return 0;
 }
+// utils.cl
+
+int Kniha::algFLOATvector_NormSquarePartial(cl::Buffer& V,
+                                            cl::Buffer& PARTIAL_OUT,
+                                            unsigned int partialFrameSize,
+                                            uint32_t partialFrameCount,
+                                            bool blocking)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(partialFrameCount));
+    auto exe = (*FLOATvector_NormSquarePartial)(eargs, V, PARTIAL_OUT, partialFrameSize);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_SumPartial(cl::Buffer& V,
+                                     cl::Buffer& PARTIAL_OUT,
+                                     unsigned int partialFrameSize,
+                                     uint32_t partialFrameCount,
+                                     bool blocking)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(partialFrameCount));
+    auto exe = (*FLOATvector_SumPartial)(eargs, V, PARTIAL_OUT, partialFrameSize);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_MaxPartial(cl::Buffer& V,
+                                     cl::Buffer& PARTIAL_OUT,
+                                     unsigned int partialFrameSize,
+                                     uint32_t partialFrameCount,
+                                     bool blocking)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(partialFrameCount));
+    auto exe = (*FLOATvector_MaxPartial)(eargs, V, PARTIAL_OUT, partialFrameSize);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algvector_NormSquarePartial(cl::Buffer& V,
+                                       cl::Buffer& VSQUARE_OUT,
+                                       unsigned int partialFrameSize,
+                                       uint32_t partialFrameCount,
+                                       bool blocking)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(partialFrameCount));
+    auto exe = (*vector_NormSquarePartial)(eargs, V, VSQUARE_OUT, partialFrameSize);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algvector_SumPartial(cl::Buffer& V,
+                                cl::Buffer& SUM_OUT,
+                                unsigned int partialFrameSize,
+                                uint32_t partialFrameCount,
+                                bool blocking)
+{
+    cl::EnqueueArgs eargs(*Q[0], cl::NDRange(partialFrameCount));
+    auto exe = (*vector_SumPartial)(eargs, V, SUM_OUT, partialFrameSize);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algvector_NormSquarePartial_barrier(cl::Buffer& V,
+                                               cl::Buffer& V_red,
+                                               unsigned long& VDIM,
+                                               unsigned long& VDIM_ALIGNED,
+                                               uint32_t workGroupSize,
+                                               bool blocking)
+{
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
+    auto exe = (*vector_NormSquarePartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algvector_SumPartial_barrier(cl::Buffer& V,
+                                        cl::Buffer& V_red,
+                                        unsigned long& VDIM,
+                                        unsigned long& VDIM_ALIGNED,
+                                        uint32_t workGroupSize,
+                                        bool blocking)
+{
+    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
+    auto exe = (*vector_SumPartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
 
 int Kniha::algFLOATvector_copy(cl::Buffer& A, cl::Buffer& B, uint64_t size, bool blocking)
 {
@@ -1270,7 +1380,7 @@ int Kniha::algFLOATvector_copy(cl::Buffer& A, cl::Buffer& B, uint64_t size, bool
 }
 
 int Kniha::algFLOATvector_copy_offset(
-    cl::Buffer& A, cl::Buffer& B, unsigned int offset, uint64_t size, bool blocking)
+    cl::Buffer& A, cl::Buffer& B, unsigned long offset, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_copy_offset)(eargs, A, B, offset);
@@ -1282,7 +1392,7 @@ int Kniha::algFLOATvector_copy_offset(
 }
 
 int Kniha::algFLOATvector_copy_offsets(
-    cl::Buffer& A, unsigned int oA, cl::Buffer& B, unsigned int oB, uint64_t size, bool blocking)
+    cl::Buffer& A, unsigned long oA, cl::Buffer& B, unsigned long oB, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_copy_offsets)(eargs, A, oA, B, oB);
@@ -1327,7 +1437,7 @@ int Kniha::algFLOATvector_A_equals_Ac_plus_B(
 }
 
 int Kniha::algFLOATvector_A_equals_A_plus_cB_offset(
-    cl::Buffer& A, cl::Buffer& B, float c, unsigned int offset, uint64_t size, bool blocking)
+    cl::Buffer& A, cl::Buffer& B, float c, unsigned long offset, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_plus_cB_offset)(eargs, A, B, c, offset);
@@ -1369,9 +1479,9 @@ int Kniha::algFLOATvector_scale(cl::Buffer& A, float c, uint64_t size, bool bloc
     return 0;
 }
 int Kniha::algFLOATvector_A_equals_A_plus_cB_offsets(cl::Buffer& A,
-                                                     unsigned int oA,
+                                                     unsigned long oA,
                                                      cl::Buffer& B,
-                                                     unsigned int oB,
+                                                     unsigned long oB,
                                                      float c,
                                                      uint64_t size,
                                                      bool blocking)
@@ -1385,7 +1495,7 @@ int Kniha::algFLOATvector_A_equals_A_plus_cB_offsets(cl::Buffer& A,
     return 0;
 }
 int Kniha::algFLOATvector_B_equals_A_plus_B_offsets(
-    cl::Buffer& A, unsigned int oA, cl::Buffer& B, unsigned int oB, uint64_t size, bool blocking)
+    cl::Buffer& A, unsigned long oA, cl::Buffer& B, unsigned long oB, uint64_t size, bool blocking)
 {
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(size));
     auto exe = (*FLOATvector_B_equals_A_plus_B_offsets)(eargs, A, oA, B, oB);
@@ -1461,46 +1571,15 @@ int Kniha::algFLOATvector_C_equals_A_times_B(
     }
     return 0;
 }
-int Kniha::algvector_NormSquarePartial_barrier(cl::Buffer& V,
-                                               cl::Buffer& V_red,
-                                               unsigned int& VDIM,
-                                               unsigned int& VDIM_ALIGNED,
-                                               uint32_t workGroupSize,
-                                               bool blocking)
-{
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    auto exe = (*vector_NormSquarePartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
-    if(handleKernelExecution(exe, blocking, err))
-    {
-        KCTERR(err);
-    }
-    return 0;
-}
-int Kniha::algvector_SumPartial_barrier(cl::Buffer& V,
-                                        cl::Buffer& V_red,
-                                        unsigned int& VDIM,
-                                        unsigned int& VDIM_ALIGNED,
-                                        uint32_t workGroupSize,
-                                        bool blocking)
-{
-    cl::EnqueueArgs eargs_red1(*Q[0], cl::NDRange(VDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    auto exe = (*vector_SumPartial_barrier)(eargs_red1, V, V_red, localsize, VDIM);
-    if(handleKernelExecution(exe, blocking, err))
-    {
-        KCTERR(err);
-    }
-    return 0;
-}
+
 // convolution.cl
 int Kniha::algFLOATvector_2Dconvolution3x3ZeroBoundary(cl::Buffer& A,
-                                           cl::Buffer& B,
-                                           cl_int3& vdims,
-                                           cl_float16& convolutionKernel,
-                                           cl::NDRange globalRange,
-                                           cl::NDRange _localRange,
-                                           bool blocking)
+                                                       cl::Buffer& B,
+                                                       cl_int3& vdims,
+                                                       cl_float16& convolutionKernel,
+                                                       cl::NDRange globalRange,
+                                                       cl::NDRange _localRange,
+                                                       bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
     cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
@@ -1514,17 +1593,18 @@ int Kniha::algFLOATvector_2Dconvolution3x3ZeroBoundary(cl::Buffer& A,
 }
 
 int Kniha::algFLOATvector_2Dconvolution3x3ReflectionBoundary(cl::Buffer& A,
-                                           cl::Buffer& B,
-                                           cl_int3& vdims,
-                                           cl_float16& convolutionKernel,
-                                           cl::NDRange globalRange,
-                                           cl::NDRange _localRange,
-                                           bool blocking)
+                                                             cl::Buffer& B,
+                                                             cl_int3& vdims,
+                                                             cl_float16& convolutionKernel,
+                                                             cl::NDRange globalRange,
+                                                             cl::NDRange _localRange,
+                                                             bool blocking)
 {
     std::shared_ptr<cl::EnqueueArgs> eargs;
     cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
     eargs = std::make_shared<cl::EnqueueArgs>(*Q[0], globalRange, localRange);
-    auto exe = (*FLOATvector_2Dconvolution3x3ReflectionBoundary)(*eargs, A, B, vdims, convolutionKernel);
+    auto exe
+        = (*FLOATvector_2Dconvolution3x3ReflectionBoundary)(*eargs, A, B, vdims, convolutionKernel);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);
