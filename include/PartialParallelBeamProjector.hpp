@@ -92,6 +92,7 @@ public:
         if(XDIM > maximumElementSize)
         {
             vdimz_partial = vdimz;
+            vzblocks = 1;
             while(vdimz_partial % 2 == 0 && vdimz_partial * volumeFrameSize > maximumElementSize)
             {
                 vdimz_partial /= 2;
@@ -120,10 +121,11 @@ public:
                 }
             } else
             {
-                LOGI << io::xprintf("There will be bisection based even partitioning of the vdimz %d into "
-                            "%d vzblocks with "
-                            "the size vdimz_partial %d ",
-                            vdimz, vzblocks, vdimz_partial);
+                LOGI << io::xprintf(
+                    "There will be bisection based even partitioning of the vdimz %d into "
+                    "%d vzblocks with "
+                    "the size vdimz_partial %d ",
+                    vdimz, vzblocks, vdimz_partial);
             }
             XDIM_partial = vdimz_partial * volumeFrameSize;
             XDIM_partial_last = vdimz_partial_last * volumeFrameSize;
@@ -141,6 +143,7 @@ public:
         if(BDIM > maximumElementSize)
         {
             pdimz_partial = pdimz;
+            pzblocks = 1;
             while(pdimz_partial % 2 == 0
                   && pdimz_partial * projectionFrameSize > maximumElementSize)
             {
@@ -151,26 +154,29 @@ public:
             if(pdimz_partial * volumeFrameSize > maximumElementSize)
             {
                 pzblocks = (BDIM + maximumElementSize - 1) / maximumElementSize;
-                pdimz_partial = (pdimz + vzblocks - 1) / vzblocks;
+                pdimz_partial = (pdimz + pzblocks - 1) / pzblocks;
                 if(pdimz % pdimz_partial != 0)
                 {
                     pdimz_partial_last = pdimz % pdimz_partial;
-                    LOGI << io::xprintf("There will be  uneven partitioning of the pdimz %d into %d "
-                                "pzblocks with the size pdimz_partial %d and tha last block with "
-                                "size pdimz_partial_last %d",
-                                pdimz, pzblocks, pdimz_partial, pdimz_partial_last);
+                    LOGI << io::xprintf(
+                        "There will be  uneven partitioning of the pdimz %d into %d "
+                        "pzblocks with the size pdimz_partial %d and tha last block with "
+                        "size pdimz_partial_last %d",
+                        pdimz, pzblocks, pdimz_partial, pdimz_partial_last);
                 } else
                 {
                     pdimz_partial_last = pdimz_partial;
-                    LOGI << io::xprintf("There will be even partitioning of the pdimz %d into %d pzblocks "
-                                "with the size pdimz_partial %d",
-                                pdimz, pzblocks, pdimz_partial);
+                    LOGI << io::xprintf(
+                        "There will be even partitioning of the pdimz %d into %d pzblocks "
+                        "with the size pdimz_partial %d",
+                        pdimz, pzblocks, pdimz_partial);
                 }
             } else
             {
-                LOGI << io::xprintf("There will be bisection based even partitioning of the pdimz %d into "
-                            "%d pzblocks with the size pdimz_partial %d",
-                            pdimz, pzblocks, pdimz_partial);
+                LOGI << io::xprintf(
+                    "There will be bisection based even partitioning of the pdimz %d into "
+                    "%d pzblocks with the size pdimz_partial %d",
+                    pdimz, pzblocks, pdimz_partial);
             }
             BDIM_partial = pdimz_partial * projectionFrameSize;
             BDIM_partial_last = pdimz_partial_last * projectionFrameSize;

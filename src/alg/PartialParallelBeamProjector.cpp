@@ -69,11 +69,13 @@ int PartialParallelBeamProjector::project_partial(float* volume, float* projecti
     float *volumePtr, *projectionPtr;
     uint64_t geometriesFrom;
     uint64_t geometriesTo;
+    uint64_t projectionArrayOffset;
     float voxelzCenterOffset;
     uint32_t pdimz_partial_now, vdimz_partial_now;
     for(uint64_t PIN = 0; PIN != pzblocks; PIN++)
     {
-        projectionPtr = projection + PIN * pFrameSize * (uint64_t)pdimz_partial;
+        projectionArrayOffset = PIN * pFrameSize * (uint64_t)pdimz_partial;
+        projectionPtr = projection + projectionArrayOffset;
         if(PIN != pzblocks - 1)
         {
             pdimz_partial_now = pdimz_partial;
@@ -98,26 +100,35 @@ int PartialParallelBeamProjector::project_partial(float* volume, float* projecti
                 vdimz_partial_now = vdimz_partial_last;
                 arrayIntoBuffer(volumePtr, *x_buf, XDIM_partial_last);
             }
-            std::cout << io::xprintf("BUFREAD VIN=%d\n", VIN);
+            std::cout << io::xprintf("BUFREAD VIN=%d\n", VIN) << std::flush;
             voxelzCenterOffset = float(vdimz) * 0.5f
                 - (float(VIN * vdimz_partial) + float(vdimz_partial_now) * 0.5f);
             CT->updateReductionParameters(pdimx, pdimy, pdimz_partial_now, vdimx, vdimy,
                                           vdimz_partial_now, workGroupSize);
 
-            std::cout << io::xprintf("START Partial projection PIN=%d [0, %d) VIN = %d [0, %d).\n", PIN,
-                                pzblocks, VIN, vzblocks);
+            std::cout << io::xprintf("START Partial projection PIN=%d [0, %d) VIN = %d [0, %d).\n",
+                                     PIN, pzblocks, VIN, vzblocks)
+                      << std::flush;
             Q[0]->finish();
             CT->project_partial(*x_buf, *b_buf, voxelzCenterOffset, geometriesFrom, geometriesTo);
             Q[0]->finish();
-            std::cout << io::xprintf("END Partial projection PIN=%d [0, %d) VIN = %d [0, %d).\n", PIN,
-                                pzblocks, VIN, vzblocks);
+            std::cout << io::xprintf("END Partial projection PIN=%d [0, %d) VIN = %d [0, %d).\n",
+                                     PIN, pzblocks, VIN, vzblocks)
+                      << std::flush;
         }
         if(PIN != pzblocks - 1)
         {
+
+            LOGW << io::xprintf("Writing %lu values to [%lu, %lu).", BDIM_partial,
+                                projectionArrayOffset, projectionArrayOffset + BDIM_partial);
             bufferIntoArray(*b_buf, projectionPtr, BDIM_partial);
+            LOGW << "Finished writing!";
         } else
         {
+            LOGW << io::xprintf("Writing %lu values to [%lu, %lu).", BDIM_partial_last,
+                                projectionArrayOffset, projectionArrayOffset + BDIM_partial_last);
             bufferIntoArray(*b_buf, projectionPtr, BDIM_partial_last);
+            LOGW << "Finished writing!";
         }
     }
     return 0;

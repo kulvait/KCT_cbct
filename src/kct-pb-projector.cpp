@@ -263,8 +263,6 @@ int main(int argc, char* argv[])
         }
     } else
     {
-        LOGE << io::xprintf("Using projector with partialProjectorBytesize=%ld",
-                            ARG.partialProjectorBytesize);
         PartialParallelBeamProjector PBCVP(
             ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
             ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, ARG.partialProjectorBytesize,
@@ -297,6 +295,7 @@ int main(int argc, char* argv[])
         float* volume = new float[ARG.totalVolumeSize];
         float* projection = new float[ARG.totalProjectionSize];
         float* projection_rhs = nullptr;
+        LOGE << io::xprintf("Partial projector partialProjectorBytesize=%ld, allocated arrays with totalVolumeSize=%lu totalProjectionSize=%lu", ARG.partialProjectorBytesize, ARG.totalVolumeSize, ARG.totalProjectionSize);
         io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
         bool readxmajor = true;
         inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
