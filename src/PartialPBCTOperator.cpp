@@ -1,8 +1,8 @@
-#include "BasePBCTOperator.hpp"
+#include "PartialPBCTOperator.hpp"
 
 namespace KCT {
 
-void BasePBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOCALARRAYSIZE)
+void PartialPBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())
     {
@@ -30,7 +30,7 @@ void BasePBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOC
     }
 }
 
-void BasePBCTOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
+void PartialPBCTOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
@@ -48,7 +48,7 @@ void BasePBCTOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_
     }
 }
 
-void BasePBCTOperator::initializeTTProjector()
+void PartialPBCTOperator::initializeTTProjector()
 {
     if(!isOpenCLInitialized())
     {
@@ -67,7 +67,7 @@ void BasePBCTOperator::initializeTTProjector()
     }
 }
 
-void BasePBCTOperator::initializeVolumeConvolution()
+void PartialPBCTOperator::initializeVolumeConvolution()
 {
     if(!isOpenCLInitialized())
     {
@@ -81,7 +81,7 @@ void BasePBCTOperator::initializeVolumeConvolution()
     }
 }
 
-void BasePBCTOperator::useJacobiVectorCLCode()
+void PartialPBCTOperator::useJacobiVectorCLCode()
 {
     if(!isOpenCLInitialized())
     {
@@ -94,7 +94,7 @@ void BasePBCTOperator::useJacobiVectorCLCode()
     }
 }
 
-int BasePBCTOperator::problemSetup(
+int PartialPBCTOperator::problemSetup(
     std::vector<std::shared_ptr<geometry::Geometry3DParallelI>> geometries,
     double voxelSpacingX,
     double voxelSpacingY,
@@ -106,9 +106,9 @@ int BasePBCTOperator::problemSetup(
     if(geometries.size() != pdimz)
     {
         std::string ERR
-            = io::xprintf("The pdimz=%d but the size of camera geometries vector is %d!", pdimz,
+            = io::xprintf("The pdimz=%d and the size of camera geometries vector is %d.", pdimz,
                           geometries.size());
-        KCTERR(ERR);
+        LOGW << ERR;
     }
     this->geometries = geometries;
     PM8Vector.clear();
@@ -131,7 +131,7 @@ int BasePBCTOperator::problemSetup(
     return 0;
 }
 
-int BasePBCTOperator::allocateXBuffers(uint32_t xBufferCount)
+int PartialPBCTOperator::allocateXBuffers(uint32_t xBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> xbufptr;
@@ -146,12 +146,15 @@ int BasePBCTOperator::allocateXBuffers(uint32_t xBufferCount)
         } else
         {
             x_buffers.push_back(xbufptr);
+            LOGI << io::xprintf(
+                "Successfull allocation of the x_buffers[%d] buffer of the length %lu.",
+                x_buffers.size() - 1, sizeof(float) * XDIM);
         }
     }
     return 0;
 }
 
-int BasePBCTOperator::allocateBBuffers(uint32_t bBufferCount)
+int PartialPBCTOperator::allocateBBuffers(uint32_t bBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> bbufptr;
@@ -169,7 +172,7 @@ int BasePBCTOperator::allocateBBuffers(uint32_t bBufferCount)
     return 0;
 }
 
-int BasePBCTOperator::allocateTmpXBuffers(uint32_t xBufferCount)
+int PartialPBCTOperator::allocateTmpXBuffers(uint32_t xBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> xbufptr;
@@ -187,7 +190,7 @@ int BasePBCTOperator::allocateTmpXBuffers(uint32_t xBufferCount)
     return 0;
 }
 
-int BasePBCTOperator::allocateTmpBBuffers(uint32_t bBufferCount)
+int PartialPBCTOperator::allocateTmpBBuffers(uint32_t bBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> bbufptr;
@@ -205,7 +208,7 @@ int BasePBCTOperator::allocateTmpBBuffers(uint32_t bBufferCount)
     return 0;
 }
 
-std::shared_ptr<cl::Buffer> BasePBCTOperator::getXBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCTOperator::getXBuffer(uint32_t i)
 {
     if(i < x_buffers.size())
     {
@@ -219,7 +222,7 @@ std::shared_ptr<cl::Buffer> BasePBCTOperator::getXBuffer(uint32_t i)
     }
 }
 
-std::shared_ptr<cl::Buffer> BasePBCTOperator::getBBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCTOperator::getBBuffer(uint32_t i)
 {
     if(i < b_buffers.size())
     {
@@ -233,7 +236,7 @@ std::shared_ptr<cl::Buffer> BasePBCTOperator::getBBuffer(uint32_t i)
     }
 }
 
-std::shared_ptr<cl::Buffer> BasePBCTOperator::getTmpXBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCTOperator::getTmpXBuffer(uint32_t i)
 {
     if(i < tmp_x_buffers.size())
     {
@@ -248,7 +251,7 @@ std::shared_ptr<cl::Buffer> BasePBCTOperator::getTmpXBuffer(uint32_t i)
     }
 }
 
-std::shared_ptr<cl::Buffer> BasePBCTOperator::getTmpBBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCTOperator::getTmpBBuffer(uint32_t i)
 {
     if(i < tmp_b_buffers.size())
     {
@@ -268,10 +271,10 @@ std::shared_ptr<cl::Buffer> BasePBCTOperator::getTmpBBuffer(uint32_t i)
  * @param projectionIncrement For OS SART 1 by default
  *
  */
-int BasePBCTOperator::backproject(cl::Buffer& B,
-                                  cl::Buffer& X,
-                                  uint32_t initialProjectionIndex,
-                                  uint32_t projectionIncrement)
+int PartialPBCTOperator::backproject(cl::Buffer& B,
+                                     cl::Buffer& X,
+                                     uint32_t initialProjectionIndex,
+                                     uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
@@ -306,12 +309,14 @@ int BasePBCTOperator::backproject(cl::Buffer& B,
  * @param projectionIncrement For OS SART, 1 by default
  *
  */
-int BasePBCTOperator::project(cl::Buffer& X,
-                              cl::Buffer& B,
-                              uint32_t initialProjectionIndex,
-                              uint32_t projectionIncrement)
+int PartialPBCTOperator::project_partial(cl::Buffer& X,
+                                         cl::Buffer& B,
+                                         float voxelzCenterOffset,
+                                         uint32_t geometries_from,
+                                         uint32_t geometries_to,
+                                         uint32_t initialProjectionIndex,
+                                         uint32_t projectionIncrement)
 {
-    Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     cl::NDRange localRange;
     if(useBarrierImplementation)
     {
@@ -329,31 +334,38 @@ int BasePBCTOperator::project(cl::Buffer& X,
     float scalingFactor;
     unsigned long frameSize = pdimx * pdimy;
     unsigned long offset;
-    for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
+    cl_double3 volumeCenter_local = volumeCenter;
+    volumeCenter_local.z -= (voxelzCenterOffset*voxelSizes.z);
+    uint64_t IND;
+    for(std::size_t i = initialProjectionIndex; i < PM8Vector.size(); i += projectionIncrement)
     {
-        CM = PM8Vector[i];
-        scalingFactor = scalingFactorVector[i];
-        offset = i * frameSize;
-        if(useSidonProjector)
+        if(i >= geometries_from && i < geometries_to)
         {
-            KCTERR("Siddon operators are not yet implemented for PBCT.");
-        } else if(useTTProjector)
-        {
-            KCTERR("Footprint operators are not yet implemented for PBCT.");
-        } else
-        {
-            if(useBarrierImplementation)
+            CM = PM8Vector[i];
+            scalingFactor = scalingFactorVector[i];
+            IND = i - geometries_from;
+            offset = IND * frameSize;
+            if(useSidonProjector)
             {
-                cl::NDRange globalRange(vdimx, vdimy, vdimz);
-                algFLOAT_pbct_cutting_voxel_project_barrier(
-                    X, B, offset, CM, vdims, voxelSizes, volumeCenter, pdims, scalingFactor,
-                    LOCALARRAYSIZE, globalRange, localRange);
+                KCTERR("Siddon operators are not yet implemented for PBCT.");
+            } else if(useTTProjector)
+            {
+                KCTERR("Footprint operators are not yet implemented for PBCT.");
             } else
             {
-                cl::NDRange globalRange(vdimz, vdimy, vdimx);
-                algFLOAT_pbct_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
-                                                    volumeCenter, pdims, scalingFactor, globalRange,
-                                                    localRange);
+                if(useBarrierImplementation)
+                {
+                    cl::NDRange globalRange(vdimx, vdimy, vdimz);
+                    algFLOAT_pbct_cutting_voxel_project_barrier(
+                        X, B, offset, CM, vdims, voxelSizes, volumeCenter_local, pdims,
+                        scalingFactor, LOCALARRAYSIZE, globalRange, localRange);
+                } else
+                {
+                    cl::NDRange globalRange(vdimz, vdimy, vdimx);
+                    algFLOAT_pbct_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
+                                                        volumeCenter_local, pdims, scalingFactor,
+                                                        globalRange, localRange);
+                }
             }
         }
     }
@@ -362,7 +374,7 @@ int BasePBCTOperator::project(cl::Buffer& X,
 
 // Scaling factor is a expression f*f/(px*py), where f is source to detector distance and pixel
 // sizes are (px and py)  Focal length http://ksimek.github.io/2013/08/13/intrinsic/
-std::vector<float> BasePBCTOperator::computeScalingFactors()
+std::vector<float> PartialPBCTOperator::computeScalingFactors()
 {
     std::vector<float> scalingFactors;
     float pixelArea, detectorTilt, scalingFactor;
@@ -377,7 +389,7 @@ std::vector<float> BasePBCTOperator::computeScalingFactors()
     return scalingFactors;
 }
 
-void BasePBCTOperator::writeVolume(cl::Buffer& X, float* x, std::string path)
+void PartialPBCTOperator::writeVolume(cl::Buffer& X, float* x, std::string path)
 {
     bufferIntoArray(X, x, XDIM);
     bool arrayxmajor = true;
@@ -386,7 +398,7 @@ void BasePBCTOperator::writeVolume(cl::Buffer& X, float* x, std::string path)
                                               vdimx, vdimy, vdimz, outxmajor);
 }
 
-void BasePBCTOperator::writeProjections(cl::Buffer& B, float* b, std::string path)
+void PartialPBCTOperator::writeProjections(cl::Buffer& B, float* b, std::string path)
 {
     bufferIntoArray(B, b, BDIM);
     bool arrayxmajor = false;
@@ -395,7 +407,7 @@ void BasePBCTOperator::writeProjections(cl::Buffer& B, float* b, std::string pat
                                               pdimx, pdimy, pdimz, outxmajor);
 }
 
-void BasePBCTOperator::setTimestamp(bool finishCommandQueue)
+void PartialPBCTOperator::setTimestamp(bool finishCommandQueue)
 {
     if(finishCommandQueue)
     {
@@ -403,7 +415,7 @@ void BasePBCTOperator::setTimestamp(bool finishCommandQueue)
     }
     timestamp = std::chrono::steady_clock::now();
 }
-std::chrono::milliseconds BasePBCTOperator::millisecondsFromTimestamp(bool setNewTimestamp)
+std::chrono::milliseconds PartialPBCTOperator::millisecondsFromTimestamp(bool setNewTimestamp)
 {
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - timestamp);
@@ -415,7 +427,7 @@ std::chrono::milliseconds BasePBCTOperator::millisecondsFromTimestamp(bool setNe
 }
 
 std::string
-BasePBCTOperator::printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+PartialPBCTOperator::printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
 {
     if(finishCommandQueue)
     {
@@ -425,7 +437,7 @@ BasePBCTOperator::printTime(std::string msg, bool finishCommandQueue, bool setNe
     return io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
 }
 
-void BasePBCTOperator::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+void PartialPBCTOperator::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
 {
     if(finishCommandQueue)
     {
@@ -438,32 +450,36 @@ void BasePBCTOperator::reportTime(std::string msg, bool finishCommandQueue, bool
     }
 }
 
-void BasePBCTOperator::setVerbose(bool verbose, std::string intermediatePrefix)
+void PartialPBCTOperator::setVerbose(bool verbose, std::string intermediatePrefix)
 {
     this->verbose = verbose;
     this->intermediatePrefix = intermediatePrefix;
 }
 
-double BasePBCTOperator::adjointProductTest(float* x, float* b)
+double PartialPBCTOperator::adjointProductTest(float* x, float* b)
 {
-    std::shared_ptr<cl::Buffer> x_buf, xa_buf; // X buffers
-    allocateXBuffers(2);
-    x_buf = getXBuffer(0);
-    arrayIntoBuffer(x, *x_buf, XDIM);
-    xa_buf = getXBuffer(1);
-    allocateBBuffers(2);
-    std::shared_ptr<cl::Buffer> b_buf, ba_buf; // B buffers
-    b_buf = getBBuffer(0);
-    arrayIntoBuffer(b, *b_buf, BDIM);
-    ba_buf = getBBuffer(1);
-    project(*x_buf, *ba_buf);
-    backproject(*b_buf, *xa_buf);
-    double bdotAx = scalarProductBBuffer_barrier_double(*b_buf, *ba_buf);
-    double ATbdotx = scalarProductXBuffer_barrier_double(*x_buf, *xa_buf);
-    return (bdotAx / ATbdotx);
+    /*
+        std::shared_ptr<cl::Buffer> x_buf, xa_buf; // X buffers
+        allocateXBuffers(2);
+        x_buf = getXBuffer(0);
+        arrayIntoBuffer(x, *x_buf, XDIM);
+        xa_buf = getXBuffer(1);
+        allocateBBuffers(2);
+        std::shared_ptr<cl::Buffer> b_buf, ba_buf; // B buffers
+        b_buf = getBBuffer(0);
+        arrayIntoBuffer(b, *b_buf, BDIM);
+        ba_buf = getBBuffer(1);
+        project(*x_buf, *ba_buf);
+        backproject(*b_buf, *xa_buf);
+        double bdotAx = scalarProductBBuffer_barrier_double(*b_buf, *ba_buf);
+        double ATbdotx = scalarProductXBuffer_barrier_double(*x_buf, *xa_buf);
+        return (bdotAx / ATbdotx);
+    */
+    LOGE << "Unimplemented";
+    return 0;
 }
 
-cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
+cl::NDRange PartialPBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
 {
     cl::NDRange projectorLocalNDRange;
     if(barrierCalls)
@@ -489,7 +505,7 @@ cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
     return projectorLocalNDRange;
 }
 
-cl::NDRange BasePBCTOperator::guessBackprojectorLocalNDRange()
+cl::NDRange PartialPBCTOperator::guessBackprojectorLocalNDRange()
 {
     cl::NDRange backprojectorLocalNDRange;
     if(vdimx % 4 == 0 && vdimy % 16 == 0 && workGroupSize >= 64)

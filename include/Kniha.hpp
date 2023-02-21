@@ -72,6 +72,8 @@ public:
 
     static std::string infoString(cl_int cl_info_id);
 
+    std::vector<std::shared_ptr<cl::CommandQueue>> getCommandQueues() { return Q; }
+
 protected:
     const cl_float FLOATZERO = 0.0f;
     const cl_double DOUBLEZERO = 0.0;

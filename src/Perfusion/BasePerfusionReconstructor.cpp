@@ -157,7 +157,7 @@ int BasePerfusionReconstructor::problemSetup(std::vector<float*> projections,
 
         // Test positions of corners relative to source
     }
-    initializeAlgorithmsBuffers(); // Partial algorithms
+    initReductionBuffers(); // Partial algorithms
     return initializeVectors(projections, basisVectorValues, volumes, volumeContainsX0);
 }
 

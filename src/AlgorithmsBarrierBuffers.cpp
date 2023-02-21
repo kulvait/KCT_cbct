@@ -1,7 +1,6 @@
 #include "AlgorithmsBarrierBuffers.hpp"
 
 namespace KCT {
-
 /**
  * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
  *
@@ -402,12 +401,116 @@ int AlgorithmsBarrierBuffers::bufferIntoArray(cl::Buffer cl_buffer, float* c_arr
     return 0;
 }
 
-int AlgorithmsBarrierBuffers::initializeAlgorithmsBuffers()
+void AlgorithmsBarrierBuffers::initReductionParameters(uint32_t pdimx,
+                                                       uint32_t pdimy,
+                                                       uint32_t pdimz,
+                                                       uint32_t vdimx,
+                                                       uint32_t vdimy,
+                                                       uint32_t vdimz,
+                                                       uint32_t workGroupSize)
+
+{
+    this->pdimx = pdimx;
+    this->pdimy = pdimy;
+    this->pdimz = pdimz;
+    this->vdimx = vdimx;
+    this->vdimy = vdimy;
+    this->vdimz = vdimz;
+    this->workGroupSize = workGroupSize;
+    const uint32_t UINT32_MAXXX = ((uint32_t)-1);
+    const uint64_t xdim = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
+    const uint64_t bdim = uint64_t(pdimx) * uint64_t(pdimy) * uint64_t(pdimz);
+    const uint64_t xframesize = uint64_t(vdimx) * uint64_t(vdimy);
+    const uint64_t bframesize = uint64_t(pdimx) * uint64_t(pdimy);
+    const uint64_t xdim_aligned = xdim + (workGroupSize - xdim % workGroupSize) % workGroupSize;
+    const uint64_t bdim_aligned = bdim + (workGroupSize - bdim % workGroupSize) % workGroupSize;
+    XDIM = xdim;
+    XDIM_ALIGNED = xdim_aligned;
+    XDIM_REDUCED1 = xdim_aligned / workGroupSize; // It is divisible by design
+    XDIM_REDUCED1_ALIGNED = XDIM_REDUCED1
+        + (workGroupSize - XDIM_REDUCED1 % workGroupSize)
+            % workGroupSize; // It shall be XDIM_REDUCED1 == XDIM_REDUCED1_ALIGNED
+    XDIM_REDUCED2 = XDIM_REDUCED1_ALIGNED / workGroupSize;
+    XDIM_REDUCED2_ALIGNED
+        = XDIM_REDUCED2 + (workGroupSize - XDIM_REDUCED2 % workGroupSize) % workGroupSize;
+    BDIM = bdim;
+    BDIM_ALIGNED = bdim_aligned;
+    BDIM_REDUCED1 = bdim_aligned / workGroupSize;
+    BDIM_REDUCED1_ALIGNED
+        = BDIM_REDUCED1 + (workGroupSize - BDIM_REDUCED1 % workGroupSize) % workGroupSize;
+    BDIM_REDUCED2 = BDIM_REDUCED1_ALIGNED / workGroupSize;
+    BDIM_REDUCED2_ALIGNED
+        = BDIM_REDUCED2 + (workGroupSize - BDIM_REDUCED2 % workGroupSize) % workGroupSize;
+    std::string err;
+    if(xframesize > UINT32_MAXXX)
+    {
+        err = io::xprintf(
+            "Algorithms are based on the assumption that the x y volume slice can be "
+            "indexed by uint32_t but xframesize=%lu that is bigger than UINT32_MAXXX=%lu",
+            xframesize, UINT32_MAXXX);
+        KCTERR(err);
+    }
+    if(bframesize > UINT32_MAXXX)
+    {
+        err = io ::xprintf(
+            "Algorithms are based on the assumption that the projection size can be "
+            "indexed by uint32_t but bframesize=%lu that is bigger than UINT32_MAXXX=%lu",
+            bframesize, UINT32_MAXXX);
+        KCTERR(err);
+    }
+    if(XDIM_REDUCED2 > UINT32_MAXXX)
+    {
+        err = io::xprintf(
+            "Barrier algorithms are based on the assumption that XDIM_REDUCED2=%lu fits into "
+            "UINT32_MAXXX=%u. In the last step they call algFLOATvector_SumPartial.",
+            XDIM_REDUCED2, UINT32_MAXXX);
+        KCTERR(err);
+    }
+    if(BDIM_REDUCED2 > UINT32_MAXXX)
+    {
+        err = io::xprintf("BDIM_REDUCED2_ALIGNED * 8=%lu is bigger than UINT32_MAXXX=%u",
+                          BDIM_REDUCED2_ALIGNED, UINT32_MAXXX);
+        KCTERR(err);
+    }
+    if(xdim_aligned > UINT32_MAXXX)
+    {
+        err = io::xprintf(
+            "Size of the volume buffer xdim_aligned=%lu is bigger than UINT32_MAXXX=%u",
+            xdim_aligned, UINT32_MAXXX);
+        LOGW << err;
+    } else if(xdim_aligned * 4 > UINT32_MAXXX)
+    {
+        err = io::xprintf(
+            "Byte size of the volume buffer xdim_aligned=%lu is bigger than UINT32_MAXXX=%u",
+            4 * xdim_aligned, UINT32_MAXXX);
+        LOGW << err;
+    }
+    if(bdim_aligned > UINT32_MAXXX)
+    {
+        err = io::xprintf(
+            "Size of the projection buffer bdim_aligned=%lu is bigger than UINT32_MAXXX=%u",
+            bdim_aligned, UINT32_MAXXX);
+        LOGW << err;
+    } else if(bdim_aligned * 4 > UINT32_MAXXX)
+    {
+        err = io::xprintf("Byte size of the projection buffer bdim_aligned=%lu is bigger than "
+                          "UINT32_MAXXX=%u",
+                          4 * bdim_aligned, UINT32_MAXXX);
+        LOGW << err;
+    }
+    reductionParametersSet = true;
+}
+
+int AlgorithmsBarrierBuffers::initReductionBuffers()
 {
     cl_int err;
+    if(!reductionParametersSet)
+    {
+        KCTERR("First call initReductionParameters.");
+    }
     if(algorithmsBuffersInitialized)
     {
-        throw std::runtime_error("Buffers already initialized!");
+        KCTERR("Buffers already initialized, call updateReductionParameters instead.");
     }
     if(XDIM > BDIM)
     {
@@ -427,6 +530,8 @@ int AlgorithmsBarrierBuffers::initializeAlgorithmsBuffers()
         }
         tmp_b_red1 = tmp_x_red1;
         tmp_b_red2 = tmp_x_red2;
+        tmp_red1_bytesize = sizeof(double) * XDIM_REDUCED1;
+        tmp_red2_bytesize = sizeof(double) * XDIM_REDUCED2;
     } else
     {
 
@@ -446,8 +551,93 @@ int AlgorithmsBarrierBuffers::initializeAlgorithmsBuffers()
         }
         tmp_x_red1 = tmp_b_red1;
         tmp_x_red2 = tmp_b_red2;
+        tmp_red1_bytesize = sizeof(double) * BDIM_REDUCED1;
+        tmp_red2_bytesize = sizeof(double) * BDIM_REDUCED2;
     }
     algorithmsBuffersInitialized = true;
+    return 0;
+}
+
+int AlgorithmsBarrierBuffers::updateReductionParameters(uint32_t pdimx,
+                                                        uint32_t pdimy,
+                                                        uint32_t pdimz,
+                                                        uint32_t vdimx,
+                                                        uint32_t vdimy,
+                                                        uint32_t vdimz,
+                                                        uint32_t workGroupSize)
+
+{
+    cl_int err;
+    if(pdimx == this->pdimx && pdimy == this->pdimy && pdimz == this->pdimz && vdimx == this->vdimx
+       && this->vdimy == vdimy && this->vdimz == vdimz && this->workGroupSize == workGroupSize)
+    {
+        return 0;
+    }
+    initReductionParameters(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize);
+    if(!algorithmsBuffersInitialized)
+    {
+        initReductionBuffers();
+    } else
+    {
+        if(XDIM > BDIM)
+        {
+            if(sizeof(double) * XDIM_REDUCED1 > tmp_red1_bytesize)
+            {
+                tmp_x_red1 = std::make_shared<cl::Buffer>(
+                    *context, CL_MEM_READ_WRITE, sizeof(double) * XDIM_REDUCED1, nullptr, &err);
+                if(err != CL_SUCCESS)
+                {
+                    LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!",
+                                        err);
+                    return -1;
+                }
+                tmp_b_red1 = tmp_x_red1;
+                tmp_red1_bytesize = sizeof(double) * XDIM_REDUCED1;
+            }
+            if(sizeof(double) * XDIM_REDUCED2 > tmp_red2_bytesize)
+            {
+                tmp_x_red2 = std::make_shared<cl::Buffer>(
+                    *context, CL_MEM_READ_WRITE, sizeof(double) * XDIM_REDUCED2, nullptr, &err);
+                if(err != CL_SUCCESS)
+                {
+                    LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!",
+                                        err);
+                    return -1;
+                }
+                tmp_b_red2 = tmp_x_red2;
+                tmp_red2_bytesize = sizeof(double) * XDIM_REDUCED2;
+            }
+        } else
+        {
+            if(sizeof(double) * BDIM_REDUCED1 > tmp_red1_bytesize)
+            {
+
+                tmp_b_red1 = std::make_shared<cl::Buffer>(
+                    *context, CL_MEM_READ_WRITE, sizeof(double) * BDIM_REDUCED1, nullptr, &err);
+                if(err != CL_SUCCESS)
+                {
+                    LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!",
+                                        err);
+                    return -1;
+                }
+                tmp_x_red1 = tmp_b_red1;
+                tmp_red1_bytesize = sizeof(double) * BDIM_REDUCED1;
+            }
+            if(sizeof(double) * BDIM_REDUCED2 > tmp_red2_bytesize)
+            {
+                tmp_b_red2 = std::make_shared<cl::Buffer>(
+                    *context, CL_MEM_READ_WRITE, sizeof(double) * BDIM_REDUCED2, nullptr, &err);
+                if(err != CL_SUCCESS)
+                {
+                    LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!",
+                                        err);
+                    return -1;
+                }
+                tmp_x_red2 = tmp_b_red2;
+                tmp_red2_bytesize = sizeof(double) * BDIM_REDUCED2;
+            }
+        }
+    }
     return 0;
 }
 
