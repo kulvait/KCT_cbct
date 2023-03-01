@@ -255,7 +255,7 @@ void CGLSReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
             algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *discrepancy_bbuf_xpart_Laplace, vdims,
-                                            convolutionKernel, globalRange, localRange);
+                                                        convolutionKernel, globalRange, localRange);
         }
         algFLOATvector_scale(*discrepancy_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
@@ -318,8 +318,8 @@ void CGLSReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
             algFLOATvector_2Dconvolution3x3ZeroBoundary(*discrepancy_bbuf_xpart_Laplace,
-                                            *residualVector_xbuf_Laplaceadd, vdims,
-                                            convolutionKernel, globalRange, localRange);
+                                                        *residualVector_xbuf_Laplaceadd, vdims,
+                                                        convolutionKernel, globalRange, localRange);
         }
         algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_Laplaceadd,
                                           effectSizeLaplace, XDIM);
@@ -828,11 +828,11 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         return -1;
     }
     Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0,
-                                      uint32_t(pdimx) * pdimy * sizeof(float));
+                                      uint64_t(pdimx) * pdimy * sizeof(float));
     Q[0]->enqueueFillBuffer<cl_float>(*w_proj, FLOATZERO, 0,
-                                      uint32_t(pdimx) * pdimy * sizeof(float));
+                                      uint64_t(pdimx) * pdimy * sizeof(float));
     Q[0]->enqueueFillBuffer<cl_float>(*x_proj, FLOATZERO, 0,
-                                      uint32_t(pdimx) * pdimy * sizeof(float));
+                                      uint64_t(pdimx) * pdimy * sizeof(float));
     // Experimental
     LOGI << io::xprintf("Initial norm of b is %f and initial |Ax-b| is %f.", NB0, norm);
     // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
@@ -858,8 +858,9 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     // EXPERIMENTAL
     double sum;
     uint32_t framesize = pdimx * pdimy;
-    cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
-    (*vector_NormSquarePartial)(eargs1, *v_proj, *tmp_x_red1, framesize).wait();
+    uint32_t partialFrameSize = framesize;
+    uint32_t partialFrameCount = 1;
+    algvector_NormSquarePartial(*v_proj, *tmp_x_red1, partialFrameSize, partialFrameCount);
     Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
     vnorm2_old += sum;
     // EXPERIMENTAL
@@ -925,8 +926,7 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         }
         vnorm2_now = normXBuffer_barrier_double(*v_buf);
         // EXPERIMENTAL
-        cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
-        (*vector_NormSquarePartial)(eargs1, *v_proj, *tmp_x_red1, framesize).wait();
+        algvector_NormSquarePartial(*v_proj, *tmp_x_red1, partialFrameSize, partialFrameCount);
         Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
         vnorm2_now += sum;
         // EXPERIMENTAL

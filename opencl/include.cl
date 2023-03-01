@@ -7,6 +7,12 @@
 #endif
 #endif
 
+#ifdef LONGIND
+typedef uint UINT;
+#else
+typedef ulong UINT;
+#endif
+
 // Atomic operations
 /** Atomic float addition.
  *

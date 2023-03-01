@@ -26,6 +26,7 @@
 #include "PROG/ArgumentsFramespec.hpp"
 #include "PROG/Program.hpp"
 #include "ParallelBeamProjector.hpp"
+#include "PartialParallelBeamProjector.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
 using namespace KCT;
@@ -68,15 +69,14 @@ public:
             = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
         if(totalVolumeSize > INT_MAX)
         {
-            LOGE << "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
-            return -1;
+            LOGW << io::xprintf("Volume size %lu is bigger than INT_MAX=%lu.", totalVolumeSize,
+                                INT_MAX);
         }
         // End parsing arguments
         if(totalProjectionSize > INT_MAX)
         {
-            LOGE << "Implement indexing by uint64_t matrix dimension overflow of projection "
-                    "pixels count.";
-            return -1;
+            LOGW << io::xprintf("Total projection size %lu is bigger than INT_MAX=%lu.",
+                                totalProjectionSize, INT_MAX);
         }
         io::DenSupportedType t = inf.getElementType();
         if(t != io::DenSupportedType::FLOAT32)
@@ -96,6 +96,8 @@ public:
     // Here (0,0,0) is in the center of the volume
     uint64_t totalVolumeSize;
     uint64_t totalProjectionSize;
+    int64_t partialProjectorBytesize
+        = -1; // Negative means do not use partial projector implementation
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
     std::string inputVolume;
@@ -132,6 +134,13 @@ void Args::defineArguments()
              "file is supplied, orthogonality of incomming rays to the detector is assumed, that "
              "effectivelly means all these parameters are 1.0.";
     cliApp->add_option("--detectorTilt", inputDetectorTilts, optstr);
+    optstr = io::xprintf(
+        "If this parameter is negative, partial projection implementation will not be used, "
+        "if it is zero, partial projection implementation with default bytesize of the arrays "
+        "will be used, if it is positive, the parameter is interpretted as a maximal size of "
+        "the memory block on the host device [defaults to %d].",
+        partialProjectorBytesize);
+    cliApp->add_option("--partial-projection-bytesize", partialProjectorBytesize, optstr);
     addForceArgs();
     addFramespecArgs();
     addCuttingVoxelProjectorArgs(true);
@@ -194,59 +203,130 @@ int main(int argc, char* argv[])
                       ARG.backprojectorLocalNDRange[2]);
 
     // Construct projector and initialize OpenCL
-    ParallelBeamProjector PBCVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ,
-                                ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
-                                ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
-                                backprojectorLocalNDRange);
-    // PBCVP.initializeAllAlgorithms();
-    if(ARG.useSidonProjector)
+    if(ARG.partialProjectorBytesize < 0)
     {
-        PBCVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
-    } else if(ARG.useTTProjector)
-    {
+        ParallelBeamProjector PBCVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ,
+                                    ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
+                                    ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
+                                    backprojectorLocalNDRange);
+        // PBCVP.initializeAllAlgorithms();
+        if(ARG.useSidonProjector)
+        {
+            PBCVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        } else if(ARG.useTTProjector)
+        {
 
-        PBCVP.initializeTTProjector();
+            PBCVP.initializeTTProjector();
+        } else
+        {
+            PBCVP.initializeCVPProjector(ARG.useBarrierCalls, ARG.barrierArraySize);
+        }
+        int ecd = PBCVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
+        if(ecd < 0)
+        {
+            std::string ERR
+                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+            KCTERR(ERR);
+        }
+        PBCVP.problemSetup(geometryVector, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
+                           ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
+        float* volume = new float[ARG.totalVolumeSize];
+        float* projection = new float[ARG.totalProjectionSize];
+        float* projection_rhs = nullptr;
+        io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
+        bool readxmajor = true;
+        inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
+        if(!ARG.rightHandSide.empty())
+        {
+            LOGD << io::xprintf(
+                io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
+            projection_rhs = new float[ARG.totalProjectionSize];
+            io::DenFileInfo rhsInfo(ARG.rightHandSide);
+            readxmajor = false; // Projections are y-major
+            rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
+            PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
+        } else
+        {
+            PBCVP.project(volume, projection);
+        }
+        bool projectionxmajor = false;
+        bool writexmajor = true;
+        io::DenFileInfo::create3DDenFileFromArray(
+            projection, projectionxmajor, ARG.outputProjection, io::DenSupportedType::FLOAT32,
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, writexmajor);
+        delete[] volume;
+        delete[] projection;
+        if(projection_rhs != nullptr)
+        {
+            delete[] projection_rhs;
+        }
     } else
     {
-        PBCVP.initializeCVPProjector(ARG.useBarrierCalls, ARG.barrierArraySize);
-    }
-    int ecd = PBCVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
-                                     xpath, ARG.CLdebug, ARG.CLrelaxed);
-    if(ecd < 0)
-    {
-        std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-        KCTERR(ERR);
-    }
-    PBCVP.problemSetup(geometryVector, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-                       ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
-    float* volume = new float[ARG.totalVolumeSize];
-    float* projection = new float[ARG.totalProjectionSize];
-    float* projection_rhs = nullptr;
-    io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
-    bool readxmajor = true;
-    inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
-    if(!ARG.rightHandSide.empty())
-    {
-        LOGD << io::xprintf(io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
-        projection_rhs = new float[ARG.totalProjectionSize];
-        io::DenFileInfo rhsInfo(ARG.rightHandSide);
-        readxmajor = false; // Projections are y-major
-        rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
-        PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
-    } else
-    {
-        PBCVP.project(volume, projection);
-    }
-    bool projectionxmajor = false;
-    bool writexmajor = true;
-    io::DenFileInfo::create3DDenFileFromArray(
-        projection, projectionxmajor, ARG.outputProjection, io::DenSupportedType::FLOAT32,
-        ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, writexmajor);
-    delete[] volume;
-    delete[] projection;
-    if(projection_rhs != nullptr)
-    {
-        delete[] projection_rhs;
+        PartialParallelBeamProjector PBCVP(
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
+            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, ARG.partialProjectorBytesize,
+            projectorLocalNDRange, backprojectorLocalNDRange);
+        // PBCVP.initializeAllAlgorithms();
+        if(ARG.useSidonProjector)
+        {
+            PBCVP.getCTOperator()->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        } else if(ARG.useTTProjector)
+        {
+
+            PBCVP.getCTOperator()->initializeTTProjector();
+        } else
+        {
+            PBCVP.getCTOperator()->initializeCVPProjector(ARG.useBarrierCalls,
+                                                          ARG.barrierArraySize);
+        }
+        int ecd = PBCVP.getCTOperator()->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                                          ARG.CLdeviceIDs.size(), xpath,
+                                                          ARG.CLdebug, ARG.CLrelaxed);
+        if(ecd < 0)
+        {
+            std::string ERR
+                = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+            KCTERR(ERR);
+        }
+        PBCVP.getCTOperator()->problemSetup(geometryVector, ARG.voxelSizeX, ARG.voxelSizeY,
+                                            ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
+                                            ARG.volumeCenterZ);
+        float* volume = new float[ARG.totalVolumeSize];
+        float* projection = new float[ARG.totalProjectionSize];
+        float* projection_rhs = nullptr;
+        LOGI << io::xprintf("Partial projector partialProjectorBytesize=%ld, allocated arrays with "
+                            "totalVolumeSize=%lu totalProjectionSize=%lu",
+                            ARG.partialProjectorBytesize, ARG.totalVolumeSize,
+                            ARG.totalProjectionSize);
+        io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
+        bool readxmajor = true;
+        LOGI << io::xprintf("Reading input volume into array of the size %lu", ARG.totalVolumeSize);
+        inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
+        if(!ARG.rightHandSide.empty())
+        {
+            LOGD << io::xprintf(
+                io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
+            projection_rhs = new float[ARG.totalProjectionSize];
+            io::DenFileInfo rhsInfo(ARG.rightHandSide);
+            readxmajor = false; // Projections are y-major
+            rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
+            PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
+        } else
+        {
+            PBCVP.project_partial(volume, projection);
+        }
+        bool projectionxmajor = false;
+        bool writexmajor = true;
+        io::DenFileInfo::create3DDenFileFromArray(
+            projection, projectionxmajor, ARG.outputProjection, io::DenSupportedType::FLOAT32,
+            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, writexmajor);
+        delete[] volume;
+        delete[] projection;
+        if(projection_rhs != nullptr)
+        {
+            delete[] projection_rhs;
+        }
     }
     PRG.endLog(true);
 }

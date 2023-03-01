@@ -312,7 +312,7 @@ target_compile_definitions(kct-pb-krylov PUBLIC CL_TARGET_OPENCL_VERSION=120)
 target_git_version_init(kct-pb-krylov)
 install (TARGETS kct-pb-krylov RUNTIME DESTINATION .)
 
-SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp)
+SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp src/alg/PartialParallelBeamProjector.cpp src/PartialPBCTOperator.cpp)
 add_executable(kct-pb-projector ${CLLINCGLS_SOURCES})
 set_target_properties(
     kct-pb-projector
@@ -324,7 +324,7 @@ target_link_libraries(kct-pb-projector ctiol)
 target_link_libraries(kct-pb-projector ctmal)
 target_link_libraries(kct-pb-projector OpenCL::OpenCL)
 target_link_libraries(kct-pb-projector CTIOL_OPENCL)
-#target_link_libraries (kct-pb-projector ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (kct-pb-projector ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(kct-pb-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_compile_definitions(kct-pb-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
 target_compile_definitions(kct-pb-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)

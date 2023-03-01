@@ -72,6 +72,8 @@ public:
 
     static std::string infoString(cl_int cl_info_id);
 
+    std::vector<std::shared_ptr<cl::CommandQueue>> getCommandQueues() { return Q; }
+
 protected:
     const cl_float FLOATZERO = 0.0f;
     const cl_double DOUBLEZERO = 0.0;
@@ -129,7 +131,8 @@ protected:
                                                 float globalScalingMultiplier,
                                                 cl::NDRange globalRange,
                                                 cl::NDRange localRange = cl::NullRange,
-                                                bool blocking = false);
+                                                bool blocking = false,
+                                                uint32_t QID = 0);
 
     // backprojector_sidon.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
@@ -258,7 +261,8 @@ protected:
                                               unsigned int LOCALARRAYSIZE,
                                               cl::NDRange globalRange,
                                               cl::NDRange localRange = cl::NullRange,
-                                              bool blocking = false);
+                                              bool blocking = false,
+                                              uint32_t QID = 0);
 
     // projector_old.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
@@ -320,157 +324,237 @@ protected:
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         FLOATvector_NormSquarePartial;
+    int algFLOATvector_NormSquarePartial(cl::Buffer& V,
+                                         cl::Buffer& PARTIAL_OUT,
+                                         unsigned int partialFrameSize,
+                                         uint32_t partialFrameCount,
+                                         bool blocking = false,
+                                         uint32_t QID = 0);
+
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         FLOATvector_SumPartial;
+    int algFLOATvector_SumPartial(cl::Buffer& V,
+                                  cl::Buffer& PARTIAL_OUT,
+                                  unsigned int partialFrameSize,
+                                  uint32_t partialFrameCount,
+                                  bool blocking = false,
+                                  uint32_t QID = 0);
+
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         FLOATvector_MaxPartial;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+    int algFLOATvector_MaxPartial(cl::Buffer& V,
+                                  cl::Buffer& PARTIAL_OUT,
+                                  unsigned int partialFrameSize,
+                                  uint32_t partialFrameCount,
+                                  bool blocking = false,
+                                  uint32_t QID = 0);
+
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         FLOATvector_NormSquarePartial_barrier;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         FLOATvector_SumPartial_barrier;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         FLOATvector_MaxPartial_barrier;
+
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         vector_NormSquarePartial;
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> vector_SumPartial;
+    int algvector_NormSquarePartial(cl::Buffer& V,
+                                    cl::Buffer& SQUARE_OUT,
+                                    unsigned int partialFrameSize,
+                                    uint32_t partialFrameCount,
+                                    bool blocking = false,
+                                    uint32_t QID = 0);
 
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>> vector_SumPartial;
+    int algvector_SumPartial(cl::Buffer& V,
+                             cl::Buffer& SUM_OUT,
+                             unsigned int partialFrameSize,
+                             uint32_t partialFrameCount,
+                             bool blocking = false,
+                             uint32_t QID = 0);
+
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         vector_NormSquarePartial_barrier;
     int algvector_NormSquarePartial_barrier(cl::Buffer& V,
                                             cl::Buffer& V_red,
-                                            unsigned int& VDIM,
-                                            unsigned int& VDIM_ALIGNED,
+                                            unsigned long& VDIM,
+                                            unsigned long& VDIM_ALIGNED,
                                             uint32_t workGroupSize,
-                                            bool blocking = false);
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+                                            bool blocking = false,
+                                            uint32_t QID = 0);
+
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         vector_SumPartial_barrier;
     int algvector_SumPartial_barrier(cl::Buffer& V,
                                      cl::Buffer& V_red,
-                                     unsigned int& VDIM,
-                                     unsigned int& VDIM_ALIGNED,
+                                     unsigned long& VDIM,
+                                     unsigned long& VDIM_ALIGNED,
                                      uint32_t workGroupSize,
-                                     bool blocking = false);
+                                     bool blocking = false,
+                                     uint32_t QID = 0);
     std::shared_ptr<
-        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned int&>>
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         vector_ScalarProductPartial_barrier;
     // FLOATvector_zero
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_zero;
-    int algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking = false);
+    int algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);
     // FLOATvector_zero_infinite_values
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_zero_infinite_values;
-    int algFLOATvector_zero_infinite_values(cl::Buffer& A, uint64_t size, bool blocking = false);
+    int algFLOATvector_zero_infinite_values(cl::Buffer& A,
+                                            uint64_t size,
+                                            bool blocking = false,
+                                            uint32_t QID = 0);
     // FLOATvector_scale
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOATvector_scale;
-    int algFLOATvector_scale(cl::Buffer& A, float c, uint64_t size, bool blocking = false);
+    int algFLOATvector_scale(
+        cl::Buffer& A, float c, uint64_t size, bool blocking = false, uint32_t QID = 0);
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_sqrt;
     // FLOATvector_invert
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_invert;
-    int algFLOATvector_invert(cl::Buffer& X, uint64_t size, bool blocking = false);
+    int
+    algFLOATvector_invert(cl::Buffer& X, uint64_t size, bool blocking = false, uint32_t QID = 0);
     // FLOATvector_invert_except_zero
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_invert_except_zero;
-    int algFLOATvector_invert_except_zero(cl::Buffer& A, uint64_t size, bool blocking = false);
+    int algFLOATvector_invert_except_zero(cl::Buffer& A,
+                                          uint64_t size,
+                                          bool blocking = false,
+                                          uint32_t QID = 0);
     // FLOATvector_substitute_greater_than
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&, float&>>
         FLOATvector_substitute_greater_than;
-    int algFLOATvector_substitute_greater_than(
-        cl::Buffer& A, float maxValue, float substitution, uint64_t size, bool blocking = false);
+    int algFLOATvector_substitute_greater_than(cl::Buffer& A,
+                                               float maxValue,
+                                               float substitution,
+                                               uint64_t size,
+                                               bool blocking = false,
+                                               uint32_t QID = 0);
     // FLOATvector_substitute_lower_than
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&, float&>> FLOATvector_substitute_lower_than;
-    int algFLOATvector_substitute_lower_than(
-        cl::Buffer& A, float minValue, float substitution, uint64_t size, bool blocking = false);
+    int algFLOATvector_substitute_lower_than(cl::Buffer& A,
+                                             float minValue,
+                                             float substitution,
+                                             uint64_t size,
+                                             bool blocking = false,
+                                             uint32_t QID = 0);
     // FLOATvector_copy
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOATvector_copy;
-    int algFLOATvector_copy(cl::Buffer& A, cl::Buffer& B, uint64_t size, bool blocking = false);
+    int algFLOATvector_copy(
+        cl::Buffer& A, cl::Buffer& B, uint64_t size, bool blocking = false, uint32_t QID = 0);
     // FLOATvector_copy_offset
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned long&>>
         FLOATvector_copy_offset;
-    int algFLOATvector_copy_offset(
-        cl::Buffer& A, cl::Buffer& B, unsigned int offset, uint64_t size, bool blocking = false);
+    int algFLOATvector_copy_offset(cl::Buffer& A,
+                                   cl::Buffer& B,
+                                   unsigned long offset,
+                                   uint64_t size,
+                                   bool blocking = false,
+                                   uint32_t QID = 0);
     // FLOATvector_copy_offsets
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned int&, cl::Buffer&, unsigned int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned long&, cl::Buffer&, unsigned long&>>
         FLOATvector_copy_offsets;
     int algFLOATvector_copy_offsets(cl::Buffer& A,
-                                    unsigned int oA,
+                                    uint64_t oA,
                                     cl::Buffer& B,
-                                    unsigned int oB,
+                                    uint64_t oB,
                                     uint64_t size,
-                                    bool blocking = false);
+                                    bool blocking = false,
+                                    uint32_t QID = 0);
     // FLOATvector_A_equals_cB
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>> FLOATvector_A_equals_cB;
-    int algFLOATvector_A_equals_cB(
-        cl::Buffer& A, cl::Buffer& B, float c, uint64_t size, bool blocking = false);
+    int algFLOATvector_A_equals_cB(cl::Buffer& A,
+                                   cl::Buffer& B,
+                                   float c,
+                                   uint64_t size,
+                                   bool blocking = false,
+                                   uint32_t QID = 0);
     // FLOATvector_A_equals_A_plus_cB
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOATvector_A_equals_A_plus_cB;
-    int algFLOATvector_A_equals_A_plus_cB(
-        cl::Buffer& A, cl::Buffer& B, float c, uint64_t size, bool blocking = false);
+    int algFLOATvector_A_equals_A_plus_cB(cl::Buffer& A,
+                                          cl::Buffer& B,
+                                          float c,
+                                          uint64_t size,
+                                          bool blocking = false,
+                                          uint32_t QID = 0);
     // FLOATvector_A_equals_Ac_plus_B
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
         FLOATvector_A_equals_Ac_plus_B;
-    int algFLOATvector_A_equals_Ac_plus_B(
-        cl::Buffer& A, cl::Buffer& B, float c, uint64_t size, bool blocking = false);
+    int algFLOATvector_A_equals_Ac_plus_B(cl::Buffer& A,
+                                          cl::Buffer& B,
+                                          float c,
+                                          uint64_t size,
+                                          bool blocking = false,
+                                          uint32_t QID = 0);
     // FLOATvector_A_equals_A_times_B
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOATvector_A_equals_A_times_B;
 
-    int algFLOATvector_A_equals_A_times_B(cl::Buffer& A,
-                                          cl::Buffer& B,
-                                          uint64_t size,
-                                          bool blocking = false);
+    int algFLOATvector_A_equals_A_times_B(
+        cl::Buffer& A, cl::Buffer& B, uint64_t size, bool blocking = false, uint32_t QID = 0);
     // FLOATvector_C_equals_A_times_B
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&>>
         FLOATvector_C_equals_A_times_B;
-    int algFLOATvector_C_equals_A_times_B(
-        cl::Buffer& A, cl::Buffer& B, cl::Buffer& C, uint64_t size, bool blocking = false);
+    int algFLOATvector_C_equals_A_times_B(cl::Buffer& A,
+                                          cl::Buffer& B,
+                                          cl::Buffer& C,
+                                          uint64_t size,
+                                          bool blocking = false,
+                                          uint32_t QID = 0);
     // FLOATvector_A_equals_A_plus_cB_offset
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, unsigned long&>>
         FLOATvector_A_equals_A_plus_cB_offset;
     int algFLOATvector_A_equals_A_plus_cB_offset(cl::Buffer& A,
                                                  cl::Buffer& B,
                                                  float c,
-                                                 unsigned int offset,
+                                                 unsigned long offset,
                                                  uint64_t size,
-                                                 bool blocking = false);
+                                                 bool blocking = false,
+                                                 uint32_t QID = 0);
 
     // FLOATvector_B_equals_A_plus_B_offsets
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned int&, cl::Buffer&, unsigned int&>>
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned long&, cl::Buffer&, unsigned long&>>
         FLOATvector_B_equals_A_plus_B_offsets;
     int algFLOATvector_B_equals_A_plus_B_offsets(cl::Buffer& from,
-                                                 unsigned int from_offset,
+                                                 unsigned long from_offset,
                                                  cl::Buffer& to,
-                                                 unsigned int to_offset,
+                                                 unsigned long to_offset,
                                                  uint64_t size,
-                                                 bool blocking = false);
+                                                 bool blocking = false,
+                                                 uint32_t QID = 0);
     // FLOATvector_A_equals_A_plus_cB_offsets
-    std::shared_ptr<cl::make_kernel<cl::Buffer&, unsigned int&, cl::Buffer&, unsigned int&, float&>>
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, unsigned long&, cl::Buffer&, unsigned long&, float&>>
         FLOATvector_A_equals_A_plus_cB_offsets;
     int algFLOATvector_A_equals_A_plus_cB_offsets(cl::Buffer& A,
-                                                  unsigned int oA,
+                                                  unsigned long oA,
                                                   cl::Buffer& B,
-                                                  unsigned int oB,
+                                                  unsigned long oB,
                                                   float c,
                                                   uint64_t size,
-                                                  bool blocking = false);
+                                                  bool blocking = false,
+                                                  uint32_t QID = 0);
     // convolution.cl
     // FLOATvector_2Dconvolution3x3
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float16&>>
         FLOATvector_2Dconvolution3x3ZeroBoundary;
     int algFLOATvector_2Dconvolution3x3ZeroBoundary(cl::Buffer& A,
-                                        cl::Buffer& B,
-                                        cl_int3& vdims,
-                                        cl_float16& convolutionKernel,
-                                        cl::NDRange globalRange,
-                                        cl::NDRange localRange = cl::NullRange,
-                                        bool blocking = false);
+                                                    cl::Buffer& B,
+                                                    cl_int3& vdims,
+                                                    cl_float16& convolutionKernel,
+                                                    cl::NDRange globalRange,
+                                                    cl::NDRange localRange = cl::NullRange,
+                                                    bool blocking = false,
+                                                    uint32_t QID = 0);
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float16&>>
         FLOATvector_2Dconvolution3x3ReflectionBoundary;
     int algFLOATvector_2Dconvolution3x3ReflectionBoundary(cl::Buffer& A,
-                                        cl::Buffer& B,
-                                        cl_int3& vdims,
-                                        cl_float16& convolutionKernel,
-                                        cl::NDRange globalRange,
-                                        cl::NDRange localRange = cl::NullRange,
-                                        bool blocking = false);
+                                                          cl::Buffer& B,
+                                                          cl_int3& vdims,
+                                                          cl_float16& convolutionKernel,
+                                                          cl::NDRange globalRange,
+                                                          cl::NDRange localRange = cl::NullRange,
+                                                          bool blocking = false,
+                                                          uint32_t QID = 0);
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionGradientSobelFeldmanReflectionBoundary;
@@ -483,7 +567,8 @@ protected:
                                                                            cl::NDRange globalRange,
                                                                            cl::NDRange localRange
                                                                            = cl::NullRange,
-                                                                           bool blocking = false);
+                                                                           bool blocking = false,
+                                                                           uint32_t QID = 0);
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary;
@@ -496,7 +581,8 @@ protected:
                                                                      cl::NDRange globalRange,
                                                                      cl::NDRange localRange
                                                                      = cl::NullRange,
-                                                                     bool blocking = false);
+                                                                     bool blocking = false,
+                                                                     uint32_t QID = 0);
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     cl::Buffer&,
@@ -514,7 +600,8 @@ protected:
                                                        int reflectionBoundary,
                                                        cl::NDRange globalRange,
                                                        cl::NDRange localRange = cl::NullRange,
-                                                       bool blocking = false);
+                                                       bool blocking = false,
+                                                       uint32_t QID = 0);
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&, int&>>
         FLOATvector_2DconvolutionGradientFarid5x5;
@@ -526,7 +613,8 @@ protected:
                                                      int reflectionBoundary,
                                                      cl::NDRange globalRange,
                                                      cl::NDRange localRange = cl::NullRange,
-                                                     bool blocking = false);
+                                                     bool blocking = false,
+                                                     uint32_t QID = 0);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_3DconvolutionLaplaceZeroBoundary;
     int algFLOATvector_3DconvolutionLaplaceZeroBoundary(cl::Buffer& A,
@@ -535,7 +623,8 @@ protected:
                                                         cl_float3& voxelSizes,
                                                         cl::NDRange globalRange,
                                                         cl::NDRange localRange = cl::NullRange,
-                                                        bool blocking = false);
+                                                        bool blocking = false,
+                                                        uint32_t QID = 0);
 
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
@@ -548,7 +637,8 @@ protected:
                                            cl_float3& voxelSizes,
                                            cl::NDRange globalRange,
                                            cl::NDRange localRange = cl::NullRange,
-                                           bool blocking = false);
+                                           bool blocking = false,
+                                           uint32_t QID = 0);
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_2DisotropicGradient;
@@ -559,7 +649,8 @@ protected:
                                            cl_float3& voxelSizes,
                                            cl::NDRange globalRange,
                                            cl::NDRange localRange = cl::NullRange,
-                                           bool blocking = false);
+                                           bool blocking = false,
+                                           uint32_t QID = 0);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_isotropicBackDx;
     int algFLOATvector_isotropicBackDx(cl::Buffer& F,
@@ -568,7 +659,8 @@ protected:
                                        cl_float3& voxelSizes,
                                        cl::NDRange globalRange,
                                        cl::NDRange localRange = cl::NullRange,
-                                       bool blocking = false);
+                                       bool blocking = false,
+                                       uint32_t QID = 0);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_isotropicBackDy;
     int algFLOATvector_isotropicBackDy(cl::Buffer& F,
@@ -577,7 +669,8 @@ protected:
                                        cl_float3& voxelSizes,
                                        cl::NDRange globalRange,
                                        cl::NDRange localRange = cl::NullRange,
-                                       bool blocking = false);
+                                       bool blocking = false,
+                                       uint32_t QID = 0);
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
         FLOATvector_isotropicBackDz;
     int algFLOATvector_isotropicBackDz(cl::Buffer& F,
@@ -586,7 +679,8 @@ protected:
                                        cl_float3& voxelSizes,
                                        cl::NDRange globalRange,
                                        cl::NDRange localRange = cl::NullRange,
-                                       bool blocking = false);
+                                       bool blocking = false,
+                                       uint32_t QID = 0);
 
     // pbct_cvp.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
@@ -610,7 +704,8 @@ protected:
                                             float globalScalingMultiplier,
                                             cl::NDRange globalRange,
                                             cl::NDRange localRange = cl::NullRange,
-                                            bool blocking = false);
+                                            bool blocking = false,
+                                            uint32_t QID = 0);
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
@@ -633,7 +728,8 @@ protected:
                                                 float globalScalingMultiplier,
                                                 cl::NDRange globalRange,
                                                 cl::NDRange localRange = cl::NullRange,
-                                                bool blocking = false);
+                                                bool blocking = false,
+                                                uint32_t QID = 0);
 
     // pbct_cvp_barrier.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
@@ -659,7 +755,8 @@ protected:
                                                     unsigned int LOCALARRAYSIZE,
                                                     cl::NDRange globalRange,
                                                     cl::NDRange localRange = cl::NullRange,
-                                                    bool blocking = false);
+                                                    bool blocking = false,
+                                                    uint32_t QID = 0);
 
 private:
     /**

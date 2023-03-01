@@ -1,49 +1,49 @@
 //#pragma OPENCL EXTENSION cl_amd_printf : enable
 //==============================utils.cl=====================================
 void kernel FLOATvector_NormSquarePartial(global const float* restrict x,
-                                          global float* restrict normSquare,
-                                          private uint frameLen)
+                                          global float* restrict partialSum,
+                                          private uint partialFrameSize)
 {
-    uint gid = get_global_id(0);
-    uint start = gid * frameLen;
-    uint end = start + frameLen;
+    size_t gid = get_global_id(0);
+    size_t start = gid * partialFrameSize;
+    size_t end = start + partialFrameSize;
     float sum = 0.0f;
     float val;
-    for(int i = start; i < end; i++)
+    for(size_t i = start; i < end; i++)
     {
         val = x[i];
         sum += val * val;
     }
-    normSquare[gid] = sum;
+    partialSum[gid] = sum;
 }
 
 void kernel FLOATvector_SumPartial(global const float* restrict x,
-                                   global float* restrict sumPartial,
-                                   private uint frameLen)
+                                   global float* restrict partialSum,
+                                   private uint partialFrameSize)
 {
-    uint gid = get_global_id(0);
-    uint start = gid * frameLen;
-    uint end = start + frameLen;
+    size_t gid = get_global_id(0);
+    size_t start = gid * partialFrameSize;
+    size_t end = start + partialFrameSize;
     float sum = 0.0f;
     float val;
-    for(int i = start; i < end; i++)
+    for(size_t i = start; i < end; i++)
     {
         val = x[i];
         sum += val;
     }
-    sumPartial[gid] = sum;
+    partialSum[gid] = sum;
 }
 
 void kernel FLOATvector_MaxPartial(global const float* restrict x,
                                    global float* restrict partialResults,
-                                   private uint frameLen)
+                                   private uint partialFrameSize)
 {
-    uint gid = get_global_id(0);
-    uint start = gid * frameLen;
-    uint end = start + frameLen;
+    size_t gid = get_global_id(0);
+    size_t start = gid * partialFrameSize;
+    size_t end = start + partialFrameSize;
     float maxVal = x[start];
     float val;
-    for(int i = start; i < end; i++)
+    for(size_t i = start; i < end; i++)
     {
         val = x[i];
         maxVal = max(val, maxVal);
@@ -57,12 +57,12 @@ void kernel FLOATvector_MaxPartial(global const float* restrict x,
 void kernel FLOATvector_NormSquarePartial_barrier(global const float* restrict x,
                                                   global float* restrict normSquare,
                                                   local float* localx,
-                                                  private uint vecLength)
+                                                  private ulong vecLength)
 {
-    uint gid = get_global_id(0);
-    uint gs = get_global_size(0);
-    uint lid = get_local_id(0);
-    uint ls = get_local_size(0);
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
     float val;
     if(gid < vecLength)
     {
@@ -74,7 +74,7 @@ void kernel FLOATvector_NormSquarePartial_barrier(global const float* restrict x
     localx[lid] = val * val;
 
     barrier(CLK_LOCAL_MEM_FENCE);
-    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
     {
         if(lid < stride)
         {
@@ -95,12 +95,12 @@ void kernel FLOATvector_NormSquarePartial_barrier(global const float* restrict x
 void kernel FLOATvector_SumPartial_barrier(global const float* restrict x,
                                            global float* restrict partialSum,
                                            local float* loc,
-                                           private uint vecLength)
+                                           private ulong vecLength)
 {
-    uint gid = get_global_id(0);
-    uint gs = get_global_size(0);
-    uint lid = get_local_id(0);
-    uint ls = get_local_size(0);
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
     float val;
     if(gid < vecLength)
     {
@@ -112,7 +112,7 @@ void kernel FLOATvector_SumPartial_barrier(global const float* restrict x,
     loc[lid] = val;
 
     barrier(CLK_LOCAL_MEM_FENCE);
-    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
     {
         if(lid < stride)
         {
@@ -133,12 +133,12 @@ void kernel FLOATvector_SumPartial_barrier(global const float* restrict x,
 void kernel FLOATvector_MaxPartial_barrier(global const float* restrict x,
                                            global float* restrict partialResult,
                                            local float* localx,
-                                           private uint vecLength)
+                                           private ulong vecLength)
 {
-    uint gid = get_global_id(0);
-    uint gs = get_global_size(0);
-    uint lid = get_local_id(0);
-    uint ls = get_local_size(0);
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
     float val;
     if(gid < vecLength)
     {
@@ -150,7 +150,7 @@ void kernel FLOATvector_MaxPartial_barrier(global const float* restrict x,
     localx[lid] = val;
 
     barrier(CLK_LOCAL_MEM_FENCE);
-    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
     {
         if(lid < stride)
         {
@@ -165,37 +165,21 @@ void kernel FLOATvector_MaxPartial_barrier(global const float* restrict x,
     }
 }
 
-/** Project given volume using cutting voxel projector.
- *
- *
- * @param volume Volume to project.
- * @param projection Projection to construct.
- * @param CM Projection matrix. This projection matrix is constructed in the way that (i,j,k) =
- * (0,0,0,1) is projected to the center of the voxel with given coordinates.
- * @param sourcePosition Source position in the xyz space.
- * @param normalToDetector Normal to detector in the (i,j,k) space.
- * @param vdims Dimensions of the volume.
- * @param voxelSizes Lengths of the voxel edges.
- * @param pdims Dimensions of the projection.
- * @param scalingFactor Scale the results by this factor.
- *
- * @return
- */
 void kernel vector_NormSquarePartial(global const float* restrict x,
-                                     global double* restrict normSquare,
-                                     private uint frameLen)
+                                     global double* restrict partialSum,
+                                     private uint partialFrameSize)
 {
-    int gid = get_global_id(0);
-    int start = gid * frameLen;
-    int end = start + frameLen;
+    size_t gid = get_global_id(0);
+    size_t start = gid * partialFrameSize;
+    size_t end = start + partialFrameSize;
     double sum = 0.0;
     double val;
-    for(int i = start; i < end; i++)
+    for(size_t i = start; i < end; i++)
     {
         val = x[i];
         sum += val * val;
     }
-    normSquare[gid] = sum;
+    partialSum[gid] = sum;
 }
 
 /**
@@ -208,18 +192,18 @@ void kernel vector_NormSquarePartial(global const float* restrict x,
  * @return
  */
 void kernel vector_SumPartial(global const double* restrict x,
-                              global double* restrict sumPartial,
+                              global double* restrict partialSum,
                               private uint frameLen)
 {
-    uint gid = get_global_id(0);
-    uint start = gid * frameLen;
-    uint end = start + frameLen;
+    size_t gid = get_global_id(0);
+    size_t start = gid * frameLen;
+    size_t end = start + frameLen;
     double sum = 0.0;
-    for(uint i = start; i < end; i++)
+    for(size_t i = start; i < end; i++)
     {
         sum += x[i];
     }
-    sumPartial[gid] = sum;
+    partialSum[gid] = sum;
 }
 
 // Code based on
@@ -228,12 +212,12 @@ void kernel vector_SumPartial(global const double* restrict x,
 void kernel vector_NormSquarePartial_barrier(global const float* restrict x,
                                              global double* restrict normSquare,
                                              local double* localx,
-                                             private uint vecLength)
+                                             private ulong vecLength)
 {
-    uint gid = get_global_id(0);
-    uint gs = get_global_size(0);
-    uint lid = get_local_id(0);
-    uint ls = get_local_size(0);
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
     double val;
     if(gid < vecLength)
     {
@@ -245,7 +229,7 @@ void kernel vector_NormSquarePartial_barrier(global const float* restrict x,
     localx[lid] = val * val;
 
     barrier(CLK_LOCAL_MEM_FENCE);
-    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
     {
         if(lid < stride)
         {
@@ -266,12 +250,12 @@ void kernel vector_NormSquarePartial_barrier(global const float* restrict x,
 void kernel vector_SumPartial_barrier(global const double* restrict x,
                                       global double* restrict partialSum,
                                       local double* loc,
-                                      private uint vecLength)
+                                      private ulong vecLength)
 {
-    uint gid = get_global_id(0);
-    uint gs = get_global_size(0);
-    uint lid = get_local_id(0);
-    uint ls = get_local_size(0);
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
     double val;
     if(gid < vecLength)
     {
@@ -283,7 +267,7 @@ void kernel vector_SumPartial_barrier(global const double* restrict x,
     loc[lid] = val;
 
     barrier(CLK_LOCAL_MEM_FENCE);
-    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
     {
         if(lid < stride)
         {
@@ -302,12 +286,12 @@ void kernel vector_ScalarProductPartial_barrier(global const float* restrict a,
                                                 global const float* restrict b,
                                                 global double* restrict product,
                                                 local double* localx,
-                                                private uint vecLength)
+                                                private ulong vecLength)
 {
-    uint gid = get_global_id(0);
-    uint gs = get_global_size(0);
-    uint lid = get_local_id(0);
-    uint ls = get_local_size(0);
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
     double val;
     if(gid < vecLength)
     {
@@ -319,7 +303,7 @@ void kernel vector_ScalarProductPartial_barrier(global const float* restrict a,
     localx[lid] = val;
 
     barrier(CLK_LOCAL_MEM_FENCE);
-    for(uint stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
     {
         if(lid < stride)
         {
@@ -338,7 +322,7 @@ void kernel FLOATvector_zero(global float* a) { a[get_global_id(0)] = 0.0f; }
 
 void kernel FLOATvector_zero_infinite_values(global float* X)
 {
-    uint gid = get_global_id(0);
+    const size_t gid = get_global_id(0);
     float val = X[gid];
     if(isinf(val))
     {
@@ -348,25 +332,25 @@ void kernel FLOATvector_zero_infinite_values(global float* X)
 
 void kernel FLOATvector_scale(global float* v, private float f)
 {
-    int gid = get_global_id(0);
+    const size_t gid = get_global_id(0);
     v[gid] = v[gid] * f;
 }
 
 void kernel FLOATvector_sqrt(global float* v)
 {
-    uint gid = get_global_id(0);
+    const size_t gid = get_global_id(0);
     v[gid] = sqrt(v[gid]);
 }
 
 void kernel FLOATvector_invert(global float* v)
 {
-    uint gid = get_global_id(0);
+    const size_t gid = get_global_id(0);
     v[gid] = 1.0 / v[gid];
 }
 
 void kernel FLOATvector_invert_except_zero(global float* X)
 {
-    uint gid = get_global_id(0);
+    const size_t gid = get_global_id(0);
     float val = X[gid];
     if(val != 0.0f)
     {
@@ -378,7 +362,7 @@ void kernel FLOATvector_substitute_greater_than(global float* X,
                                                 const float minValue,
                                                 const float substitution)
 {
-    uint gid = get_global_id(0);
+    const size_t gid = get_global_id(0);
     float val = X[gid];
     if(val > minValue)
     {
@@ -390,7 +374,7 @@ void kernel FLOATvector_substitute_lower_than(global float* X,
                                               const float maxValue,
                                               const float substitution)
 {
-    uint gid = get_global_id(0);
+    const size_t gid = get_global_id(0);
     float val = X[gid];
     if(val < maxValue)
     {
@@ -406,16 +390,16 @@ void kernel FLOATvector_copy(global const float* restrict A, global float* restr
 
 void kernel FLOATvector_copy_offset(global const float* restrict A,
                                     global float* restrict B,
-                                    private uint offset)
+                                    private ulong offset)
 {
     const size_t index = get_global_id(0) + offset;
     B[index] = A[index];
 }
 
 void kernel FLOATvector_copy_offsets(global const float* restrict A,
-                                     private uint oA,
+                                     private ulong oA,
                                      global float* restrict B,
-                                     private uint oB)
+                                     private ulong oB)
 {
     const size_t gid = get_global_id(0);
     B[gid + oB] = A[gid + oA];
@@ -462,25 +446,25 @@ void kernel FLOATvector_C_equals_A_times_B(global const float* restrict A,
 void kernel FLOATvector_A_equals_A_plus_cB_offset(global float* restrict A,
                                                   global const float* restrict B,
                                                   private float c,
-                                                  private uint offset)
+                                                  private ulong offset)
 {
     const size_t index = get_global_id(0) + offset;
     A[index] += c * B[index];
 }
 
 void kernel FLOATvector_B_equals_A_plus_B_offsets(global const float* restrict A,
-                                                  const uint oA,
+                                                  const ulong oA,
                                                   global float* restrict B,
-                                                  const uint oB)
+                                                  const ulong oB)
 {
     const size_t gid = get_global_id(0);
     B[gid + oB] += A[gid + oA];
 }
 
 void kernel FLOATvector_A_equals_A_plus_cB_offsets(global float* restrict A,
-                                                   private const uint oA,
+                                                   private const ulong oA,
                                                    global const float* restrict B,
-                                                   private const uint oB,
+                                                   private const ulong oB,
                                                    private float c)
 {
     const size_t gid = get_global_id(0);

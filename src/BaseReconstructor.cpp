@@ -213,7 +213,7 @@ int BaseReconstructor::problemSetup(float* projection,
 
         // Test positions of corners relative to source
     }
-    initializeAlgorithmsBuffers();
+    initReductionBuffers();
     return initializeVectors(projection, volume, volumeContainsX0);
 }
 
