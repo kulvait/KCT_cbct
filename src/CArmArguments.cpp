@@ -75,8 +75,7 @@ void CArmArguments::parsePlatformString(bool verbose)
     if(platformsOpenCL == 0)
     {
         ERR = io::xprintf("No OpenCL platform available to this program.");
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     CLdeviceIDs.clear();
     if(CLplatformString.empty())
@@ -106,8 +105,7 @@ void CArmArguments::parsePlatformString(bool verbose)
     if(!std::regex_match(CLplatformString, platformDeviceRegex))
     {
         ERR = io::xprintf("The platform string does not match the required regexp");
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     if(std::regex_match(CLplatformString, platformOnlyRegex))
     {
@@ -119,8 +117,7 @@ void CArmArguments::parsePlatformString(bool verbose)
         } else
         {
             ERR = io::xprintf("The platform %d does not contain any device!", CLplatformID);
-            LOGE << ERR;
-            throw std::runtime_error(ERR);
+            KCTERR(ERR);
         }
     } else
     {
@@ -129,8 +126,7 @@ void CArmArguments::parsePlatformString(bool verbose)
         if(pieces_match.size() != 3)
         {
             ERR = io::xprintf("Error!");
-            LOGE << ERR;
-            throw std::runtime_error(ERR);
+            KCTERR(ERR);
         }
         CLplatformID = std::stoul(pieces_match[1].str());
         fillDevicesList(pieces_match[2].str(), CLplatformID);

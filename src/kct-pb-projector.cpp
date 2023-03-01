@@ -295,9 +295,13 @@ int main(int argc, char* argv[])
         float* volume = new float[ARG.totalVolumeSize];
         float* projection = new float[ARG.totalProjectionSize];
         float* projection_rhs = nullptr;
-        LOGE << io::xprintf("Partial projector partialProjectorBytesize=%ld, allocated arrays with totalVolumeSize=%lu totalProjectionSize=%lu", ARG.partialProjectorBytesize, ARG.totalVolumeSize, ARG.totalProjectionSize);
+        LOGI << io::xprintf("Partial projector partialProjectorBytesize=%ld, allocated arrays with "
+                            "totalVolumeSize=%lu totalProjectionSize=%lu",
+                            ARG.partialProjectorBytesize, ARG.totalVolumeSize,
+                            ARG.totalProjectionSize);
         io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
         bool readxmajor = true;
+        LOGI << io::xprintf("Reading input volume into array of the size %lu", ARG.totalVolumeSize);
         inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
         if(!ARG.rightHandSide.empty())
         {
@@ -310,9 +314,7 @@ int main(int argc, char* argv[])
             PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
         } else
         {
-            LOGI << io::xprintf("START project_partial");
             PBCVP.project_partial(volume, projection);
-            LOGI << io::xprintf("END project_partial");
         }
         bool projectionxmajor = false;
         bool writexmajor = true;

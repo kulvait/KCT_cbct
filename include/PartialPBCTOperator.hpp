@@ -203,8 +203,10 @@ public:
      *
      * @return
      */
-    int project_partial(cl::Buffer& X,
+    int project_partial(uint32_t QID,
+                        cl::Buffer& X,
                         cl::Buffer& B,
+                        uint32_t vdimz_local,
                         float volumeCenterOffset,
                         uint32_t geometries_from,
                         uint32_t geometries_to,

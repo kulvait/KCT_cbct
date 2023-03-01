@@ -2,16 +2,17 @@
 
 namespace KCT {
 
-int PartialParallelBeamProjector::arrayIntoBuffer(float* c_array,
+int PartialParallelBeamProjector::arrayIntoBuffer(uint32_t QID,
+                                                  float* c_array,
                                                   cl::Buffer cl_buffer,
                                                   uint64_t size)
 {
     uint64_t bufferSize = size * sizeof(float);
-    std::vector<std::shared_ptr<cl::CommandQueue>> Q = CT->getCommandQueues();
+    std::shared_ptr<cl::CommandQueue> Q = CT->getCommandQueues()[QID];
     cl_int err = CL_SUCCESS;
     if(c_array != nullptr)
     {
-        err = Q[0]->enqueueWriteBuffer(cl_buffer, CL_TRUE, 0, bufferSize, (void*)c_array);
+        err = Q->enqueueWriteBuffer(cl_buffer, CL_TRUE, 0, bufferSize, (void*)c_array);
     } else
     {
         KCTERR("Null pointer exception!");
@@ -24,16 +25,17 @@ int PartialParallelBeamProjector::arrayIntoBuffer(float* c_array,
     return 0;
 }
 
-int PartialParallelBeamProjector::bufferIntoArray(cl::Buffer cl_buffer,
+int PartialParallelBeamProjector::bufferIntoArray(uint32_t QID,
+                                                  cl::Buffer cl_buffer,
                                                   float* c_array,
                                                   uint64_t size)
 {
-    std::vector<std::shared_ptr<cl::CommandQueue>> Q = CT->getCommandQueues();
+    std::shared_ptr<cl::CommandQueue> Q = CT->getCommandQueues()[QID];
     uint64_t bufferSize = size * sizeof(float);
     cl_int err = CL_SUCCESS;
     if(c_array != nullptr)
     {
-        err = Q[0]->enqueueReadBuffer(cl_buffer, CL_TRUE, 0, bufferSize, (void*)c_array);
+        err = Q->enqueueReadBuffer(cl_buffer, CL_TRUE, 0, bufferSize, (void*)c_array);
     } else
     {
         KCTERR("Null pointer exception!");
@@ -46,90 +48,136 @@ int PartialParallelBeamProjector::bufferIntoArray(cl::Buffer cl_buffer,
     return 0;
 }
 
-int PartialParallelBeamProjector::fillBufferByConstant(cl::Buffer cl_buffer,
+int PartialParallelBeamProjector::fillBufferByConstant(uint32_t QID,
+                                                       cl::Buffer cl_buffer,
                                                        float constant,
                                                        uint64_t bytecount)
 {
-    std::vector<std::shared_ptr<cl::CommandQueue>> Q = CT->getCommandQueues();
-    return Q[0]->enqueueFillBuffer<cl_float>(cl_buffer, constant, 0, bytecount);
+    std::shared_ptr<cl::CommandQueue> Q = CT->getCommandQueues()[QID];
+    return Q->enqueueFillBuffer<cl_float>(cl_buffer, constant, 0, bytecount);
 }
 
-int PartialParallelBeamProjector::project_partial(float* volume, float* projection)
+std::queue<uint32_t> QID_queue;
+std::mutex ql;
+std::condition_variable gpuavail;
+
+int PartialParallelBeamProjector::project_pzblock(float* volume, float* projection, uint64_t PIN)
 {
-    std::vector<std::shared_ptr<cl::CommandQueue>> Q = CT->getCommandQueues();
-    CT->allocateXBuffers(1);
-    CT->allocateBBuffers(1);
-    std::shared_ptr<cl::Buffer> x_buf, b_buf;
-    x_buf = CT->getXBuffer(0);
-    b_buf = CT->getBBuffer(0);
-    // uint32_t pdimx, pdimy, pFrameSize, pdimz, pdimz_partial, vdimz_partial_last pzblocks;
-    // uint32_t vdimx, vdimy, vFrameSize, vdimz, vdimz_partial, pdimz_partial_last, vzblocks;
-    // uint64_t XDIM, BDIM, XDIM_partial, BDIM_partial;
-    // uint64_t XBYTES, BBYTES, XBYTES_partial, BBYTES_partial;
+    std::mt19937_64 eng{std::random_device{}()};  // Randomizing I/O
+    std::uniform_int_distribution<> dist{0, 3000};
+    std::this_thread::sleep_for(std::chrono::milliseconds{dist(eng)});
+
+
     float *volumePtr, *projectionPtr;
     uint64_t geometriesFrom;
     uint64_t geometriesTo;
     uint64_t projectionArrayOffset;
     float voxelzCenterOffset;
     uint32_t pdimz_partial_now, vdimz_partial_now;
+    uint64_t BDIM_now;
+    projectionArrayOffset = PIN * pFrameSize * (uint64_t)pdimz_partial;
+    projectionPtr = projection + projectionArrayOffset;
+    if(PIN != pzblocks - 1)
+    {
+        pdimz_partial_now = pdimz_partial;
+        BDIM_now = BDIM_partial;
+    } else
+    {
+        pdimz_partial_now = pdimz_partial_last;
+        BDIM_now = BDIM_partial_last;
+    }
+    geometriesFrom = PIN * pdimz_partial;
+    geometriesTo = geometriesFrom + pdimz_partial_now;
+    std::shared_ptr<cl::CommandQueue> Q;
+    uint32_t QID;
+    // Obtain QID of the GPU on which to execute
+    {
+        std::unique_lock qll(ql);
+        // It first tests then waits, see
+        // https://stackoverflow.com/questions/75591190/strange-behavior-of-condition-variable-in-c
+        gpuavail.wait(qll, [] { return !QID_queue.empty(); });
+        QID = QID_queue.front();
+        QID_queue.pop();
+        Q = CT->getCommandQueues()[QID];
+        LOGI << io::xprintf("START QID %d to project PIN %d [0,%d).", QID, PIN, pzblocks);
+    }
+    std::shared_ptr<cl::Buffer> x_buf, b_buf;
+    x_buf = CT->getXBuffer(QID);
+    b_buf = CT->getBBuffer(QID);
+    // Projection buffer is filled by zeros
+    fillBufferByConstant(QID, *b_buf, 0.0f, BDIM_now * sizeof(float));
+    for(uint64_t VIN = 0; VIN != vzblocks; VIN++)
+    {
+        volumePtr = volume + VIN * vFrameSize * (uint64_t)vdimz_partial;
+        if(VIN != vzblocks - 1)
+        {
+            vdimz_partial_now = vdimz_partial;
+            arrayIntoBuffer(QID, volumePtr, *x_buf, XDIM_partial);
+        } else
+        {
+            vdimz_partial_now = vdimz_partial_last;
+            arrayIntoBuffer(QID, volumePtr, *x_buf, XDIM_partial_last);
+        }
+        voxelzCenterOffset
+            = float(vdimz) * 0.5f - (float(VIN * vdimz_partial) + float(vdimz_partial_now) * 0.5f);
+        // CT->updateReductionParameters(pdimx, pdimy, pdimz_partial_now, vdimx, vdimy,
+        //                              vdimz_partial_now, workGroupSize);
+
+        CT->project_partial(QID, *x_buf, *b_buf, vdimz_partial_now, voxelzCenterOffset,
+                            geometriesFrom, geometriesTo);
+    }
+
+    bufferIntoArray(QID, *b_buf, projectionPtr, BDIM_now);
+
+    LOGD << io::xprintf("END PIN %d [0,%d) written %lu values to [%lu, %lu).", PIN, pzblocks,
+                        BDIM_now, projectionArrayOffset, projectionArrayOffset + BDIM_now);
+    // Push QID into the queue and notify waiting threads
+    {
+        std::unique_lock qll(ql);
+        QID_queue.push(QID);
+    }
+    gpuavail.notify_one();
+    return PIN;
+}
+
+int PartialParallelBeamProjector::project_partial(float* volume, float* projection)
+{
+    std::vector<std::shared_ptr<cl::CommandQueue>> Q = CT->getCommandQueues();
+    // Fill queue with QID of available GPUs in the queue
+    uint32_t qsize = Q.size();
+    QID_queue = std::queue<uint32_t>();
+
+    CT->allocateXBuffers(1 * qsize);
+    CT->allocateBBuffers(1 * qsize);
+
+    std::vector<cl::Memory> mem;
+    std::shared_ptr<cl::Buffer> x_buf, b_buf;
+    for(uint32_t i = 0; i != qsize; i++)
+    {
+        QID_queue.push(i);
+        x_buf = CT->getXBuffer(i);
+        b_buf = CT->getBBuffer(i);
+        mem.clear();
+        mem.emplace_back(*x_buf);
+        mem.emplace_back(*b_buf);
+        Q[i]->enqueueMigrateMemObjects(mem, CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED);
+    }
+
+    // uint32_t pdimx, pdimy, pFrameSize, pdimz, pdimz_partial, vdimz_partial_last pzblocks;
+    // uint32_t vdimx, vdimy, vFrameSize, vdimz, vdimz_partial, pdimz_partial_last, vzblocks;
+    // uint64_t XDIM, BDIM, XDIM_partial, BDIM_partial;
+    // uint64_t XBYTES, BBYTES, XBYTES_partial, BBYTES_partial;
+    std::vector<std::future<int>> computedTasks;
     for(uint64_t PIN = 0; PIN != pzblocks; PIN++)
     {
-        projectionArrayOffset = PIN * pFrameSize * (uint64_t)pdimz_partial;
-        projectionPtr = projection + projectionArrayOffset;
-        if(PIN != pzblocks - 1)
-        {
-            pdimz_partial_now = pdimz_partial;
-        } else
-        {
-            pdimz_partial_now = pdimz_partial_last;
-        }
-        geometriesFrom = PIN * pdimz_partial;
-        geometriesTo = geometriesFrom + pdimz_partial_now;
-        // Projection buffer is filled by zeros
-        fillBufferByConstant(*b_buf, 0.0f, BDIM_partial * sizeof(float));
-        for(uint64_t VIN = 0; VIN != vzblocks; VIN++)
-        {
-            volumePtr = volume + VIN * vFrameSize * (uint64_t)vdimz_partial;
-            std::cout << io::xprintf("START VIN=%d\n", VIN);
-            if(VIN != vzblocks - 1)
-            {
-                vdimz_partial_now = vdimz_partial;
-                arrayIntoBuffer(volumePtr, *x_buf, XDIM_partial);
-            } else
-            {
-                vdimz_partial_now = vdimz_partial_last;
-                arrayIntoBuffer(volumePtr, *x_buf, XDIM_partial_last);
-            }
-            std::cout << io::xprintf("BUFREAD VIN=%d\n", VIN) << std::flush;
-            voxelzCenterOffset = float(vdimz) * 0.5f
-                - (float(VIN * vdimz_partial) + float(vdimz_partial_now) * 0.5f);
-            CT->updateReductionParameters(pdimx, pdimy, pdimz_partial_now, vdimx, vdimy,
-                                          vdimz_partial_now, workGroupSize);
-
-            std::cout << io::xprintf("START Partial projection PIN=%d [0, %d) VIN = %d [0, %d).\n",
-                                     PIN, pzblocks, VIN, vzblocks)
-                      << std::flush;
-            Q[0]->finish();
-            CT->project_partial(*x_buf, *b_buf, voxelzCenterOffset, geometriesFrom, geometriesTo);
-            Q[0]->finish();
-            std::cout << io::xprintf("END Partial projection PIN=%d [0, %d) VIN = %d [0, %d).\n",
-                                     PIN, pzblocks, VIN, vzblocks)
-                      << std::flush;
-        }
-        if(PIN != pzblocks - 1)
-        {
-
-            LOGW << io::xprintf("Writing %lu values to [%lu, %lu).", BDIM_partial,
-                                projectionArrayOffset, projectionArrayOffset + BDIM_partial);
-            bufferIntoArray(*b_buf, projectionPtr, BDIM_partial);
-            LOGW << "Finished writing!";
-        } else
-        {
-            LOGW << io::xprintf("Writing %lu values to [%lu, %lu).", BDIM_partial_last,
-                                projectionArrayOffset, projectionArrayOffset + BDIM_partial_last);
-            bufferIntoArray(*b_buf, projectionPtr, BDIM_partial_last);
-            LOGW << "Finished writing!";
-        }
+        std::future<int> future
+            = std::async(std::launch::async, &PartialParallelBeamProjector::project_pzblock, this,
+                         volume, projection, PIN);
+        computedTasks.emplace_back(std::move(future));
+    }
+    for(std::future<int>& f : computedTasks)
+    {
+        f.get(); // To finish all the computations
     }
     return 0;
 }

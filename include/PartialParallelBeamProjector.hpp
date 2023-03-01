@@ -5,8 +5,14 @@
 
 // External libraries
 #include <CL/cl.hpp>
+#include <chrono>
+#include <condition_variable>
+#include <future>
 #include <iostream>
 #include <limits>
+#include <mutex>
+#include <queue>
+#include <random>
 
 // Internal libraries
 #include "Kniha.hpp"
@@ -207,41 +213,9 @@ public:
      *
      * @return
      */
-    int initializeOrUpdateVolumeBuffer(float* volumeArray = nullptr);
-    /**
-     * Initialize volume buffer by given size, updates voxel size of the projector.
-     *
-     * @param volumeSizeX
-     * @param volumeSizeY
-     * @param volumeSizeZ
-     * @param volumeArray If its nullptr, initialize by zero.
-     *
-     * @return
-     */
-    int initializeOrUpdateVolumeBuffer(uint32_t vdimx,
-                                       uint32_t vdimy,
-                                       uint32_t vdimz,
-                                       float* volumeArray = nullptr);
 
-    /**
-     * Initialize projection buffer by given size. With or without updating dimensions
-     *
-     * @param projectionSizeX
-     * @param projectionSizeY
-     * @param projectionSizeZ
-     * @param projectionArray If is nullptr, initialize by zero.
-     *
-     * @return
-     */
-    int initializeOrUpdateProjectionBuffer(uint32_t pdimx,
-                                           uint32_t pdimy,
-                                           uint32_t pdimz,
-                                           float* projectionArray = nullptr);
-    int initializeOrUpdateProjectionBuffer(uint32_t projectionSizeZ,
-                                           float* projectionArray = nullptr);
-    int initializeOrUpdateProjectionBuffer(float* projectionArray = nullptr);
-
-    int fillBufferByConstant(cl::Buffer cl_buffer, float constant, uint64_t bytecount);
+    int
+    fillBufferByConstant(uint32_t QID, cl::Buffer cl_buffer, float constant, uint64_t bytecount);
     int project_partial(float* volume, float* projection);
     int project_print_discrepancy(float* volume, float* projection, float* rhs);
     int backproject(float* projection, float* volume);
@@ -250,26 +224,27 @@ public:
     double normSquareDifference(float* projection, uint32_t pdimx, uint32_t pdimy);
 
 private:
-    int arrayIntoBuffer(float* c_array, cl::Buffer cl_buffer, uint64_t size);
-    int bufferIntoArray(cl::Buffer cl_buffer, float* c_array, uint64_t size);
-    const cl_float FLOATZERO = 0.0f;
-    const cl_double DOUBLEZERO = 0.0;
-    float FLOATONE = 1.0f;
-    float* volume = nullptr;
-    uint64_t totalVolumeBufferSize;
-    uint64_t frameSize;
-    uint64_t totalProjectionBufferSize;
+    /**
+     * @brief Project one pzblock
+     *
+     * @param volume
+     * @param projection
+     * @param PIN
+     *
+     * @return
+     */
+    int project_pzblock(float* volume, float* projection, uint64_t PIN);
+    int arrayIntoBuffer(uint32_t QID, float* c_array, cl::Buffer cl_buffer, uint64_t size);
+    int bufferIntoArray(uint32_t QID, cl::Buffer cl_buffer, float* c_array, uint64_t size);
     cl::NDRange projectorLocalNDRange;
     cl::NDRange projectorLocalNDRangeBarrier;
 
     std::shared_ptr<cl::Buffer> volumeBuffer = nullptr;
     std::shared_ptr<cl::Buffer> projectionBuffer = nullptr;
     std::shared_ptr<cl::Buffer> tmpBuffer = nullptr;
-    size_t tmpBuffer_size = 0;
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
 
     std::shared_ptr<PartialPBCTOperator> CT;
-    uint32_t volumePartitions;
     uint32_t workGroupSize;
     uint64_t maximumSliceSize; // 256*1024*1024*8
     cl::NDRange backprojectorLocalNDRange;

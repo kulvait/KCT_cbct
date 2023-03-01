@@ -309,8 +309,10 @@ int PartialPBCTOperator::backproject(cl::Buffer& B,
  * @param projectionIncrement For OS SART, 1 by default
  *
  */
-int PartialPBCTOperator::project_partial(cl::Buffer& X,
+int PartialPBCTOperator::project_partial(uint32_t QID,
+                                         cl::Buffer& X,
                                          cl::Buffer& B,
+                                         uint32_t vdimz_local,
                                          float voxelzCenterOffset,
                                          uint32_t geometries_from,
                                          uint32_t geometries_to,
@@ -325,6 +327,7 @@ int PartialPBCTOperator::project_partial(cl::Buffer& X,
     {
         localRange = projectorLocalNDRange;
     }
+    cl_int3 vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz_local) });
     // clang-format off
     // cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
     // std::shared_ptr<cl::NDRange> barrierLocalRange
@@ -335,7 +338,7 @@ int PartialPBCTOperator::project_partial(cl::Buffer& X,
     unsigned long frameSize = pdimx * pdimy;
     unsigned long offset;
     cl_double3 volumeCenter_local = volumeCenter;
-    volumeCenter_local.z -= (voxelzCenterOffset*voxelSizes.z);
+    volumeCenter_local.z -= (voxelzCenterOffset * voxelSizes.z);
     uint64_t IND;
     for(std::size_t i = initialProjectionIndex; i < PM8Vector.size(); i += projectionIncrement)
     {
@@ -358,13 +361,13 @@ int PartialPBCTOperator::project_partial(cl::Buffer& X,
                     cl::NDRange globalRange(vdimx, vdimy, vdimz);
                     algFLOAT_pbct_cutting_voxel_project_barrier(
                         X, B, offset, CM, vdims, voxelSizes, volumeCenter_local, pdims,
-                        scalingFactor, LOCALARRAYSIZE, globalRange, localRange);
+                        scalingFactor, LOCALARRAYSIZE, globalRange, localRange, false, QID);
                 } else
                 {
                     cl::NDRange globalRange(vdimz, vdimy, vdimx);
                     algFLOAT_pbct_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
                                                         volumeCenter_local, pdims, scalingFactor,
-                                                        globalRange, localRange);
+                                                        globalRange, localRange, false, QID);
                 }
             }
         }
