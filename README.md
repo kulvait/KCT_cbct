@@ -68,12 +68,17 @@ Comand line parser CLI11. It is licensed under 3 Clause BSD License.
 
 Testing framework. Licensed under Boost Software License 1.0.
 
-### [CTPL](https://github.com/vit-vit/ctpl)
-
-Threadpool library.
-
 
 ## Documentation
+
+I am trying to at least in code document major parts of the programs. Using argparse and its help strings might also improve understanding of programs. Extensive development documentation for the project is missing, but as the user base of the project is growing, I am trying at least to provide some hits to the potential users by providing relevant information on github pages and through Doxygen documentation.
+
+### Web based information
+
+There is a [github pages presentation](https://kulvait.github.io/KCT_doc/) including blog, which covers some of the use cases of this project. 
+
+### Doxygen documentation
+Some of the source files are documented using Doxygen markup. This documentation is not covering all the sources and some parts of the documentation are missing.
 
 Documentation is generated using doxygen and lives in doc directory.
 First the config file for doxygen was prepared runing doxygen -g.
@@ -89,9 +94,9 @@ Doc files and this file can be written using [Markdown syntax](https://daringfir
 
 ## Licensing
 
-When there is no other licensing and/or copyright information in the source files of this project, the following apply for the source files in the directories include and src and for CMakeLists.txt file:
+When there is no other licensing and/or copyright information in the source files of this project, the following apply for the source files in the directories include, src, opencl and for CMakeLists.txt file:
 
-Copyright (C) 2018-2022 Vojtěch Kulvait
+Copyright (C) 2018-2023 Vojtěch Kulvait
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
