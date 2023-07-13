@@ -39,19 +39,28 @@ public:
 
     PartialPBCTOperator(uint32_t pdimx,
                         uint32_t pdimy,
-                        uint32_t pdimz,
+                        uint32_t pzblock_maxsize,
                         uint32_t vdimx,
                         uint32_t vdimy,
-                        uint32_t vdimz,
+                        uint32_t vzblock_maxsize,
                         uint32_t workGroupSize = 256,
                         cl::NDRange projectorLocalNDRange = cl::NullRange,
                         cl::NDRange backprojectorLocalNDRange = cl::NullRange)
         : AlgorithmsBarrierBuffers()
+        , pdimx(pdimx)
+        , pdimy(pdimy)
+        , pzblock_maxsize(pzblock_maxsize)
+        , vdimx(vdimx)
+        , vdimy(vdimy)
+        , vzblock_maxsize(vzblock_maxsize)
+        , workGroupSize(workGroupSize)
     {
-        initReductionParameters(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize);
+        XDIM_maxsize = (uint64_t)vdimx * (uint64_t)vdimy * (uint64_t)vzblock_maxsize;
+        BDIM_maxsize = (uint64_t)pdimx * (uint64_t)pdimy * (uint64_t)pzblock_maxsize;
+        initReductionParameters(pdimx, pdimy, pzblock_maxsize, vdimx, vdimy, vzblock_maxsize,
+                                workGroupSize);
         pdims = cl_int2({ int(pdimx), int(pdimy) });
         pdims_uint = cl_uint2({ pdimx, pdimy });
-        vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
         timestamp = std::chrono::steady_clock::now();
         std::size_t projectorLocalNDRangeDim = projectorLocalNDRange.dimensions();
         std::size_t backprojectorLocalNDRangeDim = backprojectorLocalNDRange.dimensions();
@@ -220,7 +229,6 @@ protected:
     // Constructor defined variables
     cl_int2 pdims;
     cl_uint2 pdims_uint;
-    cl_int3 vdims;
 
     // Problem setup variables
     double voxelSpacingX, voxelSpacingY, voxelSpacingZ;
@@ -276,6 +284,10 @@ protected:
 
     bool verbose = false;
     std::string intermediatePrefix = "";
+
+    const uint32_t pdimx, pdimy, pzblock_maxsize, vdimx, vdimy, vzblock_maxsize;
+    uint64_t XDIM_maxsize, BDIM_maxsize;
+    const uint32_t workGroupSize;
 };
 
 } // namespace KCT

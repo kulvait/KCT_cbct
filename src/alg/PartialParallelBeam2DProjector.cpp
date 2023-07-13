@@ -1,8 +1,8 @@
-#include "PartialParallelBeamProjector.hpp"
+#include "PartialParallelBeam2DProjector.hpp"
 
 namespace KCT {
 
-int PartialParallelBeamProjector::arrayIntoBuffer(uint32_t QID,
+int PartialParallelBeam2DProjector::arrayIntoBuffer(uint32_t QID,
                                                   float* c_array,
                                                   cl::Buffer cl_buffer,
                                                   uint64_t size)
@@ -25,7 +25,7 @@ int PartialParallelBeamProjector::arrayIntoBuffer(uint32_t QID,
     return 0;
 }
 
-int PartialParallelBeamProjector::bufferIntoArray(uint32_t QID,
+int PartialParallelBeam2DProjector::bufferIntoArray(uint32_t QID,
                                                   cl::Buffer cl_buffer,
                                                   float* c_array,
                                                   uint64_t size)
@@ -48,7 +48,7 @@ int PartialParallelBeamProjector::bufferIntoArray(uint32_t QID,
     return 0;
 }
 
-int PartialParallelBeamProjector::fillBufferByConstant(uint32_t QID,
+int PartialParallelBeam2DProjector::fillBufferByConstant(uint32_t QID,
                                                        cl::Buffer cl_buffer,
                                                        float constant,
                                                        uint64_t bytecount)
@@ -61,11 +61,12 @@ std::queue<uint32_t> QID_queue;
 std::mutex ql;
 std::condition_variable gpuavail;
 
-int PartialParallelBeamProjector::project_pzblock(float* volume, float* projection, uint64_t PIN)
+int PartialParallelBeam2DProjector::project_pzblock(float* volume, float* projection, uint64_t PIN)
 {
-    std::mt19937_64 eng{ std::random_device{}() }; // Randomizing I/O
-    std::uniform_int_distribution<> dist{ 0, 3000 };
-    std::this_thread::sleep_for(std::chrono::milliseconds{ dist(eng) });
+    std::mt19937_64 eng{std::random_device{}()};  // Randomizing I/O
+    std::uniform_int_distribution<> dist{0, 3000};
+    std::this_thread::sleep_for(std::chrono::milliseconds{dist(eng)});
+
 
     float *volumePtr, *projectionPtr;
     uint64_t geometriesFrom;
@@ -139,7 +140,7 @@ int PartialParallelBeamProjector::project_pzblock(float* volume, float* projecti
     return PIN;
 }
 
-int PartialParallelBeamProjector::project_partial(float* volume, float* projection)
+int PartialParallelBeam2DProjector::project_partial(float* volume, float* projection)
 {
     std::vector<std::shared_ptr<cl::CommandQueue>> Q = CT->getCommandQueues();
     // Fill queue with QID of available GPUs in the queue
@@ -170,7 +171,7 @@ int PartialParallelBeamProjector::project_partial(float* volume, float* projecti
     for(uint64_t PIN = 0; PIN != pzblocks; PIN++)
     {
         std::future<int> future
-            = std::async(std::launch::async, &PartialParallelBeamProjector::project_pzblock, this,
+            = std::async(std::launch::async, &PartialParallelBeam2DProjector::project_pzblock, this,
                          volume, projection, PIN);
         computedTasks.emplace_back(std::move(future));
     }
@@ -178,10 +179,9 @@ int PartialParallelBeamProjector::project_partial(float* volume, float* projecti
     {
         f.get(); // To finish all the computations
     }
-    LOGD << "End project_partial all data are written into projection array.";
     return 0;
 }
-int PartialParallelBeamProjector::project_print_discrepancy(float* volume,
+int PartialParallelBeam2DProjector::project_print_discrepancy(float* volume,
                                                             float* projection,
                                                             float* rhs)
 {
@@ -205,7 +205,7 @@ int PartialParallelBeamProjector::project_print_discrepancy(float* volume,
     LOGE << "Unimplemented";
     return 0;
 }
-int PartialParallelBeamProjector::backproject(float* projection, float* volume)
+int PartialParallelBeam2DProjector::backproject(float* projection, float* volume)
 {
     /*
         allocateXBuffers(1);
@@ -220,7 +220,7 @@ int PartialParallelBeamProjector::backproject(float* projection, float* volume)
     return 0;
 }
 
-double PartialParallelBeamProjector::normSquare(float* v, uint32_t pdimx, uint32_t pdimy)
+double PartialParallelBeam2DProjector::normSquare(float* v, uint32_t pdimx, uint32_t pdimy)
 {
     /*
         size_t vecsize = sizeof(float) * pdimx * pdimy;
@@ -244,7 +244,7 @@ double PartialParallelBeamProjector::normSquare(float* v, uint32_t pdimx, uint32
     return 0;
 }
 
-double PartialParallelBeamProjector::normSquareDifference(float* v, uint32_t pdimx, uint32_t pdimy)
+double PartialParallelBeam2DProjector::normSquareDifference(float* v, uint32_t pdimx, uint32_t pdimy)
 {
     /*
         size_t vecsize = sizeof(float) * pdimx * pdimy;

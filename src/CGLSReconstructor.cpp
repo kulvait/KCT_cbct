@@ -860,8 +860,8 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
     uint32_t framesize = pdimx * pdimy;
     uint32_t partialFrameSize = framesize;
     uint32_t partialFrameCount = 1;
-    algvector_NormSquarePartial(*v_proj, *tmp_x_red1, partialFrameSize, partialFrameCount);
-    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+    algvector_NormSquarePartial(*v_proj, *tmp_red1[0], partialFrameSize, partialFrameCount);
+    Q[0]->enqueueReadBuffer(*tmp_red1[0], CL_TRUE, 0, sizeof(double), &sum);
     vnorm2_old += sum;
     // EXPERIMENTAL
     algFLOATvector_copy(*v_buf, *w_buf, XDIM);
@@ -926,8 +926,8 @@ int CGLSReconstructor::reconstruct_experimental(uint32_t maxIterations, float er
         }
         vnorm2_now = normXBuffer_barrier_double(*v_buf);
         // EXPERIMENTAL
-        algvector_NormSquarePartial(*v_proj, *tmp_x_red1, partialFrameSize, partialFrameCount);
-        Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+        algvector_NormSquarePartial(*v_proj, *tmp_red1[0], partialFrameSize, partialFrameCount);
+        Q[0]->enqueueReadBuffer(*tmp_red1[0], CL_TRUE, 0, sizeof(double), &sum);
         vnorm2_now += sum;
         // EXPERIMENTAL
         beta = vnorm2_now / vnorm2_old;

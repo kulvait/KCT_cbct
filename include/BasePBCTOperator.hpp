@@ -42,7 +42,16 @@ public:
                      cl::NDRange projectorLocalNDRange = cl::NullRange,
                      cl::NDRange backprojectorLocalNDRange = cl::NullRange)
         : AlgorithmsBarrierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
+        , pdimx(pdimx)
+        , pdimy(pdimy)
+        , pdimz(pdimz)
+        , vdimx(vdimx)
+        , vdimy(vdimy)
+        , vdimz(vdimz)
+        , workGroupSize(workGroupSize)
     {
+        XDIM = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
+        BDIM = uint64_t(pdimx) * uint64_t(pdimy) * uint64_t(pdimz);
         pdims = cl_int2({ int(pdimx), int(pdimy) });
         pdims_uint = cl_uint2({ pdimx, pdimy });
         vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
@@ -100,7 +109,8 @@ public:
             this->backprojectorLocalNDRange = guessBackprojectorLocalNDRange();
         }
         projectorLocalNDRangeDim = this->projectorLocalNDRange.dimensions();
-        std::size_t projectorLocalNDRangeBarrierDim = this->projectorLocalNDRangeBarrier.dimensions();
+        std::size_t projectorLocalNDRangeBarrierDim
+            = this->projectorLocalNDRangeBarrier.dimensions();
         backprojectorLocalNDRangeDim = this->backprojectorLocalNDRange.dimensions();
         if(projectorLocalNDRangeDim == 0)
         {
@@ -117,7 +127,8 @@ public:
         } else
         {
             LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange(%d, %d, %d)",
-                                this->projectorLocalNDRangeBarrier[0], this->projectorLocalNDRangeBarrier[1],
+                                this->projectorLocalNDRangeBarrier[0],
+                                this->projectorLocalNDRangeBarrier[1],
                                 this->projectorLocalNDRangeBarrier[2]);
         }
         if(backprojectorLocalNDRangeDim == 0)
@@ -256,6 +267,10 @@ protected:
 
     bool verbose = false;
     std::string intermediatePrefix = "";
+
+    const uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
+    const uint32_t workGroupSize;
+    uint64_t BDIM, XDIM;
 };
 
 } // namespace KCT

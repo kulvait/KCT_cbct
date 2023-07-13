@@ -41,7 +41,16 @@ public:
                                uint32_t vdimz,
                                uint32_t workGroupSize = 256)
         : AlgorithmsBarrierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
+        , pdimx(pdimx)
+        , pdimy(pdimy)
+        , pdimz(pdimz)
+        , vdimx(vdimx)
+        , vdimy(vdimy)
+        , vdimz(vdimz)
+        , workGroupSize(workGroupSize)
     {
+        XDIM = uint64_t(vdimx) * uint64_t(vdimy) * uint64_t(vdimz);
+        BDIM = uint64_t(pdimx) * uint64_t(pdimy) * uint64_t(pdimz);
         pdims = cl_int2({ int(pdimx), int(pdimy) });
         pdims_uint = cl_uint2({ pdimx, pdimy });
         vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
@@ -203,6 +212,10 @@ protected:
     std::vector<std::vector<std::shared_ptr<cl::Buffer>>> x_buffers, tmp_x_buffers;
     std::vector<std::vector<std::shared_ptr<cl::Buffer>>> b_buffers, tmp_b_buffers;
     // tmp_b_buf for rescaling, tmp_x_buf for LSQR
+    const uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
+    const uint32_t workGroupSize;
+    uint64_t BDIM, XDIM;
+
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
 
     bool verbose = false;

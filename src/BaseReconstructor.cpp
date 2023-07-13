@@ -149,8 +149,7 @@ int BaseReconstructor::problemSetup(float* projection,
     {
         std::string err
             = io::xprintf("The pdimz=%d but the size of camera geometries vector is %d!");
-        LOGE << err;
-        throw std::runtime_error(err);
+        KCTERR(err);
     }
     this->cameraVector = cameraVector;
     PM12Vector.clear();
@@ -410,7 +409,7 @@ int BaseReconstructor::backproject(cl::Buffer& B,
                                    uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
-    unsigned int frameSize = pdimx * pdimy;
+    uint32_t frameSize = rp->pFrameSize;
     algFLOATvector_copy(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), localRangeBackprojection);
@@ -481,7 +480,7 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B,
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, std::numeric_limits<float>::infinity(), 0,
                                       XDIM * sizeof(float));
-    unsigned int frameSize = pdimx * pdimy;
+    unsigned int frameSize = rp->pFrameSize;
     algFLOATvector_copy(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::NDRange voxelRange(vdimx, vdimy, vdimz);
@@ -549,7 +548,7 @@ int BaseReconstructor::project(cl::Buffer& X,
                                uint32_t projectionIncrement)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
-    unsigned int frameSize = pdimx * pdimy;
+    unsigned int frameSize = rp->pFrameSize;
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx), projectorLocalNDRange);
     cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);

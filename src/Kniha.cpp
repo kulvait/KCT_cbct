@@ -773,6 +773,31 @@ void Kniha::CLINCLUDEpbct_cvp_barrier()
     });
 }
 
+void Kniha::CLINCLUDEpbct2d_cvp()
+{
+    insertCLFile("opencl/pbct2d_cvp.cl");
+    callbacks.emplace_back([this](cl::Program program) {
+        {
+            auto& ptr = FLOAT_pbct2d_cutting_voxel_project;
+            std::string str = "FLOAT_pbct2d_cutting_voxel_project";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOAT_pbct2d_cutting_voxel_backproject;
+            std::string str = "FLOAT_pbct2d_cutting_voxel_backproject";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+    });
+}
+
 void Kniha::insertCLFile(std::string f)
 {
     if(std::find(CLFiles.begin(), CLFiles.end(), f) == CLFiles.end())

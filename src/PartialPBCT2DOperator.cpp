@@ -1,8 +1,8 @@
-#include "PartialPBCTOperator.hpp"
+#include "PartialPBCT2DOperator.hpp"
 
 namespace KCT {
 
-void PartialPBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOCALARRAYSIZE)
+void PartialPBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())
     {
@@ -30,7 +30,7 @@ void PartialPBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t 
     }
 }
 
-void PartialPBCTOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
+void PartialPBCT2DOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
@@ -48,7 +48,7 @@ void PartialPBCTOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint
     }
 }
 
-void PartialPBCTOperator::initializeTTProjector()
+void PartialPBCT2DOperator::initializeTTProjector()
 {
     if(!isOpenCLInitialized())
     {
@@ -67,7 +67,7 @@ void PartialPBCTOperator::initializeTTProjector()
     }
 }
 
-void PartialPBCTOperator::initializeVolumeConvolution()
+void PartialPBCT2DOperator::initializeVolumeConvolution()
 {
     if(!isOpenCLInitialized())
     {
@@ -81,7 +81,7 @@ void PartialPBCTOperator::initializeVolumeConvolution()
     }
 }
 
-void PartialPBCTOperator::useJacobiVectorCLCode()
+void PartialPBCT2DOperator::useJacobiVectorCLCode()
 {
     if(!isOpenCLInitialized())
     {
@@ -94,7 +94,7 @@ void PartialPBCTOperator::useJacobiVectorCLCode()
     }
 }
 
-int PartialPBCTOperator::problemSetup(
+int PartialPBCT2DOperator::problemSetup(
     std::vector<std::shared_ptr<geometry::Geometry3DParallelI>> geometries,
     double voxelSpacingX,
     double voxelSpacingY,
@@ -135,7 +135,7 @@ int PartialPBCTOperator::problemSetup(
     return 0;
 }
 
-int PartialPBCTOperator::allocateXBuffers(uint32_t xBufferCount)
+int PartialPBCT2DOperator::allocateXBuffers(uint32_t xBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> xbp;
@@ -154,7 +154,7 @@ int PartialPBCTOperator::allocateXBuffers(uint32_t xBufferCount)
     return 0;
 }
 
-int PartialPBCTOperator::allocateBBuffers(uint32_t bBufferCount)
+int PartialPBCT2DOperator::allocateBBuffers(uint32_t bBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> bbp;
@@ -172,7 +172,7 @@ int PartialPBCTOperator::allocateBBuffers(uint32_t bBufferCount)
     return 0;
 }
 
-int PartialPBCTOperator::allocateTmpXBuffers(uint32_t xBufferCount)
+int PartialPBCT2DOperator::allocateTmpXBuffers(uint32_t xBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> xbp;
@@ -190,7 +190,7 @@ int PartialPBCTOperator::allocateTmpXBuffers(uint32_t xBufferCount)
     return 0;
 }
 
-int PartialPBCTOperator::allocateTmpBBuffers(uint32_t bBufferCount)
+int PartialPBCT2DOperator::allocateTmpBBuffers(uint32_t bBufferCount)
 {
     cl_int err;
     std::shared_ptr<cl::Buffer> bbp;
@@ -208,7 +208,7 @@ int PartialPBCTOperator::allocateTmpBBuffers(uint32_t bBufferCount)
     return 0;
 }
 
-std::shared_ptr<cl::Buffer> PartialPBCTOperator::getXBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getXBuffer(uint32_t i)
 {
     if(i < x_buffers.size())
     {
@@ -222,7 +222,7 @@ std::shared_ptr<cl::Buffer> PartialPBCTOperator::getXBuffer(uint32_t i)
     }
 }
 
-std::shared_ptr<cl::Buffer> PartialPBCTOperator::getBBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getBBuffer(uint32_t i)
 {
     if(i < b_buffers.size())
     {
@@ -236,7 +236,7 @@ std::shared_ptr<cl::Buffer> PartialPBCTOperator::getBBuffer(uint32_t i)
     }
 }
 
-std::shared_ptr<cl::Buffer> PartialPBCTOperator::getTmpXBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getTmpXBuffer(uint32_t i)
 {
     if(i < tmp_x_buffers.size())
     {
@@ -250,7 +250,7 @@ std::shared_ptr<cl::Buffer> PartialPBCTOperator::getTmpXBuffer(uint32_t i)
     }
 }
 
-std::shared_ptr<cl::Buffer> PartialPBCTOperator::getTmpBBuffer(uint32_t i)
+std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getTmpBBuffer(uint32_t i)
 {
     if(i < tmp_b_buffers.size())
     {
@@ -269,7 +269,7 @@ std::shared_ptr<cl::Buffer> PartialPBCTOperator::getTmpBBuffer(uint32_t i)
  * @param projectionIncrement For OS SART 1 by default
  *
  */
-int PartialPBCTOperator::backproject(cl::Buffer& B,
+int PartialPBCT2DOperator::backproject(cl::Buffer& B,
                                      cl::Buffer& X,
                                      uint32_t initialProjectionIndex,
                                      uint32_t projectionIncrement)
@@ -310,7 +310,7 @@ int PartialPBCTOperator::backproject(cl::Buffer& B,
  * @param projectionIncrement For OS SART, 1 by default
  *
  */
-int PartialPBCTOperator::project_partial(uint32_t QID,
+int PartialPBCT2DOperator::project_partial(uint32_t QID,
                                          cl::Buffer& X,
                                          cl::Buffer& B,
                                          uint32_t vdimz_local,
@@ -397,7 +397,7 @@ int PartialPBCTOperator::project_partial(uint32_t QID,
 
 // Scaling factor is a expression f*f/(px*py), where f is source to detector distance and pixel
 // sizes are (px and py)  Focal length http://ksimek.github.io/2013/08/13/intrinsic/
-std::vector<float> PartialPBCTOperator::computeScalingFactors()
+std::vector<float> PartialPBCT2DOperator::computeScalingFactors()
 {
     std::vector<float> scalingFactors;
     float pixelArea, detectorTilt, scalingFactor;
@@ -412,7 +412,7 @@ std::vector<float> PartialPBCTOperator::computeScalingFactors()
     return scalingFactors;
 }
 
-void PartialPBCTOperator::writeVolume(cl::Buffer& X, float* x, std::string path)
+void PartialPBCT2DOperator::writeVolume(cl::Buffer& X, float* x, std::string path)
 {
     std::string ERR = "Not implemented";
     KCTERR(ERR);
@@ -424,7 +424,7 @@ void PartialPBCTOperator::writeVolume(cl::Buffer& X, float* x, std::string path)
        io::DenSupportedType::FLOAT32, vdimx, vdimy, vdimz, outxmajor);*/
 }
 
-void PartialPBCTOperator::writeProjections(cl::Buffer& B, float* b, std::string path)
+void PartialPBCT2DOperator::writeProjections(cl::Buffer& B, float* b, std::string path)
 {
     std::string ERR = "Not implemented";
     KCTERR(ERR);
@@ -436,7 +436,7 @@ void PartialPBCTOperator::writeProjections(cl::Buffer& B, float* b, std::string 
        io::DenSupportedType::FLOAT32, pdimx, pdimy, pdimz, outxmajor);*/
 }
 
-void PartialPBCTOperator::setTimestamp(bool finishCommandQueue)
+void PartialPBCT2DOperator::setTimestamp(bool finishCommandQueue)
 {
     if(finishCommandQueue)
     {
@@ -444,7 +444,7 @@ void PartialPBCTOperator::setTimestamp(bool finishCommandQueue)
     }
     timestamp = std::chrono::steady_clock::now();
 }
-std::chrono::milliseconds PartialPBCTOperator::millisecondsFromTimestamp(bool setNewTimestamp)
+std::chrono::milliseconds PartialPBCT2DOperator::millisecondsFromTimestamp(bool setNewTimestamp)
 {
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - timestamp);
@@ -456,7 +456,7 @@ std::chrono::milliseconds PartialPBCTOperator::millisecondsFromTimestamp(bool se
 }
 
 std::string
-PartialPBCTOperator::printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+PartialPBCT2DOperator::printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
 {
     if(finishCommandQueue)
     {
@@ -466,7 +466,7 @@ PartialPBCTOperator::printTime(std::string msg, bool finishCommandQueue, bool se
     return io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
 }
 
-void PartialPBCTOperator::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+void PartialPBCT2DOperator::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
 {
     if(finishCommandQueue)
     {
@@ -479,13 +479,13 @@ void PartialPBCTOperator::reportTime(std::string msg, bool finishCommandQueue, b
     }
 }
 
-void PartialPBCTOperator::setVerbose(bool verbose, std::string intermediatePrefix)
+void PartialPBCT2DOperator::setVerbose(bool verbose, std::string intermediatePrefix)
 {
     this->verbose = verbose;
     this->intermediatePrefix = intermediatePrefix;
 }
 
-double PartialPBCTOperator::adjointProductTest(float* x, float* b)
+double PartialPBCT2DOperator::adjointProductTest(float* x, float* b)
 {
     /*
         std::shared_ptr<cl::Buffer> x_buf, xa_buf; // X buffers
@@ -508,7 +508,7 @@ double PartialPBCTOperator::adjointProductTest(float* x, float* b)
     return 0;
 }
 
-cl::NDRange PartialPBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
+cl::NDRange PartialPBCT2DOperator::guessProjectionLocalNDRange(bool barrierCalls)
 {
     cl::NDRange projectorLocalNDRange;
     if(barrierCalls)
@@ -534,7 +534,7 @@ cl::NDRange PartialPBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
     return projectorLocalNDRange;
 }
 
-cl::NDRange PartialPBCTOperator::guessBackprojectorLocalNDRange()
+cl::NDRange PartialPBCT2DOperator::guessBackprojectorLocalNDRange()
 {
     cl::NDRange backprojectorLocalNDRange;
     if(vdimx % 4 == 0 && vdimy % 16 == 0 && workGroupSize >= 64)

@@ -1451,7 +1451,7 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
                 q = DST / FX; // From v3 to v2
             else
                 q = ONE;
-            CENTROID = (REAL2)((q - p) * vd1, voxelSizes.y);
+            //CENTROID = (REAL2)((q - p) * vd1, voxelSizes.y);
             NAREA = THREE * (p + q);
             if(NAREA > ZERO)
             {
@@ -1486,7 +1486,7 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
                 q = DST / FY; // v0 to v3
             else
                 q = ONE;
-            CENTROID = (REAL2)(voxelSizes.x, (q - p) * vd3);
+            //CENTROID = (REAL2)(voxelSizes.x, (q - p) * vd3);
             NAREA = THREE * (p + q);
             if(NAREA > ZERO)
             {
@@ -1505,7 +1505,7 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
                 q = DST / -FX; // v2 to v3
             else
                 q = ZERO;
-            CENTROID = (REAL2)(q * vd1, p * vd3);
+            //CENTROID = (REAL2)(q * vd1, p * vd3);
             NAREA_complement = HALF * p * q;
             NAREA = ONE - NAREA_complement;
             w = HALF / NAREA;

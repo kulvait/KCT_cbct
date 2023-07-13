@@ -147,6 +147,7 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/convolution.cl opencl/convolution.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/pbct_cvp.cl opencl/pbct_cvp.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/pbct_cvp_barrier.cl opencl/pbct_cvp_barrier.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/pbct2d_cvp.cl opencl/pbct2d_cvp.cl COPYONLY)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_sidon.cl DESTINATION opencl)
@@ -166,6 +167,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/convolution.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/pbct_cvp.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/pbct_cvp_barrier.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/pbct2d_cvp.cl DESTINATION opencl)
 
 
 SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
@@ -330,6 +332,25 @@ target_compile_definitions(kct-pb-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_
 target_compile_definitions(kct-pb-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)
 target_git_version_init(kct-pb-projector)
 install (TARGETS kct-pb-projector RUNTIME DESTINATION .)
+
+SET(PB2DPROJECTOR_SOURCES src/kct-pb2d-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp src/alg/PartialParallelBeam2DProjector.cpp src/PartialPBCT2DOperator.cpp)
+add_executable(kct-pb2d-projector ${PB2DPROJECTOR_SOURCES})
+set_target_properties(
+    kct-pb2d-projector
+    PROPERTIES 
+        OUTPUT_NAME "kct-pb2d-projector"
+        SUFFIX ""
+)
+target_link_libraries(kct-pb2d-projector ctiol)
+target_link_libraries(kct-pb2d-projector ctmal)
+target_link_libraries(kct-pb2d-projector OpenCL::OpenCL)
+target_link_libraries(kct-pb2d-projector CTIOL_OPENCL)
+target_link_libraries (kct-pb2d-projector ${CMAKE_THREAD_LIBS_INIT})
+target_include_directories(kct-pb2d-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
+target_compile_definitions(kct-pb2d-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+target_compile_definitions(kct-pb2d-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)
+target_git_version_init(kct-pb2d-projector)
+install (TARGETS kct-pb2d-projector RUNTIME DESTINATION .)
 
 SET(CLLINCGLS_SOURCES src/kct-pb-backprojector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp)
 add_executable(kct-pb-backprojector ${CLLINCGLS_SOURCES})

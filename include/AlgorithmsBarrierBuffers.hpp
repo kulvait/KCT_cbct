@@ -17,6 +17,7 @@
 #include "MATRIX/utils.hpp"
 #include "OPENCL/OpenCLManager.hpp"
 #include "PROG/KCTException.hpp"
+#include "ReductionParameters.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
 
@@ -26,7 +27,11 @@ namespace KCT {
 class AlgorithmsBarrierBuffers : public virtual Kniha
 {
 public:
-    AlgorithmsBarrierBuffers() { CLINCLUDEutils(); }
+    AlgorithmsBarrierBuffers()
+    {
+        rp = nullptr;
+        CLINCLUDEutils();
+    }
 
     AlgorithmsBarrierBuffers(uint32_t pdimx,
                              uint32_t pdimy,
@@ -60,27 +65,53 @@ public:
     int updateReductionBuffers();
 
 protected:
-    uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
-    uint32_t workGroupSize = 256;
-    uint64_t XDIM, BDIM, XDIM_ALIGNED, BDIM_ALIGNED, XDIM_REDUCED1, BDIM_REDUCED1,
-        XDIM_REDUCED1_ALIGNED, BDIM_REDUCED1_ALIGNED, XDIM_REDUCED2, BDIM_REDUCED2,
-        XDIM_REDUCED2_ALIGNED, BDIM_REDUCED2_ALIGNED;
+    std::shared_ptr<ReductionParameters> rp;
 
     // Functions to manipulate with buffers
-    float normBBuffer_barrier(cl::Buffer& B);
-    float normXBuffer_barrier(cl::Buffer& X);
-    float normBBuffer_frame(cl::Buffer& B);
-    float normXBuffer_frame(cl::Buffer& X);
-    float sumBBuffer_barrier_float(cl::Buffer& B);
-    float sumXBuffer_barrier_float(cl::Buffer& X);
-    float maxBBuffer_barrier_float(cl::Buffer& B);
-    float maxXBuffer_barrier_float(cl::Buffer& X);
-    double normBBuffer_barrier_double(cl::Buffer& B);
-    double normXBuffer_barrier_double(cl::Buffer& X);
-    double normBBuffer_frame_double(cl::Buffer& B);
-    double normXBuffer_frame_double(cl::Buffer& X);
-    double scalarProductBBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B);
-    double scalarProductXBuffer_barrier_double(cl::Buffer& A, cl::Buffer& B);
+    float normBBuffer_barrier(cl::Buffer& B,
+                              std::shared_ptr<ReductionParameters> rp = nullptr,
+                              uint32_t QID = 0);
+    float normXBuffer_barrier(cl::Buffer& X,
+                              std::shared_ptr<ReductionParameters> rp = nullptr,
+                              uint32_t QID = 0);
+    float normBBuffer_frame(cl::Buffer& B,
+                            std::shared_ptr<ReductionParameters> rp = nullptr,
+                            uint32_t QID = 0);
+    float normXBuffer_frame(cl::Buffer& X,
+                            std::shared_ptr<ReductionParameters> rp = nullptr,
+                            uint32_t QID = 0);
+    float sumBBuffer_barrier_float(cl::Buffer& B,
+                                   std::shared_ptr<ReductionParameters> rp = nullptr,
+                                   uint32_t QID = 0);
+    float sumXBuffer_barrier_float(cl::Buffer& X,
+                                   std::shared_ptr<ReductionParameters> rp = nullptr,
+                                   uint32_t QID = 0);
+    float maxBBuffer_barrier_float(cl::Buffer& B,
+                                   std::shared_ptr<ReductionParameters> rp = nullptr,
+                                   uint32_t QID = 0);
+    float maxXBuffer_barrier_float(cl::Buffer& X,
+                                   std::shared_ptr<ReductionParameters> rp = nullptr,
+                                   uint32_t QID = 0);
+    double normBBuffer_barrier_double(cl::Buffer& B,
+                                      std::shared_ptr<ReductionParameters> rp = nullptr,
+                                      uint32_t QID = 0);
+    double normXBuffer_barrier_double(cl::Buffer& X,
+                                      std::shared_ptr<ReductionParameters> rp = nullptr,
+                                      uint32_t QID = 0);
+    double normBBuffer_frame_double(cl::Buffer& B,
+                                    std::shared_ptr<ReductionParameters> rp = nullptr,
+                                    uint32_t QID = 0);
+    double normXBuffer_frame_double(cl::Buffer& X,
+                                    std::shared_ptr<ReductionParameters> rp = nullptr,
+                                    uint32_t QID = 0);
+    double scalarProductBBuffer_barrier_double(cl::Buffer& A,
+                                               cl::Buffer& B,
+                                               std::shared_ptr<ReductionParameters> rp = nullptr,
+                                               uint32_t QID = 0);
+    double scalarProductXBuffer_barrier_double(cl::Buffer& A,
+                                               cl::Buffer& B,
+                                               std::shared_ptr<ReductionParameters> rp = nullptr,
+                                               uint32_t QID = 0);
 
     /**
      * Copy float* array of size elements into the CL::buffer. The buffer must have appropriate
@@ -92,7 +123,7 @@ protected:
      *
      * @return 0 on success
      */
-    int arrayIntoBuffer(float* c_array, cl::Buffer cl_buffer, uint64_t size);
+    int arrayIntoBuffer(float* c_array, cl::Buffer cl_buffer, uint64_t size, uint32_t QID = 0);
     /**
      * Copy CL:buffer into the float* array of size elements. The buffer must have appropriate size.
      *
@@ -102,14 +133,14 @@ protected:
      *
      * @return 0 on success
      */
-    int bufferIntoArray(cl::Buffer cl_buffer, float* c_array, uint64_t size);
-    std::shared_ptr<cl::Buffer> tmp_b_red1 = nullptr, tmp_b_red2 = nullptr;
-    std::shared_ptr<cl::Buffer> tmp_x_red1 = nullptr, tmp_x_red2 = nullptr;
+    int bufferIntoArray(cl::Buffer cl_buffer, float* c_array, uint64_t size, uint32_t QID = 0);
+    std::vector<std::shared_ptr<cl::Buffer>> tmp_red1;
+    std::vector<std::shared_ptr<cl::Buffer>> tmp_red2;
 
 private:
     bool reductionParametersSet = false;
     bool algorithmsBuffersInitialized = false;
-    uint32_t tmp_red1_bytesize, tmp_red2_bytesize;
+    uint64_t tmp_red1_bytesize = 0, tmp_red2_bytesize = 0;
 };
 
 } // namespace KCT

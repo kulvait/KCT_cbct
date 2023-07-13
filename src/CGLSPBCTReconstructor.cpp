@@ -858,8 +858,8 @@ int CGLSPBCTReconstructor::reconstruct_experimental(uint32_t maxIterations, floa
     double sum;
     uint32_t framesize = pdimx * pdimy;
     cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
-    (*vector_NormSquarePartial)(eargs1, *v_proj, *tmp_x_red1, framesize).wait();
-    Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+    (*vector_NormSquarePartial)(eargs1, *v_proj, *tmp_red1[0], framesize).wait();
+    Q[0]->enqueueReadBuffer(*tmp_red1[0], CL_TRUE, 0, sizeof(double), &sum);
     vnorm2_old += sum;
     // EXPERIMENTAL
     algFLOATvector_copy(*v_buf, *w_buf, XDIM);
@@ -925,8 +925,8 @@ int CGLSPBCTReconstructor::reconstruct_experimental(uint32_t maxIterations, floa
         vnorm2_now = normXBuffer_barrier_double(*v_buf);
         // EXPERIMENTAL
         cl::EnqueueArgs eargs1(*Q[0], cl::NDRange(1));
-        (*vector_NormSquarePartial)(eargs1, *v_proj, *tmp_x_red1, framesize).wait();
-        Q[0]->enqueueReadBuffer(*tmp_x_red1, CL_TRUE, 0, sizeof(double), &sum);
+        (*vector_NormSquarePartial)(eargs1, *v_proj, *tmp_red1[0], framesize).wait();
+        Q[0]->enqueueReadBuffer(*tmp_red1[0], CL_TRUE, 0, sizeof(double), &sum);
         vnorm2_now += sum;
         // EXPERIMENTAL
         beta = vnorm2_now / vnorm2_old;
