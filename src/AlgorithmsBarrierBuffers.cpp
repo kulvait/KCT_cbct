@@ -555,7 +555,7 @@ int AlgorithmsBarrierBuffers::initReductionBuffers()
     std::shared_ptr<cl::Buffer> red1_buf, red2_buf;
     uint32_t qsize = Q.size();
     std::vector<cl::Memory> mem;
-    for(int QID = 0; QID != qsize; QID++)
+    for(unsigned int QID = 0; QID != qsize; QID++)
     {
         red1_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
                                                 rp->BYTESIZE_REDUCED1_MIN, nullptr, &err);
@@ -611,7 +611,7 @@ int AlgorithmsBarrierBuffers::updateReductionParameters(uint32_t pdimx,
         if(rp->BYTESIZE_REDUCED1_MIN > tmp_red1_bytesize)
         {
             tmp_red1.clear();
-            for(int QID = 0; QID != qsize; QID++)
+            for(unsigned int QID = 0; QID != qsize; QID++)
             {
                 red1_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
                                                         rp->BYTESIZE_REDUCED1_MIN, nullptr, &err);
@@ -631,7 +631,7 @@ int AlgorithmsBarrierBuffers::updateReductionParameters(uint32_t pdimx,
         if(rp->BYTESIZE_REDUCED2_MIN > tmp_red2_bytesize)
         {
             tmp_red2.clear();
-            for(int QID = 0; QID != qsize; QID++)
+            for(unsigned int QID = 0; QID != qsize; QID++)
             {
                 red2_buf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE,
                                                         rp->BYTESIZE_REDUCED2_MIN, nullptr, &err);

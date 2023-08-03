@@ -13,6 +13,7 @@
 #include <mutex>
 #include <queue>
 #include <random>
+#include <thread>
 
 // Internal libraries
 #include "Kniha.hpp"

@@ -915,7 +915,7 @@ std::string Kniha::infoString(cl_int cl_info_id)
     } else if(cl_info_id == CL_COMMAND_FILL_IMAGE)
     {
         return "CL_COMMAND_FILL_IMAGE";
-    } else if(cl_info_id == CL_COMMAND_SVM_FREE)
+    } /*else if(cl_info_id == CL_COMMAND_SVM_FREE)
     {
         return "CL_COMMAND_SVM_FREE";
     } else if(cl_info_id == CL_COMMAND_SVM_MEMCPY)
@@ -930,7 +930,7 @@ std::string Kniha::infoString(cl_int cl_info_id)
     } else if(cl_info_id == CL_COMMAND_SVM_UNMAP)
     {
         return "CL_COMMAND_SVM_UNMAP";
-    } else if(cl_info_id == CL_DEVICE_NOT_FOUND)
+    } */else if(cl_info_id == CL_DEVICE_NOT_FOUND)
     {
         return "CL_DEVICE_NOT_FOUND";
     } else if(cl_info_id == CL_DEVICE_NOT_AVAILABLE)
@@ -1198,7 +1198,7 @@ cl::NDRange Kniha::assignLocalRange(cl::NDRange localRange, cl::NDRange globalRa
             KCTERR(err);
         } else
         {
-            for(int i = 0; i < dim; i++)
+            for(unsigned int i = 0; i < dim; i++)
             {
                 if(globalRange[i] < localRange[i])
                 {
