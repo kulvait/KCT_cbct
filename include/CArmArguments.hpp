@@ -1,6 +1,7 @@
 #pragma once
 #include <cctype>
 #include <string>
+#include <regex>
 
 #include "OPENCL/OpenCLManager.hpp"
 #include "PROG/Arguments.hpp"

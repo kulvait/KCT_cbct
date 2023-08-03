@@ -68,7 +68,7 @@ void CArmArguments::parsePlatformString(bool verbose)
 {
     const std::regex platformDeviceRegex("(\\d+|\\d+:((\\d+-\\d+|\\d+),)*(\\d+-\\d+|\\d+))");
     const std::regex platformOnlyRegex("\\d+");
-    const std::regex platformExtendedRegex("(\\d+):([\\d-,]+)");
+    const std::regex platformExtendedRegex("(\\d+):([\\d,-]+)");
     // Handle empty string
     std::string ERR;
     uint32_t platformsOpenCL = util::OpenCLManager::platformCount();
