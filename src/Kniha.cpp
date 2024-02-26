@@ -930,7 +930,8 @@ std::string Kniha::infoString(cl_int cl_info_id)
     } else if(cl_info_id == CL_COMMAND_SVM_UNMAP)
     {
         return "CL_COMMAND_SVM_UNMAP";
-    } */else if(cl_info_id == CL_DEVICE_NOT_FOUND)
+    } */
+    else if(cl_info_id == CL_DEVICE_NOT_FOUND)
     {
         return "CL_DEVICE_NOT_FOUND";
     } else if(cl_info_id == CL_DEVICE_NOT_AVAILABLE)
@@ -1995,6 +1996,97 @@ int Kniha::algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
             cl_info_id, command_type_string.c_str());
         KCTERR(err);
     }
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+// pbct2d_cvp.cl
+int Kniha::algFLOAT_pbct2d_cutting_voxel_project(cl::Buffer& volume,
+                                                 cl::Buffer& projection,
+                                                 unsigned long projectionOffset,
+                                                 cl_double3& CM,
+                                                 cl_int3& vdims,
+                                                 cl_double3& voxelSizes,
+                                                 cl_double2& volumeCenter,
+                                                 cl_int2& pdims,
+                                                 float& globalScalingMultiplier,
+                                                 int& k_from,
+                                                 int& k_count,
+                                                 cl::NDRange globalRange,
+                                                 cl::NDRange _localRange, // default cl::NullRange
+                                                 bool blocking,
+                                                 uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    /*
+        auto exe = (*FLOAT_pbct2d_cutting_voxel_project)(*eargs, volume, projection,
+       projectionOffset, CM, vdims, voxelSizes, volumeCenter, pdims, globalScalingMultiplier,
+       k_from, k_count);
+    */
+    // Improve error handling, see
+    // https://stackoverflow.com/questions/14088030/opencl-returns-error-58-while-executing-larga-amount-of-data
+    cl::Kernel kernel = cl::Kernel(*program, "FLOAT_pbct2d_cutting_voxel_project");
+    kernel.setArg(0, volume);
+    kernel.setArg(1, projection);
+    kernel.setArg(2, projectionOffset);
+    kernel.setArg(3, CM);
+    kernel.setArg(4, vdims);
+    kernel.setArg(5, voxelSizes);
+    kernel.setArg(6, volumeCenter);
+    kernel.setArg(7, pdims);
+    kernel.setArg(8, globalScalingMultiplier);
+    kernel.setArg(9, k_from);
+    kernel.setArg(10, k_count);
+    cl::NDRange nulloffset = cl::NullRange;
+    cl::Event exe;
+    cl_int cl_info_id
+        = Q[QID]->enqueueNDRangeKernel(kernel, nulloffset, globalRange, localRange, nullptr, &exe);
+    if(cl_info_id != CL_SUCCESS)
+    {
+        std::string command_type_string = infoString(cl_info_id);
+        err = io::xprintf(
+            "Error in enqueueNDRangeKernel FLOAT_pbct2d_cutting_voxel_project cl_info_id=%d, "
+            "command_type_string=%s!",
+            cl_info_id, command_type_string.c_str());
+        KCTERR(err);
+    }
+
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOAT_pbct2d_cutting_voxel_backproject(
+    cl::Buffer& volume,
+    cl::Buffer& projection,
+    unsigned long projectionOffset,
+    cl_double3& CM,
+    cl_int3& vdims,
+    cl_double3& voxelSizes,
+    cl_double2& volumeCenter,
+    cl_int2& pdims,
+    float& globalScalingMultiplier,
+    int& k_from,
+    int& k_to,
+    cl::NDRange globalRange,
+    cl::NDRange _localRange, // default cl::NullRange
+    bool blocking,
+    uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+
+    auto exe = (*FLOAT_pbct2d_cutting_voxel_backproject)(
+        *eargs, volume, projection, projectionOffset, CM, vdims, voxelSizes, volumeCenter, pdims,
+        globalScalingMultiplier, k_from, k_to);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

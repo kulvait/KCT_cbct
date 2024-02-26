@@ -96,8 +96,9 @@ public:
     // Here (0,0,0) is in the center of the volume
     uint64_t totalVolumeSize;
     uint64_t totalProjectionSize;
-    int64_t partialProjectorBytesize
-        = 2147483648; // Negative means do not use partial projector implementation
+    // For 0 set it to 2147483648;
+    // Negative means do not use partial projector implementation
+    int64_t partialProjectorBytesize = -1;
     uint32_t baseOffset = 0;
     bool noFrameOffset = false;
     std::string inputVolume;

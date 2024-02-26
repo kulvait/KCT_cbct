@@ -129,13 +129,15 @@ typedef double16 REAL16;
 #define LENGTH(x) length(x)
 #endif
 
-#define PROJECTX0(CM, v0) dot(v0, CM.s012) / dot(v0, CM.s89a)
+#define PROJECTX0(CM, v0) (dot(v0, CM.s012) / dot(v0, CM.s89a))
 
-#define PROJECTY0(CM, v0) dot(v0, CM.s456) / dot(v0, CM.s89a)
+#define PROJECTY0(CM, v0) (dot(v0, CM.s456) / dot(v0, CM.s89a))
 
-#define PBPROJECTX(CM, v) dot(v, CM.s012) + CM.s3
+#define PBPROJECTX(CM, v) (dot(v, CM.s012) + CM.s3)
 
-#define PBPROJECTY(CM, v) dot(v, CM.s456) + CM.s7
+#define PBPROJECTY(CM, v) (dot(v, CM.s456) + CM.s7)
+
+#define PB2DPROJECT(CM, v) (dot(v, CM.s01) + CM.s2)
 
 #define INDEX(f) convert_int_rtn(f + HALF)
 

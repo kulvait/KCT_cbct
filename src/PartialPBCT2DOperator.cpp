@@ -16,11 +16,11 @@ void PartialPBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_
         {
             addOptString(io::xprintf("-DLOCALARRAYSIZE=%d", LOCALARRAYSIZE));
             this->LOCALARRAYSIZE = LOCALARRAYSIZE;
-            CLINCLUDEpbct_cvp();
+            CLINCLUDEpbct2d_cvp();
             CLINCLUDEpbct_cvp_barrier();
         } else
         {
-            CLINCLUDEpbct_cvp();
+            CLINCLUDEpbct2d_cvp();
         }
         CLINCLUDEbackprojector();
         CLINCLUDErescaleProjections();
@@ -30,7 +30,8 @@ void PartialPBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_
     }
 }
 
-void PartialPBCT2DOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
+void PartialPBCT2DOperator::initializeSidonProjector(uint32_t probesPerEdgeX,
+                                                     uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
@@ -270,9 +271,9 @@ std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getTmpBBuffer(uint32_t i)
  *
  */
 int PartialPBCT2DOperator::backproject(cl::Buffer& B,
-                                     cl::Buffer& X,
-                                     uint32_t initialProjectionIndex,
-                                     uint32_t projectionIncrement)
+                                       cl::Buffer& X,
+                                       uint32_t initialProjectionIndex,
+                                       uint32_t projectionIncrement)
 {
     std::string ERR = "Not yet implemented";
     KCTERR(ERR);
@@ -311,14 +312,14 @@ int PartialPBCT2DOperator::backproject(cl::Buffer& B,
  *
  */
 int PartialPBCT2DOperator::project_partial(uint32_t QID,
-                                         cl::Buffer& X,
-                                         cl::Buffer& B,
-                                         uint32_t vdimz_local,
-                                         float voxelzCenterOffset,
-                                         uint32_t geometries_from,
-                                         uint32_t geometries_to,
-                                         uint32_t initialProjectionIndex,
-                                         uint32_t projectionIncrement)
+                                           cl::Buffer& X,
+                                           cl::Buffer& B,
+                                           uint32_t vdimz_local,
+                                           float voxelzCenterOffset,
+                                           uint32_t geometries_from,
+                                           uint32_t geometries_to,
+                                           uint32_t initialProjectionIndex,
+                                           uint32_t projectionIncrement)
 {
     cl::NDRange localRange;
     if(useBarrierImplementation)
@@ -342,14 +343,17 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
     // std::shared_ptr<cl::NDRange> barrierLocalRange
     //    = std::make_shared<cl::NDRange>(projectorLocalNDRangeBarrier);
     // clang-format on
-    cl_double8 CM;
+    cl_double3 CM;
     float scalingFactor;
     unsigned long frameSize = pdimx * pdimy;
     unsigned long offset;
     cl_double3 volumeCenter_local = volumeCenter;
+    cl_double2 volumeCenter2D = { volumeCenter.x, volumeCenter.y };
     volumeCenter_local.z -= (voxelzCenterOffset * voxelSizes.z);
     uint64_t IND;
     uint32_t i_start, i_stop;
+    int k_from = 0;
+    int k_count = vdimz_local;
     if(initialProjectionIndex == 0 && projectionIncrement == 1)
     {
         i_start = geometries_from;
@@ -360,11 +364,13 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
         i_stop = PM8Vector.size();
     }
 
+    std::shared_ptr<geometry::Geometry3DParallelI> G;
     for(std::size_t i = i_start; i < i_stop; i += projectionIncrement)
     {
         if(i >= geometries_from && i < geometries_to)
         {
-            CM = PM8Vector[i];
+            G = geometries[i];
+            G->projectionMatrixPXAsVector3((double*)&CM, voxelzCenterOffset);
             scalingFactor = scalingFactorVector[i];
             IND = i - geometries_from;
             offset = IND * frameSize;
@@ -378,16 +384,19 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
             {
                 if(useBarrierImplementation)
                 {
-                    cl::NDRange globalRange(vdimx, vdimy, vdimz_local);
-                    algFLOAT_pbct_cutting_voxel_project_barrier(
-                        X, B, offset, CM, vdims, voxelSizes, volumeCenter_local, pdims,
-                        scalingFactor, LOCALARRAYSIZE, globalRange, localRange, false, QID);
+                    KCTERR("Barrier projection with algFLOAT_pbct2d_cutting_voxel_project_barrier "
+                           "not yet implemented!");
+                    /*
+                                        cl::NDRange globalRange(vdimx, vdimy, vdimz_local);
+                                        algFLOAT_pbct2d_cutting_voxel_project_barrier(
+                                            X, B, offset, CM, vdims, voxelSizes, volumeCenter_local,
+                       pdims, scalingFactor, LOCALARRAYSIZE, globalRange, localRange, false, QID);*/
                 } else
                 {
-                    cl::NDRange globalRange(vdimz_local, vdimy, vdimx);
-                    algFLOAT_pbct_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
-                                                        volumeCenter_local, pdims, scalingFactor,
-                                                        globalRange, localRange, false, QID);
+                    cl::NDRange globalRange(vdimx, vdimy);
+                    algFLOAT_pbct2d_cutting_voxel_project(
+                        X, B, offset, CM, vdims, voxelSizes, volumeCenter2D, pdims, scalingFactor,
+                        k_from, k_count, globalRange, localRange, false, QID);
                 }
             }
         }
@@ -466,7 +475,9 @@ PartialPBCT2DOperator::printTime(std::string msg, bool finishCommandQueue, bool 
     return io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
 }
 
-void PartialPBCT2DOperator::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+void PartialPBCT2DOperator::reportTime(std::string msg,
+                                       bool finishCommandQueue,
+                                       bool setNewTimestamp)
 {
     if(finishCommandQueue)
     {
