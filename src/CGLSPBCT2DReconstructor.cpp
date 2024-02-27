@@ -36,7 +36,7 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     }
     backproject(*discrepancy_bbuf, *residualVector_xbuf);
-    BasePBCT2DReconstructor::writeVolume(*residualVector_xbuf, "initialBackprojection.den");
+    //BasePBCT2DReconstructor::writeVolume(*residualVector_xbuf, "initialBackprojection.den");
     algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
     residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
     reportTime("Backprojection 0", false, true);
