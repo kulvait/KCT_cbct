@@ -17,7 +17,7 @@
 #include "gitversion/version.h"
 
 // Reconstructors
-#include "CGLSPBCTReconstructor.hpp"
+#include "CGLSPBCT2DReconstructor.hpp"
 
 // Internal libraries
 #include "CArmArguments.hpp"
@@ -53,6 +53,8 @@ public:
     uint64_t totalProjectionSize;
     uint64_t projectionFrameSize;
     uint64_t totalVolumeSize;
+    uint32_t slabFrom = 0;
+    uint32_t slabSize = 0;
     uint32_t baseOffset = 0;
     double tikhonovLambdaL2 = std::numeric_limits<float>::quiet_NaN();
     double tikhonovLambdaV2 = std::numeric_limits<float>::quiet_NaN();
@@ -149,10 +151,16 @@ void Args::defineArguments()
     l3d->needs(tlaplace2d_opt);
     addForceArgs();
     // Reconstruction geometry
-    addVolumeSizeArgs();
+    bool includeVolumeSizez = false;
+    addVolumeSizeArgs(includeVolumeSizez);
+    og_geometry->add_option(
+        "--slab-from", slabFrom,
+        "Use for slab reconstruction, reconstruct only part of the projection data.");
+    og_geometry->add_option("--slab-size", slabSize,
+                            "Use for slab reconstruction, reconstruct only part of the projection "
+                            "data, 0 means reconstruct up to dimy.");
     addVolumeCenterArgs();
     addVoxelSizeArgs();
-    // addPixelSizeArgs();
 
     // Program flow parameters
     addSettingsArgs();
@@ -224,14 +232,33 @@ int Args::postParse()
     {
         ERR = io::xprintf("Incompatible number of %d projections with %d projection matrices",
                           inf.dimz(), pmi.dimz());
+        LOGE << ERR;
+        return -1;
     }
     projectionSizeX = inf.dimx();
     projectionSizeY = inf.dimy();
     projectionSizeZ = inf.dimz();
-    totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
-    projectionFrameSize = projectionSizeX * projectionSizeY;
+    if(slabFrom >= projectionSizeY)
+    {
+        ERR = io::xprintf("Inconsistent slab spec!");
+        LOGE << ERR;
+        return -1;
+    }
+    if(slabSize == 0)
+    {
+        slabSize = projectionSizeY - slabFrom;
+    }
+    uint32_t slabTo = slabFrom + slabSize;
+    if(slabTo > projectionSizeY)
+    {
+        ERR = io::xprintf("Inconsistent slab spec!");
+        LOGE << ERR;
+        return -1;
+    }
+    totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(slabSize);
+    projectionFrameSize = static_cast<uint64_t>(projectionSizeX) * static_cast<uint64_t>(slabSize);
     totalProjectionSize
-        = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+        = uint64_t(projectionSizeX) * uint64_t(slabSize) * uint64_t(projectionSizeZ);
     LOGD << io::xprintf("Projection (x,y,z) = (%d, %d, %d), totalProjectionSize=%lu",
                         projectionSizeX, projectionSizeY, projectionSizeZ, totalProjectionSize);
     if(inf.dimz() != pmi.dimz())
@@ -367,13 +394,14 @@ int main(int argc, char* argv[])
         float* projection = new float[ARG.totalProjectionSize];
         io::DenFileInfo inputProjectionInfo(ARG.inputProjections);
         bool readxmajor = false;
-        inputProjectionInfo.readIntoArray<float>(projection, readxmajor);
+        inputProjectionInfo.readIntoArray<float>(projection, readxmajor, 0, 0, ARG.slabFrom,
+                                                 ARG.slabSize);
         float* volume = new float[ARG.totalVolumeSize];
         if(ARG.initialVectorX0 != "")
         {
             io::DenFileInfo iv(ARG.initialVectorX0);
             readxmajor = false;
-            iv.readIntoArray(volume, readxmajor);
+            iv.readIntoArray(volume, readxmajor, 0, 0, 0, 0, ARG.slabFrom, ARG.slabSize);
         }
         std::string startPath;
         startPath = io::getParent(ARG.outputVolume);
@@ -383,10 +411,11 @@ int main(int argc, char* argv[])
         LOGI << io::xprintf("startpath=%s", startPath.c_str());
         if(ARG.cgls)
         {
-            std::shared_ptr<CGLSPBCTReconstructor> cgls = std::make_shared<CGLSPBCTReconstructor>(
-                ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
-                ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
-                backprojectorLocalNDRange);
+            std::shared_ptr<CGLSPBCT2DReconstructor> cgls
+                = std::make_shared<CGLSPBCT2DReconstructor>(
+                    ARG.projectionSizeX, ARG.slabSize, ARG.projectionSizeZ, ARG.volumeSizeX,
+                    ARG.volumeSizeY, ARG.slabSize, ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
+                    backprojectorLocalNDRange);
             cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
             // testing
             //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
@@ -423,17 +452,20 @@ int main(int argc, char* argv[])
                 std::string ERR
                     = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
                 LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             bool X0initialized = ARG.initialVectorX0 != "";
-            cgls->problemSetup(geometryVector, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
-                               ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
+            float geometryAtY = ARG.voxelSizeY
+                * (static_cast<float>(ARG.slabFrom) + 0.5f * static_cast<float>(ARG.slabSize));
+            cgls->problemSetup(geometryVector, geometryAtY, ARG.voxelSizeX, ARG.voxelSizeY,
+                               ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
+                               ARG.volumeCenterZ);
             ecd = cgls->initializeVectors(projection, volume, X0initialized);
             if(ecd != 0)
             {
                 std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
                 LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             if(ARG.useJacobiPreconditioning)
             {
@@ -458,21 +490,21 @@ int main(int argc, char* argv[])
             bool writexmajor = true;
             io::DenFileInfo::create3DDenFileFromArray(
                 volume, volumexmajor, ARG.outputVolume, io::DenSupportedType::FLOAT32,
-                ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, writexmajor);
+                ARG.volumeSizeX, ARG.volumeSizeY, ARG.slabSize, writexmajor);
             delete[] volume;
             delete[] projection;
         } else if(ARG.glsqr)
         {
-            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+            KCTERR("CGLS is the only algorithm yet implemented for 2D parallel rays geometry.");
         } else if(ARG.psirt)
         {
-            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+            KCTERR("CGLS is the only algorithm yet implemented for 2D parallel rays geometry.");
         } else if(ARG.sirt)
         {
-            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+            KCTERR("CGLS is the only algorithm yet implemented for 2D parallel rays geometry.");
         } else if(ARG.ossart)
         {
-            KCTERR("CGLS is the only algorithm yet implemented for parallel rays geometry.");
+            KCTERR("CGLS is the only algorithm yet implemented for 2D parallel rays geometry.");
         }
         PRG.endLog(true);
     } catch(KCTException& ex)

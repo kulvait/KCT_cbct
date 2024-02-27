@@ -421,8 +421,7 @@ int main(int argc, char* argv[])
             {
                 std::string ERR
                     = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             bool X0initialized = ARG.initialVectorX0 != "";
             cgls->problemSetup(geometryVector, ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ,
@@ -431,8 +430,7 @@ int main(int argc, char* argv[])
             if(ecd != 0)
             {
                 std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             if(ARG.useJacobiPreconditioning)
             {

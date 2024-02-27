@@ -24,8 +24,7 @@ inline void CArmArguments::insertDeviceID(uint32_t deviceID, uint32_t devicesOnP
     } else
     {
         ERR = io::xprintf("The device %d not exist can not be in the CLdeviceIDs list.", deviceID);
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
 }
 
@@ -50,8 +49,7 @@ inline void CArmArguments::fillDevicesList(std::string commaSeparatedEntries, ui
             if(pieces_match.size() != 3)
             {
                 ERR = io::xprintf("Error!");
-                LOGE << ERR;
-                throw std::runtime_error(ERR);
+                KCTERR(ERR);
             }
             uint32_t deviceIDstart, deviceIDend;
             deviceIDstart = std::stoul(pieces_match[1].str());
@@ -152,7 +150,7 @@ void CArmArguments::addGeometryGroup()
     }
 }
 
-void CArmArguments::addVolumeSizeArgs()
+void CArmArguments::addVolumeSizeArgs(bool includeVolumeSizez)
 {
     using namespace CLI;
     addGeometryGroup();
@@ -162,12 +160,19 @@ void CArmArguments::addVolumeSizeArgs()
     Option* vy = og_geometry->add_option(
         "--volume-sizey", volumeSizeY,
         io::xprintf("Y dimension of volume as voxel count, defaults to %d.", volumeSizeY));
-    Option* vz = og_geometry->add_option(
-        "--volume-sizez", volumeSizeZ,
-        io::xprintf("Z dimension of volume as voxel count, defaults to %d.", volumeSizeZ));
-    vx->needs(vy)->needs(vz);
-    vy->needs(vx)->needs(vz);
-    vz->needs(vx)->needs(vy);
+    if(includeVolumeSizez)
+    {
+        Option* vz = og_geometry->add_option(
+            "--volume-sizez", volumeSizeZ,
+            io::xprintf("Z dimension of volume as voxel count, defaults to %d.", volumeSizeZ));
+        vx->needs(vy)->needs(vz);
+        vy->needs(vx)->needs(vz);
+        vz->needs(vx)->needs(vy);
+    } else
+    {
+        vx->needs(vy);
+        vy->needs(vx);
+    }
 }
 
 void CArmArguments::addProjectionSizeArgs()

@@ -9,9 +9,46 @@ void inline PB2DInsertVerticalValues(global const float* restrict volumePtr,
     for(uint i = 0; i != numValues; i++)
     {
         val = volumePtr[i * volumeStride];
-        AtomicAdd_g_f(projectionPtr + i, factor * val);
+        val *= factor;
+        if(val != 0.0f)
+        {
+            AtomicAdd_g_f(projectionPtr + i, val);
+        }
     }
 }
+
+/*
+ * Possible implementation, which is slow
+inline REAL
+PB2DExactPolygonPartXXX(const REAL PQ, const REAL PX_inc1, const REAL PX_inc2, const REAL PX_inc3)
+{
+    if(PQ <= ZERO)
+    {
+        return ZERO;
+    } else if(PQ < PX_inc1)
+    {
+        return HALF * PQ * PQ / (PX_inc1 * PX_inc2);
+    } else if(PQ < PX_inc2)
+    {
+        return HALF * (PQ + (PQ - PX_inc1)) / PX_inc2;
+    } else if(PQ < PX_inc3)
+    {
+        if(PX_inc1 == 0)
+        {
+            return PQ / PX_inc2;
+        } else if(PX_inc2 == 0)
+        {
+            return PQ / PX_inc1;
+        } else
+        {
+            return ONE - HALF * (PX_inc3 - PQ) * (PX_inc3 - PQ) / (PX_inc1 * PX_inc2);
+        }
+    } else
+    {
+        return ONE;
+    }
+}
+*/
 
 // clang-format off
 // const REAL vd1 = v1->x - v0->x; Nonzero x part
@@ -38,17 +75,11 @@ void inline PB2DInsertVerticalValues(global const float* restrict volumePtr,
 // given index but we need to achieve p \in [0,1] and q\in[0,1] so that we have to solve it
 // individually
 // I put it int the way to greedy select the biggest area possible
-inline REAL PB2DExactPolygonPart(const REAL PX,
-                                 const REAL vd1,
-                                 const REAL vd3,
-                                 const REAL PX_xyx0,
-                                 const REAL PX_xyx1,
-                                 const REAL PX_xyx2,
-                                 const REAL PX_xyx3,
-                                 const REAL3 CM)
+inline REAL PB2DExactPolygonPart(
+    const REAL PX, const REAL PX_xyx0, const REAL PX_xyx1, const REAL PX_xyx2, const REAL PX_xyx3)
 {
-    const REAL FX = vd1 * CM.s0;
-    const REAL FY = vd3 * CM.s1;
+    const REAL FX = PX_xyx1 - PX_xyx0;
+    const REAL FY = PX_xyx3 - PX_xyx0;
     REAL DST;
     REAL p, q;
     REAL NAREA;
@@ -148,7 +179,7 @@ void kernel FLOAT_pbct2d_cutting_voxel_project(global const float* restrict volu
 //_normalToDetector is not used in this implementation
 #ifdef RELAXED
     const float3 CM = convert_float3(_CM);
-    const float3 voxelSizes = convert_float2(_voxelSizes);
+    const float3 voxelSizes = convert_float3(_voxelSizes);
     const float2 volumeCenter = convert_float2(_volumeCenter);
 #else
 #define CM _CM
@@ -160,7 +191,7 @@ void kernel FLOAT_pbct2d_cutting_voxel_project(global const float* restrict volu
         = (REAL2)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y) * halfVoxelSizes;
     const REAL2 voxelcenter_xy = volumeCenter + volumeCenter_voxelcenter_offset;
     const ulong IND = voxelIndex(i, j, 0, vdims);
-    const global float* voxelPointer = volume + IND;
+    const global float* restrict voxelPointer = volume + IND;
     const int volumeStride = vdims.x * vdims.y;
     // Projected voxel center
     const REAL PX0 = PB2DPROJECT(CM, voxelcenter_xy);
@@ -194,16 +225,12 @@ void kernel FLOAT_pbct2d_cutting_voxel_project(global const float* restrict volu
     // [PI_min, PI_max]
     REAL2 PXinc = fabs(CM.s01) * halfVoxelSizes.s01; // Increments for half voxel shifts
     REAL PXincTotal = PXinc.x + PXinc.y;
-    REAL PX_xyx0 = PX0 - PXincTotal; // At minimum
+    REAL PX_min = PX0 - PXincTotal; // At minimum
     REAL PX_xyx1 = PX0 - PXinc.y + PXinc.x; // Minimum plus xshift
-    REAL PX_xyx2 = PX0 + PXincTotal; // maximum
+    REAL PX_max = PX0 + PXincTotal; // maximum
     REAL PX_xyx3 = PX0 + PXinc.y - PXinc.x; // Minimum plus yshift
-    REAL PX_min = PX_xyx0;
-    REAL PX_max = PX_xyx2;
     int PI_min = INDEX(PX_min + zeroPrecisionTolerance);
     int PI_max = INDEX(PX_max - zeroPrecisionTolerance);
-    REAL vd1 = (CM.s0 > 0 ? voxelSizes.s0 : -voxelSizes.s0);
-    REAL vd3 = (CM.s1 > 0 ? voxelSizes.s1 : -voxelSizes.s1);
     global float* restrict pixelPointer;
     if(PI_max >= 0 && PI_min < pdims.x)
     {
@@ -213,11 +240,6 @@ void kernel FLOAT_pbct2d_cutting_voxel_project(global const float* restrict volu
             pixelPointer = projection + PI_min * pdims.y + k_from;
             PB2DInsertVerticalValues(voxelPointer, volumeStride, pixelPointer, k_count,
                                      voxelVolumeTimesScalingFactor);
-            if(voxelVolumeTimesScalingFactor < 0.0)
-            {
-                printf("SINGLE PI (i,j)=(%d,%d) voxelVolumeTimesScalingFactor=%f\n", i, j,
-                       voxelVolumeTimesScalingFactor);
-            }
         } else
 #ifdef DROPINCOMPLETEVOXELS
             if(PI_min < 0 || PI_max >= pdims.x)
@@ -231,33 +253,23 @@ void kernel FLOAT_pbct2d_cutting_voxel_project(global const float* restrict volu
             int I = max(-1, PI_min);
             int I_STOP = min(PI_max, pdims.x);
             // Section of the square that corresponds to the indices < i
-            sectionSize_prev = PB2DExactPolygonPart(((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1,
-                                                    PX_xyx2, PX_xyx3, CM);
+            sectionSize_prev
+                = PB2DExactPolygonPart(((REAL)I) + HALF, PX_min, PX_xyx1, PX_max, PX_xyx3);
             if(I >= 0)
             {
                 factor = voxelVolumeTimesScalingFactor * sectionSize_prev;
                 pixelPointer = projection + I * pdims.y + k_from;
                 PB2DInsertVerticalValues(voxelPointer, volumeStride, pixelPointer, k_count, factor);
-                if(factor < 0.0)
-                {
-                    printf("IF (i,j)=(%d,%d) voxelVolumeTimesScalingFactor=%f\n", i, j, factor);
-                    printf("voxelVolumeTimesScalingFactor=%f voxelSizes=(%f, %f, %f) scalingFactor=%f\n", voxelVolumeTimesScalingFactor, voxelSizes.x, voxelSizes.y, voxelSizes.z, scalingFactor);
-                    printf("sectionSize_prev=%f PX_min=%f PX_max=%f PI_min=%d I=%d CM=(%f, %f, %f)\n", sectionSize_prev, PX_min, PX_max, PI_min, I, CM.s0, CM.s1, CM.s2);
-                }
             }
             for(I = I + 1; I < I_STOP; I++)
             {
-                sectionSize_cur = PB2DExactPolygonPart(((REAL)I) + HALF, vd1, vd3, PX_xyx0, PX_xyx1,
-                                                       PX_xyx2, PX_xyx3, CM);
+                sectionSize_cur
+                    = PB2DExactPolygonPart(((REAL)I) + HALF, PX_min, PX_xyx1, PX_max, PX_xyx3);
                 polygonSize = sectionSize_cur - sectionSize_prev;
                 factor = voxelVolumeTimesScalingFactor * polygonSize;
                 pixelPointer = projection + I * pdims.y + k_from;
                 PB2DInsertVerticalValues(voxelPointer, volumeStride, pixelPointer, k_count, factor);
                 sectionSize_prev = sectionSize_cur;
-                if(factor < 0.0)
-                {
-                    printf("FOR (i,j)=(%d,%d) voxelVolumeTimesScalingFactor=%f\n", i, j, factor);
-                }
             }
             polygonSize = ONE - sectionSize_prev;
             // Without second test polygonsize==0 triggers division by zero
@@ -266,10 +278,6 @@ void kernel FLOAT_pbct2d_cutting_voxel_project(global const float* restrict volu
                 factor = voxelVolumeTimesScalingFactor * polygonSize;
                 pixelPointer = projection + I * pdims.y + k_from;
                 PB2DInsertVerticalValues(voxelPointer, volumeStride, pixelPointer, k_count, factor);
-                if(factor < 0.0)
-                {
-                    printf("END (i,j)=(%d,%d) voxelVolumeTimesScalingFactor=%f\n", i, j, factor);
-                }
             }
         }
     }
@@ -308,7 +316,7 @@ void kernel FLOAT_pbct2d_cutting_voxel_backproject(global float* restrict volume
 //_normalToDetector is not used in this implementation
 #ifdef RELAXED
     const float3 CM = convert_float3(_CM);
-    const float3 voxelSizes = convert_float2(_voxelSizes);
+    const float3 voxelSizes = convert_float3(_voxelSizes);
     const float2 volumeCenter = convert_float2(_volumeCenter);
 #else
 #define CM _CM
@@ -320,7 +328,7 @@ void kernel FLOAT_pbct2d_cutting_voxel_backproject(global float* restrict volume
         = (REAL2)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y) * halfVoxelSizes;
     const REAL2 voxelcenter_xy = volumeCenter + volumeCenter_voxelcenter_offset;
     const ulong IND = voxelIndex(i, j, 0, vdims);
-    const global float* voxelPointer = volume + IND;
+    global float* restrict voxelPointer = volume + IND;
     const int volumeStride = vdims.x * vdims.y;
     // Projected voxel center
     const REAL PX0 = PB2DPROJECT(CM, voxelcenter_xy);
@@ -354,17 +362,13 @@ void kernel FLOAT_pbct2d_cutting_voxel_backproject(global float* restrict volume
     // [PI_min, PI_max]
     REAL2 PXinc = fabs(CM.s01) * halfVoxelSizes.s01; // Increments for half voxel shifts
     REAL PXincTotal = PXinc.x + PXinc.y;
-    REAL PX_xyx0 = PX0 - PXincTotal; // At minimum
+    REAL PX_min = PX0 - PXincTotal; // At minimum
     REAL PX_xyx1 = PX0 - PXinc.y + PXinc.x; // Minimum plus xshift
-    REAL PX_xyx2 = PX0 + PXincTotal; // maximum
+    REAL PX_max = PX0 + PXincTotal; // maximum
     REAL PX_xyx3 = PX0 + PXinc.y - PXinc.x; // Minimum plus yshift
-    REAL PX_min = PX_xyx0;
-    REAL PX_max = PX_xyx2;
     int PI_min = INDEX(PX_min + zeroPrecisionTolerance);
     int PI_max = INDEX(PX_max - zeroPrecisionTolerance);
-    REAL vd1 = (CM.s0 > 0 ? voxelSizes.s0 : -voxelSizes.s0);
-    REAL vd3 = (CM.s1 > 0 ? voxelSizes.s1 : -voxelSizes.s1);
-    global float* pixelPointer;
+    const global float* restrict pixelPointer;
     float ADD[KCOUNT]; // uninitialized by default
     int k_processed = 0;
     int k_to = k_from + k_count;
@@ -401,8 +405,8 @@ void kernel FLOAT_pbct2d_cutting_voxel_backproject(global float* restrict volume
                 int I = max(-1, PI_min);
                 int I_STOP = min(PI_max, pdims.x);
                 // Section of the square that corresponds to the indices < i
-                sectionSize_prev = PB2DExactPolygonPart(((REAL)I) + HALF, vd1, vd3, PX_xyx0,
-                                                        PX_xyx1, PX_xyx2, PX_xyx3, CM);
+                sectionSize_prev
+                    = PB2DExactPolygonPart(((REAL)I) + HALF, PX_min, PX_xyx1, PX_max, PX_xyx3);
                 if(I >= 0)
                 {
                     factor = voxelVolumeTimesScalingFactor * sectionSize_prev;
@@ -414,8 +418,8 @@ void kernel FLOAT_pbct2d_cutting_voxel_backproject(global float* restrict volume
                 }
                 for(I = I + 1; I < I_STOP; I++)
                 {
-                    sectionSize_cur = PB2DExactPolygonPart(((REAL)I) + HALF, vd1, vd3, PX_xyx0,
-                                                           PX_xyx1, PX_xyx2, PX_xyx3, CM);
+                    sectionSize_cur
+                        = PB2DExactPolygonPart(((REAL)I) + HALF, PX_min, PX_xyx1, PX_max, PX_xyx3);
                     polygonSize = sectionSize_cur - sectionSize_prev;
                     factor = voxelVolumeTimesScalingFactor * polygonSize;
                     pixelPointer = projection + I * pdims.y + k_from_loc;
@@ -441,10 +445,11 @@ void kernel FLOAT_pbct2d_cutting_voxel_backproject(global float* restrict volume
             {
                 if(ADD[k] != 0)
                 {
-                    volume[IND + k * volumeStride] += ADD[k];
+                    voxelPointer[k * volumeStride] += ADD[k];
                 }
             }
             k_from_loc += k_count_loc;
+            voxelPointer += k_count_loc * volumeStride;
             k_count_loc = min(KCOUNT, k_to - k_from_loc);
         }
     }

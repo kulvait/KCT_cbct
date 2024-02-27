@@ -78,7 +78,7 @@ protected:
     void fillDevicesList(std::string commaSeparatedEntries, uint32_t CLplatformID);
 
     void addGeometryGroup();
-    void addVolumeSizeArgs();
+    void addVolumeSizeArgs(bool includeSizez = true);
     void addVoxelSizeArgs();
     void addVolumeCenterArgs();
     void addProjectionSizeArgs();

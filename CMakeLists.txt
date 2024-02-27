@@ -184,24 +184,24 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 
-SET(CLLINPROJECTOR_SOURCES src/CLlin-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
-add_executable(CLlin-projector ${CLLINPROJECTOR_SOURCES})
+SET(KCTPROJECTOR_SOURCES src/kct-cb-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
+add_executable(kct-projector ${KCTPROJECTOR_SOURCES})
 set_target_properties(
-    CLlin-projector
+    kct-projector
     PROPERTIES 
         OUTPUT_NAME "kct-projector"
         SUFFIX ""
 )
-target_link_libraries(CLlin-projector ctiol)
-target_link_libraries(CLlin-projector ctmal)
-target_link_libraries(CLlin-projector OpenCL::OpenCL)
-target_link_libraries(CLlin-projector CTIOL_OPENCL)
-#target_include_directories(CLlin-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
-#target_compile_definitions(CLlin-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
-#target_compile_definitions(CLlin-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)
-target_git_version_init(CLlin-projector)
-target_link_libraries (CLlin-projector ${CMAKE_THREAD_LIBS_INIT})
-install (TARGETS CLlin-projector RUNTIME DESTINATION .)
+target_link_libraries(kct-projector ctiol)
+target_link_libraries(kct-projector ctmal)
+target_link_libraries(kct-projector OpenCL::OpenCL)
+target_link_libraries(kct-projector CTIOL_OPENCL)
+#target_include_directories(kct-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
+#target_compile_definitions(kct-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+#target_compile_definitions(kct-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)
+target_git_version_init(kct-projector)
+target_link_libraries (kct-projector ${CMAKE_THREAD_LIBS_INIT})
+install (TARGETS kct-projector RUNTIME DESTINATION .)
 
 SET(CLLINCONVOLUTION_SOURCES src/CLlin-convolution.cpp src/Kniha.cpp src/alg/VolumeConvolutionOperator.cpp src/CArmArguments.cpp)
 add_executable(CLlin-convolution ${CLLINCONVOLUTION_SOURCES})
@@ -282,8 +282,8 @@ target_include_directories(CLlin-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_git_version_init(CLlin-krylov)
 install (TARGETS CLlin-krylov RUNTIME DESTINATION .)
 
-SET(CLLINCGLS_SOURCES src/kct-pb-krylov.cpp src/Kniha.cpp src/BasePBCTReconstructor.cpp src/BasePBCTOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCTReconstructor.cpp)
-add_executable(kct-pb-krylov ${CLLINCGLS_SOURCES})
+SET(KCTPBKRYLOV_SOURCES src/kct-pb-krylov.cpp src/Kniha.cpp src/BasePBCTReconstructor.cpp src/BasePBCTOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCTReconstructor.cpp)
+add_executable(kct-pb-krylov ${KCTPBKRYLOV_SOURCES})
 set_target_properties(
     kct-pb-krylov
     PROPERTIES 
@@ -300,6 +300,25 @@ target_include_directories(kct-pb-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 #target_compile_definitions(kct-pb-krylov PUBLIC CL_TARGET_OPENCL_VERSION=120)
 target_git_version_init(kct-pb-krylov)
 install (TARGETS kct-pb-krylov RUNTIME DESTINATION .)
+
+SET(KCTPB2DKRYLOV_SOURCES src/kct-pb2d-krylov.cpp src/Kniha.cpp src/BasePBCT2DReconstructor.cpp src/BasePBCT2DOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCT2DReconstructor.cpp)
+add_executable(kct-pb2d-krylov ${KCTPB2DKRYLOV_SOURCES})
+set_target_properties(
+    kct-pb2d-krylov
+    PROPERTIES 
+        OUTPUT_NAME "kct-pb2d-krylov"
+        SUFFIX ""
+)
+target_link_libraries(kct-pb2d-krylov ctiol)
+target_link_libraries(kct-pb2d-krylov ctmal)
+target_link_libraries(kct-pb2d-krylov OpenCL::OpenCL)
+target_link_libraries(kct-pb2d-krylov CTIOL_OPENCL)
+#target_link_libraries (kct-pb2d-krylov ${CMAKE_THREAD_LIBS_INIT})
+target_include_directories(kct-pb2d-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
+#target_compile_definitions(kct-pb2d-krylov PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+#target_compile_definitions(kct-pb2d-krylov PUBLIC CL_TARGET_OPENCL_VERSION=120)
+target_git_version_init(kct-pb2d-krylov)
+install (TARGETS kct-pb2d-krylov RUNTIME DESTINATION .)
 
 SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp src/alg/PartialParallelBeamProjector.cpp src/PartialPBCTOperator.cpp)
 add_executable(kct-pb-projector ${CLLINCGLS_SOURCES})

@@ -23,7 +23,6 @@ void PartialPBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t 
             CLINCLUDEpbct_cvp();
         }
         CLINCLUDEbackprojector();
-        CLINCLUDErescaleProjections();
     } else
     {
         KCTERR("Could not initialize projector when OpenCL was already initialized.");
