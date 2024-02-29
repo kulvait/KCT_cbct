@@ -17,38 +17,6 @@ void inline PB2DInsertVerticalValues(global const float* restrict volumePtr,
     }
 }
 
-/*
- * Possible implementation, which is slow
-inline REAL
-PB2DExactPolygonPartXXX(const REAL PQ, const REAL PX_inc1, const REAL PX_inc2, const REAL PX_inc3)
-{
-    if(PQ <= ZERO)
-    {
-        return ZERO;
-    } else if(PQ < PX_inc1)
-    {
-        return HALF * PQ * PQ / (PX_inc1 * PX_inc2);
-    } else if(PQ < PX_inc2)
-    {
-        return HALF * (PQ + (PQ - PX_inc1)) / PX_inc2;
-    } else if(PQ < PX_inc3)
-    {
-        if(PX_inc1 == 0)
-        {
-            return PQ / PX_inc2;
-        } else if(PX_inc2 == 0)
-        {
-            return PQ / PX_inc1;
-        } else
-        {
-            return ONE - HALF * (PX_inc3 - PQ) * (PX_inc3 - PQ) / (PX_inc1 * PX_inc2);
-        }
-    } else
-    {
-        return ONE;
-    }
-}
-*/
 
 // clang-format off
 // const REAL vd1 = v1->x - v0->x; Nonzero x part
@@ -190,7 +158,7 @@ void kernel FLOAT_pbct2d_cutting_voxel_project(global const float* restrict volu
     const REAL2 volumeCenter_voxelcenter_offset
         = (REAL2)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y) * halfVoxelSizes;
     const REAL2 voxelcenter_xy = volumeCenter + volumeCenter_voxelcenter_offset;
-    const ulong IND = voxelIndex(i, j, 0, vdims);
+    const ulong IND = voxelIndex(i, j, k_from, vdims);
     const global float* restrict voxelPointer = volume + IND;
     const int volumeStride = vdims.x * vdims.y;
     // Projected voxel center
@@ -327,7 +295,7 @@ void kernel FLOAT_pbct2d_cutting_voxel_backproject(global float* restrict volume
     const REAL2 volumeCenter_voxelcenter_offset
         = (REAL2)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y) * halfVoxelSizes;
     const REAL2 voxelcenter_xy = volumeCenter + volumeCenter_voxelcenter_offset;
-    const ulong IND = voxelIndex(i, j, 0, vdims);
+    const ulong IND = voxelIndex(i, j, k_from, vdims);
     global float* restrict voxelPointer = volume + IND;
     const int volumeStride = vdims.x * vdims.y;
     // Projected voxel center

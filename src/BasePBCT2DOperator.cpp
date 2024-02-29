@@ -14,11 +14,10 @@ void BasePBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t L
         CLINCLUDEinclude();
         if(useBarrierCalls)
         {
-            KCTERR("Barrier CVP projector not yet implemented for PBCT2D!");
             addOptString(io::xprintf("-DLOCALARRAYSIZE=%d", LOCALARRAYSIZE));
             this->LOCALARRAYSIZE = LOCALARRAYSIZE;
-            CLINCLUDEpbct_cvp();
-            CLINCLUDEpbct_cvp_barrier();
+            CLINCLUDEpbct2d_cvp();
+            CLINCLUDEpbct2d_cvp_barrier();
         } else
         {
             CLINCLUDEpbct2d_cvp();
@@ -336,7 +335,7 @@ int BasePBCT2DOperator::project(cl::Buffer& X,
     unsigned long frameSize = pdimx * pdimy;
     unsigned long offset;
     int k_from = 0;
-    int k_to = pdimy;
+    int k_count = pdimy;
     for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
     {
         CM = PM3Vector[i];
@@ -352,13 +351,16 @@ int BasePBCT2DOperator::project(cl::Buffer& X,
         {
             if(useBarrierImplementation)
             {
-                KCTERR("Barrier CVP projector not yet implemented for PBCT2D!");
+                cl::NDRange globalRange(vdimx, vdimy);
+                algFLOAT_pbct2d_cutting_voxel_project_barrier(
+                    X, B, offset, CM, vdims, voxelSizes, volumeCenter, pdims, scalingFactor, k_from,
+                    k_count, LOCALARRAYSIZE, globalRange, localRange);
             } else
             {
                 cl::NDRange globalRange(vdimx, vdimy);
                 algFLOAT_pbct2d_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
                                                       volumeCenter, pdims, scalingFactor, k_from,
-                                                      k_to, globalRange, localRange);
+                                                      k_count, globalRange, localRange);
             }
         }
     }
@@ -474,19 +476,30 @@ cl::NDRange BasePBCT2DOperator::guessProjectionLocalNDRange(bool barrierCalls)
     cl::NDRange projectorLocalNDRange;
     if(barrierCalls)
     {
-
-        if(vdimx % 64 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
         {
-            projectorLocalNDRange = cl::NDRange(64, 4); // 9.45 Barrier
+            projectorLocalNDRange = cl::NDRange(16, 16); // 3.8 Barrier
+        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(8, 8); // 10.9 Barrier
+        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(4, 4); // 32.5 Barrier
         } else
         {
             projectorLocalNDRange = cl::NullRange;
         }
     } else
     {
-        if(vdimz % 4 == 0 && vdimy % 64 == 0 && workGroupSize >= 256)
+        if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
         {
-            projectorLocalNDRange = cl::NDRange(4, 64); // 23.23 RELAXED
+            projectorLocalNDRange = cl::NDRange(16, 16); // 3.8 Barrier
+        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(8, 8); // 10.9 Barrier
+        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(4, 4); // 32.5 Barrier
         } else
         {
             projectorLocalNDRange = cl::NullRange;

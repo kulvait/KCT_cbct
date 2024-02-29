@@ -58,7 +58,7 @@ public:
         timestamp = std::chrono::steady_clock::now();
         std::size_t projectorLocalNDRangeDim = projectorLocalNDRange.dimensions();
         std::size_t backprojectorLocalNDRangeDim = backprojectorLocalNDRange.dimensions();
-        if(projectorLocalNDRangeDim == 2)
+        if(projectorLocalNDRangeDim == 2 || projectorLocalNDRangeDim == 3)
         {
             if(projectorLocalNDRange[0] == 0 && projectorLocalNDRange[1] == 0)
             {
@@ -70,8 +70,10 @@ public:
                 this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
             } else
             {
-                this->projectorLocalNDRange = projectorLocalNDRange;
-                this->projectorLocalNDRangeBarrier = projectorLocalNDRange;
+                this->projectorLocalNDRange
+                    = cl::NDRange(projectorLocalNDRange[0], projectorLocalNDRange[1]);
+                this->projectorLocalNDRangeBarrier
+                    = cl::NDRange(projectorLocalNDRange[0], projectorLocalNDRange[1]);
             }
         } else
         {
@@ -83,7 +85,7 @@ public:
             this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
             this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
         }
-        if(backprojectorLocalNDRangeDim == 2)
+        if(backprojectorLocalNDRangeDim == 2 || backprojectorLocalNDRangeDim == 3)
         {
             if(backprojectorLocalNDRange[0] == 0 && backprojectorLocalNDRange[1] == 0)
             {
@@ -93,14 +95,17 @@ public:
                 this->backprojectorLocalNDRange = guessBackprojectorLocalNDRange();
             } else
             {
-                this->backprojectorLocalNDRange = backprojectorLocalNDRange;
+                this->backprojectorLocalNDRange
+                    = cl::NDRange(backprojectorLocalNDRange[0], backprojectorLocalNDRange[1]);
             }
         } else
         {
             if(backprojectorLocalNDRangeDim != 0)
             {
-                LOGE << io::xprintf(
-                    "Wrong specification of backprojectorLocalNDRange, trying guessing!");
+                LOGE << io::xprintf("Wrong specification of backprojectorLocalNDRangeDim=%d with "
+                                    "backprojectorLocalNDRange=(%d, %d, %d) trying guessing!",
+                                    backprojectorLocalNDRangeDim, backprojectorLocalNDRange[0],
+                                    backprojectorLocalNDRange[1], backprojectorLocalNDRange[2]);
             }
             this->backprojectorLocalNDRange = guessBackprojectorLocalNDRange();
         }
@@ -111,6 +116,10 @@ public:
         if(projectorLocalNDRangeDim == 0)
         {
             LOGD << io::xprintf("projectorLocalNDRange = cl::NDRange()");
+        } else if(projectorLocalNDRangeDim == 2)
+        {
+            LOGD << io::xprintf("projectorLocalNDRange = cl::NDRange(%d, %d)",
+                                this->projectorLocalNDRange[0], this->projectorLocalNDRange[1]);
         } else
         {
             LOGD << io::xprintf("projectorLocalNDRange = cl::NDRange(%d, %d, %d)",
@@ -120,6 +129,11 @@ public:
         if(projectorLocalNDRangeBarrierDim == 0)
         {
             LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange()");
+        } else if(projectorLocalNDRangeBarrierDim == 2)
+        {
+            LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange(%d, %d)",
+                                this->projectorLocalNDRangeBarrier[0],
+                                this->projectorLocalNDRangeBarrier[1]);
         } else
         {
             LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange(%d, %d, %d)",
@@ -130,6 +144,11 @@ public:
         if(backprojectorLocalNDRangeDim == 0)
         {
             LOGD << io::xprintf("backprojectorLocalNDRangeDim = cl::NDRange()");
+        } else if(backprojectorLocalNDRangeDim == 2)
+        {
+            LOGD << io::xprintf("backprojectorLocalNDRange = cl::NDRange(%d, %d)",
+                                this->backprojectorLocalNDRange[0],
+                                this->backprojectorLocalNDRange[1]);
         } else
         {
             LOGD << io::xprintf("backprojectorLocalNDRange = cl::NDRange(%d, %d, %d)",

@@ -45,7 +45,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
     int2 Lpdims;
     uint mappedLocalRange;
     // PJLocalRange,
-    //    PILocalRange_memoryMapped; // Memory used only in cornerWorkItem
+    //    LocalFrame_PICount; // Memory used only in cornerWorkItem
     bool stopNextIteration;
 #ifdef RELAXED
     const float8 CM = convert_float8(_CM);
@@ -66,7 +66,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
     local bool stopNextIteration_local;
     local REAL8 CML;
     local int PILocalMin, PILocalMax, PILocalStart_memoryMapped, PJLocalMin, PJLocalMax;
-    local int PILocalRange_memoryMapped, PJLocalRange;
+    local int LocalFrame_PICount, PJLocalRange;
     // local int projectorLocalRange[7]; //
     if(LID == 0) // Get dimension
     {
@@ -122,21 +122,20 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
             }
             // Prepare local memory
             PILocalStart_memoryMapped = PILocalMin;
-            PILocalRange_memoryMapped
-                = PILocalMax - PILocalMin; // How many columns fits to local memory
+            LocalFrame_PICount = PILocalMax - PILocalMin; // How many columns fits to local memory
             PJLocalRange = PJLocalMax - PJLocalMin;
-            uint FullLocalRange = PILocalRange_memoryMapped * PJLocalRange;
+            uint FullLocalRange = LocalFrame_PICount * PJLocalRange;
             if(FullLocalRange <= LOCALARRAYSIZE)
             {
                 stopNextIteration_local = true;
             } else
             {
-                PILocalRange_memoryMapped
+                LocalFrame_PICount
                     = LOCALARRAYSIZE / PJLocalRange; // How many columns fits to local memory
                 stopNextIteration_local = false;
             }
 
-            // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. PILocalRange_memoryMapped, 5 ..
+            // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. LocalFrame_PICount, 5 ..
             // PJMAX-PJMIN, 6 CurrentPISTART
             CML = CM;
             CML.s3 -= PILocalMin;
@@ -145,11 +144,11 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
     }
     barrier(CLK_LOCAL_MEM_FENCE); // Cutting voxel projector
                                   // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 ..
-                                  // PILocalRange_memoryMapped, 5
+                                  // LocalFrame_PICount, 5
                                   // .. PJMAX-PJMIN, 6 CurrentPISTART
     if(fullyOffProjectorPosition)
         return;
-    Lpdims = (int2)(PILocalRange_memoryMapped, PJLocalRange);
+    Lpdims = (int2)(LocalFrame_PICount, PJLocalRange);
     mappedLocalRange = Lpdims.x * Lpdims.y;
     LIDRANGE = (mappedLocalRange + LOCSIZE - 1) / LOCSIZE;
     fillStart = min(LID * LIDRANGE, mappedLocalRange);
@@ -357,7 +356,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
             }
         }
         // End CVP
-        // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. PILocalRange_memoryMapped, 5 ..
+        // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. LocalFrame_PICount, 5 ..
         // PJMAX-PJMIN, 6 CurrentPISTART
         barrier(CLK_LOCAL_MEM_FENCE); // Local to global copy
         uint LI, LJ, globalIndex;
@@ -372,15 +371,15 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
         }
         if(LID == 0)
         {
-            CML.s3 -= PILocalRange_memoryMapped;
+            CML.s3 -= LocalFrame_PICount;
             // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. PIMAX-PIMIN, 5 .. PJMAX-PJMIN, 6
             // CurrentPISTART
-            PILocalStart_memoryMapped += PILocalRange_memoryMapped;
+            PILocalStart_memoryMapped += LocalFrame_PICount;
             if(PILocalStart_memoryMapped < PILocalMax)
             {
-                if(PILocalMax - PILocalStart_memoryMapped <= PILocalRange_memoryMapped)
+                if(PILocalMax - PILocalStart_memoryMapped <= LocalFrame_PICount)
                 {
-                    PILocalRange_memoryMapped = PILocalMax - PILocalStart_memoryMapped;
+                    LocalFrame_PICount = PILocalMax - PILocalStart_memoryMapped;
                     stopNextIteration_local = true;
                 }
             }
@@ -389,7 +388,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
         if(!stopNextIteration)
         {
             barrier(CLK_LOCAL_MEM_FENCE);
-            Lpdims = (int2)(PILocalRange_memoryMapped, PJLocalRange);
+            Lpdims = (int2)(LocalFrame_PICount, PJLocalRange);
             mappedLocalRange = Lpdims.x * Lpdims.y;
             fillStart = min(fillStart, mappedLocalRange);
             fillStop = min(fillStop, mappedLocalRange);
@@ -400,7 +399,7 @@ void kernel FLOAT_pbct_cutting_voxel_project_barrier(global const float* restric
             }
             barrier(CLK_LOCAL_MEM_FENCE); // Cutting voxel projector
                                           // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 ..
-                                          // PILocalRange_memoryMapped, 5
+                                          // LocalFrame_PICount, 5
                                           // .. PJMAX-PJMIN, 6 CurrentPISTART
 
             // printf("Next %d %d %d. \n", i, j, k);

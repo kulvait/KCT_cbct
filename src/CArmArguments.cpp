@@ -62,7 +62,7 @@ inline void CArmArguments::fillDevicesList(std::string commaSeparatedEntries, ui
     }
 }
 
-void CArmArguments::parsePlatformString(bool verbose)
+uint64_t CArmArguments::parsePlatformString(bool verbose)
 {
     const std::regex platformDeviceRegex("(\\d+|\\d+:((\\d+-\\d+|\\d+),)*(\\d+-\\d+|\\d+))");
     const std::regex platformOnlyRegex("\\d+");
@@ -89,56 +89,80 @@ void CArmArguments::parsePlatformString(bool verbose)
                 {
                     LOGD << io::xprintf("Selected device %d on platform %d.", 0, CLplatformID);
                 }
-                return;
+                break;
             }
-        }
-    }
-
-    std::string platformString;
-    std::string deviceString;
-    // Remove spaces
-    CLplatformString.erase(
-        std::remove_if(CLplatformString.begin(), CLplatformString.end(), ::isspace),
-        CLplatformString.end());
-    if(!std::regex_match(CLplatformString, platformDeviceRegex))
-    {
-        ERR = io::xprintf("The platform string does not match the required regexp");
-        KCTERR(ERR);
-    }
-    if(std::regex_match(CLplatformString, platformOnlyRegex))
-    {
-        CLplatformID = std::stoul(CLplatformString);
-        uint32_t devicesOnPlatform = util::OpenCLManager::deviceCount(CLplatformID);
-        if(devicesOnPlatform > 0)
-        {
-            CLdeviceIDs.push_back(0);
-        } else
-        {
-            ERR = io::xprintf("The platform %d does not contain any device!", CLplatformID);
-            KCTERR(ERR);
         }
     } else
     {
-        std::smatch pieces_match;
-        std::regex_match(CLplatformString, pieces_match, platformExtendedRegex);
-        if(pieces_match.size() != 3)
+
+        std::string platformString;
+        std::string deviceString;
+        // Remove spaces
+        CLplatformString.erase(
+            std::remove_if(CLplatformString.begin(), CLplatformString.end(), ::isspace),
+            CLplatformString.end());
+        if(!std::regex_match(CLplatformString, platformDeviceRegex))
         {
-            ERR = io::xprintf("Error!");
+            ERR = io::xprintf("The platform string does not match the required regexp");
             KCTERR(ERR);
         }
-        CLplatformID = std::stoul(pieces_match[1].str());
-        fillDevicesList(pieces_match[2].str(), CLplatformID);
+        if(std::regex_match(CLplatformString, platformOnlyRegex))
+        {
+            CLplatformID = std::stoul(CLplatformString);
+            uint32_t devicesOnPlatform = util::OpenCLManager::deviceCount(CLplatformID);
+            if(devicesOnPlatform > 0)
+            {
+                CLdeviceIDs.push_back(0);
+
+            } else
+            {
+                ERR = io::xprintf("The platform %d does not contain any device!", CLplatformID);
+                KCTERR(ERR);
+            }
+        } else
+        {
+            std::smatch pieces_match;
+            std::regex_match(CLplatformString, pieces_match, platformExtendedRegex);
+            if(pieces_match.size() != 3)
+            {
+                ERR = io::xprintf("Error!");
+                KCTERR(ERR);
+            }
+            CLplatformID = std::stoul(pieces_match[1].str());
+            fillDevicesList(pieces_match[2].str(), CLplatformID);
+        }
+    }
+    uint32_t deviceCount = CLdeviceIDs.size();
+    if(deviceCount == 0)
+    {
+        return 0;
     }
     if(verbose)
     {
         std::string str = io::xprintf("%d", CLdeviceIDs[0]);
-        for(uint32_t i = 1; i != CLdeviceIDs.size(); i++)
+        for(uint32_t i = 1; i < deviceCount; i++)
         {
             str = io::xprintf("%s, %d", str.c_str(), CLdeviceIDs[i]);
         }
         str = io::xprintf("%s.", str.c_str());
-        LOGD << io::xprintf("Selected devices %s on platformID %d.", str.c_str(), CLplatformID);
+        LOGD << io::xprintf("Selected device%s %s on platformID %d.", deviceCount > 1 ? "s" : "",
+                            str.c_str(), CLplatformID);
     }
+    uint64_t localMemMaxByteSize, devMaxLoc;
+    localMemMaxByteSize = util::OpenCLManager::localMemSize(CLplatformID, CLdeviceIDs[0]);
+    for(uint32_t i = 0; i < deviceCount; i++)
+    {
+        devMaxLoc = util::OpenCLManager::localMemSize(CLplatformID, CLdeviceIDs[0]);
+        if(devMaxLoc < localMemMaxByteSize)
+        {
+            localMemMaxByteSize = devMaxLoc;
+        }
+    }
+    if(barrierArraySize < 0)
+    {
+        barrierArraySize = localMemMaxByteSize / 4 - 128; // Space for 32 int like local variables
+    }
+    return localMemMaxByteSize;
 } // namespace KCT::util
 
 void CArmArguments::addGeometryGroup()
@@ -523,7 +547,7 @@ void CArmArguments::addProjectorLocalNDRangeArgs()
                                            projectorLocalNDRange[1], projectorLocalNDRange[2]);
     opt_cl_projectorlocalrange = og_cl_settings->add_option(
         "--projector-local-range", projectorLocalNDRange,
-        io::xprintf("Specify local NDRange for projector, (0,0,1) is a special value to guess, "
+        io::xprintf("Specify local NDRange for projector, (0,1,1) is a special value to guess, "
                     "(0,0,0) means NDRange(), defaults to %s.",
                     defaultValue.c_str()));
     opt_cl_projectorlocalrange->expected(3);
@@ -536,7 +560,7 @@ void CArmArguments::addBackprojectorLocalNDRangeArgs()
                       backprojectorLocalNDRange[1], backprojectorLocalNDRange[2]);
     opt_cl_backprojectorlocalrange = og_cl_settings->add_option(
         "--backprojector-local-range", backprojectorLocalNDRange,
-        io::xprintf("Specify local NDRange for backprojector, (0,0,1) is a special value to guess, "
+        io::xprintf("Specify local NDRange for backprojector, (0,1,1) is a special value to guess, "
                     "(0,0,0) means NDRange(), defaults to %s.",
                     defaultValue.c_str()));
     opt_cl_backprojectorlocalrange->expected(3);

@@ -70,6 +70,7 @@ public:
     void CLINCLUDEpbct_cvp();
     void CLINCLUDEpbct_cvp_barrier();
     void CLINCLUDEpbct2d_cvp();
+    void CLINCLUDEpbct2d_cvp_barrier();
 
     static std::string infoString(cl_int cl_info_id);
 
@@ -330,7 +331,7 @@ protected:
                                               cl_int2& pdims,
                                               float& globalScalingMultiplier,
                                               int& k_from,
-                                              int& k_to,
+                                              int& k_count,
                                               cl::NDRange globalRange,
                                               cl::NDRange localRange = cl::NullRange,
                                               bool blocking = false,
@@ -357,11 +358,41 @@ protected:
                                                   cl_int2& pdims,
                                                   float& globalScalingMultiplier,
                                                   int& k_from,
-                                                  int& k_to,
+                                                  int& k_count,
                                                   cl::NDRange globalRange,
                                                   cl::NDRange localRange = cl::NullRange,
                                                   bool blocking = false,
                                                   uint32_t QID = 0);
+    // pbct2d_cvp_barrier.cl
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    cl::LocalSpaceArg&,
+                                    unsigned long&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double2&,
+                                    cl_int2&,
+                                    float&,
+                                    int&,
+                                    int&>>
+        FLOAT_pbct2d_cutting_voxel_project_barrier;
+    int algFLOAT_pbct2d_cutting_voxel_project_barrier(cl::Buffer& volume,
+                                                      cl::Buffer& projection,
+                                                      unsigned long& projectionOffset,
+                                                      cl_double3& CM,
+                                                      cl_int3& vdims,
+                                                      cl_double3& voxelSizes,
+                                                      cl_double2& volumeCenter,
+                                                      cl_int2& pdims,
+                                                      float globalScalingMultiplier,
+                                                      int& k_from,
+                                                      int& k_count,
+                                                      unsigned int LOCALARRAYSIZE,
+                                                      cl::NDRange globalRange,
+                                                      cl::NDRange localRange = cl::NullRange,
+                                                      bool blocking = false,
+                                                      uint32_t QID = 0);
     // rescaleProjections.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     unsigned int&,

@@ -798,6 +798,22 @@ void Kniha::CLINCLUDEpbct2d_cvp()
     });
 }
 
+void Kniha::CLINCLUDEpbct2d_cvp_barrier()
+{
+    insertCLFile("opencl/pbct2d_cvp_barrier.cl");
+    callbacks.emplace_back([this](cl::Program program) {
+        {
+            auto& ptr = FLOAT_pbct2d_cutting_voxel_project_barrier;
+            std::string str = "FLOAT_pbct2d_cutting_voxel_project_barrier";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+    });
+}
+
 void Kniha::insertCLFile(std::string f)
 {
     if(std::find(CLFiles.begin(), CLFiles.end(), f) == CLFiles.end())
@@ -1894,6 +1910,7 @@ int Kniha::algFLOATvector_isotropicBackDz(cl::Buffer& F,
     return 0;
 }
 
+// pbct_cvp.cl
 int Kniha::algFLOAT_pbct_cutting_voxel_project(cl::Buffer& volume,
                                                cl::Buffer& projection,
                                                unsigned long& projectionOffset,
@@ -1950,6 +1967,7 @@ int Kniha::algFLOAT_pbct_cutting_voxel_backproject(cl::Buffer& volume,
     return 0;
 }
 
+// pbct_cvp_barrier.cl
 int Kniha::algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
                                                        cl::Buffer& projection,
                                                        unsigned long& projectionOffset,
@@ -2074,7 +2092,7 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_backproject(
     cl_int2& pdims,
     float& globalScalingMultiplier,
     int& k_from,
-    int& k_to,
+    int& k_count,
     cl::NDRange globalRange,
     cl::NDRange _localRange, // default cl::NullRange
     bool blocking,
@@ -2086,7 +2104,70 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_backproject(
 
     auto exe = (*FLOAT_pbct2d_cutting_voxel_backproject)(
         *eargs, volume, projection, projectionOffset, CM, vdims, voxelSizes, volumeCenter, pdims,
-        globalScalingMultiplier, k_from, k_to);
+        globalScalingMultiplier, k_from, k_count);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+// pbct2d_cvp_barrier.cl
+int Kniha::algFLOAT_pbct2d_cutting_voxel_project_barrier(
+    cl::Buffer& volume,
+    cl::Buffer& projection,
+    unsigned long& projectionOffset,
+    cl_double3& CM,
+    cl_int3& vdims,
+    cl_double3& voxelSizes,
+    cl_double2& volumeCenter,
+    cl_int2& pdims,
+    float globalScalingMultiplier,
+    int& k_from,
+    int& k_count,
+    unsigned int LOCALARRAYSIZE,
+    cl::NDRange globalRange,
+    cl::NDRange _localRange, // default cl::NullRange
+    bool blocking, // default false
+    uint32_t QID) // default 0
+{
+    // https://stackoverflow.com/questions/14088030/opencl-returns-error-58-while-executing-larga-amount-of-data
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    cl::LocalSpaceArg localProjection = cl::Local(LOCALARRAYSIZE * sizeof(float));
+    cl::Kernel kernel = cl::Kernel(*program, "FLOAT_pbct2d_cutting_voxel_project_barrier");
+    kernel.setArg(0, volume);
+    kernel.setArg(1, projection);
+    kernel.setArg(2, localProjection);
+    kernel.setArg(3, projectionOffset);
+    kernel.setArg(4, CM);
+    kernel.setArg(5, vdims);
+    kernel.setArg(6, voxelSizes);
+    kernel.setArg(7, volumeCenter);
+    kernel.setArg(8, pdims);
+    kernel.setArg(9, globalScalingMultiplier);
+    kernel.setArg(10, k_from);
+    kernel.setArg(11, k_count);
+    cl::NDRange nulloffset = cl::NullRange;
+    cl::Event exe;
+    cl_int cl_info_id
+        = Q[QID]->enqueueNDRangeKernel(kernel, nulloffset, globalRange, localRange, nullptr, &exe);
+    if(cl_info_id != CL_SUCCESS)
+    {
+        std::string command_type_string = infoString(cl_info_id);
+        err = io::xprintf("Error in enqueueNDRangeKernel "
+                          "FLOAT_pbct2d_cutting_voxel_project_barrier cl_info_id=%d, "
+                          "command_type_string=%s!",
+                          cl_info_id, command_type_string.c_str());
+        KCTERR(err);
+    } else
+    {
+//        LOGI << io::xprintf("CL_SUCCESS enqueueNDRangeKernel with LOCALARRAYSIZE=%d "
+//                            "projectionOffset=%d globalRange=[%d, %d, %d] localRange=[%d, %d, %d]",
+//                            LOCALARRAYSIZE, projectionOffset, globalRange[0], globalRange[1],
+//                            globalRange[2], localRange[0], localRange[1], localRange[2]);
+    }
+    blocking = true;
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

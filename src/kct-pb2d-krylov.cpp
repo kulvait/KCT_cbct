@@ -343,7 +343,23 @@ int Args::postParse()
             return -1;
         }
     }
-    parsePlatformString();
+    bool barrierAdjustSize = false;
+    if(useBarrierCalls && barrierArraySize == -1)
+    {
+        barrierAdjustSize = true;
+    }
+    uint64_t localMemSize = parsePlatformString();
+    if(barrierAdjustSize)
+    {
+        barrierArraySize = localMemSize / 4 - 16; // 9 shall be sufficient but for memory alignment
+        LOGI << io::xprintf("Setting LOCALARRAYSIZE=%d for optimal performance.",
+                            barrierArraySize);
+    }
+    if(useBarrierCalls && barrierArraySize > localMemSize / 4 - 9)
+    {
+        ERR = io::xprintf("Array of size %d can not be allocated on given device, maximum is %d!",
+                          barrierArraySize, localMemSize / 4 - 9);
+    }
     return 0;
 }
 

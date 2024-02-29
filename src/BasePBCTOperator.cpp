@@ -472,6 +472,15 @@ cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
         if(vdimx % 64 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
         {
             projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
+        } else if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(16, 16, 1); // 3.8 Barrier
+        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(8, 8, 1); // 10.9 Barrier
+        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(4, 4, 1); // 32.5 Barrier
         } else
         {
             projectorLocalNDRange = cl::NullRange;
@@ -481,6 +490,15 @@ cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
         if(vdimz % 4 == 0 && vdimy % 64 == 0 && workGroupSize >= 256)
         {
             projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
+        } else if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(16, 16, 1); // 3.8 Barrier
+        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(8, 8, 1); // 10.9 Barrier
+        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        {
+            projectorLocalNDRange = cl::NDRange(4, 4, 1); // 32.5 Barrier
         } else
         {
             projectorLocalNDRange = cl::NullRange;

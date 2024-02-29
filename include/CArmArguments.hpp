@@ -1,7 +1,7 @@
 #pragma once
 #include <cctype>
-#include <string>
 #include <regex>
+#include <string>
 
 #include "OPENCL/OpenCLManager.hpp"
 #include "PROG/Arguments.hpp"
@@ -53,7 +53,8 @@ public:
     bool useNoScaling = false;
     bool useBarrierCalls = false;
     bool useElevationCorrection = false;
-    uint32_t barrierArraySize = 7680; // To fit Intel
+    int barrierArraySize = -1; // Guess it
+    // int barrierArraySize = 7680; ... To fit Intel
     bool useCenterVoxelProjector = false;
     bool useSidonProjector = false;
     uint32_t probesPerEdge = 1;
@@ -62,13 +63,13 @@ public:
     std::string CLplatformString = "";
     uint32_t CLplatformID = 0;
     std::vector<uint32_t> CLdeviceIDs;
-    std::vector<uint32_t> backprojectorLocalNDRange = { 0, 0, 1 };
-    std::vector<uint32_t> projectorLocalNDRange = { 0, 0, 1 };
+    std::vector<uint32_t> backprojectorLocalNDRange = { 0, 1, 1 };
+    std::vector<uint32_t> projectorLocalNDRange = { 0, 1, 1 };
     bool CLdebug = false;
     bool CLrelaxed = false;
     uint32_t CLitemsPerWorkgroup = 256;
-
-    void parsePlatformString(bool verbose = false);
+    // Returns minimum CL_DEVICE_LOCAL_MEM_SIZE
+    uint64_t parsePlatformString(bool verbose = false);
 
 protected:
     CArmArguments(int argc, char* argv[], std::string appName);
