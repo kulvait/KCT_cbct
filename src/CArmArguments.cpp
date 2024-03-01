@@ -160,7 +160,14 @@ uint64_t CArmArguments::parsePlatformString(bool verbose)
     }
     if(barrierArraySize < 0)
     {
-        barrierArraySize = localMemMaxByteSize / 4 - 128; // Space for 32 int like local variables
+        uint64_t localFloatSize = localMemMaxByteSize / 4;
+        if(localFloatSize > 256)
+        {
+            barrierArraySize = localFloatSize - 256; // Space for 32 int like local variables
+        } else
+        {
+            barrierArraySize = 1; // Space for 32 int like local variables
+        }
     }
     return localMemMaxByteSize;
 } // namespace KCT::util

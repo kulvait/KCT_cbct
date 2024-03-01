@@ -39,18 +39,14 @@ public:
                           uint32_t vdimx,
                           uint32_t vdimy,
                           uint32_t vdimz,
-                          uint32_t workGroupSize = 256,
-                          cl::NDRange projectorLocalNDRange = cl::NullRange,
-                          cl::NDRange backprojectorLocalNDRange = cl::NullRange)
+                          uint32_t workGroupSize = 256)
         : BasePBCTOperator(pdimx,
                            pdimy,
                            pdimz,
                            vdimx,
                            vdimy,
                            vdimz,
-                           workGroupSize,
-                           projectorLocalNDRange,
-                           backprojectorLocalNDRange)
+                           workGroupSize)
     {
         totalVolumeBufferSize = XDIM * sizeof(float);
         totalProjectionBufferSize = BDIM * sizeof(float);

@@ -2,6 +2,139 @@
 
 namespace KCT {
 
+bool BasePBCTOperator::isLocalRangeAdmissible(cl::NDRange& localRange)
+{
+    size_t dim = localRange.dimensions();
+    if(dim == 0)
+    {
+        return false;
+    } else if(dim == 3)
+    {
+        uint64_t totalSize = localRange[0] * localRange[1] * localRange[2];
+        if(totalSize > maxWorkGroupSize)
+        {
+            return false;
+        }
+        if(localRange[0] == 0 || vdimx % localRange[0] != 0)
+        {
+            return false;
+        }
+        if(localRange[1] == 0 || vdimy % localRange[1] != 0)
+        {
+            return false;
+        }
+        if(localRange[2] == 0 || vdimz % localRange[2] != 0)
+        {
+            return false;
+        }
+        return true;
+    } else
+    {
+        return false;
+    }
+}
+
+void BasePBCTOperator::checkLocalRange(cl::NDRange& localRange, std::string name)
+{
+    size_t dim = localRange.dimensions();
+    std::string ERR;
+    if(dim == 0)
+    {
+        LOGD << io::xprintf("%s = cl::NDRange()", name.c_str());
+    } else if(dim == 3)
+    {
+        uint64_t totalSize = localRange[0] * localRange[1] * localRange[2];
+        if(totalSize > maxWorkGroupSize)
+        {
+            ERR = io::xprintf("%s has total size %d exceeding maxWorkGroupSize=%d!", name.c_str(),
+                              totalSize, maxWorkGroupSize);
+            KCTERR(ERR);
+        }
+        if(totalSize == 0)
+        {
+            ERR = io::xprintf("There is 0 in %s definition!", name.c_str());
+            KCTERR(ERR);
+        }
+        if(vdimx % localRange[0] != 0)
+        {
+            ERR = io::xprintf("%s vdimx %% localRange[0] != 0 %d %% %d!=0", name.c_str(), vdimx,
+                              localRange[0]);
+            KCTERR(ERR);
+        }
+        if(vdimy % localRange[1] != 0)
+        {
+            ERR = io::xprintf("%s vdimy %% localRange[1] != 0 %d %% %d!=0", name.c_str(), vdimy,
+                              localRange[1]);
+            KCTERR(ERR);
+        }
+        if(vdimz % localRange[2] != 0)
+        {
+            ERR = io::xprintf("%s vdimz %% localRange[2] != 0 %d %% %d!=0", name.c_str(), vdimz,
+                              localRange[2]);
+            KCTERR(ERR);
+        }
+        LOGD << io::xprintf("%s = cl::NDRange(%d, %d, %d)", name.c_str(), localRange[0],
+                            localRange[1], localRange[2]);
+    } else
+    {
+        ERR = io::xprintf("%s has dimension %d but it shall be 3!", name.c_str(), dim);
+        KCTERR(ERR);
+    }
+}
+
+int BasePBCTOperator::initializeOpenCL(uint32_t platformID,
+                                       uint32_t* deviceIds,
+                                       uint32_t deviceIdsLength,
+                                       std::string xpath,
+                                       bool debug,
+                                       bool relaxed,
+                                       cl::NDRange projectorLocalNDRange,
+                                       cl::NDRange backprojectorLocalNDRange)
+{
+    int val
+        = Kniha::initializeOpenCL(platformID, deviceIds, deviceIdsLength, xpath, debug, relaxed);
+    if(val == 0)
+    {
+        std::size_t dim = projectorLocalNDRange.dimensions();
+        if(dim == 0
+           || (dim == 3 && projectorLocalNDRange[0] == 0 && projectorLocalNDRange[1] == 1
+               && projectorLocalNDRange[2] == 1)) // guess
+        {
+            this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
+            this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
+        } else if(isLocalRangeAdmissible(projectorLocalNDRange))
+        {
+            this->projectorLocalNDRange = projectorLocalNDRange;
+            this->projectorLocalNDRangeBarrier = projectorLocalNDRange;
+        } else
+        {
+            this->projectorLocalNDRange = cl::NullRange;
+            this->projectorLocalNDRangeBarrier = cl::NullRange;
+        }
+        dim = backprojectorLocalNDRange.dimensions();
+        if(dim == 0
+           || (dim == 3 && backprojectorLocalNDRange[0] == 0 && backprojectorLocalNDRange[1] == 1
+               && backprojectorLocalNDRange[2] == 1)) // guess
+        {
+            this->backprojectorLocalNDRange = guessBackprojectorLocalNDRange();
+        } else if(isLocalRangeAdmissible(backprojectorLocalNDRange))
+        {
+            this->backprojectorLocalNDRange = backprojectorLocalNDRange;
+        } else
+        {
+            this->backprojectorLocalNDRange = cl::NullRange;
+        }
+        checkLocalRange(this->projectorLocalNDRange, "projectorLocalNDRange");
+        checkLocalRange(this->projectorLocalNDRangeBarrier, "projectorLocalNDRangeBarrier");
+        checkLocalRange(this->backprojectorLocalNDRange, "backprojectorLocalNDRange");
+        return 0;
+    } else
+    {
+        std::string ERR = io::xprintf("Wrong initialization of OpenCL with code %d!", val);
+        KCTERR(ERR);
+    }
+}
+
 void BasePBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())
@@ -351,6 +484,8 @@ int BasePBCTOperator::project(cl::Buffer& X,
             } else
             {
                 cl::NDRange globalRange(vdimz, vdimy, vdimx);
+                localRange = cl::NDRange(projectorLocalNDRange[2], projectorLocalNDRange[1],
+                              projectorLocalNDRange[0]);
                 algFLOAT_pbct_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
                                                     volumeCenter, pdims, scalingFactor, globalRange,
                                                     localRange);
@@ -466,19 +601,20 @@ double BasePBCTOperator::adjointProductTest(float* x, float* b)
 cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
 {
     cl::NDRange projectorLocalNDRange;
+    LOGI << io::xprintf("vdimx=%d vdimy=%d vdimz=%d maxWorkGroupSize=%d", vdimx, vdimy, vdimz,
+                        maxWorkGroupSize);
     if(barrierCalls)
     {
-
-        if(vdimx % 64 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        if(vdimx % 64 == 0 && vdimy % 4 == 0 && 64 * 4 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(64, 4, 1); // 9.45 Barrier
-        } else if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
+        } else if(vdimx % 16 == 0 && vdimy % 16 == 0 && 16 * 16 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(16, 16, 1); // 3.8 Barrier
-        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 256)
+        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && 8 * 8 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(8, 8, 1); // 10.9 Barrier
-        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && 4 * 4 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(4, 4, 1); // 32.5 Barrier
         } else
@@ -487,16 +623,16 @@ cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
         }
     } else
     {
-        if(vdimz % 4 == 0 && vdimy % 64 == 0 && workGroupSize >= 256)
+        if(vdimx % 4 == 0 && vdimy % 64 == 0 && 4 * 64 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(4, 64, 1); // 23.23 RELAXED
-        } else if(vdimx % 16 == 0 && vdimy % 16 == 0 && workGroupSize >= 256)
+        } else if(vdimx % 16 == 0 && vdimy % 16 == 0 && 16 * 16 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(16, 16, 1); // 3.8 Barrier
-        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && workGroupSize >= 256)
+        } else if(vdimx % 8 == 0 && vdimy % 8 == 0 && 8 * 8 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(8, 8, 1); // 10.9 Barrier
-        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && workGroupSize >= 256)
+        } else if(vdimx % 4 == 0 && vdimy % 4 == 0 && 4 * 4 <= maxWorkGroupSize)
         {
             projectorLocalNDRange = cl::NDRange(4, 4, 1); // 32.5 Barrier
         } else
@@ -510,7 +646,7 @@ cl::NDRange BasePBCTOperator::guessProjectionLocalNDRange(bool barrierCalls)
 cl::NDRange BasePBCTOperator::guessBackprojectorLocalNDRange()
 {
     cl::NDRange backprojectorLocalNDRange;
-    if(vdimx % 4 == 0 && vdimy % 16 == 0 && workGroupSize >= 64)
+    if(vdimx % 4 == 0 && vdimy % 16 == 0 && 4 * 16 <= maxWorkGroupSize)
     {
         backprojectorLocalNDRange = cl::NDRange(4, 16, 1); // 4.05 RELAXED
     } else

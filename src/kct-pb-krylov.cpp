@@ -384,8 +384,7 @@ int main(int argc, char* argv[])
         {
             std::shared_ptr<CGLSPBCTReconstructor> cgls = std::make_shared<CGLSPBCTReconstructor>(
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
-                ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
-                backprojectorLocalNDRange);
+                ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
             cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
             // testing
             //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
@@ -414,9 +413,9 @@ int main(int argc, char* argv[])
             {
                 cgls->useJacobiVectorCLCode();
             }
-            int ecd
-                = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
+            int ecd = cgls->initializeOpenCL(
+                ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
+                ARG.CLrelaxed, projectorLocalNDRange, backprojectorLocalNDRange);
             if(ecd < 0)
             {
                 std::string ERR

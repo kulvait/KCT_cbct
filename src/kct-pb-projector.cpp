@@ -207,8 +207,7 @@ int main(int argc, char* argv[])
     {
         ParallelBeamProjector PBCVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ,
                                     ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
-                                    ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
-                                    backprojectorLocalNDRange);
+                                    ARG.CLitemsPerWorkgroup);
         // PBCVP.initializeAllAlgorithms();
         if(ARG.useSidonProjector)
         {
@@ -222,7 +221,8 @@ int main(int argc, char* argv[])
             PBCVP.initializeCVPProjector(ARG.useBarrierCalls, ARG.barrierArraySize);
         }
         int ecd = PBCVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
+                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed,
+                                         projectorLocalNDRange, backprojectorLocalNDRange);
         if(ecd < 0)
         {
             std::string ERR

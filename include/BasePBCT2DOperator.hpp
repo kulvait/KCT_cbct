@@ -38,9 +38,7 @@ public:
                        uint32_t vdimx,
                        uint32_t vdimy,
                        uint32_t vdimz,
-                       uint32_t workGroupSize = 256,
-                       cl::NDRange projectorLocalNDRange = cl::NullRange,
-                       cl::NDRange backprojectorLocalNDRange = cl::NullRange)
+                       uint32_t workGroupSize = 256)
         : AlgorithmsBarrierBuffers(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
         , pdimx(pdimx)
         , pdimy(pdimy)
@@ -56,112 +54,21 @@ public:
         pdims_uint = cl_uint2({ pdimx, pdimy });
         vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz) });
         timestamp = std::chrono::steady_clock::now();
-        std::size_t projectorLocalNDRangeDim = projectorLocalNDRange.dimensions();
-        std::size_t backprojectorLocalNDRangeDim = backprojectorLocalNDRange.dimensions();
-        if(projectorLocalNDRangeDim == 2 || projectorLocalNDRangeDim == 3)
-        {
-            if(projectorLocalNDRange[0] == 0 && projectorLocalNDRange[1] == 0)
-            {
-                this->projectorLocalNDRange = cl::NullRange;
-                this->projectorLocalNDRangeBarrier = cl::NullRange;
-            } else if(projectorLocalNDRange[0] == 0 || projectorLocalNDRange[1] == 0)
-            {
-                this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
-                this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
-            } else
-            {
-                this->projectorLocalNDRange
-                    = cl::NDRange(projectorLocalNDRange[0], projectorLocalNDRange[1]);
-                this->projectorLocalNDRangeBarrier
-                    = cl::NDRange(projectorLocalNDRange[0], projectorLocalNDRange[1]);
-            }
-        } else
-        {
-            if(projectorLocalNDRangeDim != 0)
-            {
-                LOGE << io::xprintf(
-                    "Wrong specification of projectorLocalNDRange, trying guessing!");
-            }
-            this->projectorLocalNDRange = guessProjectionLocalNDRange(false);
-            this->projectorLocalNDRangeBarrier = guessProjectionLocalNDRange(true);
-        }
-        if(backprojectorLocalNDRangeDim == 2 || backprojectorLocalNDRangeDim == 3)
-        {
-            if(backprojectorLocalNDRange[0] == 0 && backprojectorLocalNDRange[1] == 0)
-            {
-                this->backprojectorLocalNDRange = cl::NullRange;
-            } else if(backprojectorLocalNDRange[0] == 0 || backprojectorLocalNDRange[1] == 0)
-            {
-                this->backprojectorLocalNDRange = guessBackprojectorLocalNDRange();
-            } else
-            {
-                this->backprojectorLocalNDRange
-                    = cl::NDRange(backprojectorLocalNDRange[0], backprojectorLocalNDRange[1]);
-            }
-        } else
-        {
-            if(backprojectorLocalNDRangeDim != 0)
-            {
-                LOGE << io::xprintf("Wrong specification of backprojectorLocalNDRangeDim=%d with "
-                                    "backprojectorLocalNDRange=(%d, %d, %d) trying guessing!",
-                                    backprojectorLocalNDRangeDim, backprojectorLocalNDRange[0],
-                                    backprojectorLocalNDRange[1], backprojectorLocalNDRange[2]);
-            }
-            this->backprojectorLocalNDRange = guessBackprojectorLocalNDRange();
-        }
-        projectorLocalNDRangeDim = this->projectorLocalNDRange.dimensions();
-        std::size_t projectorLocalNDRangeBarrierDim
-            = this->projectorLocalNDRangeBarrier.dimensions();
-        backprojectorLocalNDRangeDim = this->backprojectorLocalNDRange.dimensions();
-        if(projectorLocalNDRangeDim == 0)
-        {
-            LOGD << io::xprintf("projectorLocalNDRange = cl::NDRange()");
-        } else if(projectorLocalNDRangeDim == 2)
-        {
-            LOGD << io::xprintf("projectorLocalNDRange = cl::NDRange(%d, %d)",
-                                this->projectorLocalNDRange[0], this->projectorLocalNDRange[1]);
-        } else
-        {
-            LOGD << io::xprintf("projectorLocalNDRange = cl::NDRange(%d, %d, %d)",
-                                this->projectorLocalNDRange[0], this->projectorLocalNDRange[1],
-                                this->projectorLocalNDRange[2]);
-        }
-        if(projectorLocalNDRangeBarrierDim == 0)
-        {
-            LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange()");
-        } else if(projectorLocalNDRangeBarrierDim == 2)
-        {
-            LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange(%d, %d)",
-                                this->projectorLocalNDRangeBarrier[0],
-                                this->projectorLocalNDRangeBarrier[1]);
-        } else
-        {
-            LOGD << io::xprintf("projectorLocalNDRangeBarrier = cl::NDRange(%d, %d, %d)",
-                                this->projectorLocalNDRangeBarrier[0],
-                                this->projectorLocalNDRangeBarrier[1],
-                                this->projectorLocalNDRangeBarrier[2]);
-        }
-        if(backprojectorLocalNDRangeDim == 0)
-        {
-            LOGD << io::xprintf("backprojectorLocalNDRangeDim = cl::NDRange()");
-        } else if(backprojectorLocalNDRangeDim == 2)
-        {
-            LOGD << io::xprintf("backprojectorLocalNDRange = cl::NDRange(%d, %d)",
-                                this->backprojectorLocalNDRange[0],
-                                this->backprojectorLocalNDRange[1]);
-        } else
-        {
-            LOGD << io::xprintf("backprojectorLocalNDRange = cl::NDRange(%d, %d, %d)",
-                                this->backprojectorLocalNDRange[0],
-                                this->backprojectorLocalNDRange[1],
-                                this->backprojectorLocalNDRange[2]);
-        }
     }
 
     void initializeCVPProjector(bool barrierVariant, uint32_t LOCALARRAYSIZE = 7680);
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
     void initializeVolumeConvolution();
+
+    int initializeOpenCL(uint32_t platformID,
+                         uint32_t* deviceIds,
+                         uint32_t deviceIdsLength,
+                         std::string xpath,
+                         bool debug,
+                         bool relaxed,
+                         cl::NDRange projectorLocalNDRange = cl::NullRange,
+                         cl::NDRange backprojectorLocalNDRange = cl::NullRange);
 
     void useJacobiVectorCLCode();
 
@@ -288,6 +195,10 @@ protected:
     const uint32_t pdimx, pdimy, pdimz, vdimx, vdimy, vdimz;
     const uint32_t workGroupSize;
     uint64_t BDIM, XDIM;
+
+private:
+    bool isLocalRangeAdmissible(cl::NDRange& localRange);
+    void checkLocalRange(cl::NDRange& localRange, std::string name);
 };
 
 } // namespace KCT

@@ -32,7 +32,7 @@ public:
      * calling CLINCLUDE functions. These sources will be included as non null functors.
      *
      * @param xpath
-     * @param platformId
+     * @param platformID
      *
      * @return
      * @see [OpenCL C++
@@ -40,12 +40,12 @@ public:
      * @see [OpenCL C++
      * tutorial](http://simpleopencl.blogspot.com/2013/06/tutorial-simple-start-with-opencl-and-c.html)
      */
-    int initializeOpenCL(uint32_t platformId,
-                         uint32_t* deviceIds,
-                         uint32_t deviceIdsLength,
-                         std::string xpath,
-                         bool debug,
-                         bool relaxed);
+    int initializeOpenCL(uint32_t platformID,
+                                 uint32_t* deviceIds,
+                                 uint32_t deviceIdsLength,
+                                 std::string xpath,
+                                 bool debug,
+                                 bool relaxed);
 
     bool isOpenCLInitialized() { return openCLInitialized; }
 
@@ -90,6 +90,9 @@ protected:
     std::vector<cl::Device> devices;
     std::shared_ptr<cl::Context> context = nullptr;
     std::vector<std::shared_ptr<cl::CommandQueue>> Q;
+    // Info objects
+    uint64_t localMemBytesize;
+    uint32_t maxWorkGroupSize;
 
     // OpenCL functors
     // backprojector.cl

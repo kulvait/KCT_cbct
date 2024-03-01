@@ -11,7 +11,7 @@ void Kniha::addOptString(std::string option)
     }
 }
 
-int Kniha::initializeOpenCL(uint32_t platformId,
+int Kniha::initializeOpenCL(uint32_t platformID,
                             uint32_t* deviceIds,
                             uint32_t deviceIdsLength,
                             std::string xpath,
@@ -24,7 +24,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
         KCTERR(err);
     }
     // Select the first available platform.
-    platform = util::OpenCLManager::getPlatform(platformId, true);
+    platform = util::OpenCLManager::getPlatform(platformID, true);
     if(platform == nullptr)
     {
         return -1;
@@ -33,7 +33,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     std::shared_ptr<cl::Device> dev;
     if(deviceIdsLength == 0)
     {
-        LOGD << io::xprintf("Adding deviceID %d on the platform %d.", 0, platformId);
+        LOGD << io::xprintf("Adding deviceID %d on the platform %d.", 0, platformID);
         dev = util::OpenCLManager::getDevice(*platform, 0, true);
         if(dev == nullptr)
         {
@@ -44,7 +44,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     {
         for(uint32_t i = 0; i != deviceIdsLength; i++)
         {
-            LOGD << io::xprintf("Adding deviceID %d on the platform %d.", deviceIds[i], platformId);
+            LOGD << io::xprintf("Adding deviceID %d on the platform %d.", deviceIds[i], platformID);
             dev = util::OpenCLManager::getDevice(*platform, deviceIds[i], true);
             if(dev == nullptr)
             {
@@ -153,7 +153,7 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     // Was reported on
     // https://github.com/beagle-dev/beagle-lib/blob/master/libhmsbeagle/GPU/GPUInterfaceOpenCL.cpp
     // Nvidia platform seems to be unaffected contrary to the report
-    if(util::OpenCLManager::getPlatformName(platformId) != "Intel(R) OpenCL")
+    if(util::OpenCLManager::getPlatformName(platformID) != "Intel(R) OpenCL")
     {
         if(platform->unloadCompiler() != CL_SUCCESS)
         {
@@ -167,10 +167,18 @@ int Kniha::initializeOpenCL(uint32_t platformId,
     {
         f(*program);
     }
+    std::vector<uint64_t> devices_maxWorkGroupSize;
+    std::vector<uint64_t> devices_localMemBytesize;
     for(uint32_t i = 0; i != devices.size(); i++)
     {
         Q.push_back(std::make_shared<cl::CommandQueue>(*context, devices[i]));
+        devices_maxWorkGroupSize.push_back(util::OpenCLManager::maxWGS(devices[i]));
+        devices_localMemBytesize.push_back(util::OpenCLManager::localMemSize(devices[i]));
     }
+    maxWorkGroupSize
+        = *std::min_element(devices_maxWorkGroupSize.begin(), devices_maxWorkGroupSize.end());
+    localMemBytesize
+        = *std::min_element(devices_localMemBytesize.begin(), devices_localMemBytesize.end());
     openCLInitialized = true;
     return 0;
 }
@@ -2160,14 +2168,7 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_project_barrier(
                           "command_type_string=%s!",
                           cl_info_id, command_type_string.c_str());
         KCTERR(err);
-    } else
-    {
-//        LOGI << io::xprintf("CL_SUCCESS enqueueNDRangeKernel with LOCALARRAYSIZE=%d "
-//                            "projectionOffset=%d globalRange=[%d, %d, %d] localRange=[%d, %d, %d]",
-//                            LOCALARRAYSIZE, projectionOffset, globalRange[0], globalRange[1],
-//                            globalRange[2], localRange[0], localRange[1], localRange[2]);
     }
-    blocking = true;
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

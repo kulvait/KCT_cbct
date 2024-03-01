@@ -352,8 +352,7 @@ int Args::postParse()
     if(barrierAdjustSize)
     {
         barrierArraySize = localMemSize / 4 - 16; // 9 shall be sufficient but for memory alignment
-        LOGI << io::xprintf("Setting LOCALARRAYSIZE=%d for optimal performance.",
-                            barrierArraySize);
+        LOGI << io::xprintf("Setting LOCALARRAYSIZE=%d for optimal performance.", barrierArraySize);
     }
     if(useBarrierCalls && barrierArraySize > localMemSize / 4 - 9)
     {
@@ -430,8 +429,7 @@ int main(int argc, char* argv[])
             std::shared_ptr<CGLSPBCT2DReconstructor> cgls
                 = std::make_shared<CGLSPBCT2DReconstructor>(
                     ARG.projectionSizeX, ARG.slabSize, ARG.projectionSizeZ, ARG.volumeSizeX,
-                    ARG.volumeSizeY, ARG.slabSize, ARG.CLitemsPerWorkgroup, projectorLocalNDRange,
-                    backprojectorLocalNDRange);
+                    ARG.volumeSizeY, ARG.slabSize, ARG.CLitemsPerWorkgroup);
             cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
             // testing
             //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
@@ -460,9 +458,9 @@ int main(int argc, char* argv[])
             {
                 cgls->useJacobiVectorCLCode();
             }
-            int ecd
-                = cgls->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
+            int ecd = cgls->initializeOpenCL(
+                ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
+                ARG.CLrelaxed, projectorLocalNDRange, backprojectorLocalNDRange);
             if(ecd < 0)
             {
                 std::string ERR
