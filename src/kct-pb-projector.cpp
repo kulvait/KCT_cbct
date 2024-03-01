@@ -263,10 +263,10 @@ int main(int argc, char* argv[])
         }
     } else
     {
-        PartialParallelBeamProjector PBCVP(
-            ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
-            ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, ARG.partialProjectorBytesize,
-            projectorLocalNDRange, backprojectorLocalNDRange);
+        PartialParallelBeamProjector PBCVP(ARG.projectionSizeX, ARG.projectionSizeY,
+                                           ARG.projectionSizeZ, ARG.volumeSizeX, ARG.volumeSizeY,
+                                           ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup,
+                                           ARG.partialProjectorBytesize);
         // PBCVP.initializeAllAlgorithms();
         if(ARG.useSidonProjector)
         {
@@ -280,9 +280,9 @@ int main(int argc, char* argv[])
             PBCVP.getCTOperator()->initializeCVPProjector(ARG.useBarrierCalls,
                                                           ARG.barrierArraySize);
         }
-        int ecd = PBCVP.getCTOperator()->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                                          ARG.CLdeviceIDs.size(), xpath,
-                                                          ARG.CLdebug, ARG.CLrelaxed);
+        int ecd = PBCVP.getCTOperator()->initializeOpenCL(
+            ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
+            ARG.CLrelaxed, projectorLocalNDRange, backprojectorLocalNDRange);
         if(ecd < 0)
         {
             std::string ERR

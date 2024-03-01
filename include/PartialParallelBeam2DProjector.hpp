@@ -53,9 +53,7 @@ public:
                                    uint32_t vdimy,
                                    uint32_t vdimz,
                                    uint32_t workGroupSize = 256,
-                                   uint64_t maximumByteSize = 2147483648, // 256*1024*1024*8
-                                   cl::NDRange projectorLocalNDRange = cl::NullRange,
-                                   cl::NDRange backprojectorLocalNDRange = cl::NullRange)
+                                   uint64_t maximumByteSize = 2147483648) // 256*1024*1024*8
     {
         this->pdimx = pdimx;
         this->pdimy = pdimy;
@@ -69,8 +67,6 @@ public:
             maximumByteSize = 2147483648;
         }
         this->maximumByteSize = maximumByteSize;
-        this->projectorLocalNDRange = projectorLocalNDRange;
-        this->backprojectorLocalNDRange = backprojectorLocalNDRange;
         uint64_t projectionFrameSize = pdimx * pdimy;
         uint64_t volumeFrameSize = vdimx * vdimy;
         uint64_t maximumElementSize = maximumByteSize / sizeof(float);
@@ -199,8 +195,7 @@ public:
                                 maximumByteSize);
         }
         CT = std::make_shared<PartialPBCT2DOperator>(
-            pdimx, pdimy, pdimz_partial, vdimx, vdimy, vdimz_partial, workGroupSize,
-            projectorLocalNDRange, backprojectorLocalNDRange);
+            pdimx, pdimy, pdimz_partial, vdimx, vdimy, vdimz_partial, workGroupSize);
     }
 
     std::shared_ptr<PartialPBCT2DOperator> getCTOperator() { return CT; }

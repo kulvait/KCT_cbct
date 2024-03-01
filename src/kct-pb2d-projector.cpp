@@ -25,7 +25,6 @@
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/ArgumentsFramespec.hpp"
 #include "PROG/Program.hpp"
-#include "ParallelBeamProjector.hpp"
 #include "PartialParallelBeam2DProjector.hpp"
 #include "SMA/BufferedSparseMatrixFloatWritter.hpp"
 
@@ -218,8 +217,7 @@ int main(int argc, char* argv[])
     }
     PartialParallelBeam2DProjector PBCVP(
         ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
-        ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, partialProjectionBytesize,
-        projectorLocalNDRange, backprojectorLocalNDRange);
+        ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup, partialProjectionBytesize);
     // PBCVP.initializeAllAlgorithms();
     if(ARG.useSidonProjector)
     {
@@ -232,9 +230,9 @@ int main(int argc, char* argv[])
     {
         PBCVP.getCTOperator()->initializeCVPProjector(ARG.useBarrierCalls, ARG.barrierArraySize);
     }
-    int ecd = PBCVP.getCTOperator()->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
-                                                      ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
-                                                      ARG.CLrelaxed);
+    int ecd = PBCVP.getCTOperator()->initializeOpenCL(
+        ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
+        ARG.CLrelaxed, projectorLocalNDRange, backprojectorLocalNDRange);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);

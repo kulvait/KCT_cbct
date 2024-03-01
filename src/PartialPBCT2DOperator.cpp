@@ -2,6 +2,35 @@
 
 namespace KCT {
 
+int PartialPBCT2DOperator::initializeOpenCL(uint32_t platformID,
+                                       uint32_t* deviceIds,
+                                       uint32_t deviceIdsLength,
+                                       std::string xpath,
+                                       bool debug,
+                                       bool relaxed,
+                                       cl::NDRange projectorLocalNDRange,
+                                       cl::NDRange backprojectorLocalNDRange)
+{
+    int val
+        = Kniha::initializeOpenCL(platformID, deviceIds, deviceIdsLength, xpath, debug, relaxed);
+    if(val == 0)
+    {
+        PBCT2DLocalNDRangeFactory localRangeFactory(vdimx, vdimy, maxWorkGroupSize);
+        bool verbose = true;
+        this->projectorLocalNDRange
+            = localRangeFactory.getProjectorLocalNDRange(projectorLocalNDRange, verbose);
+        this->projectorLocalNDRangeBarrier
+            = localRangeFactory.getProjectorBarrierLocalNDRange(projectorLocalNDRange, verbose);
+        this->backprojectorLocalNDRange
+            = localRangeFactory.getBackprojectorLocalNDRange(backprojectorLocalNDRange, verbose);
+        return 0;
+    } else
+    {
+        std::string ERR = io::xprintf("Wrong initialization of OpenCL with code %d!", val);
+        KCTERR(ERR);
+    }
+}
+
 void PartialPBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOCALARRAYSIZE)
 {
     if(!isOpenCLInitialized())

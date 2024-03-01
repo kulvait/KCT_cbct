@@ -284,7 +284,7 @@ target_include_directories(CLlin-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_git_version_init(CLlin-krylov)
 install (TARGETS CLlin-krylov RUNTIME DESTINATION .)
 
-SET(KCTPBKRYLOV_SOURCES src/kct-pb-krylov.cpp src/Kniha.cpp src/BasePBCTReconstructor.cpp src/BasePBCTOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCTReconstructor.cpp)
+SET(KCTPBKRYLOV_SOURCES src/kct-pb-krylov.cpp src/Kniha.cpp src/BasePBCTReconstructor.cpp src/BasePBCTOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCTReconstructor.cpp src/NDRange/PBCTLocalNDRangeFactory.cpp src/NDRange/NDRangeHelper.cpp)
 add_executable(kct-pb-krylov ${KCTPBKRYLOV_SOURCES})
 set_target_properties(
     kct-pb-krylov
@@ -303,7 +303,7 @@ target_include_directories(kct-pb-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_git_version_init(kct-pb-krylov)
 install (TARGETS kct-pb-krylov RUNTIME DESTINATION .)
 
-SET(KCTPB2DKRYLOV_SOURCES src/kct-pb2d-krylov.cpp src/Kniha.cpp src/BasePBCT2DReconstructor.cpp src/BasePBCT2DOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCT2DReconstructor.cpp)
+SET(KCTPB2DKRYLOV_SOURCES src/kct-pb2d-krylov.cpp src/Kniha.cpp src/BasePBCT2DReconstructor.cpp src/BasePBCT2DOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCT2DReconstructor.cpp src/NDRange/NDRangeHelper.cpp src/NDRange/PBCT2DLocalNDRangeFactory.cpp)
 add_executable(kct-pb2d-krylov ${KCTPB2DKRYLOV_SOURCES})
 set_target_properties(
     kct-pb2d-krylov
@@ -322,7 +322,7 @@ target_include_directories(kct-pb2d-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_git_version_init(kct-pb2d-krylov)
 install (TARGETS kct-pb2d-krylov RUNTIME DESTINATION .)
 
-SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp src/alg/PartialParallelBeamProjector.cpp src/PartialPBCTOperator.cpp)
+SET(CLLINCGLS_SOURCES src/kct-pb-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp src/alg/PartialParallelBeamProjector.cpp src/PartialPBCTOperator.cpp src/NDRange/PBCTLocalNDRangeFactory.cpp src/NDRange/NDRangeHelper.cpp)
 add_executable(kct-pb-projector ${CLLINCGLS_SOURCES})
 set_target_properties(
     kct-pb-projector
@@ -341,7 +341,7 @@ target_link_libraries (kct-pb-projector ${CMAKE_THREAD_LIBS_INIT})
 target_git_version_init(kct-pb-projector)
 install (TARGETS kct-pb-projector RUNTIME DESTINATION .)
 
-SET(PB2DPROJECTOR_SOURCES src/kct-pb2d-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp src/alg/PartialParallelBeam2DProjector.cpp src/PartialPBCT2DOperator.cpp)
+SET(PB2DPROJECTOR_SOURCES src/kct-pb2d-projector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/alg/PartialParallelBeam2DProjector.cpp src/PartialPBCT2DOperator.cpp src/NDRange/PBCT2DLocalNDRangeFactory.cpp src/NDRange/NDRangeHelper.cpp)
 add_executable(kct-pb2d-projector ${PB2DPROJECTOR_SOURCES})
 set_target_properties(
     kct-pb2d-projector
@@ -360,7 +360,7 @@ target_link_libraries (kct-pb2d-projector ${CMAKE_THREAD_LIBS_INIT})
 target_git_version_init(kct-pb2d-projector)
 install (TARGETS kct-pb2d-projector RUNTIME DESTINATION .)
 
-SET(CLLINCGLS_SOURCES src/kct-pb-backprojector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp)
+SET(CLLINCGLS_SOURCES src/kct-pb-backprojector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BaseReconstructor.cpp src/GLSQRReconstructor.cpp src/CGLSReconstructor.cpp src/PSIRTReconstructor.cpp src/OSSARTReconstructor.cpp src/alg/ParallelBeamProjector.cpp src/BasePBCTOperator.cpp src/NDRange/PBCTLocalNDRangeFactory.cpp src/NDRange/NDRangeHelper.cpp)
 add_executable(kct-pb-backprojector ${CLLINCGLS_SOURCES})
 set_target_properties(
     kct-pb-backprojector

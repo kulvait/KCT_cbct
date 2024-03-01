@@ -20,6 +20,7 @@
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "MATRIX/utils.hpp"
 #include "OPENCL/OpenCLManager.hpp"
+#include "NDRange/PBCT2DLocalNDRangeFactory.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
 
