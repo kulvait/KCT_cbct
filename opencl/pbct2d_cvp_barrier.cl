@@ -17,17 +17,10 @@ void inline PB2DInsertVerticalValuesBarrier(global const float* restrict volumeP
     }
 }
 
-// clang-format off
-// PQ is PX - PX_min for given coordinate to test PX
-// PX_inc1 <= PX_inc2 <= PX_inc3 are values so that
-// PX_min + PX_inc1 is in one corner
-// PX_min + PX_inc2 is in another corner
-// PX_min + PX_inc3 is in maximal corner
-// clang-format on
-inline REAL PB2DExactPolygonPartBarrier(const REAL PQ,
-                                        const REAL PX_inc1,
-                                        const REAL PX_inc2,
-                                        const REAL PX_inc3)
+inline REAL PB2DExactPolygonPartBarrierOriginal(const REAL PQ,
+                                         const REAL PX_inc1,
+                                         const REAL PX_inc2,
+                                         const REAL PX_inc3)
 {
     if(PQ <= ZERO)
     {
@@ -37,15 +30,12 @@ inline REAL PB2DExactPolygonPartBarrier(const REAL PQ,
         return HALF * PQ * PQ / (PX_inc1 * PX_inc2);
     } else if(PQ < PX_inc2)
     {
-        return HALF * (PQ + (PQ - PX_inc1)) / PX_inc2;
+        return PQ - HALF * PX_inc1 / PX_inc2;
     } else if(PQ < PX_inc3)
     {
         if(PX_inc1 == 0)
         {
             return PQ / PX_inc2;
-        } else if(PX_inc2 == 0)
-        {
-            return PQ / PX_inc1;
         } else
         {
             return ONE - HALF * (PX_inc3 - PQ) * (PX_inc3 - PQ) / (PX_inc1 * PX_inc2);
@@ -53,6 +43,95 @@ inline REAL PB2DExactPolygonPartBarrier(const REAL PQ,
     } else
     {
         return ONE;
+    }
+}
+
+// clang-format off
+// PQ is PX - PX_min for given coordinate to test PX
+// PX_inc1 <= PX_inc2 <= PX_inc3 are values so that
+// PX_min + PX_inc1 is in one corner
+// PX_min + PX_inc2 is in another corner
+// PX_min + PX_inc3 is in maximal corner
+// clang-format on
+// I don't need first test because I have assured PX_inc1!=0 when calling this procedure
+inline REAL PB2DExactPolygonPartBarrier(const REAL PQ,
+                                        const REAL PX_inc1,
+                                        const REAL PX_inc2,
+                                        const REAL PX_inc3)
+{
+    if(PQ < PX_inc1)
+    {
+        return HALF * PQ * PQ / (PX_inc1 * PX_inc2);
+    } else if(PQ < PX_inc2)
+    {
+        return PQ - HALF * PX_inc1 / PX_inc2;
+    } else if(PQ < PX_inc3)
+    {
+        return ONE - HALF * (PX_inc3 - PQ) * (PX_inc3 - PQ) / (PX_inc1 * PX_inc2);
+    } else
+    {
+        return ONE;
+    }
+}
+
+void inline FLOAT_pbct2d_cutting_voxel_project_barrier_local_pxinc1iszero(
+    global const float* restrict voxelPointer,
+    local float* restrict projection,
+    private int2 pdims,
+    private float voxelVolumeTimesScalingFactor,
+    private int PI_min,
+    private int PI_max,
+    private float PX_min,
+    private float PX_inc2,
+    private int volumeStride)
+{
+    if(PI_max >= 0 && PI_min < pdims.x)
+    {
+        local float* restrict pixelPointer;
+        if(PI_max <= PI_min) // These indices are in the admissible range
+        {
+            PI_min = convert_int_rtn(PX_min + HALF * PX_inc2 + HALF);
+            pixelPointer = projection + PI_min * pdims.y;
+            PB2DInsertVerticalValuesBarrier(voxelPointer, volumeStride, pixelPointer, pdims.y,
+                                            voxelVolumeTimesScalingFactor);
+        } else
+        {
+            REAL sectionSize_prev, sectionSize_cur, polygonSize;
+            REAL factor;
+            REAL PQ;
+            int I = max(-1, PI_min);
+            int I_STOP = min(PI_max, pdims.x);
+            // Section of the square that corresponds to the indices < i
+            PQ = ((REAL)I) + HALF - PX_min;
+            sectionSize_prev = PQ / PX_inc2;
+            if(I >= 0)
+            {
+                factor = voxelVolumeTimesScalingFactor * sectionSize_prev;
+                pixelPointer = projection + I * pdims.y;
+                PB2DInsertVerticalValuesBarrier(voxelPointer, volumeStride, pixelPointer, pdims.y,
+                                                factor);
+            }
+            for(I = I + 1; I < I_STOP; I++)
+            {
+                PQ = ((REAL)I) + HALF - PX_min;
+                sectionSize_cur = PQ / PX_inc2;
+                polygonSize = sectionSize_cur - sectionSize_prev;
+                factor = voxelVolumeTimesScalingFactor * polygonSize;
+                pixelPointer = projection + I * pdims.y;
+                PB2DInsertVerticalValuesBarrier(voxelPointer, volumeStride, pixelPointer, pdims.y,
+                                                factor);
+                sectionSize_prev = sectionSize_cur;
+            }
+            polygonSize = ONE - sectionSize_prev;
+            // Without second test polygonsize==0 triggers division by zero
+            if(I_STOP < pdims.x && polygonSize > zeroPrecisionTolerance)
+            {
+                factor = voxelVolumeTimesScalingFactor * polygonSize;
+                pixelPointer = projection + I * pdims.y;
+                PB2DInsertVerticalValuesBarrier(voxelPointer, volumeStride, pixelPointer, pdims.y,
+                                                factor);
+            }
+        }
     }
 }
 
@@ -184,13 +263,12 @@ void kernel FLOAT_pbct2d_cutting_voxel_project_barrier(global const float* restr
     const REAL PX_inc3 = TWO * PXincTotal;
     const int PI_min = INDEX(PX_min + zeroPrecisionTolerance);
     const int PI_max = INDEX(PX_max - zeroPrecisionTolerance);
-    local int LocalFootprint_PIStart_LOC;
-    local int LocalFootprint_PICount_LOC;
+
     local int LocalMemory_PIStart_LOC;
     int LocalMemory_PIStart;
     local int LocalMemory_PICount_LOC;
     local uint LocalMemory_Size_LOC;
-    local int PILocalUpperBound_LOC;
+    local int LocalFootprint_PIUpperBound_LOC;
     local int2 Lpdims_LOC;
     local bool stopNextIteration_LOC;
     bool stopThisIteration;
@@ -201,36 +279,33 @@ void kernel FLOAT_pbct2d_cutting_voxel_project_barrier(global const float* restr
         const REAL2 voxelcenter_local_xy = volumeCenter + volumeCenter_localVoxelcenter_offset;
         const REAL2 halfLocalSizes = { HALF * lis * voxelSizes.x, HALF * ljs * voxelSizes.y };
         REAL LPX0 = PB2DPROJECT(CM, voxelcenter_local_xy);
-        REAL2 LPXinc = fabs(CM.s01) * halfLocalSizes.s01;
-        REAL LPXincTotal = LPXinc.x + LPXinc.y;
+        REAL LPXincTotal = dot(fabs(CM.s01), halfLocalSizes.s01);
         REAL LPX_min = LPX0 - LPXincTotal; // At minimum
         REAL LPX_max = LPX0 + LPXincTotal; // maximum
-        int PILocalMin = INDEX(LPX_min + zeroPrecisionTolerance);
-        PILocalUpperBound_LOC = INDEX(LPX_max - zeroPrecisionTolerance) + 1;
-        if(PILocalUpperBound_LOC <= 0 || PILocalMin >= pdims.x)
+        LocalMemory_PIStart_LOC = INDEX(LPX_min + zeroPrecisionTolerance);
+        LocalFootprint_PIUpperBound_LOC = INDEX(LPX_max - zeroPrecisionTolerance) + 1;
+        if(LocalFootprint_PIUpperBound_LOC <= 0 || LocalMemory_PIStart_LOC >= pdims.x)
         {
             stopNextIteration_LOC = true;
-            LocalFootprint_PICount_LOC = 0;
             LocalMemory_PICount_LOC = 0;
+            LocalFootprint_PIUpperBound_LOC = 0;
+            LocalMemory_PIStart_LOC = 0;
         } else
         {
-            if(PILocalMin < 0)
+            if(LocalMemory_PIStart_LOC < 0)
             {
-                PILocalMin = 0;
+                LocalMemory_PIStart_LOC = 0;
             }
-            if(PILocalUpperBound_LOC > pdims.x)
+            if(LocalFootprint_PIUpperBound_LOC > pdims.x)
             {
-                PILocalUpperBound_LOC = pdims.x;
+                LocalFootprint_PIUpperBound_LOC = pdims.x;
             }
             // Prepare local memory
-            LocalFootprint_PIStart_LOC = PILocalMin;
-            LocalFootprint_PICount_LOC = PILocalUpperBound_LOC - LocalFootprint_PIStart_LOC;
+            LocalMemory_PICount_LOC = LocalFootprint_PIUpperBound_LOC - LocalMemory_PIStart_LOC;
             // How many columns fits to local memory
-            uint LocalFootprint_size = LocalFootprint_PICount_LOC * k_count;
-            LocalMemory_PIStart_LOC = LocalFootprint_PIStart_LOC;
+            uint LocalFootprint_size = LocalMemory_PICount_LOC * k_count;
             if(LocalFootprint_size <= LOCALARRAYSIZE)
             {
-                LocalMemory_PICount_LOC = LocalFootprint_PICount_LOC;
                 stopNextIteration_LOC = true;
             } else
             {
@@ -253,6 +328,8 @@ void kernel FLOAT_pbct2d_cutting_voxel_project_barrier(global const float* restr
     LIDRANGE = (LocalMemory_Size_LOC + LOCSIZE - 1) / LOCSIZE;
     fillStart = min(LID * LIDRANGE, LocalMemory_Size_LOC);
     fillStop = min(fillStart + LIDRANGE, LocalMemory_Size_LOC);
+    uint LI, LJ, globalIndex, globalOffset;
+    float val;
     // Do not care overfilling last array
     do
     {
@@ -267,20 +344,27 @@ void kernel FLOAT_pbct2d_cutting_voxel_project_barrier(global const float* restr
         }
         stopThisIteration = stopNextIteration_LOC;
         barrier(CLK_LOCAL_MEM_FENCE);
-
-        FLOAT_pbct2d_cutting_voxel_project_barrier_local(
-            voxelPointer, localProjection, Lpdims, voxelVolumeTimesScalingFactor, PI_min_local,
-            PI_max_local, PX_min_local, PX_inc1, PX_inc2, PX_inc3, volumeStride);
+        if(PX_inc1 == ZERO)
+        {
+            FLOAT_pbct2d_cutting_voxel_project_barrier_local_pxinc1iszero(
+                voxelPointer, localProjection, Lpdims, voxelVolumeTimesScalingFactor, PI_min_local,
+                PI_max_local, PX_min_local, PX_inc2, volumeStride);
+        } else
+        {
+            FLOAT_pbct2d_cutting_voxel_project_barrier_local(
+                voxelPointer, localProjection, Lpdims, voxelVolumeTimesScalingFactor, PI_min_local,
+                PI_max_local, PX_min_local, PX_inc1, PX_inc2, PX_inc3, volumeStride);
+        }
         barrier(CLK_LOCAL_MEM_FENCE); // Local to global copy
-        uint LI, LJ, globalIndex;
-        uint globalOffset = LocalMemory_PIStart * pdims.y;
-        for(int IND = fillStart; IND != fillStop; IND++)
+        globalOffset = LocalMemory_PIStart * pdims.y + k_from;
+        for(uint IND = fillStart; IND != fillStop; IND++)
         // for(int IND = LID; IND < mappedLocalRange; IND+=LIDRANGE)
         {
             LI = IND / Lpdims.y;
             LJ = IND % Lpdims.y;
-            globalIndex = globalOffset + LI * pdims.y + LJ + k_from;
-            AtomicAdd_g_f(projection + globalIndex, localProjection[IND]);
+            globalIndex = globalOffset + LI * pdims.y + LJ;
+            val = localProjection[IND];
+            AtomicAdd_g_f(projection + globalIndex, val);
         }
 
         if(!stopThisIteration)
@@ -288,12 +372,14 @@ void kernel FLOAT_pbct2d_cutting_voxel_project_barrier(global const float* restr
             if(LID == 0)
             {
                 LocalMemory_PIStart_LOC += LocalMemory_PICount_LOC;
-                // if(LocalMemory_PIStart_LOC < PILocalUpperBound_LOC) .. shall be allways true
-                // because stopThisIteration == false
+                // if(LocalMemory_PIStart_LOC < LocalFootprint_PIUpperBound_LOC) .. shall be allways
+                // true because stopThisIteration == false
                 //{
-                if(PILocalUpperBound_LOC - LocalMemory_PIStart_LOC <= LocalMemory_PICount_LOC)
+                if(LocalFootprint_PIUpperBound_LOC - LocalMemory_PIStart_LOC
+                   <= LocalMemory_PICount_LOC)
                 {
-                    LocalMemory_PICount_LOC = PILocalUpperBound_LOC - LocalMemory_PIStart_LOC;
+                    LocalMemory_PICount_LOC
+                        = LocalFootprint_PIUpperBound_LOC - LocalMemory_PIStart_LOC;
                     stopNextIteration_LOC = true;
                     Lpdims_LOC.x = LocalMemory_PICount_LOC;
                     LocalMemory_Size_LOC = LocalMemory_PICount_LOC * k_count;
