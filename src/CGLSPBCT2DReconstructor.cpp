@@ -169,7 +169,7 @@ void CGLSPBCT2DReconstructor::removeTikhonovRegularization() { this->tikhonovReg
 void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    cl::NDRange localRange = projectorLocalNDRange;
+    cl::NDRange localRange = cl::NullRange;
     cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
@@ -216,7 +216,7 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffe
 void CGLSPBCT2DReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buffer XIN)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    cl::NDRange localRange = projectorLocalNDRange;
+    cl::NDRange localRange = cl::NullRange;
     cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
@@ -263,7 +263,7 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualV
     cl::Buffer residualVector)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
-    cl::NDRange localRange = projectorLocalNDRange;
+    cl::NDRange localRange = cl::NullRange;
     cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
