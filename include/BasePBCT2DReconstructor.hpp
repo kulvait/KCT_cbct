@@ -34,19 +34,24 @@ public:
                             uint32_t vdimy,
                             uint32_t vdimz,
                             uint32_t workGroupSize = 256)
-        : BasePBCT2DOperator(pdimx,
-                             pdimy,
-                             pdimz,
-                             vdimx,
-                             vdimy,
-                             vdimz,
-                             workGroupSize)
+        : BasePBCT2DOperator(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
     {
     }
 
     virtual ~BasePBCT2DReconstructor() = default;
 
     virtual int reconstruct(uint32_t maxItterations, float minDiscrepancyError) = 0;
+
+    /**
+     * Simple method to test projector simply project x_buf containing volume array using currect
+     * projector and writes result to projection array.
+     */
+    void simpleProjection();
+    /**
+     * Simple method to test backprojector simply backproject b_buf containing projection array
+     * using currect backprojector and writes result to volume array.
+     */
+    void simpleBackprojection();
 
     void setReportingParameters(bool verbose,
                                 uint32_t reportKthIteration = 0,

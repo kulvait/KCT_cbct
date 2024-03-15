@@ -51,6 +51,20 @@ int BasePBCT2DReconstructor::initializeVectors(float* projections,
     return 0;
 }
 
+void BasePBCT2DReconstructor::simpleProjection()
+{
+    Q[0]->enqueueFillBuffer<cl_float>(*tmp_b_buf, FLOATZERO, 0, BDIM * sizeof(float));
+    project(*x_buf, *tmp_b_buf);
+    Q[0]->enqueueReadBuffer(*tmp_b_buf, CL_TRUE, 0, sizeof(float) * BDIM, b);
+}
+
+void BasePBCT2DReconstructor::simpleBackprojection()
+{
+    Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
+    backproject(*b_buf, *x_buf);
+    Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
+}
+
 void BasePBCT2DReconstructor::writeVolume(cl::Buffer& X, std::string path)
 {
     bufferIntoArray(X, x, XDIM);

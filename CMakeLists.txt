@@ -379,6 +379,21 @@ target_link_libraries(kct-pb-backprojector CTIOL_OPENCL)
 target_git_version_init(kct-pb-backprojector)
 install (TARGETS kct-pb-backprojector RUNTIME DESTINATION .)
 
+SET(PB2D_BACKPROJECTOR_SOURCES src/kct-pb2d-backprojector.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/BasePBCT2DReconstructor.cpp src/BasePBCT2DOperator.cpp src/CGLSPBCT2DReconstructor.cpp src/NDRange/NDRangeHelper.cpp src/NDRange/PBCT2DLocalNDRangeFactory.cpp)
+add_executable(kct-pb2d-backprojector ${PB2D_BACKPROJECTOR_SOURCES})
+set_target_properties(
+    kct-pb2d-backprojector
+    PROPERTIES 
+        OUTPUT_NAME "kct-pb2d-backprojector"
+        SUFFIX ""
+)
+target_link_libraries(kct-pb2d-backprojector ctiol)
+target_link_libraries(kct-pb2d-backprojector ctmal)
+target_link_libraries(kct-pb2d-backprojector OpenCL::OpenCL)
+target_link_libraries(kct-pb2d-backprojector CTIOL_OPENCL)
+target_git_version_init(kct-pb2d-backprojector)
+install (TARGETS kct-pb2d-backprojector RUNTIME DESTINATION .)
+
 SET(CLLINJACOBIGLSQR_SOURCES src/JacobiGLSQRReconstructor.cpp src/CLlin-jacobiglsqr.cpp)
 add_executable(CLlin-jacobiglsqr ${CLLINJACOBIGLSQR_SOURCES})
 set_target_properties(
