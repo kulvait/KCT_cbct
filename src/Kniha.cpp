@@ -500,13 +500,24 @@ void Kniha::CLINCLUDEutils()
             ptr11 = std::make_shared<std::remove_reference<decltype(*ptr11)>::type>(
                 cl::Kernel(program, str.c_str()));
         };
-        auto& ptr12 = FLOATvector_sqrt;
-        str = "FLOATvector_sqrt";
-        if(ptr12 == nullptr)
         {
-            ptr12 = std::make_shared<std::remove_reference<decltype(*ptr12)>::type>(
-                cl::Kernel(program, str.c_str()));
-        };
+            auto& ptr = FLOATvector_sqrt;
+            str = "FLOATvector_sqrt";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            }
+        }
+        {
+            auto& ptr = FLOATvector_square;
+            str = "FLOATvector_square";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            }
+        }
         auto& ptr13 = FLOATvector_invert;
         str = "FLOATvector_invert";
         if(ptr13 == nullptr)
@@ -1511,6 +1522,28 @@ int Kniha::algFLOATvector_A_equals_A_plus_cB_offset(cl::Buffer& A,
 {
     cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_A_plus_cB_offset)(eargs, A, B, c, offset);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+int Kniha::algFLOATvector_sqrt(cl::Buffer& A, uint64_t size, bool blocking, uint32_t QID)
+{
+
+    cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
+    auto exe = (*FLOATvector_sqrt)(eargs, A);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+int Kniha::algFLOATvector_square(cl::Buffer& A, uint64_t size, bool blocking, uint32_t QID)
+{
+
+    cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
+    auto exe = (*FLOATvector_square)(eargs, A);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

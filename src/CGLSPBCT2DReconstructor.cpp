@@ -36,7 +36,7 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     }
     backproject(*discrepancy_bbuf, *residualVector_xbuf);
-    //BasePBCT2DReconstructor::writeVolume(*residualVector_xbuf, "initialBackprojection.den");
+    // BasePBCT2DReconstructor::writeVolume(*residualVector_xbuf, "initialBackprojection.den");
     algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
     residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
     reportTime("Backprojection 0", false, true);
@@ -164,7 +164,10 @@ void CGLSPBCT2DReconstructor::addTikhonovRegularization(float L2, float V2, floa
 void CGLSPBCT2DReconstructor::useGradient3D(bool gradient3D) { this->gradient3D = gradient3D; }
 void CGLSPBCT2DReconstructor::useLaplace3D(bool laplace3D) { this->laplace3D = laplace3D; }
 
-void CGLSPBCT2DReconstructor::removeTikhonovRegularization() { this->tikhonovRegularization = false; }
+void CGLSPBCT2DReconstructor::removeTikhonovRegularization()
+{
+    this->tikhonovRegularization = false;
+}
 
 void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
 {
@@ -206,8 +209,9 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffe
         {
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims,
-                                            convolutionKernel, globalRange, localRange);
+            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *AdirectionVector_bbuf_xpart_Laplace,
+                                                        vdims, convolutionKernel, globalRange,
+                                                        localRange);
         }
         algFLOATvector_scale(*AdirectionVector_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
@@ -253,7 +257,7 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buff
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
             algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *discrepancy_bbuf_xpart_Laplace, vdims,
-                                            convolutionKernel, globalRange, localRange);
+                                                        convolutionKernel, globalRange, localRange);
         }
         algFLOATvector_scale(*discrepancy_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
@@ -316,8 +320,8 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualV
             cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
                                              0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
             algFLOATvector_2Dconvolution3x3ZeroBoundary(*discrepancy_bbuf_xpart_Laplace,
-                                            *residualVector_xbuf_Laplaceadd, vdims,
-                                            convolutionKernel, globalRange, localRange);
+                                                        *residualVector_xbuf_Laplaceadd, vdims,
+                                                        convolutionKernel, globalRange, localRange);
         }
         algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_Laplaceadd,
                                           effectSizeLaplace, XDIM);
@@ -416,11 +420,31 @@ void CGLSPBCT2DReconstructor::tikhonovSetRegularizingBuffersNull()
     AdirectionVector_bbuf_xpart_Laplace = nullptr;
 }
 
-int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations, float errCondition)
+/**
+ * Tikhonov regularized tomographic reconstruction using CGLS. Sometimes the problem is also
+ * referred as ridge regression, see https://en.wikipedia.org/wiki/Ridge_regression
+ *
+ * This procedure can be used also for preconditioning. In this case we compute the problem with two
+ * diagonal matrices C and \sqrt{R}
+ *
+ *
+ * @param maxIterations
+ * @param errCondition
+ * @param invCpr_xbuf Preconditioner C
+ * @param invSqrtRpr_bbuf Preconditioner \sqrt(R)
+ *
+ * @return
+ */
+int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations,
+                                                 float errCondition,
+                                                 std::shared_ptr<cl::Buffer> invCpr_xbuf,
+                                                 std::shared_ptr<cl::Buffer> invSqrtRpr_bbuf)
 {
     std::string INFO;
     INFO = "WELCOME TO CGLS WITH TIKHONOV, ";
     uint32_t additionalRegularizationVectors = 0; // Additional vector allocation
+    uint32_t additionalPreconditioning_xbuf = 0,
+             additionalPreconditioning_bbuf = 0; // Additional vector allocation
     if(tikhonovRegularizationL2)
     {
         INFO = io::xprintf("%sL2=%0.2f, ", effectSizeL2, INFO.c_str());
@@ -436,11 +460,16 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations, float e
         INFO = io::xprintf("%sLaplace=%0.2f, ", effectSizeLaplace, INFO.c_str());
         additionalRegularizationVectors++;
     }
+    if(invCpr_xbuf != nullptr)
+    {
+        additionalPreconditioning_xbuf = 1;
+    }
     INFO = io::xprintf("%sinit", effectSizeLaplace, INFO.c_str());
     tikhonovSetRegularizingBuffersNull();
-    allocateXBuffers(2 + 3 * additionalRegularizationVectors); // We neeed three new X buffers per
-                                                               // one regularization vector
-    allocateBBuffers(2);
+    allocateXBuffers(2 + 3 * additionalRegularizationVectors
+                     + additionalPreconditioning_xbuf); // We neeed three new X buffers per
+                                                        // one regularization vector
+    allocateBBuffers(2 + additionalPreconditioning_bbuf);
     LOGD << printTime(INFO, false, true);
     uint32_t iteration = 1;
     // Initialization
@@ -449,18 +478,36 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations, float e
 
     double residualNorm2_old, residualNorm2_now, AdirectionNorm2, AdirectionNorm2Xpart;
     double alpha, beta;
-    double NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
+    double NB0;
+    if(invSqrtRpr_bbuf != nullptr)
+    { // Need to compare with ||sqrt(R) b|| being initial norm
+        algFLOATvector_C_equals_A_times_B(*b_buf, *invSqrtRpr_bbuf, *tmp_b_buf, BDIM);
+        NB0 = std::sqrt(normBBuffer_barrier_double(*tmp_b_buf));
+        LOGI << io::xprintf("||sqrt(R) b||=%f", NB0);
+    } else
+    {
+        NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
+        LOGI << io::xprintf("||b||=%f", NB0);
+    }
     double NR0, NX;
-    LOGI << io::xprintf("||b||=%f", NB0);
     // Allocating vectors representing x
-    std::shared_ptr<cl::Buffer> directionVector_xbuf, residualVector_xbuf; // X buffers
+    std::shared_ptr<cl::Buffer> directionVector_xbuf, residualVector_xbuf,
+        preconditionedResidualVector_xbuf; // X buffers
     std::shared_ptr<cl::Buffer> discrepancy_bbuf, AdirectionVector_bbuf; // B buffers
     directionVector_xbuf = getXBuffer(0);
     residualVector_xbuf = getXBuffer(1);
+    uint32_t xBufferIndex = 1;
+    if(invCpr_xbuf != nullptr)
+    {
+        preconditionedResidualVector_xbuf = getXBuffer(xBufferIndex + 1);
+        xBufferIndex = xBufferIndex + 1;
+    } else
+    {
+        preconditionedResidualVector_xbuf = nullptr;
+    }
     discrepancy_bbuf = getBBuffer(0);
     AdirectionVector_bbuf = getBBuffer(1);
     // Tikhonov buffers initialization
-    uint32_t xBufferIndex = 1;
     if(tikhonovRegularizationL2)
     {
         residualVector_xbuf_L2add = getXBuffer(xBufferIndex + 1);
@@ -502,13 +549,35 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations, float e
     {
         Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     }
-    backproject(*discrepancy_bbuf, *residualVector_xbuf);
+    if(invSqrtRpr_bbuf != nullptr)
+    {
+        //    algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *invSqrtRpr_bbuf, BDIM);
+        algFLOATvector_C_equals_A_times_B(*discrepancy_bbuf, *invSqrtRpr_bbuf, *tmp_b_buf, BDIM);
+        backproject(*tmp_b_buf, *residualVector_xbuf);
+    } else
+    {
+        backproject(*discrepancy_bbuf, *residualVector_xbuf);
+    }
     tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(*residualVector_xbuf);
-    algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
-    residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
+    if(invCpr_xbuf != nullptr)
+    {
+        algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invCpr_xbuf,
+                                          *preconditionedResidualVector_xbuf, XDIM);
+        algFLOATvector_copy(*preconditionedResidualVector_xbuf, *directionVector_xbuf, XDIM);
+        residualNorm2_old = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
+                                                                *preconditionedResidualVector_xbuf);
+    } else
+    {
+        algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
+        residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
+    }
     reportTime("Backprojection 0", false, true);
     NR0 = std::sqrt(residualNorm2_old);
     project(*directionVector_xbuf, *AdirectionVector_bbuf);
+    if(invSqrtRpr_bbuf != nullptr)
+    {
+        algFLOATvector_A_equals_A_times_B(*AdirectionVector_bbuf, *invSqrtRpr_bbuf, BDIM);
+    }
     tikhonovMatrixActionToAdirectionAndScale(*directionVector_xbuf);
     AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf);
     AdirectionNorm2Xpart = tikhonovSumOfAdirectionNorms2();
@@ -582,9 +651,26 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations, float e
                 std::sqrt(normLaplace2_), 100 * std::abs(norm - norm_) / norm);
         }
         // DEBUG
-        backproject(*discrepancy_bbuf, *residualVector_xbuf);
+        if(invSqrtRpr_bbuf != nullptr)
+        {
+            algFLOATvector_C_equals_A_times_B(*discrepancy_bbuf, *invSqrtRpr_bbuf, *tmp_b_buf,
+                                              BDIM);
+            backproject(*tmp_b_buf, *residualVector_xbuf);
+        } else
+        {
+            backproject(*discrepancy_bbuf, *residualVector_xbuf);
+        }
         tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(*residualVector_xbuf);
-        residualNorm2_now = normXBuffer_barrier_double(*residualVector_xbuf);
+        if(invCpr_xbuf != nullptr)
+        {
+            algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invCpr_xbuf,
+                                              *preconditionedResidualVector_xbuf, XDIM);
+            residualNorm2_now = scalarProductXBuffer_barrier_double(
+                *residualVector_xbuf, *preconditionedResidualVector_xbuf);
+        } else
+        {
+            residualNorm2_now = normXBuffer_barrier_double(*residualVector_xbuf);
+        }
         reportTime(io::xprintf("Backprojection %d", iteration), false, true);
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
@@ -601,12 +687,24 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations, float e
             std::sqrt(normDiscrepancy2), std::sqrt(normL22),
             std::sqrt(normV2x2 + normV2y2 + normV2z2), std::sqrt(normV2x2), std::sqrt(normV2y2),
             std::sqrt(normV2z2), std::sqrt(normLaplace2));
-        algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
+        if(invCpr_xbuf != nullptr)
+        {
+            algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf,
+                                              *preconditionedResidualVector_xbuf, beta, XDIM);
+        } else
+        {
+            algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta,
+                                              XDIM);
+        }
         // Delayed update of direction vector
         iteration = iteration + 1;
         residualNorm2_old = residualNorm2_now;
-        project(*directionVector_xbuf, *AdirectionVector_bbuf);
         tikhonovMatrixActionToAdirectionAndScale(*directionVector_xbuf);
+        project(*directionVector_xbuf, *AdirectionVector_bbuf);
+        if(invSqrtRpr_bbuf != nullptr)
+        {
+            algFLOATvector_A_equals_A_times_B(*AdirectionVector_bbuf, *invSqrtRpr_bbuf, BDIM);
+        }
         AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf);
         AdirectionNorm2Xpart = tikhonovSumOfAdirectionNorms2();
         reportTime(io::xprintf("Projection %d", iteration), false, true);
@@ -691,9 +789,9 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(
     setTimestamp(blockingReport);
     backproject(*discrepancy_bbuf, *residualVector_xbuf);
     reportTime("Backprojection 0", blockingReport, true);
-    algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
-    algFLOATvector_A_equals_A_times_B(*directionVector_xbuf, *invertedpreconditioner_xbuf, XDIM);
-    algFLOATvector_copy(*directionVector_xbuf, *preconditionedResidualVector_xbuf, XDIM);
+    algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invertedpreconditioner_xbuf,
+                                      *preconditionedResidualVector_xbuf, XDIM);
+    algFLOATvector_copy(*preconditionedResidualVector_xbuf, *directionVector_xbuf, XDIM);
     residualNorm2_old = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
                                                             *preconditionedResidualVector_xbuf);
     NR0 = std::sqrt(residualNorm2_old);
@@ -1009,8 +1107,8 @@ void CGLSPBCT2DReconstructor::precomputeJacobiPreconditioner(std::shared_ptr<cl:
 }
 
 int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(float* invertedpreconditioner,
-                                                             uint32_t maxIterations,
-                                                             float errCondition)
+                                                               uint32_t maxIterations,
+                                                               float errCondition)
 {
     std::shared_ptr<cl::Buffer> preconditioner_xbuf; // X buffers
     allocateXBuffers(4);
@@ -1019,6 +1117,31 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(float* invertedpr
     double norm = std::sqrt(normXBuffer_barrier_double(*preconditioner_xbuf));
     LOGI << io::xprintf_green("Norm %f", norm);
     reconstructDiagonalPreconditioner(preconditioner_xbuf, maxIterations, errCondition);
+    return 0;
+}
+
+int CGLSPBCT2DReconstructor::reconstructSumPreconditioning(uint32_t maxIterations,
+                                                           float errCondition)
+{
+    cl_int err;
+    std::shared_ptr<cl::Buffer> invSqrtRpr_bbuf = std::make_shared<cl::Buffer>(
+        *context, CL_MEM_READ_WRITE, sizeof(float) * BDIM, nullptr, &err);
+    std::shared_ptr<cl::Buffer> invCpr_xbuf = std::make_shared<cl::Buffer>(
+        *context, CL_MEM_READ_WRITE, sizeof(float) * XDIM, nullptr, &err);
+    allocateXBuffers(1);
+    std::shared_ptr<cl::Buffer> ones_xbuf = getXBuffer(0);
+    Q[0]->enqueueFillBuffer<cl_float>(*ones_xbuf, FLOATONE, 0, XDIM * sizeof(float));
+    std::shared_ptr<cl::Buffer> ones_bbuf = tmp_b_buf;
+    Q[0]->enqueueFillBuffer<cl_float>(*ones_bbuf, FLOATONE, 0, BDIM * sizeof(float));
+    project(*ones_xbuf, *invSqrtRpr_bbuf);
+    algFLOATvector_invert_except_zero(*invSqrtRpr_bbuf, BDIM);
+    algFLOATvector_substitute_lower_than(*invSqrtRpr_bbuf, 0.0f, 0.0f, BDIM);
+    algFLOATvector_sqrt(*invSqrtRpr_bbuf, BDIM);
+    backproject(*ones_bbuf, *invCpr_xbuf);
+    algFLOATvector_invert_except_zero(*invCpr_xbuf, XDIM);
+    algFLOATvector_substitute_lower_than(*invCpr_xbuf, 0.0f, 0.0f, XDIM);
+    tikhonovSetRegularizingBuffersNull();
+    reconstructTikhonov(maxIterations, errCondition, invCpr_xbuf, invSqrtRpr_bbuf);
     return 0;
 }
 

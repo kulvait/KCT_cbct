@@ -336,6 +336,14 @@ void kernel FLOATvector_scale(global float* v, private float f)
     v[gid] = v[gid] * f;
 }
 
+void kernel FLOATvector_square(global float* v)
+{
+    const size_t gid = get_global_id(0);
+    float val = v[gid];
+    val = val * val;
+    v[gid] = val;
+}
+
 void kernel FLOATvector_sqrt(global float* v)
 {
     const size_t gid = get_global_id(0);

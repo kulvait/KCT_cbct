@@ -48,6 +48,7 @@ public:
     int postParse();
     void defineArguments();
     bool useJacobiPreconditioning = false;
+    bool useSumPreconditioning = false;
     int threads = 1;
     // It is evaluated from -0.5, pixels are centerred at integer coordinates
     uint64_t totalProjectionSize;
@@ -186,8 +187,10 @@ void Args::defineArguments()
 
     CLI::Option* jacobi_cli = og_settings->add_flag("--jacobi", useJacobiPreconditioning,
                                                     "Use Jacobi preconditioning.");
+    CLI::Option* sumpr_cli = og_settings->add_flag("--sum-preconditioning", useSumPreconditioning,
+                                                   "Use preconditioning by row and column sums.");
     jacobi_cli->excludes(glsqr_opt);
-    dpc->excludes(jacobi_cli);
+    dpc->excludes(jacobi_cli)->excludes(sumpr_cli);
     str = io::xprintf("Ordered subset level, number of subsets to be used, 1 for "
                       "classical SART. [defaults to %d]",
                       ossartSubsetCount);
@@ -484,6 +487,10 @@ int main(int argc, char* argv[])
             if(ARG.useJacobiPreconditioning)
             {
                 cgls->reconstructJacobi(ARG.maxIterationCount, ARG.stoppingRelativeError);
+            } else if(ARG.useSumPreconditioning)
+            {
+                cgls->reconstructSumPreconditioning(ARG.maxIterationCount,
+                                                    ARG.stoppingRelativeError);
             } else
             {
                 if(ARG.diagonalPreconditioner != "")

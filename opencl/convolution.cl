@@ -1,6 +1,9 @@
 //==============================convolution.cl=====================================
 // see https://www.evl.uic.edu/kreda/gpu/image-convolution/
-#define VOXELINDEX(i, j, k, vdims) {(i) + ((j) + (k)*vdims.y) * vdims.x}
+#define VOXELINDEX(i, j, k, vdims)                                                                 \
+    {                                                                                              \
+        (i) + ((j) + (k)*vdims.y) * vdims.x                                                        \
+    }
 
 #define REFLECTION33BOUNDARY()                                                                     \
     {                                                                                              \
@@ -554,7 +557,11 @@ void kernel FLOATvector_isotropicBackDx(global const float* restrict F,
     float out;
     if(i == 0)
     {
-        out = 0.0f;
+        // out = 0.0f;
+        out = -v;
+    } else if(i + 1 == vdims.x)
+    {
+        out = F[IND - 1];
     } else
     {
         out = F[IND - 1] - v;
@@ -575,7 +582,12 @@ void kernel FLOATvector_isotropicBackDy(global const float* restrict F,
     float out;
     if(j == 0)
     {
-        out = 0.0f;
+        //        out = 0.0f;
+        out = -v;
+    } else if(j + 1 == vdims.y)
+    {
+        out = F[IND - vdims.x];
+
     } else
     {
         out = F[IND - vdims.x] - v;
@@ -596,7 +608,11 @@ void kernel FLOATvector_isotropicBackDz(global const float* restrict F,
     float out;
     if(k == 0)
     {
-        out = 0.0f;
+        // out = 0.0f;
+        out = -v;
+    } else if(k + 1 == vdims.z)
+    {
+        out = F[IND - vdims.x * vdims.y];
     } else
     {
         out = F[IND - vdims.x * vdims.y] - v;

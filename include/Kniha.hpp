@@ -484,6 +484,12 @@ protected:
     std::shared_ptr<
         cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         vector_ScalarProductPartial_barrier;
+    // FLOATvector_sqrt
+    std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_sqrt;
+    int algFLOATvector_sqrt(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);
+    // FLOATvector_square
+    std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_square;
+    int algFLOATvector_square(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);
     // FLOATvector_zero
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_zero;
     int algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);
@@ -497,7 +503,6 @@ protected:
     std::shared_ptr<cl::make_kernel<cl::Buffer&, float&>> FLOATvector_scale;
     int algFLOATvector_scale(
         cl::Buffer& A, float c, uint64_t size, bool blocking = false, uint32_t QID = 0);
-    std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_sqrt;
     // FLOATvector_invert
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_invert;
     int

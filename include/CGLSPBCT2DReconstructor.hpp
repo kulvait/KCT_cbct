@@ -40,20 +40,8 @@ public:
                             uint32_t vdimy,
                             uint32_t vdimz,
                             uint32_t workGroupSize = 256)
-        : BasePBCT2DOperator(pdimx,
-                           pdimy,
-                           pdimz,
-                           vdimx,
-                           vdimy,
-                           vdimz,
-                           workGroupSize)
-        , BasePBCT2DReconstructor(pdimx,
-                                pdimy,
-                                pdimz,
-                                vdimx,
-                                vdimy,
-                                vdimz,
-                                workGroupSize)
+        : BasePBCT2DOperator(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
+        , BasePBCT2DReconstructor(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
 
     {
         removeTikhonovRegularization();
@@ -65,7 +53,10 @@ public:
 
     int reconstruct_experimental(uint32_t maxIterations = 100, float errCondition = 0.01);
 
-    int reconstructTikhonov(uint32_t maxIterations = 100, float errCondition = 0.01);
+    int reconstructTikhonov(uint32_t maxIterations = 100,
+                            float errCondition = 0.01,
+                            std::shared_ptr<cl::Buffer> invCpr_xbuf = nullptr,
+                            std::shared_ptr<cl::Buffer> invSqrtRpr_bbuf = nullptr);
 
     int reconstructDiagonalPreconditioner(std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
                                           uint32_t maxIterations = 100,
@@ -77,11 +68,14 @@ public:
 
     int reconstructJacobi(uint32_t maxIterations = 100, float errCondition = 0.01);
 
+    int reconstructSumPreconditioning(uint32_t maxIterations = 100, float errCondition = 0.01);
+
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
 
     void addTikhonovRegularization(float L2, float V2, float Laplace);
 
     void useGradient3D(bool gradient3D);
+
     void useLaplace3D(bool laplace3D);
 
     void removeTikhonovRegularization();
