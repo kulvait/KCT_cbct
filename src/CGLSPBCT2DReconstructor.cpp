@@ -551,7 +551,7 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations,
     }
     if(invSqrtRpr_bbuf != nullptr)
     {
-        //    algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *invSqrtRpr_bbuf, BDIM);
+        algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *invSqrtRpr_bbuf, BDIM);
         algFLOATvector_C_equals_A_times_B(*discrepancy_bbuf, *invSqrtRpr_bbuf, *tmp_b_buf, BDIM);
         backproject(*tmp_b_buf, *residualVector_xbuf);
     } else
@@ -1136,11 +1136,22 @@ int CGLSPBCT2DReconstructor::reconstructSumPreconditioning(uint32_t maxIteration
     project(*ones_xbuf, *invSqrtRpr_bbuf);
     algFLOATvector_invert_except_zero(*invSqrtRpr_bbuf, BDIM);
     algFLOATvector_substitute_lower_than(*invSqrtRpr_bbuf, 0.0f, 0.0f, BDIM);
-    algFLOATvector_sqrt(*invSqrtRpr_bbuf, BDIM);
+    algFLOATvector_square(*invSqrtRpr_bbuf, BDIM);
+    algFLOATvector_square(*invSqrtRpr_bbuf, BDIM);
+    // algFLOATvector_sqrt(*invSqrtRpr_bbuf, BDIM);
     backproject(*ones_bbuf, *invCpr_xbuf);
-    algFLOATvector_invert_except_zero(*invCpr_xbuf, XDIM);
+    // algFLOATvector_invert_except_zero(*invCpr_xbuf, XDIM);
+    // algFLOATvector_square(*invCpr_xbuf, XDIM);
     algFLOATvector_substitute_lower_than(*invCpr_xbuf, 0.0f, 0.0f, XDIM);
     tikhonovSetRegularizingBuffersNull();
+    // invSqrtRpr_bbuf = nullptr;
+    // invCpr_xbuf = nullptr;
+    algFLOATvector_copy(*b_buf, *invSqrtRpr_bbuf, BDIM);
+    algFLOATvector_invert_except_zero(*invSqrtRpr_bbuf, BDIM);
+    algFLOATvector_sqrt(*invSqrtRpr_bbuf, BDIM);
+    backproject(*b_buf, *invCpr_xbuf);
+    // algFLOATvector_square(*invCpr_xbuf, XDIM);
+    algFLOATvector_invert_except_zero(*invCpr_xbuf, XDIM);
     reconstructTikhonov(maxIterations, errCondition, invCpr_xbuf, invSqrtRpr_bbuf);
     return 0;
 }

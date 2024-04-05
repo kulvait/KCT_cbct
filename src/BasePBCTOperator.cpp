@@ -300,7 +300,8 @@ std::shared_ptr<cl::Buffer> BasePBCTOperator::getTmpBBuffer(uint32_t i)
 int BasePBCTOperator::backproject(cl::Buffer& B,
                                   cl::Buffer& X,
                                   uint32_t initialProjectionIndex,
-                                  uint32_t projectionIncrement)
+                                  uint32_t projectionIncrement,
+                                  float additionalScaling)
 {
     Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
@@ -312,7 +313,7 @@ int BasePBCTOperator::backproject(cl::Buffer& B,
     for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
     {
         CM = PM8Vector[i];
-        scalingFactor = scalingFactorVector[i];
+        scalingFactor = scalingFactorVector[i] * additionalScaling;
         offset = i * frameSize;
         if(useSidonProjector)
         {
@@ -338,7 +339,8 @@ int BasePBCTOperator::backproject(cl::Buffer& B,
 int BasePBCTOperator::project(cl::Buffer& X,
                               cl::Buffer& B,
                               uint32_t initialProjectionIndex,
-                              uint32_t projectionIncrement)
+                              uint32_t projectionIncrement,
+                              float additionalScaling)
 {
     Q[0]->enqueueFillBuffer<cl_float>(B, FLOATZERO, 0, BDIM * sizeof(float));
     cl::NDRange localRange;
@@ -361,7 +363,7 @@ int BasePBCTOperator::project(cl::Buffer& X,
     for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
     {
         CM = PM8Vector[i];
-        scalingFactor = scalingFactorVector[i];
+        scalingFactor = scalingFactorVector[i] * additionalScaling;
         offset = i * frameSize;
         if(useSidonProjector)
         {

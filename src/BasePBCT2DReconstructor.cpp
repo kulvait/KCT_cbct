@@ -58,10 +58,17 @@ void BasePBCT2DReconstructor::simpleProjection()
     Q[0]->enqueueReadBuffer(*tmp_b_buf, CL_TRUE, 0, sizeof(float) * BDIM, b);
 }
 
-void BasePBCT2DReconstructor::simpleBackprojection()
+void BasePBCT2DReconstructor::simpleBackprojection(bool naturalScaling)
 {
     Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
-    backproject(*b_buf, *x_buf);
+    float backprojectorScaling = 1.0;
+    if(naturalScaling)
+    {
+        const float pi = 3.1415927;
+        const float pdimxz = static_cast<float>(pdimx) * static_cast<float>(pdimz);
+        backprojectorScaling = pi / pdimxz;
+    }
+    backproject(*b_buf, *x_buf, 0, 1, backprojectorScaling);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
 }
 

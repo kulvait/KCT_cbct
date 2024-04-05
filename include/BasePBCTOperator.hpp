@@ -19,9 +19,9 @@
 #include "MATRIX/LightProjectionMatrix.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
 #include "MATRIX/utils.hpp"
-#include "OPENCL/OpenCLManager.hpp"
 #include "NDRange/NDRangeHelper.hpp"
 #include "NDRange/PBCTLocalNDRangeFactory.hpp"
+#include "OPENCL/OpenCLManager.hpp"
 #include "rawop.h"
 #include "stringFormatter.h"
 
@@ -161,13 +161,15 @@ protected:
      * @param X Buffer of the size at least XDIM*sizeof(float) to be backprojected to.
      * @param initialProjectionIndex For OS SART 0 by default
      * @param projectionIncrement For OS SART 1 by default
+     * @param additionalScaling Additional scaling.
      *
      * @return 0 on success
      */
     int backproject(cl::Buffer& B,
                     cl::Buffer& X,
                     uint32_t initialProjectionIndex = 0,
-                    uint32_t projectionIncrement = 1);
+                    uint32_t projectionIncrement = 1,
+                    float additionalScaling = 1.0f);
 
     /**
      * Projection B = A (X)
@@ -177,13 +179,15 @@ protected:
      * BDIM*sizeof(float).
      * @param initialProjectionIndex For OS SART 0 by default
      * @param projectionIncrement For OS SART 1 by default
+     * @param additionalScaling Additional scaling.
      *
      * @return
      */
     int project(cl::Buffer& X,
                 cl::Buffer& B,
                 uint32_t initialProjectionIndex = 0,
-                uint32_t projectionIncrement = 1);
+                uint32_t projectionIncrement = 1,
+                float additionalScaling = 1.0f);
 
     std::vector<std::shared_ptr<cl::Buffer>> x_buffers, tmp_x_buffers;
     std::vector<std::shared_ptr<cl::Buffer>> b_buffers, tmp_b_buffers;

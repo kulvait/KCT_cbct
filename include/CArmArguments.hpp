@@ -59,6 +59,10 @@ public:
     bool useSidonProjector = false;
     uint32_t probesPerEdge = 1;
     bool useTTProjector = false;
+
+    // Backprojector settings
+    bool backprojectorNaturalScaling = false;
+
     // OpenCL
     std::string CLplatformString = "";
     uint32_t CLplatformID = 0;
@@ -103,6 +107,7 @@ protected:
     void addSidonProjectorArgs();
     void addCenterVoxelProjectorArgs();
     void addProjectorArgs();
+    void addBackprojectorScalingArgs();
 
     CLI::Option_group* og_basis = nullptr;
     CLI::Option_group* og_settings = nullptr;

@@ -134,6 +134,7 @@ void Args::defineArguments()
     addBackprojectorLocalNDRangeArgs();
     addRelaxedArg();
     addProjectorArgs();
+    addBackprojectorScalingArgs();
 
     optstr = io::xprintf("Verbose print. [defaults to %s]", verbose ? "true" : "false");
     cliApp->add_flag("--verbose,!--no-verbose", verbose, optstr);
@@ -387,7 +388,7 @@ int main(int argc, char* argv[])
             LOGE << ERR;
             KCTERR(ERR);
         }
-        cgls->simpleBackprojection();
+        cgls->simpleBackprojection(ARG.backprojectorNaturalScaling);
         bool volumexmajor = true;
         bool writexmajor = true;
         io::DenFileInfo::create3DDenFileFromArray(volume, volumexmajor, ARG.outputVolume,

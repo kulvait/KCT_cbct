@@ -50,8 +50,10 @@ public:
     /**
      * Simple method to test backprojector simply backproject b_buf containing projection array
      * using currect backprojector and writes result to volume array.
+     *
+     * @param naturalBackprojectionScaling Multiply output by pi / (pdimx * pdimz)
      */
-    void simpleBackprojection();
+    void simpleBackprojection(bool naturalBackprojectionScaling = false);
 
     void setReportingParameters(bool verbose,
                                 uint32_t reportKthIteration = 0,

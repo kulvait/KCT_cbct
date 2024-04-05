@@ -378,8 +378,8 @@ void CArmArguments::addProjectorSettingsGroups()
     addSettingsGroup();
     if(og_projectorsettings == nullptr)
     {
-        og_projectorsettings
-            = og_settings->add_option_group("Projector settings", "Configuration of projectors.");
+        og_projectorsettings = og_settings->add_option_group(
+            "Projector settings", "Configuration of projectors and backprojectors.");
     }
     if(og_projectortypesettings == nullptr)
     {
@@ -545,6 +545,19 @@ void CArmArguments::addProjectorArgs()
     addCuttingVoxelProjectorArgs(false);
     addTTProjectorArgs();
     addSidonProjectorArgs();
+}
+
+void CArmArguments::addBackprojectorScalingArgs()
+{
+    using namespace CLI;
+    addProjectorSettingsGroups();
+    std::string optValue = (backprojectorNaturalScaling ? "true" : "false");
+    og_projectorsettings->add_flag(
+        "--backprojector-natural-scaling", backprojectorNaturalScaling,
+        io::xprintf("Perform natural scaling of backprojected values. Normally there is no scaling "
+                    "applied to A^T. If true scaling factor of pi/(projectionCount * pdimx) is "
+                    "used, defaults to %s.",
+                    optValue.c_str()));
 }
 
 void CArmArguments::addProjectorLocalNDRangeArgs()
