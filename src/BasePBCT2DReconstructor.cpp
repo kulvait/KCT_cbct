@@ -58,17 +58,43 @@ void BasePBCT2DReconstructor::simpleProjection()
     Q[0]->enqueueReadBuffer(*tmp_b_buf, CL_TRUE, 0, sizeof(float) * BDIM, b);
 }
 
-void BasePBCT2DReconstructor::simpleBackprojection(bool naturalScaling)
+const float pi = 3.1415927;
+
+void BasePBCT2DReconstructor::simpleBackprojection(BackprojectorScalingMethod scalingType)
 {
     Q[0]->enqueueFillBuffer<cl_float>(*x_buf, FLOATZERO, 0, XDIM * sizeof(float));
     float backprojectorScaling = 1.0;
-    if(naturalScaling)
+    if(scalingType == BackprojectorScalingMethod::FBPScaling)
     {
-        const float pi = 3.1415927;
-        const float pdimxz = static_cast<float>(pdimx) * static_cast<float>(pdimz);
-        backprojectorScaling = pi / pdimxz;
+        backprojectorScaling = pi / pdimz;
+        backproject(*b_buf, *x_buf, 0, 1, backprojectorScaling);
+    } else if(scalingType == BackprojectorScalingMethod::NaturalScaling)
+    {
+        allocateBBuffers(2);
+        allocateXBuffers(1);
+        std::shared_ptr<cl::Buffer> ones_xbuf = getXBuffer(0);
+        std::shared_ptr<cl::Buffer> lengths_bbuf = getBBuffer(0);
+        std::shared_ptr<cl::Buffer> bscaled_bbuf = getBBuffer(1);
+        Q[0]->enqueueFillBuffer<cl_float>(*ones_xbuf, FLOATONE, 0, XDIM * sizeof(float));
+        project(*ones_xbuf, *lengths_bbuf);
+        algFLOATvector_invert_except_zero(*lengths_bbuf, BDIM); // Invert for multiplication
+        algFLOATvector_C_equals_A_times_B(*b_buf, *lengths_bbuf, *bscaled_bbuf, BDIM);
+        backprojectorScaling = 1.0f / pdimz;
+        backproject(*bscaled_bbuf, *x_buf, 0, 1, backprojectorScaling);
+    } else if(scalingType == BackprojectorScalingMethod::KaczmarzScaling)
+    {
+        allocateBBuffers(2);
+        std::shared_ptr<cl::Buffer> kaczmarz_bbuf =  getBBuffer(0);
+        std::shared_ptr<cl::Buffer> bscaled_bbuf = getBBuffer(1);
+        kaczmarz_product(*kaczmarz_bbuf);
+        algFLOATvector_invert_except_zero(*kaczmarz_bbuf, BDIM); // Invert it for multiplication
+        algFLOATvector_C_equals_A_times_B(*b_buf, *kaczmarz_bbuf, *bscaled_bbuf, BDIM);
+        backprojectorScaling = 1.0f / pdimz;
+        backproject_kaczmarz(*bscaled_bbuf, *x_buf, 0, 1, backprojectorScaling);
+    } else// scalingType == BackprojectorScalingMethod::NoScaling
+    {
+        backproject(*b_buf, *x_buf);
     }
-    backproject(*b_buf, *x_buf, 0, 1, backprojectorScaling);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
 }
 

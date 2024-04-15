@@ -336,6 +336,42 @@ int BasePBCT2DOperator::backproject(cl::Buffer& B,
     return 0;
 }
 
+int BasePBCT2DOperator::backproject_kaczmarz(cl::Buffer& B,
+                                             cl::Buffer& X,
+                                             uint32_t initialProjectionIndex,
+                                             uint32_t projectionIncrement,
+                                             float additionalScaling)
+{
+    Q[0]->enqueueFillBuffer<cl_float>(X, FLOATZERO, 0, XDIM * sizeof(float));
+    cl::NDRange globalRange(vdimx, vdimy);
+    cl::NDRange localRange = backprojectorLocalNDRange;
+    cl_double3 CM;
+    float scalingFactor;
+    unsigned long frameSize = pdimx * pdimy;
+    unsigned long offset;
+    int k_from = 0;
+    int k_to = pdimy;
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
+    {
+        CM = PM3Vector[i];
+        scalingFactor = scalingFactorVector[i] * additionalScaling;
+        offset = i * frameSize;
+        if(useSidonProjector)
+        {
+            KCTERR("Siddon operators are not yet implemented for PBCT2D.");
+        } else if(useTTProjector)
+        {
+            KCTERR("Footprint operators are not yet implemented for PBCT2D.");
+        } else
+        {
+            algFLOAT_pbct2d_cutting_voxel_backproject_kaczmarz(
+                X, B, offset, CM, vdims, voxelSizes, volumeCenter, pdims, scalingFactor, k_from,
+                k_to, globalRange, localRange);
+        }
+    }
+    return 0;
+}
+
 /**
  * @param initialProjectionIndex For OS SART, 0 by default
  * @param projectionIncrement For OS SART, 1 by default
@@ -392,6 +428,75 @@ int BasePBCT2DOperator::project(cl::Buffer& X,
                 algFLOAT_pbct2d_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes,
                                                       volumeCenter, pdims, scalingFactor, k_from,
                                                       k_count, globalRange, localRange);
+            }
+        }
+    }
+    return 0;
+}
+
+int BasePBCT2DOperator::kaczmarz_product(cl::Buffer& K,
+                                         uint32_t initialProjectionIndex,
+                                         uint32_t projectionIncrement,
+                                         float additionalScaling)
+{
+    Q[0]->enqueueFillBuffer<cl_float>(K, FLOATZERO, 0, BDIM * sizeof(float));
+    cl::NDRange localRange;
+    if(useBarrierImplementation)
+    {
+        localRange = projectorLocalNDRangeBarrier;
+    } else
+    {
+        localRange = projectorLocalNDRange;
+    }
+    // clang-format off
+    // cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
+    // std::shared_ptr<cl::NDRange> barrierLocalRange
+    //    = std::make_shared<cl::NDRange>(projectorLocalNDRangeBarrier);
+    // clang-format on
+    cl_double3 CM;
+    float scalingFactor;
+    unsigned long frameSize = pdimx * pdimy;
+    unsigned long offset;
+    int k_from = 0;
+    int k_count = pdimy;
+    if(useBarrierImplementation)
+    {
+        LOGW << "Kraczmarz vector for PBCT2D operator barrier not yet implemented, using "
+                "non barrier implementation.";
+    }
+    for(std::size_t i = initialProjectionIndex; i < pdimz; i += projectionIncrement)
+    {
+        CM = PM3Vector[i];
+        scalingFactor = scalingFactorVector[i] * additionalScaling;
+        // LOGD << io::xprintf("Scaling factor=%f square=%f",
+        //                    scalingFactorVector[i] * additionalScaling, scalingFactor);
+        offset = i * frameSize;
+        if(useSidonProjector)
+        {
+            KCTERR("Siddon operators are not yet implemented for PBCT.");
+        } else if(useTTProjector)
+        {
+            KCTERR("Footprint operators are not yet implemented for PBCT.");
+        } else
+        {
+            if(useBarrierImplementation)
+            {
+                // "Kraczmarz vector for PBCT2D operator barrier not yet implemented, using "
+                //        "non barrier implementation.";
+                // cl::NDRange globalRange(vdimx, vdimy);
+                // algFLOAT_pbct2d_cutting_voxel_kraczmarz_product_barrier(
+                //    K, offset, CM, vdims, voxelSizes, volumeCenter, pdims, scalingFactor, k_from,
+                //    k_count, LOCALARRAYSIZE, globalRange, localRange);
+                cl::NDRange globalRange(vdimx, vdimy);
+                algFLOAT_pbct2d_cutting_voxel_kaczmarz_product(
+                    K, offset, CM, vdims, voxelSizes, volumeCenter, pdims, scalingFactor, k_from,
+                    k_count, globalRange, localRange);
+            } else
+            {
+                cl::NDRange globalRange(vdimx, vdimy);
+                algFLOAT_pbct2d_cutting_voxel_kaczmarz_product(
+                    K, offset, CM, vdims, voxelSizes, volumeCenter, pdims, scalingFactor, k_from,
+                    k_count, globalRange, localRange);
             }
         }
     }

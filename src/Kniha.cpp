@@ -806,8 +806,35 @@ void Kniha::CLINCLUDEpbct2d_cvp()
             };
         }
         {
+            auto& ptr = FLOAT_pbct2d_cutting_voxel_kaczmarz_product;
+            std::string str = "FLOAT_pbct2d_cutting_voxel_kaczmarz_product";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
             auto& ptr = FLOAT_pbct2d_cutting_voxel_backproject;
             std::string str = "FLOAT_pbct2d_cutting_voxel_backproject";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOAT_pbct2d_cutting_voxel_backproject_kaczmarz;
+            std::string str = "FLOAT_pbct2d_cutting_voxel_backproject_kaczmarz";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOAT_pbct2d_cutting_voxel_jacobi_vector;
+            std::string str = "FLOAT_pbct2d_cutting_voxel_jacobi_vector";
             if(ptr == nullptr)
             {
                 ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -2122,6 +2149,64 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_project(cl::Buffer& volume,
     return 0;
 }
 
+int Kniha::algFLOAT_pbct2d_cutting_voxel_kaczmarz_product(
+    cl::Buffer& projection,
+    unsigned long projectionOffset,
+    cl_double3& CM,
+    cl_int3& vdims,
+    cl_double3& voxelSizes,
+    cl_double2& volumeCenter,
+    cl_int2& pdims,
+    float& globalScalingMultiplier,
+    int& k_from,
+    int& k_count,
+    cl::NDRange globalRange,
+    cl::NDRange _localRange, // default cl::NullRange
+    bool blocking,
+    uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    /*
+        auto exe = (*FLOAT_pbct2d_cutting_voxel_project)(*eargs, volume, projection,
+       projectionOffset, CM, vdims, voxelSizes, volumeCenter, pdims, globalScalingMultiplier,
+       k_from, k_count);
+    */
+    // Improve error handling, see
+    // https://stackoverflow.com/questions/14088030/opencl-returns-error-58-while-executing-larga-amount-of-data
+    cl::Kernel kernel = cl::Kernel(*program, "FLOAT_pbct2d_cutting_voxel_kaczmarz_product");
+    kernel.setArg(0, projection);
+    kernel.setArg(1, projectionOffset);
+    kernel.setArg(2, CM);
+    kernel.setArg(3, vdims);
+    kernel.setArg(4, voxelSizes);
+    kernel.setArg(5, volumeCenter);
+    kernel.setArg(6, pdims);
+    kernel.setArg(7, globalScalingMultiplier);
+    kernel.setArg(8, k_from);
+    kernel.setArg(9, k_count);
+    cl::NDRange nulloffset = cl::NullRange;
+    cl::Event exe;
+    cl_int cl_info_id
+        = Q[QID]->enqueueNDRangeKernel(kernel, nulloffset, globalRange, localRange, nullptr, &exe);
+    if(cl_info_id != CL_SUCCESS)
+    {
+        std::string command_type_string = infoString(cl_info_id);
+        err = io::xprintf(
+            "Error in enqueueNDRangeKernel FLOAT_pbct2d_cutting_voxel_project cl_info_id=%d, "
+            "command_type_string=%s!",
+            cl_info_id, command_type_string.c_str());
+        KCTERR(err);
+    }
+
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
 int Kniha::algFLOAT_pbct2d_cutting_voxel_backproject(
     cl::Buffer& volume,
     cl::Buffer& projection,
@@ -2146,6 +2231,66 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_backproject(
     auto exe = (*FLOAT_pbct2d_cutting_voxel_backproject)(
         *eargs, volume, projection, projectionOffset, CM, vdims, voxelSizes, volumeCenter, pdims,
         globalScalingMultiplier, k_from, k_count);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOAT_pbct2d_cutting_voxel_backproject_kaczmarz(
+    cl::Buffer& volume,
+    cl::Buffer& projection,
+    unsigned long projectionOffset,
+    cl_double3& CM,
+    cl_int3& vdims,
+    cl_double3& voxelSizes,
+    cl_double2& volumeCenter,
+    cl_int2& pdims,
+    float& globalScalingMultiplier,
+    int& k_from,
+    int& k_count,
+    cl::NDRange globalRange,
+    cl::NDRange _localRange, // default cl::NullRange
+    bool blocking,
+    uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+
+    auto exe = (*FLOAT_pbct2d_cutting_voxel_backproject_kaczmarz)(
+        *eargs, volume, projection, projectionOffset, CM, vdims, voxelSizes, volumeCenter, pdims,
+        globalScalingMultiplier, k_from, k_count);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOAT_pbct2d_cutting_voxel_jacobi_vector(
+    cl::Buffer& volume,
+    cl_double3& CM,
+    cl_int3& vdims,
+    cl_double3& voxelSizes,
+    cl_double2& volumeCenter,
+    cl_int2& pdims,
+    float& globalScalingMultiplier,
+    int& k_from,
+    int& k_count,
+    cl::NDRange globalRange,
+    cl::NDRange _localRange, // default cl::NullRange
+    bool blocking,
+    uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+
+    auto exe = (*FLOAT_pbct2d_cutting_voxel_jacobi_vector)(
+        *eargs, volume, CM, vdims, voxelSizes, volumeCenter, pdims, globalScalingMultiplier, k_from,
+        k_count);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

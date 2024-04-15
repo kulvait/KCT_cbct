@@ -41,11 +41,11 @@ public:
      * tutorial](http://simpleopencl.blogspot.com/2013/06/tutorial-simple-start-with-opencl-and-c.html)
      */
     int initializeOpenCL(uint32_t platformID,
-                                 uint32_t* deviceIds,
-                                 uint32_t deviceIdsLength,
-                                 std::string xpath,
-                                 bool debug,
-                                 bool relaxed);
+                         uint32_t* deviceIds,
+                         uint32_t deviceIdsLength,
+                         std::string xpath,
+                         bool debug,
+                         bool relaxed);
 
     bool isOpenCLInitialized() { return openCLInitialized; }
 
@@ -340,6 +340,31 @@ protected:
                                               bool blocking = false,
                                               uint32_t QID = 0);
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    unsigned long&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double2&,
+                                    cl_int2&,
+                                    float&,
+                                    int&,
+                                    int&>>
+        FLOAT_pbct2d_cutting_voxel_kaczmarz_product;
+    int algFLOAT_pbct2d_cutting_voxel_kaczmarz_product(cl::Buffer& projection,
+                                                       unsigned long projectionOffset,
+                                                       cl_double3& CM,
+                                                       cl_int3& vdims,
+                                                       cl_double3& voxelSizes,
+                                                       cl_double2& volumeCenter,
+                                                       cl_int2& pdims,
+                                                       float& globalScalingMultiplier,
+                                                       int& k_from,
+                                                       int& k_count,
+                                                       cl::NDRange globalRange,
+                                                       cl::NDRange localRange = cl::NullRange,
+                                                       bool blocking = false,
+                                                       uint32_t QID = 0);
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned long&,
                                     cl_double3&,
@@ -366,6 +391,56 @@ protected:
                                                   cl::NDRange localRange = cl::NullRange,
                                                   bool blocking = false,
                                                   uint32_t QID = 0);
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl::Buffer&,
+                                    unsigned long&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double2&,
+                                    cl_int2&,
+                                    float&,
+                                    int&,
+                                    int&>>
+        FLOAT_pbct2d_cutting_voxel_backproject_kaczmarz;
+    int algFLOAT_pbct2d_cutting_voxel_backproject_kaczmarz(cl::Buffer& volume,
+                                                           cl::Buffer& projection,
+                                                           unsigned long projectionOffset,
+                                                           cl_double3& CM,
+                                                           cl_int3& vdims,
+                                                           cl_double3& voxelSizes,
+                                                           cl_double2& volumeCenter,
+                                                           cl_int2& pdims,
+                                                           float& globalScalingMultiplier,
+                                                           int& k_from,
+                                                           int& k_count,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    std::shared_ptr<cl::make_kernel<cl::Buffer&,
+                                    cl_double3&,
+                                    cl_int3&,
+                                    cl_double3&,
+                                    cl_double2&,
+                                    cl_int2&,
+                                    float&,
+                                    int&,
+                                    int&>>
+        FLOAT_pbct2d_cutting_voxel_jacobi_vector;
+    int algFLOAT_pbct2d_cutting_voxel_jacobi_vector(cl::Buffer& volume,
+                                                    cl_double3& CM,
+                                                    cl_int3& vdims,
+                                                    cl_double3& voxelSizes,
+                                                    cl_double2& volumeCenter,
+                                                    cl_int2& pdims,
+                                                    float& globalScalingMultiplier,
+                                                    int& k_from,
+                                                    int& k_count,
+                                                    cl::NDRange globalRange,
+                                                    cl::NDRange localRange = cl::NullRange,
+                                                    bool blocking = false,
+                                                    uint32_t QID = 0);
     // pbct2d_cvp_barrier.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
@@ -489,7 +564,8 @@ protected:
     int algFLOATvector_sqrt(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);
     // FLOATvector_square
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_square;
-    int algFLOATvector_square(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);
+    int
+    algFLOATvector_square(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);
     // FLOATvector_zero
     std::shared_ptr<cl::make_kernel<cl::Buffer&>> FLOATvector_zero;
     int algFLOATvector_zero(cl::Buffer& A, uint64_t size, bool blocking = false, uint32_t QID = 0);

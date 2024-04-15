@@ -172,6 +172,11 @@ protected:
                     uint32_t projectionIncrement = 1,
                     float additionalScaling = 1.0f);
 
+    int backproject_kaczmarz(cl::Buffer& B,
+                             cl::Buffer& X,
+                             uint32_t initialProjectionIndex = 0,
+                             uint32_t projectionIncrement = 1,
+                             float additionalScaling = 1.0f);
     /**
      * Projection B = A (X)
      *
@@ -189,6 +194,21 @@ protected:
                 uint32_t initialProjectionIndex = 0,
                 uint32_t projectionIncrement = 1,
                 float additionalScaling = 1.0f);
+
+    /**
+     * Compute Kaczmarz product, that is product of rows of the CT matrix.
+     *
+     * @param K output projection vector
+     * @param initialProjectionIndex
+     * @param projectionIncrement
+     * @param additionalScaling
+     *
+     * @return
+     */
+    int kaczmarz_product(cl::Buffer& K,
+                         uint32_t initialProjectionIndex = 0,
+                         uint32_t projectionIncrement = 1,
+                         float additionalScaling = 1.0f);
 
     std::vector<std::shared_ptr<cl::Buffer>> x_buffers, tmp_x_buffers;
     std::vector<std::shared_ptr<cl::Buffer>> b_buffers, tmp_b_buffers;

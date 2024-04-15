@@ -11,6 +11,7 @@
 
 // Internal libraries
 #include "AlgorithmsBarrierBuffers.hpp"
+#include "BackprojectorScalingMethod.hpp"
 #include "BasePBCT2DOperator.hpp"
 #include "BufferedFrame2D.hpp"
 #include "DEN/DenAsyncFrame2DWritter.hpp"
@@ -53,7 +54,8 @@ public:
      *
      * @param naturalBackprojectionScaling Multiply output by pi / (pdimx * pdimz)
      */
-    void simpleBackprojection(bool naturalBackprojectionScaling = false);
+    void simpleBackprojection(BackprojectorScalingMethod scalingType
+                              = BackprojectorScalingMethod::NoScaling);
 
     void setReportingParameters(bool verbose,
                                 uint32_t reportKthIteration = 0,

@@ -551,13 +551,27 @@ void CArmArguments::addBackprojectorScalingArgs()
 {
     using namespace CLI;
     addProjectorSettingsGroups();
-    std::string optValue = (backprojectorNaturalScaling ? "true" : "false");
-    og_projectorsettings->add_flag(
+
+    CLI::Option_group* op_bpx = og_projectorsettings->add_option_group(
+        "Backprojector scaling",
+        "Scaling method for backprojection output, which can modify A^T output.");
+    op_bpx->add_flag(
+        "--backprojector-no-scaling", backprojectorNoScaling,
+        io::xprintf("No scaling applied to A^T, defaults scaling."));
+    op_bpx->add_flag("--backprojector-fbp-scaling", backprojectorFBPScaling,
+                     io::xprintf("Perform fbp scaling of backprojected values, which is normally "
+                                 "used when performing FBP. If true scaling "
+                                 "factor of pi/pdimz is used"));
+    op_bpx->add_flag(
         "--backprojector-natural-scaling", backprojectorNaturalScaling,
-        io::xprintf("Perform natural scaling of backprojected values. Normally there is no scaling "
-                    "applied to A^T. If true scaling factor of pi/(projectionCount * pdimx) is "
-                    "used, defaults to %s.",
-                    optValue.c_str()));
+        io::xprintf("Perform natural scaling of backprojected values, which is close to "
+                    "backsmearing process. Vector b is divided by 1/A(1) and this vector is "
+                    "backprojected with scaling factor 1/pdimz."));
+    op_bpx->add_flag(
+        "--backprojector-kaczmarz-scaling", backprojectorKaczmarzScaling,
+        io::xprintf("Perform kaczmarz scaling of backprojected values, which means divide b by "
+                    "diag(A A^T) and then apply A^T operator scaled by 1/pdimz. "));
+    op_bpx->require_option(0, 1);
 }
 
 void CArmArguments::addProjectorLocalNDRangeArgs()

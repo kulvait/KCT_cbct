@@ -61,7 +61,10 @@ public:
     bool useTTProjector = false;
 
     // Backprojector settings
+    bool backprojectorNoScaling = false;
+    bool backprojectorFBPScaling = false;
     bool backprojectorNaturalScaling = false;
+    bool backprojectorKaczmarzScaling = false;
 
     // OpenCL
     std::string CLplatformString = "";

@@ -20,6 +20,7 @@
 #include "CGLSPBCT2DReconstructor.hpp"
 
 // Internal libraries
+#include "BackprojectorScalingMethod.hpp"
 #include "CArmArguments.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
@@ -388,7 +389,20 @@ int main(int argc, char* argv[])
             LOGE << ERR;
             KCTERR(ERR);
         }
-        cgls->simpleBackprojection(ARG.backprojectorNaturalScaling);
+        BackprojectorScalingMethod backprojectorScalingType = BackprojectorScalingMethod::NoScaling;
+        if(ARG.backprojectorFBPScaling)
+        {
+            backprojectorScalingType = BackprojectorScalingMethod::FBPScaling;
+        }
+        if(ARG.backprojectorNaturalScaling)
+        {
+            backprojectorScalingType = BackprojectorScalingMethod::NaturalScaling;
+        }
+        if(ARG.backprojectorKaczmarzScaling)
+        {
+            backprojectorScalingType = BackprojectorScalingMethod::KaczmarzScaling;
+        }
+        cgls->simpleBackprojection(backprojectorScalingType);
         bool volumexmajor = true;
         bool writexmajor = true;
         io::DenFileInfo::create3DDenFileFromArray(volume, volumexmajor, ARG.outputVolume,
