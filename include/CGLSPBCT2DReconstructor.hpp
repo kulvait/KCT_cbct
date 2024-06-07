@@ -53,6 +53,27 @@ public:
 
     int reconstruct_experimental(uint32_t maxIterations = 100, float errCondition = 0.01);
 
+    /**
+     * Tikhonov regularized tomographic reconstruction using CGLS. Sometimes the problem is also
+     * referred as ridge regression, see https://en.wikipedia.org/wiki/Ridge_regression
+     *
+     * This procedure can be used also for preconditioning. In this case we compute the problem with
+     * two diagonal matrices C and W.
+     *
+     *
+     * @param maxIterations
+     * @param errCondition
+     * @param invCpr_xbuf Right preconditioner.
+     * @param leftPreconditioner_bbuf Left preconditioner W. We are solving min_x || W (b - Ax)||^2,
+     * wehre W is the diagonal matrix constructed out of left preconditioner. In weighted least
+     * squares, this matrix is often named W^{1/2} and can represent the reciprocal of the standard
+     * deviation of the measurements. In the out of center scan, it can be also used as square root
+     * of the ray weight, reciprocal of the number of measurements for given ray. In SIRT, the
+     * weighting scheme is chosen such that W is the square root of the row sums of the system
+     * matrix, this scheme is adapted for CGLS in function reconstructSumPreconditioning.
+     *
+     * @return 0 if success, 1 if error
+     */
     int reconstructTikhonov(uint32_t maxIterations = 100,
                             float errCondition = 0.01,
                             std::shared_ptr<cl::Buffer> invCpr_xbuf = nullptr,
