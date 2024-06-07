@@ -114,6 +114,7 @@ int CGLSPBCT2DReconstructor::reconstructWLS(uint32_t maxIterations,
                                             float* weightsBDIM)
 {
     cl_int err;
+    removeTikhonovRegularization();
     weighting_bbuf
         = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                        sizeof(float) * BDIM, (void*)weightsBDIM, &err);
@@ -153,6 +154,7 @@ void CGLSPBCT2DReconstructor::addTikhonovRegularization(float L2, float V2, floa
     } else
     {
         this->tikhonovRegularizationL2 = false;
+        this->effectSizeL2 = 0.0f;
     }
     if(!std::isnan(V2) && V2 != 0.0f)
     {
@@ -162,6 +164,7 @@ void CGLSPBCT2DReconstructor::addTikhonovRegularization(float L2, float V2, floa
     } else
     {
         this->tikhonovRegularizationV2 = false;
+        this->effectSizeV2 = 0.0f;
     }
     if(!std::isnan(Laplace) && Laplace != 0.0f)
     {
@@ -171,16 +174,23 @@ void CGLSPBCT2DReconstructor::addTikhonovRegularization(float L2, float V2, floa
     } else
     {
         this->tikhonovRegularizationLaplace = false;
+        this->effectSizeLaplace = 0.0f;
     }
 }
-
-void CGLSPBCT2DReconstructor::useGradient3D(bool gradient3D) { this->gradient3D = gradient3D; }
-void CGLSPBCT2DReconstructor::useLaplace3D(bool laplace3D) { this->laplace3D = laplace3D; }
 
 void CGLSPBCT2DReconstructor::removeTikhonovRegularization()
 {
     this->tikhonovRegularization = false;
+    this->tikhonovRegularizationL2 = false;
+    this->tikhonovRegularizationV2 = false;
+    this->tikhonovRegularizationLaplace = false;
+    this->effectSizeL2 = 0.0f;
+    this->effectSizeV2 = 0.0f;
+    this->effectSizeLaplace = 0.0f;
 }
+
+void CGLSPBCT2DReconstructor::useGradient3D(bool gradient3D) { this->gradient3D = gradient3D; }
+void CGLSPBCT2DReconstructor::useLaplace3D(bool laplace3D) { this->laplace3D = laplace3D; }
 
 void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffer XIN)
 {
@@ -473,23 +483,23 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
     std::shared_ptr<cl::Buffer> leftPreconditioner_bbuf)
 {
     std::string INFO;
-    INFO = "CGLS WITH TIKHONOV, ";
+    INFO = "CGLS, ";
     uint32_t additionalRegularizationVectors = 0; // Additional vector allocation
     uint32_t additionalPreconditioning_xbuf = 0,
              additionalPreconditioning_bbuf = 0; // Additional vector allocation
     if(tikhonovRegularizationL2)
     {
-        INFO = io::xprintf("%sL2=%0.2f, ", INFO.c_str(), effectSizeL2);
+        INFO = io::xprintf("%sTikhonov L2=%0.2f, ", INFO.c_str(), effectSizeL2);
         additionalRegularizationVectors++;
     }
     if(tikhonovRegularizationV2)
     {
-        INFO = io::xprintf("%sV2=%0.2f, ", INFO.c_str(), effectSizeV2);
+        INFO = io::xprintf("%sTikhonov V2=%0.2f, ", INFO.c_str(), effectSizeV2);
         additionalRegularizationVectors += 3;
     }
     if(tikhonovRegularizationLaplace)
     {
-        INFO = io::xprintf("%sLaplace=%0.2f, ", INFO.c_str(), effectSizeLaplace);
+        INFO = io::xprintf("%sTikhonov Laplace=%0.2f, ", INFO.c_str(), effectSizeLaplace);
         additionalRegularizationVectors++;
     }
     if(invCpr_xbuf != nullptr)
@@ -501,7 +511,7 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
     {
         INFO = io::xprintf("%s left preconditioning,", INFO.c_str());
     }
-    INFO = io::xprintf("%s init.", INFO.c_str());
+    INFO = io::xprintf("%s init", INFO.c_str());
     tikhonovSetRegularizingBuffersNull();
     allocateXBuffers(2 + 3 * additionalRegularizationVectors
                      + additionalPreconditioning_xbuf); // We neeed three new X buffers per
