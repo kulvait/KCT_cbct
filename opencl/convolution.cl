@@ -473,12 +473,12 @@ FLOATvector_3DconvolutionGradientSobelFeldmanZeroBoundary(global const float* re
     GZ[IND] = grad.z;
 }
 
-void kernel FLOATvector_3DisotropicGradient(global const float* restrict F,
-                                            global float* restrict GX,
-                                            global float* restrict GY,
-                                            global float* restrict GZ,
-                                            private int3 vdims,
-                                            private float3 voxelSizes)
+void kernel FLOATvector_3DisotropicGradient_(global const float* restrict F,
+                                             global float* restrict GX,
+                                             global float* restrict GY,
+                                             global float* restrict GZ,
+                                             private int3 vdims,
+                                             private float3 voxelSizes)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -513,11 +513,11 @@ void kernel FLOATvector_3DisotropicGradient(global const float* restrict F,
     GZ[IND] = grad.z;
 }
 
-void kernel FLOATvector_2DisotropicGradient(global const float* restrict F,
-                                            global float* restrict GX,
-                                            global float* restrict GY,
-                                            private int3 vdims,
-                                            private float3 voxelSizes)
+void kernel FLOATvector_2DisotropicGradient_(global const float* restrict F,
+                                             global float* restrict GX,
+                                             global float* restrict GY,
+                                             private int3 vdims,
+                                             private float3 voxelSizes)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -544,10 +544,10 @@ void kernel FLOATvector_2DisotropicGradient(global const float* restrict F,
     GY[IND] = grad.y;
 }
 
-void kernel FLOATvector_isotropicBackDx(global const float* restrict F,
-                                        global float* restrict DX,
-                                        private int3 vdims,
-                                        private float3 voxelSizes)
+void kernel FLOATvector_isotropicBackDx_(global const float* restrict F,
+                                         global float* restrict DX,
+                                         private int3 vdims,
+                                         private float3 voxelSizes)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -569,10 +569,10 @@ void kernel FLOATvector_isotropicBackDx(global const float* restrict F,
     DX[IND] = out / voxelSizes.x;
 }
 
-void kernel FLOATvector_isotropicBackDy(global const float* restrict F,
-                                        global float* restrict DY,
-                                        private int3 vdims,
-                                        private float3 voxelSizes)
+void kernel FLOATvector_isotropicBackDy_(global const float* restrict F,
+                                         global float* restrict DY,
+                                         private int3 vdims,
+                                         private float3 voxelSizes)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -595,10 +595,10 @@ void kernel FLOATvector_isotropicBackDy(global const float* restrict F,
     DY[IND] = out / voxelSizes.y;
 }
 
-void kernel FLOATvector_isotropicBackDz(global const float* restrict F,
-                                        global float* restrict DZ,
-                                        private int3 vdims,
-                                        private float3 voxelSizes)
+void kernel FLOATvector_isotropicBackDz_(global const float* restrict F,
+                                         global float* restrict DZ,
+                                         private int3 vdims,
+                                         private float3 voxelSizes)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -618,6 +618,148 @@ void kernel FLOATvector_isotropicBackDz(global const float* restrict F,
         out = F[IND - vdims.x * vdims.y] - v;
     }
     DZ[IND] = out / voxelSizes.z;
+}
+
+float inline power(float x)
+{
+    return x;
+    if(x < 0)
+    {
+        return -min(1.0f, -x);
+    } else
+    {
+        return min(1.0f, x);
+    }
+}
+
+void kernel FLOATvector_3DisotropicGradient(global const float* restrict F,
+                                            global float* restrict GX,
+                                            global float* restrict GY,
+                                            global float* restrict GZ,
+                                            private int3 vdims,
+                                            private float3 voxelSizes)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    float3 grad;
+    if(i + 1 == vdims.x || i == 0)
+    {
+        grad.x = 0.0f;
+    } else
+    {
+        grad.x = F[IND + 1] - F[IND - 1];
+    }
+    if(j + 1 == vdims.y || j == 0)
+    {
+        grad.y = 0.0f;
+    } else
+    {
+        grad.y = F[IND + vdims.x] - F[IND - vdims.x];
+    }
+    if(k + 1 == vdims.z || k == 0)
+    {
+        grad.z = 0.0f;
+    } else
+    {
+        grad.z = F[IND + vdims.x * vdims.y] - F[IND - vdims.x * vdims.y];
+    }
+    grad /= voxelSizes;
+    GX[IND] = power(grad.x);
+    GY[IND] = power(grad.y);
+    GZ[IND] = power(grad.z);
+}
+
+void kernel FLOATvector_2DisotropicGradient(global const float* restrict F,
+                                            global float* restrict GX,
+                                            global float* restrict GY,
+                                            private int3 vdims,
+                                            private float3 voxelSizes)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    float3 grad;
+    grad.z = 1.0f;
+    if(i + 1 == vdims.x || i == 0)
+    {
+        grad.x = 0.0f;
+    } else
+    {
+        grad.x = F[IND + 1] - F[IND - 1];
+    }
+    if(j + 1 == vdims.y || j == 0)
+    {
+        grad.y = 0.0f;
+    } else
+    {
+        grad.y = F[IND + vdims.x] - F[IND - vdims.x];
+    }
+    grad /= voxelSizes;
+    GX[IND] = power(grad.x);
+    GY[IND] = power(grad.y);
+}
+
+void kernel FLOATvector_isotropicBackDx(global const float* restrict F,
+                                        global float* restrict DX,
+                                        private int3 vdims,
+                                        private float3 voxelSizes)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    float out;
+    if(i + 1 == vdims.x || i == 0)
+    {
+        out = 0.0f;
+    } else
+    {
+        out = F[IND - 1] - F[IND + 1];
+    }
+    DX[IND] = power(out / voxelSizes.x);
+}
+
+void kernel FLOATvector_isotropicBackDy(global const float* restrict F,
+                                        global float* restrict DY,
+                                        private int3 vdims,
+                                        private float3 voxelSizes)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    float out;
+    if(j + 1 == vdims.y || j == 0)
+    {
+        out = 0.0f;
+    } else
+    {
+        out = F[IND - vdims.x] - F[IND + vdims.x];
+    }
+    DY[IND] = power(out / voxelSizes.y);
+}
+
+void kernel FLOATvector_isotropicBackDz(global const float* restrict F,
+                                        global float* restrict DZ,
+                                        private int3 vdims,
+                                        private float3 voxelSizes)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    float out;
+    if(k + 1 == vdims.z || k == 0)
+    {
+        out = 0.0f;
+    } else
+    {
+        out = F[IND - vdims.x * vdims.y] - F[IND + vdims.x * vdims.y];
+    }
+    DZ[IND] = power(out / voxelSizes.z);
 }
 
 #define ZERO555BOUNDARY()                                                                          \

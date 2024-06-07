@@ -70,6 +70,10 @@ public:
 
     int reconstructSumPreconditioning(uint32_t maxIterations = 100, float errCondition = 0.01);
 
+    int reconstructWLS(uint32_t maxIterations = 100,
+                       float errCondition = 0.01,
+                       float* weighs_BDIM = nullptr);
+
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
 
     void addTikhonovRegularization(float L2, float V2, float Laplace);
@@ -87,7 +91,6 @@ private:
     void tikhonov_discrepancy_equals_discrepancy_minus_alphaAdirection(double alpha);
     void tikhonovZeroDiscrepancyBuffers();
     void tikhonovSetRegularizingBuffersNull();
-    int weightedLeastSquares(float* weights);
     int preconditionnedLeastSquares(float* preconditionerXDIM);
     double tikhonovSumOfAdirectionNorms2();
 

@@ -99,12 +99,25 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
     return 0;
 }
 
-int CGLSPBCT2DReconstructor::weightedLeastSquares(float* weightsBDIM)
+/**
+ * @brief WLS reconstruction using CGLS
+ *
+ * @param maxIterations maximum number of iterations
+ * @param errCondition stopping condition based on the relative norm of discrepancy w.r.t. the norm
+ * of initial vector b
+ * @param weightsBDIM weights for the weighted least squares, the size of the array should be BDIM
+ *
+ * @return
+ */
+int CGLSPBCT2DReconstructor::reconstructWLS(uint32_t maxIterations,
+                                            float errCondition,
+                                            float* weightsBDIM)
 {
     cl_int err;
     weighting_bbuf
         = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                        sizeof(float) * BDIM, (void*)weightsBDIM, &err);
+    err = reconstructTikhonov(maxIterations, errCondition, nullptr, weighting_bbuf);
     if(err != CL_SUCCESS)
     {
         return 0;
@@ -263,6 +276,7 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buff
     }
 }
 
+// int discrepancyCount = 0;
 void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
     cl::Buffer residualVector)
 {
@@ -295,7 +309,18 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualV
                                               effectSizeV2, XDIM);
             algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2zadd,
                                               effectSizeV2, XDIM);
-
+            /*DEBUG CODE
+                        BasePBCT2DReconstructor::writeVolume(
+                            *discrepancy_bbuf_xpart_V2x,
+                            io::xprintf("discrepancy_bbuf_xpart_V2x_%03d.den", discrepancyCount));
+                        BasePBCT2DReconstructor::writeVolume(
+                            *discrepancy_bbuf_xpart_V2y,
+                            io::xprintf("discrepancy_bbuf_xpart_V2y_%03d.den", discrepancyCount));
+                        BasePBCT2DReconstructor::writeVolume(
+                            *discrepancy_bbuf_xpart_V2z,
+                            io::xprintf("discrepancy_bbuf_xpart_V2z_%03d.den", discrepancyCount));
+                        discrepancyCount++;
+            */
         } else
         {
             algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
@@ -431,7 +456,10 @@ void CGLSPBCT2DReconstructor::tikhonovSetRegularizingBuffersNull()
  * @param maxIterations
  * @param errCondition
  * @param invCpr_xbuf Preconditioner C
- * @param invSqrtRpr_bbuf Preconditioner \sqrt(R)
+ * @param invSqrtRpr_bbuf Preconditioner \sqrt(R). Can be also used as a matrix W^{1/2} in weighted
+ * least squares so that it can be initialized by reciprocal of standard deviation. In the out of
+ * center scan can be also used as ray weight, reciprocal of the number of measurements for given
+ * ray.
  *
  * @return
  */
@@ -441,30 +469,35 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations,
                                                  std::shared_ptr<cl::Buffer> invSqrtRpr_bbuf)
 {
     std::string INFO;
-    INFO = "WELCOME TO CGLS WITH TIKHONOV, ";
+    INFO = "CGLS WITH TIKHONOV, ";
     uint32_t additionalRegularizationVectors = 0; // Additional vector allocation
     uint32_t additionalPreconditioning_xbuf = 0,
              additionalPreconditioning_bbuf = 0; // Additional vector allocation
     if(tikhonovRegularizationL2)
     {
-        INFO = io::xprintf("%sL2=%0.2f, ", effectSizeL2, INFO.c_str());
+        INFO = io::xprintf("%sL2=%0.2f, ", INFO.c_str(), effectSizeL2);
         additionalRegularizationVectors++;
     }
     if(tikhonovRegularizationV2)
     {
-        INFO = io::xprintf("%sV2=%0.2f, ", effectSizeV2, INFO.c_str());
+        INFO = io::xprintf("%sV2=%0.2f, ", INFO.c_str(), effectSizeV2);
         additionalRegularizationVectors += 3;
     }
     if(tikhonovRegularizationLaplace)
     {
-        INFO = io::xprintf("%sLaplace=%0.2f, ", effectSizeLaplace, INFO.c_str());
+        INFO = io::xprintf("%sLaplace=%0.2f, ", INFO.c_str(), effectSizeLaplace);
         additionalRegularizationVectors++;
     }
     if(invCpr_xbuf != nullptr)
     {
+        INFO = io::xprintf("%s right preconditioning,", INFO.c_str());
         additionalPreconditioning_xbuf = 1;
     }
-    INFO = io::xprintf("%sinit", effectSizeLaplace, INFO.c_str());
+    if(invSqrtRpr_bbuf != nullptr)
+    {
+        INFO = io::xprintf("%s left preconditioning,", INFO.c_str());
+    }
+    INFO = io::xprintf("%s init.", INFO.c_str());
     tikhonovSetRegularizingBuffersNull();
     allocateXBuffers(2 + 3 * additionalRegularizationVectors
                      + additionalPreconditioning_xbuf); // We neeed three new X buffers per

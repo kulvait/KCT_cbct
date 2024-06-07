@@ -67,6 +67,7 @@ public:
     std::string inputDetectorTilts;
     std::string inputProjections;
     std::string diagonalPreconditioner;
+    std::string inputLeftPreconditionerBDIM;
     bool cgls = false;
     bool glsqr = false;
     bool psirt = false;
@@ -129,27 +130,50 @@ void Args::defineArguments()
         "--os-sart", ossart, "OS SART reconstruction (non Krylov method).");
     addSettingsGroup();
     // STOP reconstruction algorithms
+    // START CGLS options
+    CLI::Option_group* og_cglsoptions = og_settings->add_option_group(
+        "CGLS Options",
+        "Setting of preconditioning, Tikhonov regularization and other CGLS specific features.");
+    registerOptionGroup("CGLS options", og_cglsoptions);
     std::string str = io::xprintf(
         "Tikhonov L2 regularization of volume, NAN to disable, [defaults to %f]", tikhonovLambdaL2);
-    CLI::Option* tl2_opt = og_settings->add_option("--tikhonov-lambda-l2", tikhonovLambdaL2, str)
+    CLI::Option* tl2_opt = og_cglsoptions->add_option("--tikhonov-lambda-l2", tikhonovLambdaL2, str)
                                ->check(CLI::Range(0.0, 1000000.0));
     str = io::xprintf("Tikhonov V2 regularization of volume, NAN to disable, [defaults to %f]",
                       tikhonovLambdaV2);
-    CLI::Option* tv2_opt = og_settings->add_option("--tikhonov-lambda-v2", tikhonovLambdaV2, str)
+    CLI::Option* tv2_opt = og_cglsoptions->add_option("--tikhonov-lambda-v2", tikhonovLambdaV2, str)
                                ->check(CLI::Range(0.0, 1000000.0));
-    CLI::Option* g2d_opt = og_settings->add_flag("--gradient-2d", gradient2D, "Use 2D gradient.");
+    CLI::Option* g2d_opt
+        = og_cglsoptions->add_flag("--gradient-2d", gradient2D, "Use 2D gradient.");
     g2d_opt->needs(tv2_opt);
     str = io::xprintf(
         "Tikhonov Laplace regularization of 2D slices of volume, NAN to disable, [defaults to %f]",
         tikhonovLambdaLaplace2D);
     CLI::Option* tlaplace2d_opt
-        = og_settings->add_option("--tikhonov-lambda-laplace", tikhonovLambdaLaplace2D, str)
+        = og_cglsoptions->add_option("--tikhonov-lambda-laplace", tikhonovLambdaLaplace2D, str)
               ->check(CLI::Range(0.0, 1000000.0));
     tl2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
     tv2_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
     tlaplace2d_opt->excludes(psirt_opt)->excludes(sirt_opt)->excludes(os_sart_opt);
-    CLI::Option* l3d = cliApp->add_flag("--laplace-2d", laplace2D, "2D Laplace operator.");
+    CLI::Option* l3d = og_cglsoptions->add_flag("--laplace-2d", laplace2D, "2D Laplace operator.");
     l3d->needs(tlaplace2d_opt);
+    CLI::Option* dpc = og_cglsoptions->add_option(
+        "--diagonal-preconditioner", diagonalPreconditioner,
+        "Specify diagonal preconditioner vector to be used in preconditioned CGLS.");
+
+    CLI::Option* jacobi_cli = og_cglsoptions->add_flag("--jacobi", useJacobiPreconditioning,
+                                                       "Use Jacobi preconditioning.");
+    CLI::Option* sumpr_cli
+        = og_cglsoptions->add_flag("--sum-preconditioning", useSumPreconditioning,
+                                   "Use preconditioning by row and column sums.");
+    CLI::Option* weights_opt = og_cglsoptions->add_option(
+        "--weights-wls", inputLeftPreconditionerBDIM,
+        "Weights for WLS reconstruction, FLOAT32 file of the dimensions of input_projections.");
+    weights_opt->excludes(jacobi_cli)->excludes(sumpr_cli);
+    jacobi_cli->excludes(glsqr_opt);
+    dpc->excludes(jacobi_cli)->excludes(sumpr_cli);
+    // END CGLS options
+    // Force switch
     addForceArgs();
     // Reconstruction geometry
     bool includeVolumeSizez = false;
@@ -181,16 +205,6 @@ void Args::defineArguments()
     cliApp->add_flag("--disable-expensive-reporting,!--no-disable-expensive-reporting",
                      disableExpensiveReporting, optstr);
     og_settings->add_option("--x0", initialVectorX0, "Specify x0 vector, zero by default.");
-    CLI::Option* dpc = og_settings->add_option(
-        "--diagonal-preconditioner", diagonalPreconditioner,
-        "Specify diagonal preconditioner vector to be used in preconditioned CGLS.");
-
-    CLI::Option* jacobi_cli = og_settings->add_flag("--jacobi", useJacobiPreconditioning,
-                                                    "Use Jacobi preconditioning.");
-    CLI::Option* sumpr_cli = og_settings->add_flag("--sum-preconditioning", useSumPreconditioning,
-                                                   "Use preconditioning by row and column sums.");
-    jacobi_cli->excludes(glsqr_opt);
-    dpc->excludes(jacobi_cli)->excludes(sumpr_cli);
     str = io::xprintf("Ordered subset level, number of subsets to be used, 1 for "
                       "classical SART. [defaults to %d]",
                       ossartSubsetCount);
@@ -251,6 +265,7 @@ int Args::postParse()
     {
         slabSize = projectionSizeY - slabFrom;
     }
+    volumeSizeZ = slabSize;
     uint32_t slabTo = slabFrom + slabSize;
     if(slabTo > projectionSizeY)
     {
@@ -491,6 +506,17 @@ int main(int argc, char* argv[])
             {
                 cgls->reconstructSumPreconditioning(ARG.maxIterationCount,
                                                     ARG.stoppingRelativeError);
+            } else if(ARG.inputLeftPreconditionerBDIM != "")
+            {
+                float* preconditionerLeftB = new float[ARG.totalProjectionSize];
+
+                io::DenFileInfo dpInfo(ARG.inputLeftPreconditionerBDIM);
+                dpInfo.readIntoArray<float>(preconditionerLeftB, readxmajor, 0, 0, ARG.slabFrom,
+                                            ARG.slabSize);
+                cgls->reconstructWLS(ARG.maxIterationCount, ARG.stoppingRelativeError,
+                                     preconditionerLeftB);
+
+                delete[] preconditionerLeftB;
             } else
             {
                 if(ARG.diagonalPreconditioner != "")
