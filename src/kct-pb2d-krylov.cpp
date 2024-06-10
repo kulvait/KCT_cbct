@@ -361,6 +361,30 @@ int Args::postParse()
             return -1;
         }
     }
+    if(inputLeftPreconditionerBDIM != "")
+    {
+        io::DenFileInfo inf_b(inputLeftPreconditionerBDIM);
+        if(inf_b.dimx() != projectionSizeX || inf_b.dimy() != projectionSizeY
+           || (inf_b.dimz() != 1 && inf_b.dimz() != projectionSizeZ))
+        {
+            ERR = io::xprintf("The dimensions of the input left preconditioner %s (%d, %d, %d) "
+                              "does not match the dimensions of the projections (%d, %d, %d).",
+                              inputLeftPreconditionerBDIM.c_str(), inf_b.dimx(), inf_b.dimy(),
+                              inf_b.dimz(), projectionSizeX, projectionSizeY, projectionSizeZ);
+            LOGE << ERR;
+            return -1;
+        }
+        DenSupportedType dataType = inf_b.getElementType();
+        if(dataType != DenSupportedType::FLOAT32)
+        {
+            ERR = io::xprintf("The file %s has declared data type %s but this implementation "
+                              "only supports FLOAT32.",
+                              inputLeftPreconditionerBDIM.c_str(),
+                              DenSupportedTypeToString(dataType).c_str());
+            LOGE << ERR;
+            return -1;
+        }
+    }
     bool barrierAdjustSize = false;
     if(useBarrierCalls && barrierArraySize == -1)
     {
@@ -509,10 +533,20 @@ int main(int argc, char* argv[])
             } else if(ARG.inputLeftPreconditionerBDIM != "")
             {
                 float* preconditionerLeftB = new float[ARG.totalProjectionSize];
-
                 io::DenFileInfo dpInfo(ARG.inputLeftPreconditionerBDIM);
-                dpInfo.readIntoArray<float>(preconditionerLeftB, readxmajor, 0, 0, ARG.slabFrom,
-                                            ARG.slabSize);
+                if(dpInfo.dimz() == ARG.projectionSizeZ)
+                {
+                    dpInfo.readIntoArray<float>(preconditionerLeftB, readxmajor, 0, 0, ARG.slabFrom,
+                                                ARG.slabSize);
+                } else if(dpInfo.dimz() == 1)
+                {
+                    uint64_t frameSize = ARG.projectionSizeX * ARG.slabSize;
+                    for(uint64_t i = 0; i < ARG.projectionSizeZ; i++)
+                    {
+                        dpInfo.readIntoArray<float>(preconditionerLeftB + i * frameSize, readxmajor,
+                                                    0, 0, ARG.slabFrom, ARG.slabSize);
+                    }
+                }
                 cgls->reconstructWLS(ARG.maxIterationCount, ARG.stoppingRelativeError,
                                      preconditionerLeftB);
 
