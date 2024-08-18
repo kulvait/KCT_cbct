@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.9)
 project(CBCT)
+#Ignore PATH to ignore conda env or anything in path
+set(CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH false)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 #When you want a different install folder
 #cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr/local/bin ..
@@ -26,6 +29,30 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 #Header directories for the project
 set(GLOBAL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories(${GLOBAL_INCLUDE_DIR})
+
+
+# Conditionally find and configure CUDA
+#set(CUDA_VERSION "11.8") # Change to "11.8" for CUDA 11.x
+#include(CheckLanguage)
+#check_language(CUDA)
+#if(CMAKE_CUDA_COMPILER)
+#  message(STATUS "CUDA compiler found: ${CMAKE_CUDA_COMPILER}")
+#  enable_language(CUDA)
+#  find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED)
+#else()
+#  message(STATUS "No CUDA compiler found, attempting to find CUDA toolkit")
+#  find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED)
+
+#  if(CUDAToolkit_FOUND)
+#    set(CMAKE_CUDA_COMPILER ${CUDAToolkit_NVCC_EXECUTABLE})
+#    message(STATUS "CUDA compiler set to: ${CMAKE_CUDA_COMPILER}")
+#    enable_language(CUDA)
+#  else()
+#    message(FATAL_ERROR "CUDA toolkit not found or CUDA compiler not set")
+#  endif()
+#endif()
+#This way I can also link against CUDA::opencl instead of OpenCL::OpenCL
+
 
 #OpenCL
 find_package(OpenCL REQUIRED)
