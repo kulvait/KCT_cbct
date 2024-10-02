@@ -140,6 +140,7 @@ public:
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
     void initializeVolumeConvolution();
+    void initializeProximal();
 
     void useJacobiVectorCLCode();
 

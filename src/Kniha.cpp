@@ -632,7 +632,14 @@ void Kniha::CLINCLUDEutils()
         {
             ptr26 = std::make_shared<std::remove_reference<decltype(*ptr26)>::type>(
                 cl::Kernel(program, str.c_str()));
-        }
+        };
+        auto& ptr27 = FLOATvector_A_equals_Ac_plus_Bd;
+        str = "FLOATvector_A_equals_Ac_plus_Bd";
+        if(ptr27 == nullptr)
+        {
+            ptr27 = std::make_shared<std::remove_reference<decltype(*ptr27)>::type>(
+                cl::Kernel(program, str.c_str()));
+        };
     });
 }
 
@@ -742,6 +749,31 @@ void Kniha::CLINCLUDEconvolution()
         {
             auto& ptr = FLOATvector_isotropicBackDz;
             std::string str = "FLOATvector_isotropicBackDz";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_isotropicBackDivergence2D;
+            std::string str = "FLOATvector_isotropicBackDivergence2D";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+    });
+}
+
+void Kniha::CLINCLUDEproximal()
+{
+    insertCLFile("opencl/proximal.cl");
+    callbacks.emplace_back([this](cl::Program program) {
+        {
+            auto& ptr = FLOATvector_infProjectionToLambda2DBall;
+            std::string str = "FLOATvector_infProjectionToLambda2DBall";
             if(ptr == nullptr)
             {
                 ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -1538,6 +1570,17 @@ int Kniha::algFLOATvector_A_equals_Ac_plus_B(
     }
     return 0;
 }
+int Kniha::algFLOATvector_A_equals_Ac_plus_Bd(
+    cl::Buffer& A, cl::Buffer& B, float c, float d, uint64_t size, bool blocking, uint32_t QID)
+{
+    cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
+    auto exe = (*FLOATvector_A_equals_Ac_plus_Bd)(eargs, A, B, c, d);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
 
 int Kniha::algFLOATvector_A_equals_A_plus_cB_offset(cl::Buffer& A,
                                                     cl::Buffer& B,
@@ -1978,6 +2021,28 @@ int Kniha::algFLOATvector_isotropicBackDz(cl::Buffer& F,
     return 0;
 }
 
+int Kniha::algFLOATvector_isotropicBackDivergence2D(cl::Buffer& FX,
+                                                    cl::Buffer& FY,
+                                                    cl::Buffer& DIV,
+                                                    cl_int3& vdims,
+                                                    cl_float3& voxelSizes,
+                                                    cl::NDRange globalRange,
+                                                    cl::NDRange _localRange,
+                                                    bool blocking,
+                                                    uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+
+    auto exe = (*FLOATvector_isotropicBackDivergence2D)(*eargs, FX, FY, DIV, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
 // pbct_cvp.cl
 int Kniha::algFLOAT_pbct_cutting_voxel_project(cl::Buffer& volume,
                                                cl::Buffer& projection,
@@ -2347,6 +2412,19 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_project_barrier(
                           cl_info_id, command_type_string.c_str());
         KCTERR(err);
     }
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+// proximal.cl
+int Kniha::algFLOATvector_infProjectionToLambda2DBall(
+    cl::Buffer& G1, cl::Buffer& G2, float lambda, uint64_t size, bool blocking, uint32_t QID)
+{
+    cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
+    auto exe = (*FLOATvector_infProjectionToLambda2DBall)(eargs, G1, G2, lambda);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

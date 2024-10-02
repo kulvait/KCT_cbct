@@ -86,8 +86,20 @@ void BaseReconstructor::initializeVolumeConvolution()
     {
         std::string err
             = "Could not initialize volume convolution when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR(err);
+    }
+}
+
+void BaseReconstructor::initializeProximal()
+{
+    if(!isOpenCLInitialized())
+    {
+        CLINCLUDEproximal();
+    } else
+    {
+        std::string err
+            = "Could not initialize volume convolution when OpenCL was already initialized.";
+        KCTERR(err);
     }
 }
 
@@ -99,8 +111,7 @@ void BaseReconstructor::useJacobiVectorCLCode()
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR(err);
     }
 }
 
@@ -120,16 +131,14 @@ int BaseReconstructor::vectorIntoBuffer(cl::Buffer X, float* v, std::size_t size
         if(err != CL_SUCCESS)
         {
             e = io::xprintf("Unsucessful initialization of Volume with error code %d!", err);
-            LOGE << e;
-            throw std::runtime_error(e);
+            KCTERR(e);
         }
     } else
     {
         e = io::xprintf(
             "The buffer is too small %d bytes to represent vector of size %d that is %d bytes.",
             bufferSize, size, totalSize);
-        LOGE << e;
-        throw std::runtime_error(e);
+        KCTERR(e);
     }
     return 0;
 }
@@ -349,8 +358,7 @@ std::shared_ptr<cl::Buffer> BaseReconstructor::getXBuffer(uint32_t i)
     {
         std::string err = io::xprintf(
             "Index %d is out of range of the x_buffers vector of size %d!", i, x_buffers.size());
-        LOGE << err;
-        throw std::runtime_error(err);
+        KCTERR(err);
     }
 }
 
@@ -363,8 +371,7 @@ std::shared_ptr<cl::Buffer> BaseReconstructor::getBBuffer(uint32_t i)
     {
         std::string err = io::xprintf(
             "Index %d is out of range of the b_buffers vector of size %d!", i, b_buffers.size());
-        LOGE << err;
-        throw std::runtime_error(err);
+        KCTERR(err);
     }
 }
 
@@ -378,8 +385,7 @@ std::shared_ptr<cl::Buffer> BaseReconstructor::getTmpXBuffer(uint32_t i)
         std::string err
             = io::xprintf("Index %d is out of range of the tmp_x_buffers vector of size %d!", i,
                           tmp_x_buffers.size());
-        LOGE << err;
-        throw std::runtime_error(err);
+        KCTERR(err);
     }
 }
 
@@ -393,8 +399,7 @@ std::shared_ptr<cl::Buffer> BaseReconstructor::getTmpBBuffer(uint32_t i)
         std::string err
             = io::xprintf("Index %d is out of range of the tmp_b_buffers vector of size %d!", i,
                           tmp_b_buffers.size());
-        LOGE << err;
-        throw std::runtime_error(err);
+        KCTERR(err);
     }
 }
 
@@ -481,6 +486,7 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B,
     Q[0]->enqueueFillBuffer<cl_float>(X, std::numeric_limits<float>::infinity(), 0,
                                       XDIM * sizeof(float));
     unsigned int frameSize = rp->pFrameSize;
+    std::string err;
     algFLOATvector_copy(B, *tmp_b_buf, BDIM);
     // cl::EnqueueArgs eargs(*Q[0], cl::NDRange(vdimz, vdimy, vdimx));
     cl::NDRange voxelRange(vdimx, vdimy, vdimz);
@@ -511,10 +517,12 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B,
         offset = i * frameSize;
         if(useSidonProjector)
         {
-            throw std::runtime_error("Minmax backprojector not implemented for Sidon projector.");
+            err = "Minmax backprojector not implemented for Sidon projector.";
+            KCTERR(err);
         } else if(useTTProjector)
         {
-            throw std::runtime_error("Minmax backprojector not implemented for TT projector.");
+            err = "Minmax backprojector not implemented for TT projector.";
+            KCTERR(err);
         } else
         {
             if(useCVPExactProjectionsScaling)

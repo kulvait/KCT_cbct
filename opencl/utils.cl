@@ -1,4 +1,4 @@
-//#pragma OPENCL EXTENSION cl_amd_printf : enable
+// #pragma OPENCL EXTENSION cl_amd_printf : enable
 //==============================utils.cl=====================================
 void kernel FLOATvector_NormSquarePartial(global const float* restrict x,
                                           global float* restrict partialSum,
@@ -435,6 +435,15 @@ void kernel FLOATvector_A_equals_Ac_plus_B(global float* restrict A,
 {
     const size_t gid = get_global_id(0);
     A[gid] = A[gid] * c + B[gid];
+}
+
+void kernel FLOATvector_A_equals_Ac_plus_Bd(global float* restrict A,
+                                            global const float* restrict B,
+                                            private float c,
+                                            private float d)
+{
+    const size_t gid = get_global_id(0);
+    A[gid] = A[gid] * c + B[gid] * d;
 }
 
 void kernel FLOATvector_A_equals_A_times_B(global float* restrict A, global const float* restrict B)

@@ -44,6 +44,8 @@ public:
     // Settings
     uint32_t maxIterationCount = 40;
     double stoppingRelativeError = 0.00025;
+    uint32_t maxIterationPDHG = 40;
+    double stoppingRelativePDHG = 0.00025;
     uint32_t reportKthIteration = 0;
 
     // Projector settings

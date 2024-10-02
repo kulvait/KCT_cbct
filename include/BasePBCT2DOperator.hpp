@@ -61,6 +61,7 @@ public:
     void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
     void initializeVolumeConvolution();
+    void initializeProximal();
 
     int initializeOpenCL(uint32_t platformID,
                          uint32_t* deviceIds,
@@ -109,6 +110,7 @@ protected:
     // Problem setup variables
     double voxelSpacingX, voxelSpacingY, voxelSpacingZ;
     cl_double3 voxelSizes;
+    cl_float3 voxelSizesF;
     cl_double2 volumeCenter;
     std::vector<std::shared_ptr<geometry::Geometry3DParallelI>> geometries;
     double geometryAtY;

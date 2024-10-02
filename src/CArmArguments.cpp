@@ -407,6 +407,16 @@ void CArmArguments::addSettingsArgs()
                      io::xprintf("Stopping relative error of ||Ax-b||/||b||, defaults to %f.",
                                  stoppingRelativeError))
         ->check(CLI::Range(0.0, 1.0));
+    og_settings
+        ->add_option(
+            "--max-iterations-pdhg", maxIterationPDHG,
+            io::xprintf("Maximum number of PDHG iterations, defaults to %d.", maxIterationPDHG))
+        ->check(CLI::Range(1, 65535));
+    og_settings
+        ->add_option("--stopping-relative-error-pdhg", stoppingRelativePDHG,
+                     io::xprintf("Stopping relative error of PDHG, defaults to %f.",
+                                 stoppingRelativePDHG))
+        ->check(CLI::Range(0.0, 1.0));
 }
 
 void CArmArguments::addCLSettingsArgs()

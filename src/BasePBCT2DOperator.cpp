@@ -106,8 +106,20 @@ void BasePBCT2DOperator::initializeVolumeConvolution()
     {
         std::string err
             = "Could not initialize volume convolution when OpenCL was already initialized.";
-        LOGE << err;
-        throw std::runtime_error(err.c_str());
+        KCTERR(err);
+    }
+}
+
+void BasePBCT2DOperator::initializeProximal()
+{
+    if(!isOpenCLInitialized())
+    {
+        CLINCLUDEproximal();
+    } else
+    {
+        std::string err
+            = "Could not initialize volume convolution when OpenCL was already initialized.";
+        KCTERR(err);
     }
 }
 
@@ -158,6 +170,8 @@ int BasePBCT2DOperator::problemSetup(
         scalingFactorVector.emplace_back(scalingFactor);
     }
     voxelSizes = cl_double3({ voxelSpacingX, voxelSpacingY, voxelSpacingZ });
+    voxelSizesF = cl_float3({ static_cast<float>(voxelSpacingX), static_cast<float>(voxelSpacingY),
+                              static_cast<float>(voxelSpacingZ) });
     volumeCenter = cl_double2({ volumeCenterX, volumeCenterY });
     initReductionBuffers();
     return 0;

@@ -18,6 +18,7 @@
 
 // Reconstructors
 #include "CGLSPBCT2DReconstructor.hpp"
+#include "PDHGPBCT2DReconstructor.hpp"
 
 // Internal libraries
 #include "CArmArguments.hpp"
@@ -70,6 +71,13 @@ public:
     std::string inputLeftPreconditionerBDIM;
     bool cgls = false;
     bool glsqr = false;
+
+    bool pdhg = false;
+    float pdhg_lambda = 0.1; // Lambda parameter in ||Ax-b|| + lambda TV(X)
+    float pdhg_tau = -0.99; // Primal variable update
+    float pdhg_sigma = -0.99; // Dual variable update
+    float pdhg_theta = 1.0; // Relaxation
+
     bool psirt = false;
     bool sirt = false;
     bool ossart = false;
@@ -120,6 +128,9 @@ void Args::defineArguments()
     og_reconstructionAlgorithm->require_option(1, 1);
     CLI::Option* cgls_opt = og_reconstructionAlgorithm->add_flag(
         "--cgls", cgls, "Perform CGLS reconstruction (Krylov method).");
+    CLI::Option* pdhg_opt = og_reconstructionAlgorithm->add_flag(
+        "--pdhg", pdhg,
+        "Perform PDHG primal dual hybrid gradient method accrording to Chambolle and Pock.");
     CLI::Option* glsqr_opt = og_reconstructionAlgorithm->add_flag(
         "--glsqr", glsqr, "Perform GLSQR instead reconstruction (Krylov method).");
     CLI::Option* psirt_opt = og_reconstructionAlgorithm->add_flag(
@@ -173,6 +184,23 @@ void Args::defineArguments()
     jacobi_cli->excludes(glsqr_opt);
     dpc->excludes(jacobi_cli)->excludes(sumpr_cli);
     // END CGLS options
+    // Start PDHG options
+    CLI::Option_group* og_pdhg = og_settings->add_option_group(
+        "PDHG Options", "Primal Dual Hybrid Gradient method options.");
+    registerOptionGroup("PDHG options", og_pdhg);
+    str = io::xprintf("PDHG lambda parameter in ||Ax-b|| + lambda TV(X), [defaults to %f]",
+                      pdhg_lambda);
+    og_pdhg->add_option("--pdhg-lambda", pdhg_lambda, str);
+    str = io::xprintf("Primal variable update parameter, negative values are fractions of "
+                      "1/voxel_size, [defaults to %f]",
+                      pdhg_tau);
+    og_pdhg->add_option("--pdhg-tau", pdhg_tau, str);
+    str = io::xprintf("Dual variable update parameter, negative values are fractions of "
+                      "1/voxel_size, [defaults to %f]",
+                      pdhg_sigma);
+    og_pdhg->add_option("--pdhg-sigma", pdhg_sigma, str);
+    str = io::xprintf("Relaxation parameter, [defaults to %f]", pdhg_theta);
+    og_pdhg->add_option("--pdhg-theta", pdhg_theta, str);
     // Force switch
     addForceArgs();
     // Reconstruction geometry
@@ -232,6 +260,12 @@ void Args::defineArguments()
     lowbox_opt->excludes(cgls_opt)->excludes(glsqr_opt);
     upbox_opt->excludes(cgls_opt)->excludes(glsqr_opt);
     relaxation_opt->excludes(cgls_opt)->excludes(glsqr_opt)->excludes(psirt_opt);
+    pdhg_opt->excludes(cgls_opt)
+        ->excludes(glsqr_opt)
+        ->excludes(psirt_opt)
+        ->excludes(sirt_opt)
+        ->excludes(os_sart_opt);
+    // END PDHG options
 }
 
 int Args::postParse()
@@ -293,7 +327,7 @@ int Args::postParse()
         LOGE << ERR;
         return 1;
     }
-    // End parsing arguments
+    // End parsing arguments/
     if(totalProjectionSize > INT_MAX)
     {
         ERR = io::xprintf("Implement indexing by uint64_t matrix dimension overflow of projection "
@@ -393,13 +427,24 @@ int Args::postParse()
     uint64_t localMemSize = parsePlatformString();
     if(barrierAdjustSize)
     {
-        barrierArraySize = localMemSize / 4 - 16; // 9 shall be sufficient but for memory alignment
+        barrierArraySize = static_cast<int>(localMemSize) / 4
+            - 16; // 9 shall be sufficient but for memory alignment
         LOGI << io::xprintf("Setting LOCALARRAYSIZE=%d for optimal performance.", barrierArraySize);
     }
-    if(useBarrierCalls && barrierArraySize > localMemSize / 4 - 9)
+    if(useBarrierCalls
+       && static_cast<int>(barrierArraySize) > static_cast<int>(localMemSize) / 4 - 9)
     {
         ERR = io::xprintf("Array of size %d can not be allocated on given device, maximum is %d!",
                           barrierArraySize, localMemSize / 4 - 9);
+    }
+    double voxelSizeAvg = (voxelSizeX + voxelSizeY + voxelSizeZ) / 3.0;
+    if(pdhg_tau < 0.0)
+    {
+        pdhg_tau = -pdhg_tau * voxelSizeAvg;
+    }
+    if(pdhg_sigma < 0.0)
+    {
+        pdhg_sigma = -pdhg_sigma * voxelSizeAvg;
     }
     return 0;
 }
@@ -567,6 +612,67 @@ int main(int argc, char* argv[])
                     cgls->reconstruct(ARG.maxIterationCount, ARG.stoppingRelativeError);
                 }
             }
+            bool volumexmajor = true;
+            bool writexmajor = true;
+            io::DenFileInfo::create3DDenFileFromArray(
+                volume, volumexmajor, ARG.outputVolume, io::DenSupportedType::FLOAT32,
+                ARG.volumeSizeX, ARG.volumeSizeY, ARG.slabSize, writexmajor);
+            delete[] volume;
+            delete[] projection;
+        } else if(ARG.pdhg)
+        {
+            std::shared_ptr<PDHGPBCT2DReconstructor> pdhg
+                = std::make_shared<PDHGPBCT2DReconstructor>(
+                    ARG.projectionSizeX, ARG.slabSize, ARG.projectionSizeZ, ARG.volumeSizeX,
+                    ARG.volumeSizeY, ARG.slabSize, ARG.CLitemsPerWorkgroup);
+            // pdhg > setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+            if(ARG.useSidonProjector)
+            {
+                pdhg->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+            } else if(ARG.useTTProjector)
+            {
+
+                pdhg->initializeTTProjector();
+            } else
+            {
+                pdhg->initializeCVPProjector(ARG.useBarrierCalls, ARG.barrierArraySize);
+            }
+            pdhg->initializeVolumeConvolution();
+            pdhg->initializeProximal();
+            int ecd = pdhg->initializeOpenCL(
+                ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
+                ARG.CLrelaxed, projectorLocalNDRange, backprojectorLocalNDRange);
+            if(ecd < 0)
+            {
+                std::string ERR
+                    = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+                LOGE << ERR;
+                KCTERR(ERR);
+            }
+            bool X0initialized = ARG.initialVectorX0 != "";
+            float geometryAtY = ARG.voxelSizeY
+                * (static_cast<float>(ARG.slabFrom) + 0.5f * static_cast<float>(ARG.slabSize));
+            pdhg->problemSetup(geometryVector, geometryAtY, ARG.voxelSizeX, ARG.voxelSizeY,
+                               ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY,
+                               ARG.volumeCenterZ);
+            ecd = pdhg->initializeVectors(projection, volume, X0initialized);
+            if(ecd != 0)
+            {
+                std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
+                LOGE << ERR;
+                KCTERR(ERR);
+            }
+            pdhg->reconstruct(ARG.pdhg_lambda, ARG.pdhg_tau, ARG.pdhg_sigma, ARG.pdhg_theta,
+                              ARG.maxIterationPDHG, ARG.stoppingRelativePDHG, ARG.maxIterationCount,
+                              ARG.stoppingRelativeError);
+            /*int reconstruct(float lambda,
+                            float tau,
+                            float sigma,
+                            float theta,
+                            uint32_t maxPDHGIterations = 100,
+                            float errConditionPDHG = 0.01,
+                            uint32_t maxCGLSIterations = 100,
+                            float errConditionCGLS = 0.01);*/
             bool volumexmajor = true;
             bool writexmajor = true;
             io::DenFileInfo::create3DDenFileFromArray(

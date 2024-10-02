@@ -190,6 +190,7 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl opencl/projector_si
 configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl opencl/projector_tt.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl opencl/rescaleProjections.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/proximal.cl opencl/proximal.cl COPYONLY)
 
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
@@ -212,6 +213,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_sidon.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/proximal.cl DESTINATION opencl)
 
 SET(KCTPROJECTOR_SOURCES src/kct-cb-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
 add_executable(kct-projector ${KCTPROJECTOR_SOURCES})
@@ -330,7 +332,7 @@ target_include_directories(kct-pb-krylov PUBLIC ${OpenCL_INCLUDE_DIRS})
 target_git_version_init(kct-pb-krylov)
 install (TARGETS kct-pb-krylov RUNTIME DESTINATION .)
 
-SET(KCTPB2DKRYLOV_SOURCES src/kct-pb2d-krylov.cpp src/Kniha.cpp src/BasePBCT2DReconstructor.cpp src/BasePBCT2DOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCT2DReconstructor.cpp src/NDRange/NDRangeHelper.cpp src/NDRange/PBCT2DLocalNDRangeFactory.cpp)
+SET(KCTPB2DKRYLOV_SOURCES src/kct-pb2d-krylov.cpp src/Kniha.cpp src/BasePBCT2DReconstructor.cpp src/BasePBCT2DOperator.cpp src/AlgorithmsBarrierBuffers.cpp src/CArmArguments.cpp src/CGLSPBCT2DReconstructor.cpp src/NDRange/NDRangeHelper.cpp src/NDRange/PBCT2DLocalNDRangeFactory.cpp src/PDHGPBCT2DReconstructor.cpp)
 add_executable(kct-pb2d-krylov ${KCTPB2DKRYLOV_SOURCES})
 set_target_properties(
     kct-pb2d-krylov

@@ -71,6 +71,7 @@ public:
     void CLINCLUDEpbct_cvp_barrier();
     void CLINCLUDEpbct2d_cvp();
     void CLINCLUDEpbct2d_cvp_barrier();
+    void CLINCLUDEproximal();
 
     static std::string infoString(cl_int cl_info_id);
 
@@ -655,6 +656,17 @@ protected:
                                           uint64_t size,
                                           bool blocking = false,
                                           uint32_t QID = 0);
+    // FLOATvector_A_equals_Ac_plus_Bd
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&, float&>>
+        FLOATvector_A_equals_Ac_plus_Bd;
+    int algFLOATvector_A_equals_Ac_plus_Bd(cl::Buffer& A,
+                                           cl::Buffer& B,
+                                           float c,
+                                           float d,
+                                           uint64_t size,
+                                           bool blocking = false,
+                                           uint32_t QID = 0);
+
     // FLOATvector_A_equals_A_times_B
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOATvector_A_equals_A_times_B;
 
@@ -852,6 +864,18 @@ protected:
                                        bool blocking = false,
                                        uint32_t QID = 0);
 
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_isotropicBackDivergence2D;
+    int algFLOATvector_isotropicBackDivergence2D(cl::Buffer& FX,
+                                                 cl::Buffer& FY,
+                                                 cl::Buffer& DIV,
+                                                 cl_int3& vdims,
+                                                 cl_float3& voxelSizes,
+                                                 cl::NDRange globalRange,
+                                                 cl::NDRange localRange = cl::NullRange,
+                                                 bool blocking = false,
+                                                 uint32_t QID = 0);
+
     // pbct_cvp.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
@@ -927,6 +951,18 @@ protected:
                                                     cl::NDRange localRange = cl::NullRange,
                                                     bool blocking = false,
                                                     uint32_t QID = 0);
+    // proximal.cl
+    // void kernel FLOATvector_infProjectionToLambda2DBall(global float* restrict G1,
+    //                                                     global float* restrict G2,
+    //                                                     float const lambda)
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
+        FLOATvector_infProjectionToLambda2DBall;
+    int algFLOATvector_infProjectionToLambda2DBall(cl::Buffer& G1,
+                                                   cl::Buffer& G2,
+                                                   float lambda,
+                                                   uint64_t size,
+                                                   bool blocking = false,
+                                                   uint32_t QID = 0);
 
 private:
     /**

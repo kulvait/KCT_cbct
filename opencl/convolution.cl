@@ -513,11 +513,12 @@ void kernel FLOATvector_3DisotropicGradient_(global const float* restrict F,
     GZ[IND] = grad.z;
 }
 
-void kernel FLOATvector_2DisotropicGradient_(global const float* restrict F,
-                                             global float* restrict GX,
-                                             global float* restrict GY,
-                                             private int3 vdims,
-                                             private float3 voxelSizes)
+// Reflection boundary for gradinet and its adjoint divergence operator
+void kernel FLOATvector_2DisotropicGradient(global const float* restrict F,
+                                            global float* restrict GX,
+                                            global float* restrict GY,
+                                            private int3 vdims,
+                                            private float3 voxelSizes)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
@@ -527,14 +528,14 @@ void kernel FLOATvector_2DisotropicGradient_(global const float* restrict F,
     float3 grad;
     if(i + 1 == vdims.x)
     {
-        grad.x = 0.0f;
+        grad.x = -v;
     } else
     {
         grad.x = F[IND + 1] - v;
     }
     if(j + 1 == vdims.y)
     {
-        grad.y = 0.0f;
+        grad.y = -v;
     } else
     {
         grad.y = F[IND + vdims.x] - v;
@@ -542,6 +543,41 @@ void kernel FLOATvector_2DisotropicGradient_(global const float* restrict F,
     grad /= voxelSizes;
     GX[IND] = grad.x;
     GY[IND] = grad.y;
+}
+
+// Reflection boundary for gradinet and its adjoint divergence operator
+void kernel FLOATvector_isotropicBackDivergence2D(global const float* restrict FX,
+                                                  global const float* restrict FY,
+                                                  global float* restrict DIV,
+                                                  private int3 vdims,
+                                                  private float3 voxelSizes)
+{
+    const int i = get_global_id(0);
+    const int j = get_global_id(1);
+    const int k = get_global_id(2);
+    const int IND = VOXELINDEX(i, j, k, vdims);
+    float VX = FX[IND];
+    float VY = FY[IND];
+    float DX, DY;
+    if(i == 0)
+    {
+        // out = 0.0f;
+        DX = -VX;
+    } else
+    {
+        DX = FX[IND - 1] - VX;
+    }
+    if(j == 0)
+    {
+        //        out = 0.0f;
+        DY = -VY;
+    } else
+    {
+        DY = FY[IND - vdims.x] - VY;
+    }
+    DX = DX / voxelSizes.x;
+    DY = DY / voxelSizes.y;
+    DIV[IND] = DX + DY;
 }
 
 void kernel FLOATvector_isotropicBackDx_(global const float* restrict F,
@@ -671,11 +707,11 @@ void kernel FLOATvector_3DisotropicGradient(global const float* restrict F,
     GZ[IND] = power(grad.z);
 }
 
-void kernel FLOATvector_2DisotropicGradient(global const float* restrict F,
-                                            global float* restrict GX,
-                                            global float* restrict GY,
-                                            private int3 vdims,
-                                            private float3 voxelSizes)
+void kernel FLOATvector_2DisotropicGradient_(global const float* restrict F,
+                                             global float* restrict GX,
+                                             global float* restrict GY,
+                                             private int3 vdims,
+                                             private float3 voxelSizes)
 {
     const int i = get_global_id(0);
     const int j = get_global_id(1);
