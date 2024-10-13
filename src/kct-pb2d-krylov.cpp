@@ -73,9 +73,12 @@ public:
     bool glsqr = false;
 
     bool pdhg = false;
-    float pdhg_lambda = 0.1; // Lambda parameter in ||Ax-b|| + lambda TV(X)
-    float pdhg_tau = -0.99; // Primal variable update
-    float pdhg_sigma = -0.99; // Dual variable update
+    float pdhg_mu = - 0.1; // Lambda parameter in ||Ax-b|| + lambda TV(X)
+    // float pdhg_tau = -0.7*0.125; // Primal variable update
+    // float pdhg_sigma = -0.7*0.125; // Dual variable update
+    float pdhg_tau = -0.7; // Primal variable update
+    float pdhg_sigma = -0.7; // Dual variable update
+                             // 1/sqrt(2)=0.7071 > 0.7
     float pdhg_theta = 1.0; // Relaxation
 
     bool psirt = false;
@@ -188,15 +191,13 @@ void Args::defineArguments()
     CLI::Option_group* og_pdhg = og_settings->add_option_group(
         "PDHG Options", "Primal Dual Hybrid Gradient method options.");
     registerOptionGroup("PDHG options", og_pdhg);
-    str = io::xprintf("PDHG lambda parameter in ||Ax-b|| + lambda TV(X), [defaults to %f]",
-                      pdhg_lambda);
-    og_pdhg->add_option("--pdhg-lambda", pdhg_lambda, str);
-    str = io::xprintf("Primal variable update parameter, negative values are fractions of "
-                      "1/voxel_size, [defaults to %f]",
+    str = io::xprintf("PDHG lambda parameter in ||Ax-b|| + mu TV(X), [defaults to %f]",
+                      pdhg_mu);
+    og_pdhg->add_option("--pdhg-mu", pdhg_mu, str);
+    str = io::xprintf("Primal variable update parameter, negative values are multiplied by -1, [defaults to %f]",
                       pdhg_tau);
     og_pdhg->add_option("--pdhg-tau", pdhg_tau, str);
-    str = io::xprintf("Dual variable update parameter, negative values are fractions of "
-                      "1/voxel_size, [defaults to %f]",
+    str = io::xprintf("Dual variable update parameter, negative values are multiplied by voxel_size*voxel_size, [defaults to %f]",
                       pdhg_sigma);
     og_pdhg->add_option("--pdhg-sigma", pdhg_sigma, str);
     str = io::xprintf("Relaxation parameter, [defaults to %f]", pdhg_theta);
@@ -440,11 +441,15 @@ int Args::postParse()
     double voxelSizeAvg = (voxelSizeX + voxelSizeY + voxelSizeZ) / 3.0;
     if(pdhg_tau < 0.0)
     {
-        pdhg_tau = -pdhg_tau * voxelSizeAvg;
+        pdhg_tau = -pdhg_tau;
     }
     if(pdhg_sigma < 0.0)
     {
-        pdhg_sigma = -pdhg_sigma * voxelSizeAvg;
+        pdhg_sigma = -pdhg_sigma * voxelSizeAvg * voxelSizeAvg;
+    }
+    if(pdhg_mu < 0.0)
+    {
+        pdhg_mu = -pdhg_mu * voxelSizeAvg * voxelSizeAvg;
     }
     return 0;
 }
@@ -662,7 +667,7 @@ int main(int argc, char* argv[])
                 LOGE << ERR;
                 KCTERR(ERR);
             }
-            pdhg->reconstruct(ARG.pdhg_lambda, ARG.pdhg_tau, ARG.pdhg_sigma, ARG.pdhg_theta,
+            pdhg->reconstruct(ARG.pdhg_mu, ARG.pdhg_tau, ARG.pdhg_sigma, ARG.pdhg_theta,
                               ARG.maxIterationPDHG, ARG.stoppingRelativePDHG, ARG.maxIterationCount,
                               ARG.stoppingRelativeError);
             /*int reconstruct(float lambda,

@@ -444,6 +444,28 @@ void Kniha::CLINCLUDEutils()
                     cl::Kernel(program, str.c_str()));
             }
         }
+        {
+            // std::shared_ptr<cl::make_kernel<cl::Buffer&, cl:Buffer&, cl::Buffer&,
+            // cl::LocalSpaceArg&, unsigned long&>> FLOATvector_L1L2norm_barrier;
+            auto& ptr = FLOATvector_L1L2norm_barrier;
+            str = "FLOATvector_L1L2norm_barrier";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            }
+        }
+        {
+            // std::shared_ptr<cl::make_kernel<cl::Buffer&, cl:Buffer&, cl::Buffer&,
+            // cl::LocalSpaceArg&, unsigned long&>> vector_L1L2norm_barrier;
+            auto& ptr = vector_L1L2norm_barrier;
+            str = "vector_L1L2norm_barrier";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            }
+        }
         auto& ptr04 = vector_NormSquarePartial;
         str = "vector_NormSquarePartial";
         if(ptr04 == nullptr)
@@ -588,6 +610,15 @@ void Kniha::CLINCLUDEutils()
             if(ptr20 == nullptr)
             {
                 ptr20 = std::make_shared<std::remove_reference<decltype(*ptr20)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            }
+        }
+        {
+            auto& ptr = FLOATvector_C_equals_Ad_plus_Be;
+            str = "FLOATvector_C_equals_Ad_plus_Be";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
                     cl::Kernel(program, str.c_str()));
             }
         }
@@ -1575,6 +1606,24 @@ int Kniha::algFLOATvector_A_equals_Ac_plus_Bd(
 {
     cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
     auto exe = (*FLOATvector_A_equals_Ac_plus_Bd)(eargs, A, B, c, d);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_C_equals_Ad_plus_Be(cl::Buffer& A,
+                                              cl::Buffer& B,
+                                              cl::Buffer& C,
+                                              float d,
+                                              float e,
+                                              uint64_t size,
+                                              bool blocking,
+                                              uint32_t QID)
+{
+    cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
+    auto exe = (*FLOATvector_C_equals_Ad_plus_Be)(eargs, A, B, C, d, e);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

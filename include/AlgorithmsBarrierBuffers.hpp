@@ -92,6 +92,10 @@ protected:
     float maxXBuffer_barrier_float(cl::Buffer& X,
                                    std::shared_ptr<ReductionParameters> rp = nullptr,
                                    uint32_t QID = 0);
+    float isotropicTVNormXBuffer_barrier_float(cl::Buffer& GX,
+                                               cl::Buffer& GY,
+                                               std::shared_ptr<ReductionParameters> rp = nullptr,
+                                               uint32_t QID = 0);
     double normBBuffer_barrier_double(cl::Buffer& B,
                                       std::shared_ptr<ReductionParameters> rp = nullptr,
                                       uint32_t QID = 0);
@@ -113,6 +117,10 @@ protected:
                                                std::shared_ptr<ReductionParameters> rp = nullptr,
                                                uint32_t QID = 0);
 
+    double isotropicTVNormXBuffer_barrier_double(cl::Buffer& GX,
+                                                 cl::Buffer& GY,
+                                                 std::shared_ptr<ReductionParameters> rp = nullptr,
+                                                 uint32_t QID = 0);
     /**
      * Copy float* array of size elements into the CL::buffer. The buffer must have appropriate
      * size.

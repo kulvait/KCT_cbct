@@ -520,6 +520,17 @@ protected:
         FLOATvector_SumPartial_barrier;
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
         FLOATvector_MaxPartial_barrier;
+    // void kernel FLOATvector_L1L2norm_barrier(global const float* restrict g1, global const float*
+    // restrict g2, global float* restrict partialSum, local float* loc, private ulong vecLength)
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
+        FLOATvector_L1L2norm_barrier;
+
+    // void kernel vector_L1L2norm_barrier(global const float* restrict g1, global const float*
+    // restrict g2, global float* restrict partialSum, local float* loc, private ulong vecLength)
+    std::shared_ptr<
+        cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl::LocalSpaceArg&, unsigned long&>>
+        vector_L1L2norm_barrier;
 
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, unsigned int&>>
         vector_NormSquarePartial;
@@ -666,7 +677,17 @@ protected:
                                            uint64_t size,
                                            bool blocking = false,
                                            uint32_t QID = 0);
-
+    // FLOATvector_C_equals_Ad_plus_Be
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, float&, float&>>
+        FLOATvector_C_equals_Ad_plus_Be;
+    int algFLOATvector_C_equals_Ad_plus_Be(cl::Buffer& A,
+                                           cl::Buffer& B,
+                                           cl::Buffer& C,
+                                           float d,
+                                           float e,
+                                           uint64_t size,
+                                           bool blocking = false,
+                                           uint32_t QID = 0);
     // FLOATvector_A_equals_A_times_B
     std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&>> FLOATvector_A_equals_A_times_B;
 

@@ -92,6 +92,10 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
         algFLOATvector_A_equals_A_plus_cB(*x_buf, *directionVector_xbuf, alpha, XDIM);
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
+        LOGD << io::xprintf("Iteration %d: alpha = %f, beta = %f, |Ax-b| = %f, |AT(Ax-b)| = %f",
+                            iteration, alpha, beta, norm, NX);
+        //BasePBCT2DReconstructor::writeVolume(*x_buf,
+        //                                     io::xprintf("cgls_x_buf_it%02d.den", iteration));
     }
     LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
                               iteration, norm, 100.0 * norm / NB0);

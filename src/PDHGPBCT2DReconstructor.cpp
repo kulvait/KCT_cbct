@@ -6,7 +6,7 @@ int PDHGPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
 {
     LOGI << "Virtual method PDHGPBCT2DReconstructor::reconstruct(maxIterations, errCondition) not "
             "implemented for PHDGPBCT2DReconstructor, call int "
-            "PDHGPBCT2DReconstructor::reconstruct(float lambda, float tau, float sigma, float "
+            "PDHGPBCT2DReconstructor::reconstruct(float mu, float tau, float sigma, float "
             "theta, uint32_t maxPDHGIterations, float errConditionPDHG, uint32_t "
             "maxCGLSIterations, float errConditionCGLS) instead.";
     return 0;
@@ -115,16 +115,21 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(cl::Buffer x0prox_xbufIN,
                                           -alpha * sqrtEffectSize, XDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)
                          + normXBuffer_barrier_double(*discrepancy_bbuf_xpart_L2));
+        LOGD << io::xprintf("Iteration %d: alpha = %f, beta = %f, |Ax-b| = %f, |AT(Ax-b)| = %f",
+                            iteration, alpha, beta, norm, NX);
+        //    BasePBCT2DReconstructor::writeVolume(*x_buf,
+        //                                         io::xprintf("PDHG_x_xbufOUT_it%02d.den",
+        //                                         iteration));
     }
     LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
                               iteration, norm, 100.0 * norm / NF0);
-    BasePBCT2DReconstructor::writeVolume(
-        x_xbufOUT,
-        io::xprintf("%sxxx_it%02d.den", intermediatePrefix.c_str(), outerIterationIndex));
+    /*    BasePBCT2DReconstructor::writeVolume(
+            x_xbufOUT,
+            io::xprintf("%sx_cgls_it%02d.den", intermediatePrefix.c_str(), outerIterationIndex));*/
     return 0;
 }
 
-int PDHGPBCT2DReconstructor::reconstruct(float lambda,
+int PDHGPBCT2DReconstructor::reconstruct(float mu,
                                          float tau,
                                          float sigma,
                                          float theta,
@@ -138,13 +143,15 @@ int PDHGPBCT2DReconstructor::reconstruct(float lambda,
     // Initialization of primal and dual variables
     double norm;
     NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
-    std::string str = io::xprintf("WELCOME TO Chambolle-Pock 2D, PDHGPBCT2DReconstructor, "
-                                  "lambda=%0.2f, tau=%0.2f, sigma=%0.2f, theta=%0.2f ||b||_2=%0.2f",
-                                  lambda, tau, sigma, theta, NB0);
-    LOGD << printTime(str, false, true);
+    double hsquare = voxelSizesF.x * voxelSizesF.x;
+    std::string str
+        = io::xprintf("WELCOME TO Chambolle-Pock 2D, PDHGPBCT2DReconstructor, "
+                      "mu=%0.2fh^2, tau=%0.2f, sigma=%0.2fh^2, theta=%0.2f ||b||_2=%0.2f",
+                      mu / hsquare, tau, sigma / hsquare, theta, NB0);
+    LOGD << io::xprintf_blue(printTime(str, false, true));
 
-    std::shared_ptr<cl::Buffer> primal_xbuf, primal_xbuf_dx, primal_xbuf_dy, dual_xbuf_x,
-        dual_xbuf_y, divergence_xbuf;
+    std::shared_ptr<cl::Buffer> primal_xbuf, primal_xbuf_prime, primal_xbuf_dx, primal_xbuf_dy,
+        dual_xbuf_x, dual_xbuf_y, divergence_xbuf;
     // Primal and dual buffers
     allocateXBuffers(11);
     primal_xbuf = getXBuffer(0); // Primal variable (x)
@@ -167,8 +174,7 @@ int PDHGPBCT2DReconstructor::reconstruct(float lambda,
     // Initial setup of primal variable (x)
     if(useVolumeAsInitialX0)
     {
-        project(*x_buf, *discrepancy_bbuf); // Initial projection
-        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *b_buf, -1.0f, BDIM); // Ax - b
+        algFLOATvector_copy(*x_buf, *primal_xbuf, XDIM); // Start with x = x0
     } else
     {
         Q[0]->enqueueFillBuffer<cl_float>(*primal_xbuf, FLOATZERO, 0,
@@ -177,7 +183,7 @@ int PDHGPBCT2DReconstructor::reconstruct(float lambda,
     std::shared_ptr<cl::Buffer> primal_xbuf_new
         = divergence_xbuf; // Divergence is to be used as a temporary buffer since it is fully
                            // initialized in second step
-    proximalOperatorCGLS(*primal_xbuf, *primal_xbuf_new, 0.0, 40, errConditionCGLS,
+    proximalOperatorCGLS(*primal_xbuf, *primal_xbuf_new, 0.0, maxCGLSIterations, errConditionCGLS,
                          0);
     algFLOATvector_copy(*primal_xbuf_new, *primal_xbuf, XDIM);
     BasePBCT2DReconstructor::writeVolume(
@@ -196,54 +202,98 @@ int PDHGPBCT2DReconstructor::reconstruct(float lambda,
     // Main Chambolle-Pock iteration loop
     cl::NDRange globalRangeGradient(vdimx, vdimy, vdimz);
     cl::NDRange localRangeGradient = cl::NullRange;
+    primal_xbuf_prime = primal_xbuf; // At the beginnig they are the same
+    bool useROF = true;
+    std::shared_ptr<cl::Buffer> rof_u0_xbuf;
+    if(useROF)
+    {
+        rof_u0_xbuf = AdirectionVector_bbuf_xpart_L2;
+        algFLOATvector_copy(*primal_xbuf, *rof_u0_xbuf, XDIM);
+    }
     while(iteration < maxPDHGIterations)
     {
         // Step 1: Update Dual Variable (p^k+1 = Proj_Dual(p^k + sigma * Grad(x^k)))
         algFLOATvector_2DisotropicGradient(
-            *primal_xbuf, *primal_xbuf_dx, *primal_xbuf_dy, vdims, voxelSizesF, globalRangeGradient,
+            *primal_xbuf_prime, *primal_xbuf_dx, *primal_xbuf_dy, vdims, voxelSizesF,
+            globalRangeGradient,
             localRangeGradient); // Compute gradient of x (dual variable p update)
         // p = p + sigma * Grad(x)
         algFLOATvector_A_equals_A_plus_cB(*dual_xbuf_x, *primal_xbuf_dx, sigma, XDIM);
         algFLOATvector_A_equals_A_plus_cB(*dual_xbuf_y, *primal_xbuf_dy, sigma, XDIM);
         // Here I need to calculate dual_xbuf_x * dual_xbuf_x + dual_xbuf_y * dual_xbuf_y
         // Then find a pointwise maximum
-        // Then compare this by lambda and if it is greater than lambda, then multiply the dual
-        // variable by max/lambda - this is L1 proximal operator
-        BasePBCT2DReconstructor::writeVolume(
-            *dual_xbuf_x,
-            io::xprintf("%s_dual_xbuf_x_bef_it%02d.den", intermediatePrefix.c_str(), iteration));
-        algFLOATvector_infProjectionToLambda2DBall(*dual_xbuf_x, *dual_xbuf_y, lambda, XDIM);
-        BasePBCT2DReconstructor::writeVolume(
-            *dual_xbuf_x,
-            io::xprintf("%s_dual_xbuf_x_aft_it%02d.den", intermediatePrefix.c_str(), iteration));
+        // Then compare this by mu and if it is greater than mu, then multiply the dual
+        // variable by max/mu - this is L1 proximal operator
+        /*
+                BasePBCT2DReconstructor::writeVolume(
+                    *dual_xbuf_x,
+                    io::xprintf("%s_dual_xbuf_x_bef_it%02d.den", intermediatePrefix.c_str(),
+           iteration));*/
+        algFLOATvector_infProjectionToLambda2DBall(*dual_xbuf_x, *dual_xbuf_y, mu, XDIM);
+        /*        BasePBCT2DReconstructor::writeVolume(
+                    *dual_xbuf_x,
+                    io::xprintf("%s_dual_xbuf_x_aft_it%02d.den", intermediatePrefix.c_str(),
+           iteration));*/
 
         // Step 2: Update Primal Variable (x^k+1 = Prox_F(x^k - tau * Div(p^k+1)))
         algFLOATvector_isotropicBackDivergence2D(*dual_xbuf_x, *dual_xbuf_y, *divergence_xbuf,
                                                  vdims, voxelSizesF, globalRangeGradient,
                                                  localRangeGradient); // Compute divergence of p
-        algFLOATvector_A_equals_A_plus_cB(*primal_xbuf, *divergence_xbuf, -tau,
-                                          XDIM); // x = x - tau * Div(p)
+        BasePBCT2DReconstructor::writeVolume(
+            *divergence_xbuf,
+            io::xprintf("%s_divergence_it%02d.den", intermediatePrefix.c_str(), iteration));
+        // I need primal_xbuf for update in step 3 so I put argument for primal proximal operator to
+        // dirergence_xbuf, which is fully computed in step 2
+        std::shared_ptr<cl::Buffer> proximal_arg_xbuf = divergence_xbuf;
+        algFLOATvector_A_equals_Ac_plus_B(*proximal_arg_xbuf, *primal_xbuf, -tau,
+                                          XDIM); // arg = x - tau * (-Div)(p)
 
         // Step 2.1: apply proximal operator related to |Ax-b|_2^2
-        std::shared_ptr<cl::Buffer> primal_xbuf_new
-            = divergence_xbuf; // Divergence is to be used as a temporary buffer since it is fully
-                               // initialized in second step
-        proximalOperatorCGLS(*primal_xbuf, *primal_xbuf_new, tau, maxCGLSIterations,
-                             errConditionCGLS, iteration);
         BasePBCT2DReconstructor::writeVolume(
-            *primal_xbuf_new, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+            *proximal_arg_xbuf,
+            io::xprintf("%s_proximal_arg_it%02d.den", intermediatePrefix.c_str(), iteration));
+        std::shared_ptr<cl::Buffer> primal_xbuf_new
+            = primal_xbuf_dx; // primal_xbuf_dx is to be used as a temporary buffer since it is
+                              // fully initialized in the first step
+        if(useROF)
+        {
+            // ROF proximal operator (1/(2*tau)) * ||u - rof_u0||_2^2 +  ||u -
+            // proximal_arg_xbuf||_2^2 primal_xbuf_new = (1/(2*tau))/(1/(2*tau) + 1) * rof_u0 +
+            // (1/(1/(2*tau) + 1)) * proximal_arg_xbuf
+            float rof_prefactor = 1.0f / (1.0f / (2.0f * tau) + 1.0f);
+            float arg_prefactor = 1.0f - rof_prefactor;
+            LOGD << io::xprintf("ROF proximal operator: arg_prefactor=%f, rof_prefactor=%f",
+                                arg_prefactor, rof_prefactor);
+            algFLOATvector_C_equals_Ad_plus_Be(*rof_u0_xbuf, *proximal_arg_xbuf, *primal_xbuf_new,
+                                               rof_prefactor, arg_prefactor, XDIM);
+        } else
+        {
+            proximalOperatorCGLS(*proximal_arg_xbuf, *primal_xbuf_new, tau, maxCGLSIterations,
+                                 errConditionCGLS, iteration);
+        }
 
         // Step 3: Over-relaxation (x̄ = x^k+1 + θ(x^k+1 - x^k))
         if(theta > 0.0f)
         {
-            algFLOATvector_A_equals_Ac_plus_Bd(*primal_xbuf_new, *primal_xbuf, 1.0f + theta, -theta,
-                                               XDIM);
+            primal_xbuf_prime = residualVector_xbuf; // It is not used right now
+            algFLOATvector_C_equals_Ad_plus_Be(*primal_xbuf, *primal_xbuf_new, *primal_xbuf_prime,
+                                               -theta, 1.0f + theta, XDIM);
+        } else
+        {
+            primal_xbuf_prime = primal_xbuf_new; // They are the same
         }
+
         // Swap buffers
+        // hack to avoid copying buffers
         std::shared_ptr<cl::Buffer> temp = primal_xbuf;
         primal_xbuf = primal_xbuf_new;
-        divergence_xbuf = temp;
+        primal_xbuf_dx = temp;
 
+        BasePBCT2DReconstructor::writeVolume(
+            *primal_xbuf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+        BasePBCT2DReconstructor::writeVolume(
+            *primal_xbuf,
+            io::xprintf("%sx_prime_it%02d.den", intermediatePrefix.c_str(), iteration));
         // Projection and error condition check
         project(*primal_xbuf, *discrepancy_bbuf); // Forward projection of x
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *b_buf, -1.0f, BDIM); // Ax - b

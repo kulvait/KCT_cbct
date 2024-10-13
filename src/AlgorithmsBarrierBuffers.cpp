@@ -28,6 +28,95 @@ double AlgorithmsBarrierBuffers::normXBuffer_frame_double(cl::Buffer& X,
 }
 
 /**
+ * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+float AlgorithmsBarrierBuffers::normXBuffer_frame(cl::Buffer& X,
+                                                  std::shared_ptr<ReductionParameters> rp,
+                                                  uint32_t QID)
+{
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+    float sum;
+    uint32_t partialFrameSize = rp->vFrameSize;
+    uint32_t partialFrameCount = rp->vdimz;
+    algFLOATvector_NormSquarePartial(X, *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    partialFrameSize = rp->vdimz;
+    partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_red1[QID], *tmp_red2[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red2[QID], CL_TRUE, 0, sizeof(float), &sum);
+    return sum;
+}
+
+/**
+ * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+double AlgorithmsBarrierBuffers::normXBuffer_barrier_double(cl::Buffer& X,
+                                                            std::shared_ptr<ReductionParameters> rp,
+                                                            uint32_t QID)
+{
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+    double sum;
+    uint32_t workGroupSize = rp->workGroupSize;
+    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->XDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
+    (*vector_NormSquarePartial_barrier)(eargs_red1, X, *tmp_red1[QID], localsize, rp->XDIM);
+    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->XDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
+    (*vector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
+                                 rp->XDIM_REDUCED1);
+    uint32_t partialFrameSize = rp->XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(double), &sum);
+    return sum;
+}
+
+/**
+ * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+float AlgorithmsBarrierBuffers::normXBuffer_barrier(cl::Buffer& X,
+                                                    std::shared_ptr<ReductionParameters> rp,
+                                                    uint32_t QID)
+{
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+
+    float sum;
+    uint32_t workGroupSize = rp->workGroupSize;
+    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->XDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
+    (*FLOATvector_NormSquarePartial_barrier)(eargs_red1, X, *tmp_red1[QID], localsize, rp->XDIM);
+    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->XDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
+    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
+                                      rp->XDIM_REDUCED1);
+    uint32_t partialFrameSize = rp->XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(float), &sum);
+    return sum;
+}
+
+/**
  * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
  *
  * @param X
@@ -50,6 +139,92 @@ double AlgorithmsBarrierBuffers::normBBuffer_frame_double(cl::Buffer& B,
     partialFrameCount = 1;
     algvector_SumPartial(*tmp_red1[QID], *tmp_red2[QID], partialFrameSize, partialFrameCount);
     Q[QID]->enqueueReadBuffer(*tmp_red2[QID], CL_TRUE, 0, sizeof(double), &sum);
+    return sum;
+}
+
+/**
+ * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+float AlgorithmsBarrierBuffers::normBBuffer_frame(cl::Buffer& B,
+                                                  std::shared_ptr<ReductionParameters> rp,
+                                                  uint32_t QID)
+{ // Use workGroupSize that is private constant default to 256
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+    float sum;
+    uint32_t partialFrameSize = rp->pFrameSize;
+    uint32_t partialFrameCount = rp->pdimz;
+    algFLOATvector_NormSquarePartial(B, *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    partialFrameSize = rp->pdimz;
+    partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_red1[QID], *tmp_red2[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red2[QID], CL_TRUE, 0, sizeof(float), &sum);
+    return sum;
+}
+
+/**
+ * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+double AlgorithmsBarrierBuffers::normBBuffer_barrier_double(cl::Buffer& B,
+                                                            std::shared_ptr<ReductionParameters> rp,
+                                                            uint32_t QID)
+{ // Use workGroupSize that is private constant default to 256
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+    double sum;
+    bool blocking = false;
+    uint32_t workGroupSize = rp->workGroupSize;
+    algvector_NormSquarePartial_barrier(B, *tmp_red1[QID], rp->BDIM, rp->BDIM_ALIGNED,
+                                        workGroupSize, blocking, QID);
+    algvector_SumPartial_barrier(*tmp_red1[QID], *tmp_red2[QID], rp->BDIM_REDUCED1,
+                                 rp->BDIM_REDUCED1_ALIGNED, workGroupSize, blocking, QID);
+    uint32_t partialFrameSize = rp->BDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(double), &sum);
+    return sum;
+}
+
+/**
+ * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+float AlgorithmsBarrierBuffers::normBBuffer_barrier(cl::Buffer& B,
+                                                    std::shared_ptr<ReductionParameters> rp,
+                                                    uint32_t QID)
+{ // Use workGroupSize that is private constant default to 256
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+    float sum;
+    uint32_t workGroupSize = rp->workGroupSize;
+    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->BDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
+    (*FLOATvector_NormSquarePartial_barrier)(eargs_red1, B, *tmp_red1[QID], localsize, rp->BDIM);
+    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->BDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
+    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
+                                      rp->BDIM_REDUCED1);
+    uint32_t partialFrameSize = rp->BDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
@@ -109,37 +284,6 @@ float AlgorithmsBarrierBuffers::maxXBuffer_barrier_float(cl::Buffer& X,
 }
 
 /**
- * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
- *
- * @param X
- *
- * @return
- */
-double AlgorithmsBarrierBuffers::normXBuffer_barrier_double(cl::Buffer& X,
-                                                            std::shared_ptr<ReductionParameters> rp,
-                                                            uint32_t QID)
-{
-    if(rp == nullptr)
-    {
-        rp = this->rp;
-    }
-    double sum;
-    uint32_t workGroupSize = rp->workGroupSize;
-    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->XDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
-    (*vector_NormSquarePartial_barrier)(eargs_red1, X, *tmp_red1[QID], localsize, rp->XDIM);
-    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->XDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*vector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
-                                 rp->XDIM_REDUCED1);
-    uint32_t partialFrameSize = rp->XDIM_REDUCED2;
-    uint32_t partialFrameCount = 1;
-    algvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
-    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
  * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
  *
  * @param X
@@ -195,35 +339,6 @@ float AlgorithmsBarrierBuffers::maxBBuffer_barrier_float(cl::Buffer& B,
 }
 
 /**
- * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
- *
- * @param X
- *
- * @return
- */
-double AlgorithmsBarrierBuffers::normBBuffer_barrier_double(cl::Buffer& B,
-                                                            std::shared_ptr<ReductionParameters> rp,
-                                                            uint32_t QID)
-{ // Use workGroupSize that is private constant default to 256
-    if(rp == nullptr)
-    {
-        rp = this->rp;
-    }
-    double sum;
-    bool blocking = false;
-    uint32_t workGroupSize = rp->workGroupSize;
-    algvector_NormSquarePartial_barrier(B, *tmp_red1[QID], rp->BDIM, rp->BDIM_ALIGNED,
-                                        workGroupSize, blocking, QID);
-    algvector_SumPartial_barrier(*tmp_red1[QID], *tmp_red2[QID], rp->BDIM_REDUCED1,
-                                 rp->BDIM_REDUCED1_ALIGNED, workGroupSize, blocking, QID);
-    uint32_t partialFrameSize = rp->BDIM_REDUCED2;
-    uint32_t partialFrameCount = 1;
-    algvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
-    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
  * Funcion computes the scalar product of two Buffers that has vdimx * vdimy * vdimz elements.
  *
  * @param A CL buffer of the size vdimx * vdimy * vdimz
@@ -251,6 +366,67 @@ double AlgorithmsBarrierBuffers::scalarProductXBuffer_barrier_double(
     uint32_t partialFrameCount = 1;
     algvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
     Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(double), &sum);
+    return sum;
+}
+
+/**
+ * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+double AlgorithmsBarrierBuffers::isotropicTVNormXBuffer_barrier_double(
+    cl::Buffer& GX, cl::Buffer& GY, std::shared_ptr<ReductionParameters> rp, uint32_t QID)
+{
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+    double sum;
+    uint32_t workGroupSize = rp->workGroupSize;
+    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->XDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(double));
+    (*vector_L1L2norm_barrier)(eargs_red1, GX, GY, *tmp_red1[QID], localsize, rp->XDIM);
+    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->XDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
+    (*vector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
+                                 rp->XDIM_REDUCED1);
+    uint32_t partialFrameSize = rp->XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(double), &sum);
+    return sum;
+}
+
+/**
+ * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
+ *
+ * @param X
+ *
+ * @return
+ */
+float AlgorithmsBarrierBuffers::isotropicTVNormXBuffer_barrier_float(
+    cl::Buffer& GX, cl::Buffer& GY, std::shared_ptr<ReductionParameters> rp, uint32_t QID)
+{
+    if(rp == nullptr)
+    {
+        rp = this->rp;
+    }
+
+    float sum;
+    uint32_t workGroupSize = rp->workGroupSize;
+    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->XDIM_ALIGNED), cl::NDRange(workGroupSize));
+    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
+    (*FLOATvector_L1L2norm_barrier)(eargs_red1, GX, GY, *tmp_red1[QID], localsize, rp->XDIM);
+    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->XDIM_REDUCED1_ALIGNED),
+                               cl::NDRange(workGroupSize));
+    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
+                                      rp->XDIM_REDUCED1);
+    uint32_t partialFrameSize = rp->XDIM_REDUCED2;
+    uint32_t partialFrameCount = 1;
+    algFLOATvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
+    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 
@@ -283,121 +459,6 @@ double AlgorithmsBarrierBuffers::scalarProductBBuffer_barrier_double(
     uint32_t partialFrameCount = 1;
     algvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
     Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(double), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
- *
- * @param X
- *
- * @return
- */
-float AlgorithmsBarrierBuffers::normXBuffer_frame(cl::Buffer& X,
-                                                  std::shared_ptr<ReductionParameters> rp,
-                                                  uint32_t QID)
-{
-    if(rp == nullptr)
-    {
-        rp = this->rp;
-    }
-    float sum;
-    uint32_t partialFrameSize = rp->vFrameSize;
-    uint32_t partialFrameCount = rp->vdimz;
-    algFLOATvector_NormSquarePartial(X, *tmp_red1[QID], partialFrameSize, partialFrameCount);
-    partialFrameSize = rp->vdimz;
-    partialFrameCount = 1;
-    algFLOATvector_SumPartial(*tmp_red1[QID], *tmp_red2[QID], partialFrameSize, partialFrameCount);
-    Q[QID]->enqueueReadBuffer(*tmp_red2[QID], CL_TRUE, 0, sizeof(float), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
- *
- * @param X
- *
- * @return
- */
-float AlgorithmsBarrierBuffers::normBBuffer_frame(cl::Buffer& B,
-                                                  std::shared_ptr<ReductionParameters> rp,
-                                                  uint32_t QID)
-{ // Use workGroupSize that is private constant default to 256
-    if(rp == nullptr)
-    {
-        rp = this->rp;
-    }
-    float sum;
-    uint32_t partialFrameSize = rp->pFrameSize;
-    uint32_t partialFrameCount = rp->pdimz;
-    algFLOATvector_NormSquarePartial(B, *tmp_red1[QID], partialFrameSize, partialFrameCount);
-    partialFrameSize = rp->pdimz;
-    partialFrameCount = 1;
-    algFLOATvector_SumPartial(*tmp_red1[QID], *tmp_red2[QID], partialFrameSize, partialFrameCount);
-    Q[QID]->enqueueReadBuffer(*tmp_red2[QID], CL_TRUE, 0, sizeof(float), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has vdimx * vdimy * vdimz elements.
- *
- * @param X
- *
- * @return
- */
-float AlgorithmsBarrierBuffers::normXBuffer_barrier(cl::Buffer& X,
-                                                    std::shared_ptr<ReductionParameters> rp,
-                                                    uint32_t QID)
-{
-    if(rp == nullptr)
-    {
-        rp = this->rp;
-    }
-
-    float sum;
-    uint32_t workGroupSize = rp->workGroupSize;
-    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->XDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_NormSquarePartial_barrier)(eargs_red1, X, *tmp_red1[QID], localsize, rp->XDIM);
-    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->XDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
-                                      rp->XDIM_REDUCED1);
-    uint32_t partialFrameSize = rp->XDIM_REDUCED2;
-    uint32_t partialFrameCount = 1;
-    algFLOATvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
-    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(float), &sum);
-    return sum;
-}
-
-/**
- * Funcion computes the norm of the Buffer that has pdimx * pdimy * pdimz elements.
- *
- * @param X
- *
- * @return
- */
-float AlgorithmsBarrierBuffers::normBBuffer_barrier(cl::Buffer& B,
-                                                    std::shared_ptr<ReductionParameters> rp,
-                                                    uint32_t QID)
-{ // Use workGroupSize that is private constant default to 256
-    if(rp == nullptr)
-    {
-        rp = this->rp;
-    }
-    float sum;
-    uint32_t workGroupSize = rp->workGroupSize;
-    cl::EnqueueArgs eargs_red1(*Q[QID], cl::NDRange(rp->BDIM_ALIGNED), cl::NDRange(workGroupSize));
-    cl::LocalSpaceArg localsize = cl::Local(workGroupSize * sizeof(float));
-    (*FLOATvector_NormSquarePartial_barrier)(eargs_red1, B, *tmp_red1[QID], localsize, rp->BDIM);
-    cl::EnqueueArgs eargs_red2(*Q[QID], cl::NDRange(rp->BDIM_REDUCED1_ALIGNED),
-                               cl::NDRange(workGroupSize));
-    (*FLOATvector_SumPartial_barrier)(eargs_red2, *tmp_red1[QID], *tmp_red2[QID], localsize,
-                                      rp->BDIM_REDUCED1);
-    uint32_t partialFrameSize = rp->BDIM_REDUCED2;
-    uint32_t partialFrameCount = 1;
-    algFLOATvector_SumPartial(*tmp_red2[QID], *tmp_red1[QID], partialFrameSize, partialFrameCount);
-    Q[QID]->enqueueReadBuffer(*tmp_red1[QID], CL_TRUE, 0, sizeof(float), &sum);
     return sum;
 }
 

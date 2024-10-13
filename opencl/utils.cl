@@ -127,6 +127,47 @@ void kernel FLOATvector_SumPartial_barrier(global const float* restrict x,
     }
 }
 
+//\|w\|_1, \mbox{where } w^i = \| v^i \|_2= \sqrt{(v^i_1)^2+(v_2^i)^2} \mbox{ and } \|.\|_1 \mbox{
+// is classical } L1 \mbox{ norm in } \mathbb{R}^n
+// Routine to compute isotropic TV norm from gradient components
+void kernel FLOATvector_L1L2norm_barrier(global const float* restrict g1,
+                                         global const float* restrict g2,
+                                         global float* restrict partialSum,
+                                         local float* loc,
+                                         private ulong vecLength)
+{
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
+    float val, v1, v2;
+    if(gid < vecLength)
+    {
+        v1 = g1[gid];
+        v2 = g2[gid];
+        val = sqrt(v1 * v1 + v2 * v2);
+    } else
+    {
+        val = 0.0;
+    }
+    loc[lid] = val;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    {
+        if(lid < stride)
+        {
+            loc[lid] += loc[lid + stride];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    if(lid == 0)
+    {
+        gid = get_group_id(0);
+        partialSum[gid] = loc[0] + loc[1];
+    }
+}
+
 // Code based on
 // https://www.fz-juelich.de/SharedDocs/Downloads/IAS/JSC/EN/slides/opencl/opencl-05-reduction.pdf?__blob=publicationFile
 // Evidently gs must be multiple of ls and for this code to work ls must be 2^n
@@ -260,6 +301,47 @@ void kernel vector_SumPartial_barrier(global const double* restrict x,
     if(gid < vecLength)
     {
         val = x[gid];
+    } else
+    {
+        val = 0.0;
+    }
+    loc[lid] = val;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+    for(ulong stride = ls / 2; stride > 1; stride >>= 1) // Does the same as /=2
+    {
+        if(lid < stride)
+        {
+            loc[lid] += loc[lid + stride];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+    if(lid == 0)
+    {
+        gid = get_group_id(0);
+        partialSum[gid] = loc[0] + loc[1];
+    }
+}
+
+//\|w\|_1, \mbox{where } w^i = \| v^i \|_2= \sqrt{(v^i_1)^2+(v_2^i)^2} \mbox{ and } \|.\|_1 \mbox{
+// is classical } L1 \mbox{ norm in } \mathbb{R}^n
+// Routine to compute isotropic TV norm from gradient components
+void kernel vector_L1L2norm_barrier(global const float* restrict g1,
+                                    global const float* restrict g2,
+                                    global float* restrict partialSum,
+                                    local float* loc,
+                                    private ulong vecLength)
+{
+    ulong gid = get_global_id(0);
+    ulong gs = get_global_size(0);
+    ulong lid = get_local_id(0);
+    ulong ls = get_local_size(0);
+    double v1, v2, val;
+    if(gid < vecLength)
+    {
+        v1 = g1[gid];
+        v2 = g2[gid];
+        val = sqrt(v1 * v1 + v2 * v2);
     } else
     {
         val = 0.0;
@@ -444,6 +526,16 @@ void kernel FLOATvector_A_equals_Ac_plus_Bd(global float* restrict A,
 {
     const size_t gid = get_global_id(0);
     A[gid] = A[gid] * c + B[gid] * d;
+}
+
+void kernel FLOATvector_C_equals_Ad_plus_Be(global const float* restrict A,
+                                            global const float* restrict B,
+                                            global float* restrict C,
+                                            private float d,
+                                            private float e)
+{
+    const size_t gid = get_global_id(0);
+    C[gid] = A[gid] * d + B[gid] * e;
 }
 
 void kernel FLOATvector_A_equals_A_times_B(global float* restrict A, global const float* restrict B)
