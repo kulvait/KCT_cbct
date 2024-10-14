@@ -235,8 +235,8 @@ int main(int argc, char* argv[])
     float* projection = new float[ARG.totalProjectionSize];
     float* projection_rhs = nullptr;
     io::DenFileInfo inputProjectionInfo(ARG.inputProjection);
-    bool readxmajor = false;
-    inputProjectionInfo.readIntoArray<float>(projection, readxmajor);
+    bool readxmajorprojection = false;
+    inputProjectionInfo.readIntoArray<float>(projection, readxmajorprojection);
     PBCVP.backproject(projection, volume);
     bool volumexmajor = true;
     bool writexmajor = true;

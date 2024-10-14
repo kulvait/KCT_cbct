@@ -222,8 +222,8 @@ int main(int argc, char* argv[])
         = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
     float* projection = new float[ARG.totalProjectionsSize];
     io::DenFileInfo inputProjectionInfo(ARG.inputProjections);
-    bool readxmajor = false;
-    inputProjectionInfo.readIntoArray<float>(projection, readxmajor);
+    bool readxmajorprojection = false;
+    inputProjectionInfo.readIntoArray<float>(projection, readxmajorprojection);
     std::string startPath = io::getParent(ARG.outputVolume);
     std::string bname = io::getBasename(ARG.outputVolume);
     bname = bname.substr(0, bname.find_last_of("."));

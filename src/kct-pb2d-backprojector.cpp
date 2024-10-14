@@ -285,7 +285,7 @@ int Args::postParse()
         barrierArraySize = localMemSize / 4 - 16; // 9 shall be sufficient but for memory alignment
         LOGI << io::xprintf("Setting LOCALARRAYSIZE=%d for optimal performance.", barrierArraySize);
     }
-    if(useBarrierCalls && barrierArraySize > localMemSize / 4 - 9)
+    if(useBarrierCalls && static_cast<int>(barrierArraySize) > static_cast<int>(localMemSize) / 4 - 9)
     {
         ERR = io::xprintf("Array of size %d can not be allocated on given device, maximum is %d!",
                           barrierArraySize, localMemSize / 4 - 9);
@@ -339,9 +339,9 @@ int main(int argc, char* argv[])
                           ARG.backprojectorLocalNDRange[2]);
         float* projection = new float[ARG.totalProjectionSize];
         io::DenFileInfo inputProjectionInfo(ARG.inputProjections);
-        bool readxmajor = false;
-        inputProjectionInfo.readIntoArray<float>(projection, readxmajor, 0, 0, ARG.slabFrom,
-                                                 ARG.slabSize);
+        bool readxmajorprojection = false;
+        inputProjectionInfo.readIntoArray<float>(projection, readxmajorprojection, 0, 0,
+                                                 ARG.slabFrom, ARG.slabSize);
         float* volume = new float[ARG.totalVolumeSize];
         std::string startPath;
         startPath = io::getParent(ARG.outputVolume);

@@ -196,8 +196,8 @@ int main(int argc, char* argv[])
     // End parsing arguments
     float* volume = new float[ARG.totalVolumeSize];
     io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
-    bool readxmajor = true;
-    inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
+    bool readxmajorvolume = true;
+    inputVolumeInfo.readIntoArray<float>(volume, readxmajorvolume);
     CVP.initializeOrUpdateVolumeBuffer(ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ, volume);
     CVP.initializeOrUpdateProjectionBuffer(ARG.projectionSizeX, ARG.projectionSizeY, 1);
     uint32_t projectionElementsCount = ARG.projectionSizeX * ARG.projectionSizeY;

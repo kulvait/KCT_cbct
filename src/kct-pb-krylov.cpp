@@ -365,14 +365,14 @@ int main(int argc, char* argv[])
                           ARG.backprojectorLocalNDRange[2]);
         float* projection = new float[ARG.totalProjectionSize];
         io::DenFileInfo inputProjectionInfo(ARG.inputProjections);
-        bool readxmajor = false;
-        inputProjectionInfo.readIntoArray<float>(projection, readxmajor);
+        bool readxmajorprojection = false;
+        bool readxmajorvolume = true;
+        inputProjectionInfo.readIntoArray<float>(projection, readxmajorprojection);
         float* volume = new float[ARG.totalVolumeSize];
         if(ARG.initialVectorX0 != "")
         {
             io::DenFileInfo iv(ARG.initialVectorX0);
-            readxmajor = false;
-            iv.readIntoArray(volume, readxmajor);
+            iv.readIntoArray(volume, readxmajorvolume);
         }
         std::string startPath;
         startPath = io::getParent(ARG.outputVolume);

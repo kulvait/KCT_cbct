@@ -203,6 +203,8 @@ int main(int argc, char* argv[])
                       ARG.backprojectorLocalNDRange[2]);
 
     // Construct projector and initialize OpenCL
+    bool readxmajorvolume = true;
+    bool readxmajorprojection = false;
     if(ARG.partialProjectorBytesize < 0)
     {
         ParallelBeamProjector PBCVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ,
@@ -235,16 +237,14 @@ int main(int argc, char* argv[])
         float* projection = new float[ARG.totalProjectionSize];
         float* projection_rhs = nullptr;
         io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
-        bool readxmajor = true;
-        inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
+        inputVolumeInfo.readIntoArray<float>(volume, readxmajorvolume);
         if(!ARG.rightHandSide.empty())
         {
             LOGD << io::xprintf(
                 io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
             projection_rhs = new float[ARG.totalProjectionSize];
             io::DenFileInfo rhsInfo(ARG.rightHandSide);
-            readxmajor = false; // Projections are y-major
-            rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
+            rhsInfo.readIntoArray<float>(projection_rhs, readxmajorprojection);
             PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
         } else
         {
@@ -300,7 +300,6 @@ int main(int argc, char* argv[])
                             ARG.partialProjectorBytesize, ARG.totalVolumeSize,
                             ARG.totalProjectionSize);
         io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
-        bool readxmajor = true;
         std::string SZ;
         if(ARG.totalVolumeSize > 1024 * 1024)
         {
@@ -313,15 +312,14 @@ int main(int argc, char* argv[])
             SZ = io::xprintf("%lu", ARG.totalVolumeSize);
         }
         LOGI << io::xprintf("Reading input volume into array of the size %s elements.", SZ.c_str());
-        inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
+        inputVolumeInfo.readIntoArray<float>(volume, readxmajorvolume);
         if(!ARG.rightHandSide.empty())
         {
             LOGD << io::xprintf(
                 io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
             projection_rhs = new float[ARG.totalProjectionSize];
             io::DenFileInfo rhsInfo(ARG.rightHandSide);
-            readxmajor = false; // Projections are y-major
-            rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
+            rhsInfo.readIntoArray<float>(projection_rhs, readxmajorprojection);
             PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
         } else
         {

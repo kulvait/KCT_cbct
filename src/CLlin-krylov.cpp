@@ -354,8 +354,8 @@ int main(int argc, char* argv[])
         {
             volume = new float[ARG.totalVolumeSize];
             io::DenFileInfo initialVectorInfo(ARG.initialVectorX0);
-            bool readxmajor = false;
-            initialVectorInfo.readIntoArray<float>(volume, readxmajor);
+            bool readxmajorvolume = true;
+            initialVectorInfo.readIntoArray<float>(volume, readxmajorvolume);
             X0initialized = true;
         } else
         {
@@ -437,8 +437,8 @@ int main(int argc, char* argv[])
                 {
                     float* preconditionerVolume = new float[ARG.totalVolumeSize];
                     io::DenFileInfo dpInfo(ARG.diagonalPreconditioner);
-                    bool readxmajor = false;
-                    dpInfo.readIntoArray<float>(preconditionerVolume, readxmajor);
+                    bool readxmajorvolume = true;
+                    dpInfo.readIntoArray<float>(preconditionerVolume, readxmajorvolume);
                     cgls->reconstructDiagonalPreconditioner(
                         preconditionerVolume, ARG.maxIterationCount, ARG.stoppingRelativeError);
                     delete[] preconditionerVolume;

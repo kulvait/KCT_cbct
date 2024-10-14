@@ -242,11 +242,11 @@ int main(int argc, char* argv[])
                      ARG.volumeCenterY, ARG.volumeCenterZ);
     io::DenAsyncFrame2DWritter<float> projectionWritter(ARG.outputProjection, ARG.projectionSizeX,
                                                         ARG.projectionSizeY, ARG.frames.size());
-    bool readxmajor = true;
+    bool readxmajorvolume = true;
     for(uint32_t i = 0; i != ARG.frames.size(); i++)
     {
         io::DenFileInfo volumeInfo(ARG.inputVolumes[i]);
-        volumeInfo.readIntoArray<float>(volume, readxmajor);
+        volumeInfo.readIntoArray<float>(volume, readxmajorvolume);
         CVP.initializeOrUpdateVolumeBuffer(volume);
         std::shared_ptr<matrix::CameraI> pm = cameraVector[i];
         int success = 0;

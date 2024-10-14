@@ -248,16 +248,16 @@ int main(int argc, char* argv[])
                         "totalVolumeSize=%lu totalProjectionSize=%lu",
                         ARG.partialProjectorBytesize, ARG.totalVolumeSize, ARG.totalProjectionSize);
     io::DenFileInfo inputVolumeInfo(ARG.inputVolume);
-    bool readxmajor = true;
+    bool readxmajorvolume = true;
+    bool readxmajorprojection = false;
     LOGI << io::xprintf("Reading input volume into array of the size %lu", ARG.totalVolumeSize);
-    inputVolumeInfo.readIntoArray<float>(volume, readxmajor);
+    inputVolumeInfo.readIntoArray<float>(volume, readxmajorvolume);
     if(!ARG.rightHandSide.empty())
     {
         LOGD << io::xprintf(io::xprintf("Initialize RHS by file %s.", ARG.rightHandSide.c_str()));
         projection_rhs = new float[ARG.totalProjectionSize];
         io::DenFileInfo rhsInfo(ARG.rightHandSide);
-        readxmajor = false; // Projections are y-major
-        rhsInfo.readIntoArray<float>(projection_rhs, readxmajor);
+        rhsInfo.readIntoArray<float>(projection_rhs, readxmajorprojection);
         PBCVP.project_print_discrepancy(volume, projection, projection_rhs);
     } else
     {

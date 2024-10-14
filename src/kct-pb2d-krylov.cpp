@@ -500,15 +500,15 @@ int main(int argc, char* argv[])
                           ARG.backprojectorLocalNDRange[2]);
         float* projection = new float[ARG.totalProjectionSize];
         io::DenFileInfo inputProjectionInfo(ARG.inputProjections);
-        bool readxmajor = false;
-        inputProjectionInfo.readIntoArray<float>(projection, readxmajor, 0, 0, ARG.slabFrom,
-                                                 ARG.slabSize);
+        bool readxmajorprojection = false;
+        bool readxmajorvolume = true;
+        inputProjectionInfo.readIntoArray<float>(projection, readxmajorprojection, 0, 0,
+                                                 ARG.slabFrom, ARG.slabSize);
         float* volume = new float[ARG.totalVolumeSize];
         if(ARG.initialVectorX0 != "")
         {
             io::DenFileInfo iv(ARG.initialVectorX0);
-            readxmajor = false;
-            iv.readIntoArray(volume, readxmajor, 0, 0, 0, 0, ARG.slabFrom, ARG.slabSize);
+            iv.readIntoArray(volume, readxmajorvolume, 0, 0, 0, 0, ARG.slabFrom, ARG.slabSize);
         }
         std::string startPath;
         startPath = io::getParent(ARG.outputVolume);
@@ -586,15 +586,16 @@ int main(int argc, char* argv[])
                 io::DenFileInfo dpInfo(ARG.inputLeftPreconditionerBDIM);
                 if(dpInfo.dimz() == ARG.projectionSizeZ)
                 {
-                    dpInfo.readIntoArray<float>(preconditionerLeftB, readxmajor, 0, 0, ARG.slabFrom,
-                                                ARG.slabSize);
+                    dpInfo.readIntoArray<float>(preconditionerLeftB, readxmajorprojection, 0, 0,
+                                                ARG.slabFrom, ARG.slabSize);
                 } else if(dpInfo.dimz() == 1)
                 {
                     uint64_t frameSize = ARG.projectionSizeX * ARG.slabSize;
                     for(uint64_t i = 0; i < ARG.projectionSizeZ; i++)
                     {
-                        dpInfo.readIntoArray<float>(preconditionerLeftB + i * frameSize, readxmajor,
-                                                    0, 0, ARG.slabFrom, ARG.slabSize);
+                        dpInfo.readIntoArray<float>(preconditionerLeftB + i * frameSize,
+                                                    readxmajorprojection, 0, 0, ARG.slabFrom,
+                                                    ARG.slabSize);
                     }
                 }
                 cgls->reconstructWLS(ARG.maxIterationCount, ARG.stoppingRelativeError,
