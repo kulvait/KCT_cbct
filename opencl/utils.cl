@@ -328,8 +328,8 @@ void kernel vector_SumPartial_barrier(global const double* restrict x,
 // Routine to compute isotropic TV norm from gradient components
 void kernel vector_L1L2norm_barrier(global const float* restrict g1,
                                     global const float* restrict g2,
-                                    global float* restrict partialSum,
-                                    local float* loc,
+                                    global double* restrict partialSum,
+                                    local double* loc,
                                     private ulong vecLength)
 {
     ulong gid = get_global_id(0);
