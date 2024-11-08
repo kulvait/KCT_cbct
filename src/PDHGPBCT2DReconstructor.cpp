@@ -57,23 +57,30 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(std::shared_ptr<cl::Buffer> xb
     {
         effectSize = 0.0f;
         sqrtEffectSize = 0.0f;
-        LOGE << io::xprintf("PDHG %d iteration, CGLS minimizing ||Ax-b||_2^2 ||b||=%0.2f %s %s %s",
-                            outerIterationIndex, NB0,
-                            xbufIN_x_prox == xbufIN_x0 ? "x_prox == x0" : "x_prox != x0",
-                            xbufIN_x_prox == xbufOUT ? "x_prox == x_out" : "x_prox != x_out",
-                            xbufIN_x0 == xbufOUT ? "x0 == x_out" : "x0 != x_out");
+        if(proximalOperatorVerbose)
+        {
+            LOGI << io::xprintf(
+                "PDHG %d iteration, CGLS minimizing ||Ax-b||_2^2 ||b||=%0.2f %s %s %s",
+                outerIterationIndex, NB0,
+                xbufIN_x_prox == xbufIN_x0 ? "x_prox == x0" : "x_prox != x0",
+                xbufIN_x_prox == xbufOUT ? "x_prox == x_out" : "x_prox != x_out",
+                xbufIN_x0 == xbufOUT ? "x0 == x_out" : "x0 != x_out");
+        }
     } else
     {
         effectSize = 0.5f / tau;
         sqrtEffectSize = std::sqrt(effectSize);
-        LOGE << io::xprintf("PDHG %d iteration, CGLS proximal operator ||Ax-b||_2^2 + 1/(2*tau) "
-                            "||x-x_prox||_2^2, |b|=%0.2f, |ATb|=%0.2f, %d iterations, tau=%0.2f "
-                            "1/(2*tau)=%0.2f, 1/sqrt(2*tau)=%0.2f %s %s %s",
-                            outerIterationIndex, NB0, NATB0, maxCGLSIterations, tau, 0.5f / tau,
-                            std::sqrt(0.5f / tau),
-                            xbufIN_x_prox == xbufIN_x0 ? "x_prox == x0" : "x_prox != x0",
-                            xbufIN_x_prox == xbufOUT ? "x_prox == x_out" : "x_prox != x_out",
-                            xbufIN_x0 == xbufOUT ? "x0 == x_out" : "x0 != x_out");
+        if(proximalOperatorVerbose)
+        {
+            LOGI << io::xprintf(
+                "PDHG %d iteration, CGLS proximal operator ||Ax-b||_2^2 + 1/(2*tau) "
+                "||x-x_prox||_2^2, |b|=%0.2f, |ATb|=%0.2f, %d iterations, tau=%0.2f "
+                "1/(2*tau)=%0.2f, 1/sqrt(2*tau)=%0.2f %s %s %s",
+                outerIterationIndex, NB0, NATB0, maxCGLSIterations, tau, 0.5f / tau,
+                std::sqrt(0.5f / tau), xbufIN_x_prox == xbufIN_x0 ? "x_prox == x0" : "x_prox != x0",
+                xbufIN_x_prox == xbufOUT ? "x_prox == x_out" : "x_prox != x_out",
+                xbufIN_x0 == xbufOUT ? "x0 == x_out" : "x0 != x_out");
+        }
     }
     uint32_t iteration = 1;
     double residualNorm2_old, residualNorm2_now, AdirectionNorm2, alpha, beta;
@@ -141,7 +148,10 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(std::shared_ptr<cl::Buffer> xb
         std::sqrt(NDRHSP2_ZEROX), NDRHS_ZEROX, std::sqrt(NX02), std::sqrt(NDRHSB2_START),
         std::sqrt(NDRHSP2_START), NDRHS_START, std::sqrt(NRHSB2_ZEROX), std::sqrt(NRHSB2_START),
         std::sqrt(NRHSP2_START), std::sqrt(NR2_START));
-    LOGD << printTime(str, false, true);
+    if(proximalOperatorVerbose)
+    {
+        LOGD << printTime(str, false, true);
+    }
     algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
     residualNorm2_old = NR2;
     project(*directionVector_xbuf,
@@ -200,19 +210,31 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(std::shared_ptr<cl::Buffer> xb
         reportTime(io::xprintf("Backprojection %d", iteration), false, true);
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
-        LOGI << io::xprintf_green(
-            "Iteration %d:\n|Ax-b|=%.2f %.2f%% |b| and %.2f%% of |Ax0-b|,\n"
-            "1/sqrt(2*tau)|x-x_prox|=%.2f %.2f%% of 1/sqrt(2*tau)|x_prox|,\n"
-            "|(Ax-b, 1/sqrt(2*tau)(x-x_prox))|=%e %.0f%% of x0 expression "
-            "|AT(Ax-b)|=%e %.0f%% of x0 expression 1/(2*tau)|x-x_prox|=%e %.0f%% of x0 expression "
-            "|(AT(Ax-b)|+ 1/(2*tau)|x-x_prox)|=%e %.0f%% of zero expression and %0.f%% of x0 "
-            "expression.",
-            iteration, std::sqrt(NDRHSB2), 100.0 * std::sqrt(NDRHSB2 / NDRHSB2_ZEROX),
-            100.0 * std::sqrt(NDRHSB2 / NDRHSB2_START), std::sqrt(NDRHSP2),
-            100.0 * std::sqrt(NDRHSP2 / NDRHSP2_ZEROX), NDRHS, 100.0 * NDRHS / NDRHS_ZEROX,
-            std::sqrt(NRHSB2), 100.0 * std::sqrt(NRHSB2 / NRHSB2_ZEROX), std::sqrt(NRHSP2),
-            100.0 * std::sqrt(NRHSP2 / NRHSP2_ZEROX), std::sqrt(NR2),
-            100.0 * std::sqrt(NR2 / NR2_ZEROX), 100.0 * std::sqrt(NR2 / NR2_START));
+        if(proximalOperatorVerbose)
+        {
+            LOGI << io::xprintf_green(
+                "\nIteration %d:\n|Ax-b|=%.2f, %.2f%% |b| and %.2f%% of |Ax0-b|,\n"
+                "1/sqrt(2*tau)|x-x_prox|=%.2f, %.2f%% of 1/sqrt(2*tau)|x_prox| and %.2f%% of "
+                "1/sqrt(2*tau)|x_0-x_prox|,\n"
+                "|(Ax-b, 1/sqrt(2*tau)(x-x_prox))|=%.2f %.2f%% of x=0 expression and %.2f%% of "
+                "x=x0 "
+                "expression,\n"
+                "|AT(Ax-b)|=%.2f %.2f%% of x=0 expression and %.2f%% of x=x0 expression,\n "
+                "1/(2*tau)|x-x_prox|=%.2f, %.2f%% of x=0 expression and %.2f%% of x=x0 "
+                "expression,\n"
+                "|(AT(Ax-b)|+ 1/(2*tau)|x-x_prox)|=%.2f %.2f%% of x=0 expression and %.2f%% of "
+                "x=x0 "
+                "expression.",
+                iteration, std::sqrt(NDRHSB2), 100.0 * std::sqrt(NDRHSB2 / NDRHSB2_ZEROX),
+                100.0 * std::sqrt(NDRHSB2 / NDRHSB2_START), std::sqrt(NDRHSP2),
+                100.0 * std::sqrt(NDRHSP2 / NDRHSP2_ZEROX),
+                100.0 * std::sqrt(NDRHSP2 / NDRHSP2_START), NDRHS, 100.0 * NDRHS / NDRHS_ZEROX,
+                100.0 * NDRHS / NDRHS_START, std::sqrt(NRHSB2),
+                100.0 * std::sqrt(NRHSB2 / NRHSB2_ZEROX), 100.0 * std::sqrt(NRHSB2 / NRHSB2_START),
+                std::sqrt(NRHSP2), 100.0 * std::sqrt(NRHSP2 / NRHSP2_ZEROX),
+                100.0 * std::sqrt(NRHSP2 / NRHSP2_START), std::sqrt(NR2),
+                100.0 * std::sqrt(NR2 / NR2_ZEROX), 100.0 * std::sqrt(NR2 / NR2_START));
+        }
         algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
@@ -231,14 +253,17 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(std::shared_ptr<cl::Buffer> xb
                                           -alpha * sqrtEffectSize, XDIM);
         NDRHSP2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_L2);
         NDRHS = std::sqrt(NDRHSB2 + NDRHSP2);
-        LOGD << io::xprintf(
-            "Iteration %d: alpha = %f, beta = %f, |DISCREPANCY| = %f, |RESIDUALOLD| = %e",
-            iteration, alpha, beta, NDRHS, std::sqrt(NR2));
+        if(proximalOperatorVerbose)
+        {
+            LOGD << io::xprintf(
+                "Iteration %d: alpha = %f, beta = %f, |DISCREPANCY| = %f, |RESIDUALOLD| = %e",
+                iteration, alpha, beta, NDRHS, std::sqrt(NR2));
+        }
         //    BasePBCT2DReconstructor::writeVolume(*x_buf,
         //                                         io::xprintf("PDHG_x_xbufOUT_it%02d.den",
         //                                         iteration));
     }
-    LOGD << io::xprintf("Iteration %d: |DISCREPANCY| = %f %.0f%% of zero expression", iteration,
+    LOGD << io::xprintf("Iteration %d: |DISCREPANCY| = %f %.2f%% of zero expression", iteration,
                         NDRHS, 100.0 * NDRHS / NDRHS_ZEROX);
     /*    BasePBCT2DReconstructor::writeVolume(
             x_xbufOUT,
@@ -367,10 +392,12 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
                 mu * TVNorm / DifferenceNorm, mu * TVNorm + DifferenceNorm);
         } else
         {
-            LOGI << io::xprintf_green("Iteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, mu "
-                                      "TV(x)=%0.2f, mu TV(x)/|Ax-b|=%f, |Ax-b| + mu TV(x)=%e",
-                                      iteration - 1, norm, 100.0 * norm / NB0, mu * TVNorm,
-                                      mu * TVNorm / norm, mu * TVNorm + norm);
+            LOGI << io::xprintf_red(
+                "\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, |Ax-b|_2^2=%0.2f mu "
+                "TV(x)=%0.2f, mu TV(x)/|Ax-b|=%0.2f, |Ax-b| + mu TV(x)=%0.2f, |Ax-b|_2^2 + mu "
+                "TV(x)=%0.2f",
+                iteration - 1, norm, 100.0 * norm / NB0, norm * norm, mu * TVNorm,
+                mu * TVNorm / norm, mu * TVNorm + norm, norm * norm + mu * TVNorm);
         }
         if(computeDiscrepancy)
         {
@@ -421,9 +448,9 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
                                           XDIM); // arg = x - tau * (-Div)(p)
 
         // Step 2.1: apply proximal operator related to |Ax-b|_2^2
-        BasePBCT2DReconstructor::writeVolume(
-            *proximal_arg_xbuf,
-            io::xprintf("%s_proximal_arg_it%02d.den", intermediatePrefix.c_str(), iteration));
+        // BasePBCT2DReconstructor::writeVolume(
+        //     *proximal_arg_xbuf,
+        //     io::xprintf("%s_proximal_arg_it%02d.den", intermediatePrefix.c_str(), iteration));
         std::shared_ptr<cl::Buffer> primal_xbuf_new
             = primal_xbuf_dx; // primal_xbuf_dx is to be used as a temporary buffer since it is
                               // fully initialized in the first step
@@ -460,11 +487,20 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
         {
             // proximalOperatorCGLS(proximal_arg_xbuf, proximal_arg_xbuf, primal_xbuf_new, tau,
             //                      maxCGLSIterations, errConditionCGLS, iteration);
-            // Let's try to initiaize by 0
-            Q[0]->enqueueFillBuffer<cl_float>(*primal_xbuf_new, FLOATZERO, 0,
-                                              XDIM * sizeof(float)); // Start with x = 0
+            // I. Does not work, let's try to initiaize by 0
+            // Q[0]->enqueueFillBuffer<cl_float>(*primal_xbuf_new, FLOATZERO, 0,
+            //                                  XDIM * sizeof(float)); // Start with x = 0
 
-            proximalOperatorCGLS(proximal_arg_xbuf, primal_xbuf_new, primal_xbuf_new, tau,
+            // proximalOperatorCGLS(proximal_arg_xbuf, primal_xbuf_new, primal_xbuf_new, tau,
+            //                      maxCGLSIterations, errConditionCGLS, iteration);
+            // II. Let's try to initialize by primal_xbuf
+            //        proximalOperatorCGLS(proximal_arg_xbuf, primal_xbuf, primal_xbuf_new, tau,
+            //                             maxCGLSIterations, errConditionCGLS, iteration);
+            // III. experiment
+
+            proximalOperatorVerbose = false;
+            maxCGLSIterations = 3;
+            proximalOperatorCGLS(proximal_arg_xbuf, primal_xbuf, primal_xbuf_new, tau,
                                  maxCGLSIterations, errConditionCGLS, iteration);
         }
 
@@ -485,11 +521,14 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
         primal_xbuf = primal_xbuf_new;
         primal_xbuf_dx = temp;
 
-        BasePBCT2DReconstructor::writeVolume(
-            *primal_xbuf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
-        BasePBCT2DReconstructor::writeVolume(
-            *primal_xbuf_prime,
-            io::xprintf("%sx_prime_it%02d.den", intermediatePrefix.c_str(), iteration));
+        if(iteration % 50 == 0)
+        {
+            BasePBCT2DReconstructor::writeVolume(
+                *primal_xbuf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+        }
+        //    BasePBCT2DReconstructor::writeVolume(
+        //        *primal_xbuf_prime,
+        //        io::xprintf("%sx_prime_it%02d.den", intermediatePrefix.c_str(), iteration));
         //  Projection and error condition check
         //  project(*primal_xbuf, *discrepancy_bbuf); // Forward projection of x
         //  algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *b_buf, -1.0f, BDIM); // Ax - b

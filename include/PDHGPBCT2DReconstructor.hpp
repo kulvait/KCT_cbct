@@ -92,6 +92,7 @@ private:
                                                std::shared_ptr<cl::Buffer> x_0 = nullptr,
                                                bool computeDiscrepancy = true);
     double NB0, NATB0;
+    bool proximalOperatorVerbose = true;
 };
 
 } // namespace KCT
