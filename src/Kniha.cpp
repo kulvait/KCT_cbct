@@ -798,6 +798,159 @@ void Kniha::CLINCLUDEconvolution()
     });
 }
 
+void Kniha::CLINCLUDEgradient()
+{
+    insertCLFile("opencl/gradient.cl");
+
+    // Add to callbacks for kernel compilation after OpenCL runtime is ready
+    callbacks.emplace_back([this](cl::Program program) {
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_2point;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_2point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_2point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_2point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_3point;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_3point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_3point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_3point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_4point;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_4point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_4point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_4point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_5point;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_5point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_5point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_5point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_6point;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_6point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_6point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_6point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_7point;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_7point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_forwardDifference_7point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_forwardDifference_7point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_centralDifference_3point;
+            std::string str = "FLOATvector_Gradient2D_centralDifference_3point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_centralDifference_3point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_centralDifference_3point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_centralDifference_5point;
+            std::string str = "FLOATvector_Gradient2D_centralDifference_5point";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_Gradient2D_centralDifference_5point_adjoint;
+            std::string str = "FLOATvector_Gradient2D_centralDifference_5point_adjoint";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+    });
+}
+
 void Kniha::CLINCLUDEproximal()
 {
     insertCLFile("opencl/proximal.cl");
@@ -805,6 +958,15 @@ void Kniha::CLINCLUDEproximal()
         {
             auto& ptr = FLOATvector_infProjectionToLambda2DBall;
             std::string str = "FLOATvector_infProjectionToLambda2DBall";
+            if(ptr == nullptr)
+            {
+                ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
+                    cl::Kernel(program, str.c_str()));
+            };
+        }
+        {
+            auto& ptr = FLOATvector_distL1ProxSoftThreasholding;
+            std::string str = "FLOATvector_distL1ProxSoftThreasholding";
             if(ptr == nullptr)
             {
                 ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -2474,6 +2636,380 @@ int Kniha::algFLOATvector_infProjectionToLambda2DBall(
 {
     cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
     auto exe = (*FLOATvector_infProjectionToLambda2DBall)(eargs, G1, G2, lambda);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_distL1ProxSoftThreasholding(
+    cl::Buffer& U0, cl::Buffer& XPROX, float omega, uint64_t size, bool blocking, uint32_t QID)
+{
+    cl::EnqueueArgs eargs(*Q[QID], cl::NDRange(size));
+    auto exe = (*FLOATvector_distL1ProxSoftThreasholding)(eargs, U0, XPROX, omega);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+
+
+// gradient.cl
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_2point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_forwardDifference_2point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+// Similarly, define the rest for other kernels
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_2point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_forwardDifference_2point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_3point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_forwardDifference_3point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_3point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_forwardDifference_3point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_4point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_forwardDifference_4point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_4point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_forwardDifference_4point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_5point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_forwardDifference_5point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_5point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_forwardDifference_5point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_6point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_forwardDifference_6point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_6point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_forwardDifference_6point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_7point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_forwardDifference_7point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_forwardDifference_7point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_forwardDifference_7point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_centralDifference_3point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_centralDifference_3point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+// Similarly, define the rest for other kernels
+
+int Kniha::algFLOATvector_Gradient2D_centralDifference_3point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_centralDifference_3point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+int Kniha::algFLOATvector_Gradient2D_centralDifference_5point(cl::Buffer& F,
+                                                              cl::Buffer& GX,
+                                                              cl::Buffer& GY,
+                                                              cl_int3& vdims,
+                                                              cl_float3& voxelSizes,
+                                                              cl::NDRange globalRange,
+                                                              cl::NDRange _localRange,
+                                                              bool blocking,
+                                                              uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe
+        = (*FLOATvector_Gradient2D_centralDifference_5point)(*eargs, F, GX, GY, vdims, voxelSizes);
+    if(handleKernelExecution(exe, blocking, err))
+    {
+        KCTERR(err);
+    }
+    return 0;
+}
+
+// Similarly, define the rest for other kernels
+
+int Kniha::algFLOATvector_Gradient2D_centralDifference_5point_adjoint(cl::Buffer& GX,
+                                                                      cl::Buffer& GY,
+                                                                      cl::Buffer& D,
+                                                                      cl_int3& vdims,
+                                                                      cl_float3& voxelSizes,
+                                                                      cl::NDRange globalRange,
+                                                                      cl::NDRange _localRange,
+                                                                      bool blocking,
+                                                                      uint32_t QID)
+{
+    std::shared_ptr<cl::EnqueueArgs> eargs;
+    cl::NDRange localRange = assignLocalRange(_localRange, globalRange);
+    eargs = std::make_shared<cl::EnqueueArgs>(*Q[QID], globalRange, localRange);
+    auto exe = (*FLOATvector_Gradient2D_centralDifference_5point_adjoint)(*eargs, GX, GY, D, vdims,
+                                                                          voxelSizes);
     if(handleKernelExecution(exe, blocking, err))
     {
         KCTERR(err);

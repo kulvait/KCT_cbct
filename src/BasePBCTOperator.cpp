@@ -436,6 +436,7 @@ void BasePBCTOperator::setTimestamp(bool finishCommandQueue)
     }
     timestamp = std::chrono::steady_clock::now();
 }
+
 std::chrono::milliseconds BasePBCTOperator::millisecondsFromTimestamp(bool setNewTimestamp)
 {
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(

@@ -30,4 +30,28 @@ void kernel FLOATvector_infProjectionToLambda2DBall(global float* restrict G1,
     }
 }
 
+// L1 proximal operator, soft thresholding solving min omega | u - u0 | + 1/2 | u - x_prox |_2^2
+void kernel FLOATvector_distL1ProxSoftThreasholding(global float* restrict U0,
+                                                    global float* restrict XPROX,
+                                                    float const omega)
+{
+    size_t gid = get_global_id(0);
+    float u_0 = U0[gid];
+    float x_prox = XPROX[gid];
+    float x_min;
+    if(u_0 < x_prox - omega)
+    {
+        x_min = x_prox - omega;
+    } else if(u_0 > x_prox + omega)
+    {
+        x_min = x_prox + omega;
+    } else
+    {
+
+        x_min = u_0;
+        // Relax proper proximal
+        // x_min = x_prox;
+    }
+    XPROX[gid] = x_min;
+}
 //==============================END proximal.cl=====================================

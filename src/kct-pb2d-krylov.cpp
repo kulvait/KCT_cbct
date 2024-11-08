@@ -28,6 +28,7 @@
 #include "DEN/DenSupportedType.hpp"
 #include "GEOMETRY/Geometry3DParallel.hpp"
 #include "GEOMETRY/Geometry3DParallelI.hpp"
+#include "GradientType.hpp"
 #include "PROG/ArgumentsForce.hpp"
 #include "PROG/KCTException.hpp"
 #include "PROG/Program.hpp"
@@ -73,13 +74,14 @@ public:
     bool glsqr = false;
 
     bool pdhg = false;
-    float pdhg_mu = - 0.1; // Lambda parameter in ||Ax-b|| + lambda TV(X)
+    float pdhg_mu = -0.1; // Lambda parameter in ||Ax-b|| + lambda TV(X)
     // float pdhg_tau = -0.7*0.125; // Primal variable update
     // float pdhg_sigma = -0.7*0.125; // Dual variable update
     float pdhg_tau = -0.7; // Primal variable update
     float pdhg_sigma = -0.7; // Dual variable update
                              // 1/sqrt(2)=0.7071 > 0.7
     float pdhg_theta = 1.0; // Relaxation
+    GradientType useGradientType = GradientType::ForwardDifference2Point;
 
     bool psirt = false;
     bool sirt = false;
@@ -191,17 +193,53 @@ void Args::defineArguments()
     CLI::Option_group* og_pdhg = og_settings->add_option_group(
         "PDHG Options", "Primal Dual Hybrid Gradient method options.");
     registerOptionGroup("PDHG options", og_pdhg);
-    str = io::xprintf("PDHG lambda parameter in ||Ax-b|| + mu TV(X), [defaults to %f]",
-                      pdhg_mu);
+    str = io::xprintf("PDHG lambda parameter in ||Ax-b|| + mu TV(X), [defaults to %f]", pdhg_mu);
     og_pdhg->add_option("--pdhg-mu", pdhg_mu, str);
-    str = io::xprintf("Primal variable update parameter, negative values are multiplied by -1, [defaults to %f]",
-                      pdhg_tau);
+    str = io::xprintf(
+        "Primal variable update parameter, negative values are multiplied by -1, [defaults to %f]",
+        pdhg_tau);
     og_pdhg->add_option("--pdhg-tau", pdhg_tau, str);
-    str = io::xprintf("Dual variable update parameter, negative values are multiplied by voxel_size*voxel_size, [defaults to %f]",
+    str = io::xprintf("Dual variable update parameter, negative values are multiplied by "
+                      "voxel_size*voxel_size, [defaults to %f]",
                       pdhg_sigma);
     og_pdhg->add_option("--pdhg-sigma", pdhg_sigma, str);
     str = io::xprintf("Relaxation parameter, [defaults to %f]", pdhg_theta);
     og_pdhg->add_option("--pdhg-theta", pdhg_theta, str);
+    CLI::Option_group* og_pdhg_gradient
+        = og_pdhg->add_option_group("Gradient Type", "Gradient type used in PDHG method.");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-forward-2point",
+        [this](std::int64_t count) { useGradientType = GradientType::ForwardDifference2Point; },
+        "Use forward difference 2 point gradient, [default].");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-forward-3point",
+        [this](std::int64_t count) { useGradientType = GradientType::ForwardDifference3Point; },
+        "Use forward difference 3 point gradient.");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-forward-4point",
+        [this](std::int64_t count) { useGradientType = GradientType::ForwardDifference4Point; },
+        "Use forward difference 4 point gradient.");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-forward-5point",
+        [this](std::int64_t count) { useGradientType = GradientType::ForwardDifference5Point; },
+        "Use forward difference 5 point gradient.");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-forward-6point",
+        [this](std::int64_t count) { useGradientType = GradientType::ForwardDifference6Point; },
+        "Use forward difference 6 point gradient.");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-forward-7point",
+        [this](std::int64_t count) { useGradientType = GradientType::ForwardDifference7Point; },
+        "Use forward difference 7 point gradient.");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-central-3point",
+        [this](std::int64_t count) { useGradientType = GradientType::CentralDifference3Point; },
+        "Use central difference 3 point gradient.");
+    og_pdhg_gradient->add_flag_function(
+        "--gradient-central-5point",
+        [this](std::int64_t count) { useGradientType = GradientType::CentralDifference5Point; },
+        "Use central difference 5 point gradient.");
+    og_pdhg_gradient->require_option(0, 1);
     // Force switch
     addForceArgs();
     // Reconstruction geometry
@@ -645,6 +683,8 @@ int main(int argc, char* argv[])
             }
             pdhg->initializeVolumeConvolution();
             pdhg->initializeProximal();
+            pdhg->initializeGradient();
+            pdhg->setGradientType(ARG.useGradientType);
             int ecd = pdhg->initializeOpenCL(
                 ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug,
                 ARG.CLrelaxed, projectorLocalNDRange, backprojectorLocalNDRange);

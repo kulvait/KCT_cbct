@@ -72,6 +72,7 @@ public:
     void CLINCLUDEpbct2d_cvp();
     void CLINCLUDEpbct2d_cvp_barrier();
     void CLINCLUDEproximal();
+    void CLINCLUDEgradient();
 
     static std::string infoString(cl_int cl_info_id);
 
@@ -984,6 +985,186 @@ protected:
                                                    uint64_t size,
                                                    bool blocking = false,
                                                    uint32_t QID = 0);
+
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, float&>>
+        FLOATvector_distL1ProxSoftThreasholding;
+    int algFLOATvector_distL1ProxSoftThreasholding(cl::Buffer& U0,
+                                                   cl::Buffer& XPROX,
+                                                   float omega,
+                                                   uint64_t size,
+                                                   bool blocking = false,
+                                                   uint32_t QID = 0);
+    // gradient.cl
+    std::shared_ptr<cl::make_kernel<cl::Buffer&, cl::Buffer&, cl::Buffer&, cl_int3&, cl_float3&>>
+        FLOATvector_Gradient2D_forwardDifference_2point,
+        FLOATvector_Gradient2D_forwardDifference_2point_adjoint,
+        FLOATvector_Gradient2D_forwardDifference_3point,
+        FLOATvector_Gradient2D_forwardDifference_3point_adjoint,
+        FLOATvector_Gradient2D_forwardDifference_4point,
+        FLOATvector_Gradient2D_forwardDifference_4point_adjoint,
+        FLOATvector_Gradient2D_forwardDifference_5point,
+        FLOATvector_Gradient2D_forwardDifference_5point_adjoint,
+        FLOATvector_Gradient2D_forwardDifference_6point,
+        FLOATvector_Gradient2D_forwardDifference_6point_adjoint,
+        FLOATvector_Gradient2D_forwardDifference_7point,
+        FLOATvector_Gradient2D_forwardDifference_7point_adjoint,
+        FLOATvector_Gradient2D_centralDifference_3point,
+        FLOATvector_Gradient2D_centralDifference_3point_adjoint,
+        FLOATvector_Gradient2D_centralDifference_5point,
+        FLOATvector_Gradient2D_centralDifference_5point_adjoint;
+
+    int algFLOATvector_Gradient2D_forwardDifference_2point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_2point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_3point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_3point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_4point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_4point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_5point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_5point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_6point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_6point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_7point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_forwardDifference_7point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_centralDifference_3point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_centralDifference_3point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_centralDifference_5point(cl::Buffer& F,
+                                                           cl::Buffer& GX,
+                                                           cl::Buffer& GY,
+                                                           cl_int3& vdims,
+                                                           cl_float3& voxelSizes,
+                                                           cl::NDRange globalRange,
+                                                           cl::NDRange localRange = cl::NullRange,
+                                                           bool blocking = false,
+                                                           uint32_t QID = 0);
+    int algFLOATvector_Gradient2D_centralDifference_5point_adjoint(cl::Buffer& GX,
+                                                                   cl::Buffer& GY,
+                                                                   cl::Buffer& D,
+                                                                   cl_int3& vdims,
+                                                                   cl_float3& voxelSizes,
+                                                                   cl::NDRange globalRange,
+                                                                   cl::NDRange localRange
+                                                                   = cl::NullRange,
+                                                                   bool blocking = false,
+                                                                   uint32_t QID = 0);
 
 private:
     /**

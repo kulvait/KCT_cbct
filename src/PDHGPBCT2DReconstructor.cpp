@@ -12,13 +12,44 @@ int PDHGPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
     return 0;
 }
 
-int PDHGPBCT2DReconstructor::proximalOperatorCGLS(cl::Buffer x0prox_xbufIN,
-                                                  cl::Buffer x_xbufOUT,
+std::array<double, 3>
+PDHGPBCT2DReconstructor::computeSolutionNorms(std::shared_ptr<cl::Buffer> x_vector,
+                                              std::shared_ptr<cl::Buffer> x_vector_dx,
+                                              std::shared_ptr<cl::Buffer> x_vector_dy,
+                                              std::shared_ptr<cl::Buffer> x_0,
+                                              bool computeDiscrepancy)
+{
+    double TVNorm = isotropicTVNormXBuffer_barrier_double(*x_vector_dx, *x_vector_dy);
+    double DiscrepancyNorm = 0.0;
+    if(computeDiscrepancy)
+    {
+        project(*x_vector, *discrepancy_bbuf); // Forward projection of x
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *b_buf, -1.0f, BDIM); // Ax - b
+        DiscrepancyNorm
+            = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)); // Norm of Ax - b
+    }
+    double DifferenceNorm = 0.0;
+    if(x_0 != nullptr)
+    {
+        std::shared_ptr<cl::Buffer> differenceVector_xbuf = discrepancy_bbuf_xpart_L2;
+        algFLOATvector_C_equals_Ad_plus_Be(*x_vector, *x_0, *differenceVector_xbuf, -1.0f, 1.0f,
+                                           XDIM);
+        DifferenceNorm = normXBuffer_barrier_double(*differenceVector_xbuf);
+    }
+    return { DiscrepancyNorm, TVNorm, DifferenceNorm };
+}
+
+// The pointers might point to the same buffer or three different buffers. It is also admissible
+// that xbufIN_x_prox and xbufIN_x0 are not equal and xbufOUT is one of them. The procedure will
+// handle these situations.
+int PDHGPBCT2DReconstructor::proximalOperatorCGLS(std::shared_ptr<cl::Buffer> xbufIN_x_prox,
+                                                  std::shared_ptr<cl::Buffer> xbufIN_x0,
+                                                  std::shared_ptr<cl::Buffer> xbufOUT,
                                                   float tau,
                                                   uint32_t maxCGLSIterations,
                                                   float errConditionCGLS,
                                                   uint32_t outerIterationIndex)
-// Solve the problem 1 / (2 * tau) ||x-x0prox||_2^2 + ||Ax - b||_2^2 by means of CGLS
+// Solve the problem 1 / (2 * tau) ||x-x_prox||_2^2 + ||Ax - b||_2^2 by means of CGLS
 {
     float effectSize;
     float sqrtEffectSize;
@@ -26,78 +57,162 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(cl::Buffer x0prox_xbufIN,
     {
         effectSize = 0.0f;
         sqrtEffectSize = 0.0f;
+        LOGE << io::xprintf("PDHG %d iteration, CGLS minimizing ||Ax-b||_2^2 ||b||=%0.2f %s %s %s",
+                            outerIterationIndex, NB0,
+                            xbufIN_x_prox == xbufIN_x0 ? "x_prox == x0" : "x_prox != x0",
+                            xbufIN_x_prox == xbufOUT ? "x_prox == x_out" : "x_prox != x_out",
+                            xbufIN_x0 == xbufOUT ? "x0 == x_out" : "x0 != x_out");
     } else
     {
         effectSize = 0.5f / tau;
         sqrtEffectSize = std::sqrt(effectSize);
+        LOGE << io::xprintf("PDHG %d iteration, CGLS proximal operator ||Ax-b||_2^2 + 1/(2*tau) "
+                            "||x-x_prox||_2^2, |b|=%0.2f, |ATb|=%0.2f, %d iterations, tau=%0.2f "
+                            "1/(2*tau)=%0.2f, 1/sqrt(2*tau)=%0.2f %s %s %s",
+                            outerIterationIndex, NB0, NATB0, maxCGLSIterations, tau, 0.5f / tau,
+                            std::sqrt(0.5f / tau),
+                            xbufIN_x_prox == xbufIN_x0 ? "x_prox == x0" : "x_prox != x0",
+                            xbufIN_x_prox == xbufOUT ? "x_prox == x_out" : "x_prox != x_out",
+                            xbufIN_x0 == xbufOUT ? "x0 == x_out" : "x0 != x_out");
     }
     uint32_t iteration = 1;
-    double norm, residualNorm2_old, residualNorm2_now, AdirectionNorm2, alpha, beta;
-    double NX = normXBuffer_barrier_double(x0prox_xbufIN);
-    double NF0 = std::sqrt(NB0 * NB0 + effectSize * NX);
-    double NR0;
-    std::string str = io::xprintf(
-        "PDHG %d iteration, Proximal CGLS using tau=%0.2f and |b| + 1/sqrt(2*tau) "
-        "|x0prox|=%0.2f, 1/sqrt(2*tau) |x0prox| = %0.2f effectSize=%0.2f, sqrtEffectSize=%0.2f",
-        outerIterationIndex, tau, NF0, NX * sqrtEffectSize, effectSize, sqrtEffectSize);
-    LOGD << printTime(str, false, true);
-    std::string filename
-        = io::xprintf("%s_x0prox_it%02d.den", intermediatePrefix.c_str(), outerIterationIndex);
-    LOGD << io::xprintf("Writing file %s", filename.c_str());
-    BasePBCT2DReconstructor::writeVolume(x0prox_xbufIN, filename);
-    Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_L2, FLOATZERO, 0,
-                                      XDIM * sizeof(float));
+    double residualNorm2_old, residualNorm2_now, AdirectionNorm2, alpha, beta;
+    double NXP2 = normXBuffer_barrier_double(*xbufIN_x_prox); // Squared L2 norm of x_prox
+    double NX02; // Squared L2 norm of x0
+    // Discrepancy norms
+    double NDRHSB2, NDRHSP2,
+        NDRHS; // ||Ax - b||_2^2, 1/(2*tau) ||x-x_prox||_2^2 and norm of discrepancy of the right
+               // hand side, which is sqrt(NDRHSB2 + NDRHSP2)
+    double NDRHSB2_START, NDRHSP2_START, NDRHS_START; // Previous quantities for initial x = x0
+    double NDRHSB2_ZEROX, NDRHSP2_ZEROX, NDRHS_ZEROX; // Previous quantities for x = 0
+    double NRHSB2, NRHSP2, NR2; // ||AT(Ax - b)||_2^2, 1/(2*tau)^2 ||x-x_prox||_2^2 and norm of
+                                // residual  right hand side, which is NRHSB2 + NRHSP2
+    double NRHSB2_START, NRHSP2_START, NR2_START; // Previous quantities for initial x = x0
+    double NRHSB2_ZEROX, NRHSP2_ZEROX, NR2_ZEROX; // Previous quantities for x = 0
 
-    algFLOATvector_copy(*b_buf, *discrepancy_bbuf, BDIM);
-    algFLOATvector_copy(x0prox_xbufIN, x_xbufOUT, XDIM);
-    // Use x0prox_xbufIN as initial vector
-    project(x_xbufOUT, *AdirectionVector_bbuf);
-    algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -1.0f,
-                                      BDIM); // Ax - b
+    NDRHSP2_ZEROX = effectSize * NXP2;
+    // Set corectly discrepancy_bbuf and discrepancy_bbuf_xpart_L2 for x = xbufIN_x0
+    if(xbufIN_x_prox == xbufIN_x0)
+    {
+        NX02 = NXP2;
+        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_L2, FLOATZERO, 0,
+                                          XDIM * sizeof(float));
+        NDRHSP2_START = 0.0;
+    } else
+    {
+        NX02 = normXBuffer_barrier_double(*xbufIN_x0);
+        algFLOATvector_C_equals_Ad_plus_Be(*xbufIN_x_prox, *xbufIN_x0, *discrepancy_bbuf_xpart_L2,
+                                           sqrtEffectSize, -sqrtEffectSize, XDIM);
+        NDRHSP2_START = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_L2);
+    }
+    project(*xbufIN_x0, *AdirectionVector_bbuf);
+    algFLOATvector_C_equals_Ad_plus_Be(*b_buf, *AdirectionVector_bbuf, *discrepancy_bbuf, 1.0f,
+                                       -1.0f, BDIM); // Ax - b
+    NDRHSB2_START = normBBuffer_barrier_double(*discrepancy_bbuf);
+    NDRHS_START = std::sqrt(NDRHSB2_START + NDRHSP2_START);
+    NDRHSB2_ZEROX = NB0 * NB0;
+    NDRHS_ZEROX = std::sqrt(NDRHSB2_ZEROX + NDRHSP2_ZEROX);
+    NDRHSB2 = NDRHSB2_START;
+    NDRHSP2 = NDRHSP2_START;
+    NDRHS = NDRHS_START;
     backproject(*discrepancy_bbuf, *residualVector_xbuf); // A^T(Ax - b)
-    // Because of the setting x_0 = x0prox, the residual is initially just residual of tomographic
-    // reconstruction A^T(Ax - b)
-
+    NRHSB2_START = normXBuffer_barrier_double(*residualVector_xbuf);
+    if(xbufIN_x_prox != xbufIN_x0)
+    {
+        // Here I have to account for updating residulaVector_xbuf with proximal part
+        algFLOATvector_A_equals_A_plus_cB(*residualVector_xbuf, *discrepancy_bbuf_xpart_L2,
+                                          sqrtEffectSize, XDIM);
+    }
+    NRHSP2_START = effectSize * NDRHSP2_START;
+    NR2_START = NRHSB2_START + NRHSP2_START;
+    NRHSB2_ZEROX = NATB0 * NATB0;
+    NRHSP2_ZEROX = effectSize * NDRHSP2_ZEROX;
+    NR2_ZEROX = NRHSB2_ZEROX + NRHSP2_ZEROX;
+    NRHSB2 = NRHSB2_START;
+    NRHSP2 = NRHSP2_START;
+    NR2 = NR2_START;
+    // After initial norms are computed, I can inform about the initial state
+    std::string str = io::xprintf(
+        "Initialization 1/sqrt(2*tau)||x_prox||=%0.2f and |(b,  1/sqrt(2*tau) "
+        "|x0prox|)|=%0.2f.\n Initial |x_prox| = %f and |Ax0-b|=%0.2f, "
+        "1/sqrt(2*tau)||x_prox-x0||=%0.2f and |(Ax0-b, 1/sqrt(2*tau) |x_prox-x0||)=%0.2f. Initial "
+        "residuals |ATb|=%f |AT(Ax0-b)|=%0.2f and 1/(2*tau)||x0-x_prox||=%0.2f, |AT(Ax0-b) + "
+        "1/(2*tau)(x0-x_prox)|=%0.2f.",
+        std::sqrt(NDRHSP2_ZEROX), NDRHS_ZEROX, std::sqrt(NX02), std::sqrt(NDRHSB2_START),
+        std::sqrt(NDRHSP2_START), NDRHS_START, std::sqrt(NRHSB2_ZEROX), std::sqrt(NRHSB2_START),
+        std::sqrt(NRHSP2_START), std::sqrt(NR2_START));
+    LOGD << printTime(str, false, true);
     algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
-    residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
-    NR0 = std::sqrt(residualNorm2_old);
-    project(*directionVector_xbuf, *AdirectionVector_bbuf);
-    AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf)
-        + normXBuffer_barrier_double(*directionVector_xbuf) * effectSize;
+    residualNorm2_old = NR2;
+    project(*directionVector_xbuf,
+            *AdirectionVector_bbuf); // There is proximal part of AdirectionVector of the form
+                                     // sqrtEffectSize * directionVector_xbuf
+    // Since directionVector_xbuf = residualVector_xbuf, the square of the L2 norm of the proximal
+    // part is effectSize * NR2
+    AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf) + effectSize * NR2;
     alpha = residualNorm2_old / AdirectionNorm2;
-
-    algFLOATvector_A_equals_A_plus_cB(x_xbufOUT, *directionVector_xbuf, alpha, XDIM);
+    // x_new = x_old + alpha * directionVector_xbuf
+    if(xbufOUT == xbufIN_x0)
+    {
+        algFLOATvector_A_equals_A_plus_cB(*xbufOUT, *directionVector_xbuf, alpha, XDIM);
+    } else
+    {
+        algFLOATvector_C_equals_Ad_plus_Be(*xbufIN_x0, *directionVector_xbuf, *xbufOUT, 1.0f, alpha,
+                                           XDIM);
+    }
     algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
+    NDRHSB2 = normBBuffer_barrier_double(*discrepancy_bbuf);
+
     // Update discrepancy related to proximal part of the right hand side
     // AdirectionVector_bbuf_xpart_L2 = sqrt(effectsSize) * directionVector_xbuf
     algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_L2, *directionVector_xbuf,
                                       -alpha * sqrtEffectSize, XDIM);
-    norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)
-                     + normXBuffer_barrier_double(*discrepancy_bbuf_xpart_L2));
+    NDRHSP2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_L2);
+    NDRHS = std::sqrt(NDRHSB2 + NDRHSP2);
 
-    while(norm / NF0 > errConditionCGLS && iteration < maxCGLSIterations)
+    while(NDRHS / NDRHS_ZEROX > errConditionCGLS && iteration < maxCGLSIterations)
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
             LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
                                 iteration);
             BasePBCT2DReconstructor::writeVolume(
-                x_xbufOUT, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+                *xbufOUT, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         backproject(*discrepancy_bbuf, *residualVector_xbuf);
+        NRHSB2 = normBBuffer_barrier_double(*residualVector_xbuf);
+        NRHSP2 = effectSize * NDRHSP2;
         // I have to update the residual vector with proximal part
         // residualVector_xbuf_L2add = sqrtEffectSize * discrepancy_bbuf_xpart_L2
         algFLOATvector_A_equals_A_plus_cB(*residualVector_xbuf, *discrepancy_bbuf_xpart_L2,
                                           sqrtEffectSize, XDIM);
+        NR2 = NRHSB2 + NRHSP2;
         residualNorm2_now = normXBuffer_barrier_double(*residualVector_xbuf);
+        // Shall be OK to put residualNorm2_now = NR2 but for sure I will check it, remove in
+        // production
+        if(std::abs(residualNorm2_now - NR2) < 1e-6)
+        {
+            LOGE << io::xprintf(
+                "Residual norm computation gave different results NR2=%e and residualNorm2_now=%e",
+                NR2, residualNorm2_now);
+            break;
+        }
         reportTime(io::xprintf("Backprojection %d", iteration), false, true);
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
-        NX = std::sqrt(residualNorm2_now);
-        LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, "
-                                  "|AT(Ax-b)|=%0.2f representing %0.3f%% of "
-                                  "|AT(Ax0-b)|.",
-                                  iteration, norm, 100.0 * norm / NF0, NX, 100 * NX / NR0);
+        LOGI << io::xprintf_green(
+            "Iteration %d:\n|Ax-b|=%.2f %.2f%% |b| and %.2f%% of |Ax0-b|,\n"
+            "1/sqrt(2*tau)|x-x_prox|=%.2f %.2f%% of 1/sqrt(2*tau)|x_prox|,\n"
+            "|(Ax-b, 1/sqrt(2*tau)(x-x_prox))|=%e %.0f%% of x0 expression "
+            "|AT(Ax-b)|=%e %.0f%% of x0 expression 1/(2*tau)|x-x_prox|=%e %.0f%% of x0 expression "
+            "|(AT(Ax-b)|+ 1/(2*tau)|x-x_prox)|=%e %.0f%% of zero expression and %0.f%% of x0 "
+            "expression.",
+            iteration, std::sqrt(NDRHSB2), 100.0 * std::sqrt(NDRHSB2 / NDRHSB2_ZEROX),
+            100.0 * std::sqrt(NDRHSB2 / NDRHSB2_START), std::sqrt(NDRHSP2),
+            100.0 * std::sqrt(NDRHSP2 / NDRHSP2_ZEROX), NDRHS, 100.0 * NDRHS / NDRHS_ZEROX,
+            std::sqrt(NRHSB2), 100.0 * std::sqrt(NRHSB2 / NRHSB2_ZEROX), std::sqrt(NRHSP2),
+            100.0 * std::sqrt(NRHSP2 / NRHSP2_ZEROX), std::sqrt(NR2),
+            100.0 * std::sqrt(NR2 / NR2_ZEROX), 100.0 * std::sqrt(NR2 / NR2_START));
         algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
@@ -108,21 +223,23 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(cl::Buffer x0prox_xbufIN,
             + normXBuffer_barrier_double(*directionVector_xbuf) * effectSize;
         reportTime(io::xprintf("Projection %d", iteration), false, true);
         alpha = residualNorm2_old / AdirectionNorm2;
-        algFLOATvector_A_equals_A_plus_cB(x_xbufOUT, *directionVector_xbuf, alpha, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*xbufOUT, *directionVector_xbuf, alpha, XDIM);
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
+        NDRHSB2 = normBBuffer_barrier_double(*discrepancy_bbuf);
         // Update discrepancy related to proximal part of the right hand side
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_L2, *directionVector_xbuf,
                                           -alpha * sqrtEffectSize, XDIM);
-        norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)
-                         + normXBuffer_barrier_double(*discrepancy_bbuf_xpart_L2));
-        LOGD << io::xprintf("Iteration %d: alpha = %f, beta = %f, |Ax-b| = %f, |AT(Ax-b)| = %f",
-                            iteration, alpha, beta, norm, NX);
+        NDRHSP2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_L2);
+        NDRHS = std::sqrt(NDRHSB2 + NDRHSP2);
+        LOGD << io::xprintf(
+            "Iteration %d: alpha = %f, beta = %f, |DISCREPANCY| = %f, |RESIDUALOLD| = %e",
+            iteration, alpha, beta, NDRHS, std::sqrt(NR2));
         //    BasePBCT2DReconstructor::writeVolume(*x_buf,
         //                                         io::xprintf("PDHG_x_xbufOUT_it%02d.den",
         //                                         iteration));
     }
-    LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
-                              iteration, norm, 100.0 * norm / NF0);
+    LOGD << io::xprintf("Iteration %d: |DISCREPANCY| = %f %.0f%% of zero expression", iteration,
+                        NDRHS, 100.0 * NDRHS / NDRHS_ZEROX);
     /*    BasePBCT2DReconstructor::writeVolume(
             x_xbufOUT,
             io::xprintf("%sx_cgls_it%02d.den", intermediatePrefix.c_str(), outerIterationIndex));*/
@@ -141,14 +258,14 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
     uint32_t iteration = 1;
 
     // Initialization of primal and dual variables
-    double norm;
+    double norm = 0.0, TVNorm = 0.0, DifferenceNorm = 0.0;
     NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
     double hsquare = voxelSizesF.x * voxelSizesF.x;
     std::string str
         = io::xprintf("WELCOME TO Chambolle-Pock 2D, PDHGPBCT2DReconstructor, "
                       "mu=%0.2fh^2, tau=%0.2f, sigma=%0.2fh^2, theta=%0.2f ||b||_2=%0.2f",
                       mu / hsquare, tau, sigma / hsquare, theta, NB0);
-    LOGD << io::xprintf_blue(printTime(str, false, true));
+    LOGD << io::xprintf_green("\n%s", printTime(str, false, true).c_str());
 
     std::shared_ptr<cl::Buffer> primal_xbuf, primal_xbuf_prime, primal_xbuf_dx, primal_xbuf_dy,
         dual_xbuf_x, dual_xbuf_y, divergence_xbuf;
@@ -170,6 +287,9 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
     allocateBBuffers(2);
     discrepancy_bbuf = getBBuffer(0);
     AdirectionVector_bbuf = getBBuffer(1);
+    // Just computing ||A^T(b)||_2 for convergence estimates
+    backproject(*b_buf, *primal_xbuf); // A^T( b)
+    NATB0 = std::sqrt(normXBuffer_barrier_double(*primal_xbuf));
 
     // Initial setup of primal variable (x)
     if(useVolumeAsInitialX0)
@@ -179,15 +299,15 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
     {
         Q[0]->enqueueFillBuffer<cl_float>(*primal_xbuf, FLOATZERO, 0,
                                           XDIM * sizeof(float)); // Start with x = 0
+        std::shared_ptr<cl::Buffer> primal_xbuf_new
+            = divergence_xbuf; // Divergence is to be used as a temporary buffer since it is fully
+                               // initialized in second step
+        proximalOperatorCGLS(primal_xbuf, primal_xbuf, primal_xbuf_new, 0.0, maxCGLSIterations,
+                             errConditionCGLS, 0);
+        algFLOATvector_copy(*primal_xbuf_new, *primal_xbuf, XDIM);
     }
-    std::shared_ptr<cl::Buffer> primal_xbuf_new
-        = divergence_xbuf; // Divergence is to be used as a temporary buffer since it is fully
-                           // initialized in second step
-    proximalOperatorCGLS(*primal_xbuf, *primal_xbuf_new, 0.0, maxCGLSIterations, errConditionCGLS,
-                         0);
-    algFLOATvector_copy(*primal_xbuf_new, *primal_xbuf, XDIM);
-    BasePBCT2DReconstructor::writeVolume(
-        *primal_xbuf, io::xprintf("%sx0_it%02d.den", intermediatePrefix.c_str(), iteration));
+    // BasePBCT2DReconstructor::writeVolume(
+    //     *primal_xbuf, io::xprintf("%sx0_it%02d.den", intermediatePrefix.c_str(), iteration));
 
     // Dual variable initialization
     Q[0]->enqueueFillBuffer<cl_float>(*dual_xbuf_x, FLOATZERO, 0,
@@ -200,24 +320,75 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
     // backproject(*discrepancy_bbuf, *divergence_xbuf); // This will initialize the residual (x0)
 
     // Main Chambolle-Pock iteration loop
-    cl::NDRange globalRangeGradient(vdimx, vdimy, vdimz);
-    cl::NDRange localRangeGradient = cl::NullRange;
+    // cl::NDRange globalRangeGradient(vdimx, vdimy, vdimz);
+    // cl::NDRange localRangeGradient = cl::NullRange;
     primal_xbuf_prime = primal_xbuf; // At the beginnig they are the same
-    bool useROF = true;
+    bool useROF = false;
+    bool L1ROF = false;
+    bool computeDiscrepancy = false;
+    if(!useROF)
+    {
+        computeDiscrepancy = true;
+    }
     std::shared_ptr<cl::Buffer> rof_u0_xbuf;
     if(useROF)
     {
         rof_u0_xbuf = AdirectionVector_bbuf_xpart_L2;
         algFLOATvector_copy(*primal_xbuf, *rof_u0_xbuf, XDIM);
+    } else
+    {
+        rof_u0_xbuf = nullptr;
     }
     while(iteration < maxPDHGIterations)
     {
+        // INFO As primal_xbuf_dx and primal_xbuf_dy are computed I can report norms
+        volume_gradient2D(*primal_xbuf, *primal_xbuf_dx, *primal_xbuf_dy);
+        if(iteration == 1)
+        {
+            BasePBCT2DReconstructor::writeVolume(
+                *primal_xbuf_dx,
+                io::xprintf("%s_xbuf_x_it%02d.den", intermediatePrefix.c_str(), iteration));
+            BasePBCT2DReconstructor::writeVolume(
+                *primal_xbuf_dy,
+                io::xprintf("%s_xbuf_y_it%02d.den", intermediatePrefix.c_str(), iteration));
+        }
+        std::array<double, 3> norms = computeSolutionNorms(
+            primal_xbuf, primal_xbuf_dx, primal_xbuf_dy, rof_u0_xbuf, computeDiscrepancy);
+        norm = norms[0];
+        TVNorm = norms[1];
+        DifferenceNorm = norms[2];
+        // norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)); // Norm of Ax - b
+        if(useROF)
+        {
+            LOGI << io::xprintf_green(
+                "Iteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, mu "
+                "TV(x)=%0.2e, |x-x_0|=%0.2e, mu TV(x)/|x-x_0|=%f |x-x_0| + mu*TV(x)=%e",
+                iteration - 1, norm, 100.0 * norm / NB0, mu * TVNorm, DifferenceNorm,
+                mu * TVNorm / DifferenceNorm, mu * TVNorm + DifferenceNorm);
+        } else
+        {
+            LOGI << io::xprintf_green("Iteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, mu "
+                                      "TV(x)=%0.2f, mu TV(x)/|Ax-b|=%f, |Ax-b| + mu TV(x)=%e",
+                                      iteration - 1, norm, 100.0 * norm / NB0, mu * TVNorm,
+                                      mu * TVNorm / norm, mu * TVNorm + norm);
+        }
+        if(computeDiscrepancy)
+        {
+            if(norm / NB0 < errConditionPDHG)
+            {
+                break; // Exit if error condition is met
+            }
+        }
+        // INFO
         // Step 1: Update Dual Variable (p^k+1 = Proj_Dual(p^k + sigma * Grad(x^k)))
-        algFLOATvector_2DisotropicGradient(
-            *primal_xbuf_prime, *primal_xbuf_dx, *primal_xbuf_dy, vdims, voxelSizesF,
-            globalRangeGradient,
-            localRangeGradient); // Compute gradient of x (dual variable p update)
-        // p = p + sigma * Grad(x)
+        volume_gradient2D(*primal_xbuf_prime, *primal_xbuf_dx, *primal_xbuf_dy);
+
+        // OLD implementation
+        // algFLOATvector_2DisotropicGradient(
+        //     *primal_xbuf_prime, *primal_xbuf_dx, *primal_xbuf_dy, vdims, voxelSizesF,
+        //     globalRangeGradient,
+        //     localRangeGradient); // Compute gradient of x (dual variable p update)
+        //  p = p + sigma * Grad(x)
         algFLOATvector_A_equals_A_plus_cB(*dual_xbuf_x, *primal_xbuf_dx, sigma, XDIM);
         algFLOATvector_A_equals_A_plus_cB(*dual_xbuf_y, *primal_xbuf_dy, sigma, XDIM);
         // Here I need to calculate dual_xbuf_x * dual_xbuf_x + dual_xbuf_y * dual_xbuf_y
@@ -236,9 +407,10 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
            iteration));*/
 
         // Step 2: Update Primal Variable (x^k+1 = Prox_F(x^k - tau * Div(p^k+1)))
-        algFLOATvector_isotropicBackDivergence2D(*dual_xbuf_x, *dual_xbuf_y, *divergence_xbuf,
-                                                 vdims, voxelSizesF, globalRangeGradient,
-                                                 localRangeGradient); // Compute divergence of p
+        volume_gradient2D_adjoint(*dual_xbuf_x, *dual_xbuf_y, *divergence_xbuf);
+        // algFLOATvector_isotropicBackDivergence2D(*dual_xbuf_x, *dual_xbuf_y, *divergence_xbuf,
+        //                                         vdims, voxelSizesF, globalRangeGradient,
+        //                                         localRangeGradient); // Compute divergence of p
         BasePBCT2DReconstructor::writeVolume(
             *divergence_xbuf,
             io::xprintf("%s_divergence_it%02d.den", intermediatePrefix.c_str(), iteration));
@@ -264,12 +436,36 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
             float arg_prefactor = 1.0f - rof_prefactor;
             LOGD << io::xprintf("ROF proximal operator: arg_prefactor=%f, rof_prefactor=%f",
                                 arg_prefactor, rof_prefactor);
-            algFLOATvector_C_equals_Ad_plus_Be(*rof_u0_xbuf, *proximal_arg_xbuf, *primal_xbuf_new,
-                                               rof_prefactor, arg_prefactor, XDIM);
+            if(!L1ROF)
+            {
+                algFLOATvector_C_equals_Ad_plus_Be(*rof_u0_xbuf, *proximal_arg_xbuf,
+                                                   *primal_xbuf_new, rof_prefactor, arg_prefactor,
+                                                   XDIM);
+            } else
+            {
+                LOGE << io::xprintf("algFLOATvector_distL1ProxSoftThreasholding with tau=%f", tau);
+                algFLOATvector_distL1ProxSoftThreasholding(*rof_u0_xbuf, *proximal_arg_xbuf, tau,
+                                                           XDIM);
+                algFLOATvector_copy(*proximal_arg_xbuf, *primal_xbuf_new,
+                                    XDIM); // Start with x = x0
+                /*
+                std::shared_ptr<cl::Buffer> temp = primal_xbuf_new;
+                primal_xbuf_new = proximal_arg_xbuf;
+                primal_xbuf_dx = primal_xbuf_new;
+                proximal_arg_xbuf = temp;
+                divergence_xbuf = temp;
+        */
+            }
         } else
         {
-            proximalOperatorCGLS(*proximal_arg_xbuf, *primal_xbuf_new, tau, maxCGLSIterations,
-                                 errConditionCGLS, iteration);
+            // proximalOperatorCGLS(proximal_arg_xbuf, proximal_arg_xbuf, primal_xbuf_new, tau,
+            //                      maxCGLSIterations, errConditionCGLS, iteration);
+            // Let's try to initiaize by 0
+            Q[0]->enqueueFillBuffer<cl_float>(*primal_xbuf_new, FLOATZERO, 0,
+                                              XDIM * sizeof(float)); // Start with x = 0
+
+            proximalOperatorCGLS(proximal_arg_xbuf, primal_xbuf_new, primal_xbuf_new, tau,
+                                 maxCGLSIterations, errConditionCGLS, iteration);
         }
 
         // Step 3: Over-relaxation (x̄ = x^k+1 + θ(x^k+1 - x^k))
@@ -292,24 +488,38 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
         BasePBCT2DReconstructor::writeVolume(
             *primal_xbuf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         BasePBCT2DReconstructor::writeVolume(
-            *primal_xbuf,
+            *primal_xbuf_prime,
             io::xprintf("%sx_prime_it%02d.den", intermediatePrefix.c_str(), iteration));
-        // Projection and error condition check
-        project(*primal_xbuf, *discrepancy_bbuf); // Forward projection of x
-        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *b_buf, -1.0f, BDIM); // Ax - b
-        norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)); // Norm of Ax - b
-
-        if(norm / NB0 < errConditionPDHG)
-        {
-            break; // Exit if error condition is met
-        }
+        //  Projection and error condition check
+        //  project(*primal_xbuf, *discrepancy_bbuf); // Forward projection of x
+        //  algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *b_buf, -1.0f, BDIM); // Ax - b
 
         iteration++;
-        LOGI << io::xprintf_green("Iteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
-                                  iteration, norm, 100.0 * norm / NB0);
     }
-
-    LOGI << io::xprintf_green("Finished at iteration %d: |Ax-b|=%0.1f.", iteration, norm);
+    // INFO As primal_xbuf_dx and primal_xbuf_dy are computed I can report norms
+    volume_gradient2D(*primal_xbuf, *primal_xbuf_dx, *primal_xbuf_dy);
+    std::array<double, 3> norms
+        = computeSolutionNorms(primal_xbuf, primal_xbuf_dx, primal_xbuf_dy, rof_u0_xbuf);
+    norm = norms[0];
+    TVNorm = norms[1];
+    DifferenceNorm = norms[2];
+    // norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)); // Norm of Ax - b
+    if(useROF)
+    {
+        LOGI << io::xprintf_green(
+            "Finished iteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, mu "
+            "TV(x)=%0.2e, |x-x_0|=%0.2e, mu TV(x)/|x-x_0|=%f |x-x_0| + mu*TV(x)=%e",
+            iteration, norm, 100.0 * norm / NB0, mu * TVNorm, DifferenceNorm,
+            mu * TVNorm / DifferenceNorm, mu * TVNorm + DifferenceNorm);
+    } else
+    {
+        LOGW << io::xprintf_green(
+            "Finished iteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|, mu "
+            "TV(x)=%0.2f, mu TV(x)/|Ax-b|=%f, |Ax-b| + mu TV(x)=%e",
+            iteration, norm, 100.0 * norm / NB0, mu * TVNorm, mu * TVNorm / norm,
+            mu * TVNorm + norm);
+    }
+    // INFO
     Q[0]->enqueueReadBuffer(*primal_xbuf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }

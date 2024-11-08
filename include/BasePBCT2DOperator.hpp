@@ -15,6 +15,7 @@
 #include "DEN/DenAsyncFrame2DWritter.hpp"
 #include "DEN/DenProjectionMatrixReader.hpp"
 #include "GEOMETRY/Geometry3DParallelI.hpp"
+#include "GradientType.hpp"
 #include "Kniha.hpp"
 #include "MATRIX/LightProjectionMatrix.hpp"
 #include "MATRIX/ProjectionMatrix.hpp"
@@ -62,6 +63,8 @@ public:
     void initializeTTProjector();
     void initializeVolumeConvolution();
     void initializeProximal();
+    void initializeGradient();
+    void setGradientType(GradientType type);
 
     int initializeOpenCL(uint32_t platformID,
                          uint32_t* deviceIds,
@@ -212,6 +215,11 @@ protected:
                          uint32_t projectionIncrement = 1,
                          float additionalScaling = 1.0f);
 
+    // Protected methods for calculating gradients
+    GradientType useGradientType;
+    int volume_gradient2D(cl::Buffer& F, cl::Buffer& GX, cl::Buffer& GY);
+    int volume_gradient2D_adjoint(cl::Buffer& GX, cl::Buffer& GY, cl::Buffer& D);
+
     std::vector<std::shared_ptr<cl::Buffer>> x_buffers, tmp_x_buffers;
     std::vector<std::shared_ptr<cl::Buffer>> b_buffers, tmp_b_buffers;
     std::chrono::time_point<std::chrono::steady_clock> timestamp;
@@ -224,6 +232,7 @@ protected:
     uint64_t BDIM, XDIM;
 
 private:
+    bool gradientInitialized = false;
     bool isLocalRangeAdmissible(cl::NDRange& localRange);
     void checkLocalRange(cl::NDRange& localRange, std::string name);
 };

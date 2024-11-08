@@ -123,6 +123,20 @@ void BasePBCT2DOperator::initializeProximal()
     }
 }
 
+void BasePBCT2DOperator::initializeGradient()
+{
+    if(!isOpenCLInitialized())
+    {
+        CLINCLUDEgradient();
+        gradientInitialized = true;
+    } else
+    {
+        std::string err
+            = "Could not initialize volume convolution when OpenCL was already initialized.";
+        KCTERR(err);
+    }
+}
+
 void BasePBCT2DOperator::useJacobiVectorCLCode()
 {
     if(!isOpenCLInitialized())
@@ -513,6 +527,119 @@ int BasePBCT2DOperator::kaczmarz_product(cl::Buffer& K,
                     k_count, globalRange, localRange);
             }
         }
+    }
+    return 0;
+}
+
+void BasePBCT2DOperator::setGradientType(GradientType type)
+{
+    useGradientType = type;
+    std::string gradientTypeString = GradientTypeToString(useGradientType);
+    LOGD << io::xprintf("Setting gradient computation method to %s", gradientTypeString.c_str());
+}
+
+int BasePBCT2DOperator::volume_gradient2D(cl::Buffer& F, cl::Buffer& GX, cl::Buffer& GY)
+{
+    if(!gradientInitialized)
+    {
+        KCTERR("Gradient not initialized, call initializeGradient() before initializing OpenCL.");
+    }
+    cl::NDRange globalRangeGradient(vdims.x, vdims.y, vdims.z);
+    cl::NDRange localRangeGradient = cl::NullRange;
+
+    switch(useGradientType)
+    {
+    case GradientType::CentralDifference3Point:
+        algFLOATvector_Gradient2D_centralDifference_3point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+
+    case GradientType::CentralDifference5Point:
+        algFLOATvector_Gradient2D_centralDifference_5point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+
+    case GradientType::ForwardDifference2Point:
+        algFLOATvector_Gradient2D_forwardDifference_2point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+
+    case GradientType::ForwardDifference3Point:
+        algFLOATvector_Gradient2D_forwardDifference_3point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference4Point:
+        algFLOATvector_Gradient2D_forwardDifference_4point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference5Point:
+        algFLOATvector_Gradient2D_forwardDifference_5point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference6Point:
+        algFLOATvector_Gradient2D_forwardDifference_6point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference7Point:
+        algFLOATvector_Gradient2D_forwardDifference_7point(F, GX, GY, vdims, voxelSizesF,
+                                                           globalRangeGradient, localRangeGradient);
+        break;
+
+    default:
+        KCTERR("Unknown GradientType");
+    }
+    return 0;
+}
+
+int BasePBCT2DOperator::volume_gradient2D_adjoint(cl::Buffer& GX, cl::Buffer& GY, cl::Buffer& D)
+{
+    if(!gradientInitialized)
+    {
+        KCTERR("Gradient not initialized, call initializeGradient() before initializing OpenCL.");
+    }
+    cl::NDRange globalRangeGradient(vdims.x, vdims.y, vdims.z);
+    cl::NDRange localRangeGradient = cl::NullRange;
+
+    switch(useGradientType)
+    {
+    case GradientType::CentralDifference3Point:
+        algFLOATvector_Gradient2D_centralDifference_3point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+
+    case GradientType::CentralDifference5Point:
+        algFLOATvector_Gradient2D_centralDifference_5point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+
+    case GradientType::ForwardDifference2Point:
+        algFLOATvector_Gradient2D_forwardDifference_2point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+
+    case GradientType::ForwardDifference3Point:
+        algFLOATvector_Gradient2D_forwardDifference_3point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference4Point:
+        algFLOATvector_Gradient2D_forwardDifference_4point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference5Point:
+        algFLOATvector_Gradient2D_forwardDifference_5point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference6Point:
+        algFLOATvector_Gradient2D_forwardDifference_6point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+    case GradientType::ForwardDifference7Point:
+        algFLOATvector_Gradient2D_forwardDifference_7point_adjoint(
+            GX, GY, D, vdims, voxelSizesF, globalRangeGradient, localRangeGradient);
+        break;
+
+    default:
+        KCTERR("Unknown GradientType");
     }
     return 0;
 }

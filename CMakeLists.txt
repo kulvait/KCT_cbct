@@ -16,6 +16,10 @@ message("Current value of flags is ${CMAKE_CXX_FLAGS} and debug is ${CMAKE_CXX_F
 set(CMAKE_CXX_FLAGS "-Wall -Wno-ignored-attributes -Wno-deprecated-copy")
 #See https://stackoverflow.com/questions/13905200/is-it-wise-to-ignore-gcc-clangs-wmissing-braces-warning
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-braces")
+#Silence the warning in /usr/local/cuda-11.8/include/CL/cl.hpp is due to a change in the ABI (Application Binary Interface) 
+#for handling parameters with 128-byte alignment introduced in GCC 4.6. Specifically, this impacts the way certain types, 
+#like cl_double16, are passed by value in function calls.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi")
 #Turn -Werror or -Wextra to see problems
 #Set -Wno-ignored-attributes due to the OpenCL Nvidia libraries
 #Is it also possible to set it target specific using target_compile_options https://www.foonathan.net/2018/10/cmake-warnings/
@@ -191,6 +195,7 @@ configure_file(${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl opencl/projector_tt.cl
 configure_file(${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl opencl/rescaleProjections.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/utils.cl opencl/utils.cl COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/opencl/proximal.cl opencl/proximal.cl COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/opencl/gradient.cl opencl/gradient.cl COPYONLY)
 
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/backprojector_minmax.cl DESTINATION opencl)
@@ -214,6 +219,7 @@ install(FILES ${CMAKE_SOURCE_DIR}/opencl/projector_tt.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/rescaleProjections.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/utils.cl DESTINATION opencl)
 install(FILES ${CMAKE_SOURCE_DIR}/opencl/proximal.cl DESTINATION opencl)
+install(FILES ${CMAKE_SOURCE_DIR}/opencl/gradient.cl DESTINATION opencl)
 
 SET(KCTPROJECTOR_SOURCES src/kct-cb-projector.cpp src/Kniha.cpp src/alg/CuttingVoxelProjector.cpp src/CArmArguments.cpp)
 add_executable(kct-projector ${KCTPROJECTOR_SOURCES})

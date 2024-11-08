@@ -15,7 +15,6 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
     double norm, residualNorm2_old, residualNorm2_now, AdirectionNorm2, alpha, beta;
     double NB0 = std::sqrt(normBBuffer_barrier_double(*b_buf));
     double NR0, NX;
-    LOGI << io::xprintf("||b||=%f", NB0);
     std::shared_ptr<cl::Buffer> directionVector_xbuf, residualVector_xbuf; // X buffers
     allocateXBuffers(2);
     directionVector_xbuf = getXBuffer(0);
@@ -30,6 +29,7 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
     {
         project(*x_buf, *AdirectionVector_bbuf);
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -1.0f, BDIM);
+        norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
         reportTime("Projection x0", false, true);
     } else
     {
@@ -41,6 +41,14 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
     residualNorm2_old = normXBuffer_barrier_double(*residualVector_xbuf);
     reportTime("Backprojection 0", false, true);
     NR0 = std::sqrt(residualNorm2_old);
+    if(useVolumeAsInitialX0)
+    {
+        LOGI << io::xprintf_green("\n|b|=%0.1f, |Ax_0-b|=%0.1f, %0.1f%% of |b|, |AT(Ax0-b)|=%0.1f",
+                                  NB0, norm, 100.0 * norm / NB0, NR0);
+    } else
+    {
+        LOGI << io::xprintf_green("\n|b|=%0.1f, |AT b|=%0.1f", NB0, NR0);
+    }
     project(*directionVector_xbuf, *AdirectionVector_bbuf);
     // writeProjections(*AdirectionVector_bbuf, "/tmp/initialProjection");
     AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf);
@@ -94,8 +102,8 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
         LOGD << io::xprintf("Iteration %d: alpha = %f, beta = %f, |Ax-b| = %f, |AT(Ax-b)| = %f",
                             iteration, alpha, beta, norm, NX);
-        //BasePBCT2DReconstructor::writeVolume(*x_buf,
-        //                                     io::xprintf("cgls_x_buf_it%02d.den", iteration));
+        // BasePBCT2DReconstructor::writeVolume(*x_buf,
+        //                                      io::xprintf("cgls_x_buf_it%02d.den", iteration));
     }
     LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
                               iteration, norm, 100.0 * norm / NB0);
@@ -200,7 +208,6 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffe
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     cl::NDRange localRange = cl::NullRange;
-    cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
         algFLOATvector_copy(XIN, *AdirectionVector_bbuf_xpart_L2,
@@ -248,7 +255,6 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buff
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     cl::NDRange localRange = cl::NullRange;
-    cl_float3 voxelSizesF = { (float)voxelSizes.x, (float)voxelSizes.y, (float)voxelSizes.z };
     if(tikhonovRegularizationL2)
     {
         algFLOATvector_copy(XIN, *discrepancy_bbuf_xpart_L2,
