@@ -264,7 +264,7 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(std::shared_ptr<cl::Buffer> xb
         //                                         iteration));
     }
     LOGD << io::xprintf(
-        "Iteration %d: |DISCREPANCY| = %f %.2f%% of zero expression |Ax-b|=%f %.2%% of |b|",
+        "Iteration %d: |DISCREPANCY| = %f %.2f%% of zero expression |Ax-b|=%f %.2f%% of |b|",
         iteration, NDRHS, 100.0 * NDRHS / NDRHS_ZEROX, std::sqrt(NDRHSB2),
         100.0 * std::sqrt(NDRHSB2 / NDRHSB2_START));
     /*    BasePBCT2DReconstructor::writeVolume(
