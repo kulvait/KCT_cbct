@@ -263,8 +263,10 @@ int PDHGPBCT2DReconstructor::proximalOperatorCGLS(std::shared_ptr<cl::Buffer> xb
         //                                         io::xprintf("PDHG_x_xbufOUT_it%02d.den",
         //                                         iteration));
     }
-    LOGD << io::xprintf("Iteration %d: |DISCREPANCY| = %f %.2f%% of zero expression", iteration,
-                        NDRHS, 100.0 * NDRHS / NDRHS_ZEROX);
+    LOGD << io::xprintf(
+        "Iteration %d: |DISCREPANCY| = %f %.2f%% of zero expression |Ax-b|=%f %.2%% of |b|",
+        iteration, NDRHS, 100.0 * NDRHS / NDRHS_ZEROX, std::sqrt(NDRHSB2),
+        100.0 * std::sqrt(NDRHSB2 / NDRHSB2_START));
     /*    BasePBCT2DReconstructor::writeVolume(
             x_xbufOUT,
             io::xprintf("%sx_cgls_it%02d.den", intermediatePrefix.c_str(), outerIterationIndex));*/
@@ -438,9 +440,9 @@ int PDHGPBCT2DReconstructor::reconstruct(float mu,
         // algFLOATvector_isotropicBackDivergence2D(*dual_xbuf_x, *dual_xbuf_y, *divergence_xbuf,
         //                                         vdims, voxelSizesF, globalRangeGradient,
         //                                         localRangeGradient); // Compute divergence of p
-        BasePBCT2DReconstructor::writeVolume(
-            *divergence_xbuf,
-            io::xprintf("%s_divergence_it%02d.den", intermediatePrefix.c_str(), iteration));
+        // BasePBCT2DReconstructor::writeVolume(
+        //    *divergence_xbuf,
+        //    io::xprintf("%s_divergence_it%02d.den", intermediatePrefix.c_str(), iteration));
         // I need primal_xbuf for update in step 3 so I put argument for primal proximal operator to
         // dirergence_xbuf, which is fully computed in step 2
         std::shared_ptr<cl::Buffer> proximal_arg_xbuf = divergence_xbuf;
