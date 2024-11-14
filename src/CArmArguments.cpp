@@ -400,7 +400,7 @@ void CArmArguments::addSettingsArgs()
     og_settings
         ->add_option(
             "--max-iterations", maxIterationCount,
-            io::xprintf("Maximum number of LSQR iterations, defaults to %d.", maxIterationCount))
+            io::xprintf("Maximum number of iterations, defaults to %d.", maxIterationCount))
         ->check(CLI::Range(1, 65535));
     og_settings
         ->add_option("--stopping-relative-error", stoppingRelativeError,

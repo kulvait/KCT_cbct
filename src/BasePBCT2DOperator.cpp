@@ -169,6 +169,9 @@ int BasePBCT2DOperator::problemSetup(
     }
     this->geometries = geometries;
     this->geometryAtY = geometryAtY;
+    this->voxelSpacingX = voxelSpacingX;
+    this->voxelSpacingY = voxelSpacingY;
+    this->voxelSpacingZ = voxelSpacingZ;
     PM3Vector.clear();
     scalingFactorVector.clear();
     cl_double3 CM;
