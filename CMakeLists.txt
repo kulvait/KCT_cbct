@@ -240,6 +240,34 @@ target_git_version_init(kct-projector)
 target_link_libraries (kct-projector ${CMAKE_THREAD_LIBS_INIT})
 install (TARGETS kct-projector RUNTIME DESTINATION .)
 
+
+# Set the source files for kct-rof
+SET(KCTROF_SOURCES src/kct-rof.cpp src/CArmArguments.cpp src/Kniha.cpp src/AlgorithmsBarrierBuffers.cpp src/BaseROFOperator.cpp src/PDHGROFExecutor.cpp)
+# Create the executable for kct-rof
+add_executable(kct-rof ${KCTROF_SOURCES})
+# Set properties for the executable
+set_target_properties(
+    kct-rof
+    PROPERTIES 
+        OUTPUT_NAME "kct-rof"
+        SUFFIX ""
+)
+# Link the necessary libraries
+target_link_libraries(kct-rof ctiol)
+target_link_libraries(kct-rof ctmal)
+target_link_libraries(kct-rof OpenCL::OpenCL)
+target_link_libraries(kct-rof CTIOL_OPENCL)
+# Include OpenCL headers
+target_include_directories(kct-rof PUBLIC ${OpenCL_INCLUDE_DIRS})
+# Optional compile definitions (if needed)
+# target_compile_definitions(kct-rof PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
+# target_compile_definitions(kct-rof PUBLIC CL_TARGET_OPENCL_VERSION=120)
+# Initialize git versioning for the executable
+target_git_version_init(kct-rof)
+target_link_libraries(kct-rof ${CMAKE_THREAD_LIBS_INIT})
+install(TARGETS kct-rof RUNTIME DESTINATION .)
+
+
 SET(CLLINCONVOLUTION_SOURCES src/CLlin-convolution.cpp src/Kniha.cpp src/alg/VolumeConvolutionOperator.cpp src/CArmArguments.cpp)
 add_executable(CLlin-convolution ${CLLINCONVOLUTION_SOURCES})
 set_target_properties(
