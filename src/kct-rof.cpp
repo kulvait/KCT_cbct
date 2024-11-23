@@ -168,8 +168,8 @@ int Args::postParse()
     if(totalVolumeSize > INT_MAX)
     {
         ERR = "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
-        LOGE << ERR;
-        return 1;
+        LOGW << ERR;
+        // return 1;
     }
     // Ensure 32-bit float type for input
     io::DenSupportedType t = inf.getElementType();

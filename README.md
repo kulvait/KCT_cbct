@@ -87,7 +87,7 @@ Doc files and this file can be written using [Markdown syntax](https://daringfir
 /**Brief description.
 *
 *Long description
-*thay might span multiple lines.
+*that might span multiple lines.
 */
 ```
 .
