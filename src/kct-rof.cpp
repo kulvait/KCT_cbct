@@ -15,6 +15,7 @@
 
 // Internal libraries
 #include "CArmArguments.hpp"
+#include "DEN/DenAsyncFrame2DBufferedWritter.hpp"
 #include "DEN/DenFileInfo.hpp"
 #include "DEN/DenFrame2DReader.hpp"
 #include "GradientType.hpp"
@@ -45,6 +46,7 @@ public:
     uint64_t totalVolumeSize;
     uint32_t slabFrom = 0;
     uint32_t slabSize = 0;
+    uint32_t chunkSize = 0;
     std::string inputVolume;
     std::string outputVolume;
     std::string initialVectorX0;
@@ -131,12 +133,22 @@ void Args::defineArguments()
     og_pdhg_gradient->require_option(0, 1);
 
     addVoxelSizeArgs();
+    og_geometry->add_option("--slab-from", slabFrom,
+                            "Starting index along the Z-axis for slab reconstruction. Only part of "
+                            "the projection data will be reconstructed, beginning at this index.");
+
     og_geometry->add_option(
-        "--slab-from", slabFrom,
-        "Use for slab reconstruction, reconstruct only part of the projection data.");
-    og_geometry->add_option("--slab-size", slabSize,
-                            "Use for slab reconstruction, reconstruct only part of the projection "
-                            "data, 0 means reconstruct up to dimy.");
+        "--slab-size", slabSize,
+        "Number of slices along the Z-axis to reconstruct for slab reconstruction. "
+        "If set to 0, reconstruction will include all slices from '--slab-from' to the end of the "
+        "volume.");
+
+    og_geometry->add_option(
+        "--chunk-size", chunkSize,
+        "Divide the reconstruction into smaller chunks of data to process sequentially. "
+        "This improves memory efficiency for large datasets, which might otherwise not fit into "
+        "GPU memory. "
+        "If set to 0, no chunking will be performed (the entire slab will be processed at once).");
 
     // Program flow parameters
     addForceArgs();
@@ -159,29 +171,79 @@ int Args::postParse()
     volumeSizeY = inf.dimy();
     volumeSizeZ = inf.dimz();
 
+    // Ensure slabSize is valid
     if(slabSize == 0)
     {
-        slabSize = volumeSizeZ - slabFrom;
+        slabSize = volumeSizeZ - slabFrom; // Default to the remaining volume starting from slabFrom
     }
+    if(slabSize <= 0 || slabFrom + slabSize > volumeSizeZ)
+    {
+        ERR = io::xprintf("Invalid slabSize (%d) or slabFrom (%d). Ensure slabFrom + slabSize <= "
+                          "volumeSizeZ (%d).",
+                          slabSize, slabFrom, volumeSizeZ);
+        LOGE << ERR;
+        return -1;
+    }
+
+    // Update volumeSizeZ to reflect the slab being reconstructed
     volumeSizeZ = slabSize;
     totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(slabSize);
+
+    // Check for overflow in totalVolumeSize
     if(totalVolumeSize > INT_MAX)
     {
-        ERR = "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
-        LOGW << ERR;
-        // return 1;
+        if(chunkSize == 0)
+        {
+            // Dynamically calculate chunkSize to ensure processing remains feasible
+            chunkSize = INT_MAX / (volumeSizeX * volumeSizeY);
+            if(chunkSize <= 0)
+            {
+                ERR = "Volume dimensions are too large to handle even with chunking.";
+                LOGE << ERR;
+                return -1;
+            } else
+            {
+                ERR = io::xprintf("Volume dimensions are too large to handle in one go. "
+                                  "Adjusting chunkSize to %d.",
+                                  chunkSize);
+                LOGW << ERR;
+            }
+        }
     }
+
+    // Ensure chunkSize is valid and within slabSize
+    if(chunkSize == 0)
+    {
+        // If chunkSize is unspecified, default to slabSize (process entire slab at once)
+        chunkSize = slabSize;
+    } else if(chunkSize > slabSize)
+    {
+        // Ensure chunkSize does not exceed slabSize
+        LOGW << io::xprintf(
+            "chunkSize (%d) exceeds slabSize (%d). Adjusting chunkSize to slabSize.", chunkSize,
+            slabSize);
+        chunkSize = slabSize;
+    }
+
+    // Update volumeSizeZ to reflect the chnunk being reconstructed and recalculate total volume
+    volumeSizeZ = slabSize;
+    totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(chunkSize);
+
     // Ensure 32-bit float type for input
     io::DenSupportedType t = inf.getElementType();
     if(t != io::DenSupportedType::FLOAT32)
     {
         ERR = io::xprintf("This program supports FLOAT32 volumes only but the supplied "
-                          "volume file %s is of type %s",
+                          "volume file %s is of type %s.",
                           inputVolume.c_str(), io::DenSupportedTypeToString(t).c_str());
         LOGE << ERR;
         return -1;
     }
+
+    // Parse platform string
     parsePlatformString();
+
+    // Adjust PDHG parameters based on voxel size
     double voxelSizeAvg = (voxelSizeX + voxelSizeY + voxelSizeZ) / 3.0;
     if(pdhg_tau < 0.0)
     {
@@ -195,6 +257,7 @@ int Args::postParse()
     {
         pdhg_mu = -pdhg_mu * voxelSizeAvg * voxelSizeAvg;
     }
+
     return 0;
 }
 
@@ -225,21 +288,29 @@ int main(int argc, char* argv[])
     PRG.startLog(true);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
 
-    // Initialize ROF operator
-    float* volume = new float[ARG.totalVolumeSize];
-    bool readxmajorvolume = true;
+    // File handling logic
     io::DenFileInfo iv(ARG.inputVolume);
-    iv.readIntoArray(volume, readxmajorvolume, 0, 0, 0, 0, ARG.slabFrom, ARG.slabSize);
-    std::string startPath;
-    startPath = io::getParent(ARG.outputVolume);
     std::string bname = io::getBasename(ARG.outputVolume);
     bname = bname.substr(0, bname.find_last_of("."));
+    std::string startPath;
+    startPath = io::getParent(ARG.outputVolume);
     startPath = io::xprintf("%s/%s_", startPath.c_str(), bname.c_str());
     LOGI << io::xprintf("startpath=%s", startPath.c_str());
+    std::shared_ptr<io::DenAsyncFrame2DBufferedWritter<float>> outputWritter
+        = std::make_shared<io::DenAsyncFrame2DBufferedWritter<float>>(
+            ARG.outputVolume, ARG.volumeSizeX, ARG.volumeSizeY, ARG.slabSize);
 
+    // Chunk handling logic
+    int numChunks = (ARG.slabSize + ARG.chunkSize - 1) / ARG.chunkSize; // Ceiling division
+    uint32_t lastChunkSize = ARG.slabSize % ARG.chunkSize;
+    if(lastChunkSize == 0)
+    {
+        lastChunkSize = ARG.chunkSize;
+    }
+    // Initialize ROF operator
     std::shared_ptr<PDHGROFExecutor> pdhg = std::make_shared<PDHGROFExecutor>(
-        ARG.volumeSizeX, ARG.volumeSizeY, ARG.slabSize, ARG.CLitemsPerWorkgroup);
-    // pdhg > setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+        ARG.volumeSizeX, ARG.volumeSizeY, ARG.chunkSize, ARG.CLitemsPerWorkgroup);
+    float* volume = new float[ARG.totalVolumeSize];
     pdhg->initializeVolumeConvolution();
     pdhg->initializeProximal();
     pdhg->initializeGradient();
@@ -253,20 +324,54 @@ int main(int argc, char* argv[])
         KCTERR(ERR);
     }
     pdhg->problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ);
-    ecd = pdhg->initializeVolume(volume);
-    if(ecd != 0)
+    bool readxmajorvolume = true;
+    uint32_t currentChunkSize = ARG.chunkSize;
+    uint32_t zposition = ARG.slabFrom;
+    // Process chunks one by one
+    for(int chunkIdx = 0; chunkIdx < numChunks; ++chunkIdx)
     {
-        std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-        LOGE << ERR;
-        KCTERR(ERR);
+        // pdhg > setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
+        if(chunkIdx == numChunks - 1 && lastChunkSize != ARG.chunkSize)
+        {
+            currentChunkSize = lastChunkSize;
+            pdhg = std::make_shared<PDHGROFExecutor>(ARG.volumeSizeX, ARG.volumeSizeY,
+                                                     currentChunkSize, ARG.CLitemsPerWorkgroup);
+            pdhg->initializeVolumeConvolution();
+            pdhg->initializeProximal();
+            pdhg->initializeGradient();
+            pdhg->setGradientType(ARG.useGradientType);
+            int ecd
+                = pdhg->initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0],
+                                         ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
+            if(ecd < 0)
+            {
+                std::string ERR
+                    = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
+                LOGE << ERR;
+                KCTERR(ERR);
+            }
+            pdhg->problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ);
+        }
+        // Determine the size of the current chunk
+        // Read the corresponding slab for the current chunk
+        iv.readIntoArray(volume, readxmajorvolume, 0, 0, 0, 0, zposition, currentChunkSize);
+        ecd = pdhg->initializeVolume(volume);
+        if(ecd < 0)
+        {
+            std::string ERR = io::xprintf("Could not initialize volume for chunkIdx %d/%d.",
+                                          chunkIdx, numChunks);
+            LOGE << ERR;
+            KCTERR(ERR);
+        }
+        pdhg->reconstruct(ARG.pdhg_mu, ARG.pdhg_tau, ARG.pdhg_sigma, ARG.pdhg_theta,
+                          ARG.maxIterationPDHG, ARG.stoppingRelativePDHG);
+        for(uint32_t z = 0; z < currentChunkSize; ++z)
+        {
+            outputWritter->writeBuffer(volume + z * ARG.volumeSizeX * ARG.volumeSizeY,
+                                       zposition - ARG.slabFrom + z);
+        }
+        zposition += currentChunkSize;
     }
-    pdhg->reconstruct(ARG.pdhg_mu, ARG.pdhg_tau, ARG.pdhg_sigma, ARG.pdhg_theta,
-                      ARG.maxIterationPDHG, ARG.stoppingRelativePDHG);
-    bool volumexmajor = true;
-    bool writexmajor = true;
-    io::DenFileInfo::create3DDenFileFromArray(volume, volumexmajor, ARG.outputVolume,
-                                              io::DenSupportedType::FLOAT32, ARG.volumeSizeX,
-                                              ARG.volumeSizeY, ARG.slabSize, writexmajor);
 
     delete[] volume;
 
