@@ -1,10 +1,22 @@
 # KCT CBCT
 
-Fast, accurate and reliable software for algebraic CT reconstruction.
+**Fast, accurate and reliable software for algebraic CT reconstruction.**
 
-This set of software tools includes OpenCL implementation of modern CT and CBCT reconstruction algorithms including unpublished algorithms by the author. Initially, the focus was on CT reconstruction using Krylov LSQR and CGLS methods. Gradually, other widely used methods such as OS-SIRT are added. Initially, the software was based on the idea of a projector that directly computes the projections of individual voxels onto pixels using the volume integrals of the voxel cuts. The author intends to publish a paper on this cutting voxel projector (CVP) in late 2021. However, the package also includes implementations of the TT projector and the Siddon projector the DD and TR projectors will be implemented in the near future. The code for the CVP projector is optimized using OpenCL local memory and is probably one of the fastest projector implementations ever for algebraic reconstruction. 
+This software package provides a comprehensive suite of tools for modern CT and CBCT reconstruction, featuring highly optimized OpenCL implementations of advanced algorithms, including unpublished methods developed by the author. Initially focused on algebraic reconstruction using Krylov-based LSQR and CGLS methods, the package has since expanded to include other widely used techniques, such as OS-SIRT.
 
-The package has been tested and is compatible with the AMD Radeon VII Vega 20 GPU and NVIDIA GeForce RTX 2080 Ti GPU. Some routines have been optimized specifically for these GPU architectures. OpenCL code conforms to the [OpenCL 1.2 specification](https://www.khronos.org/registry/OpenCL/specs/opencl-1.2.pdf) and the implementation uses C++ wrappers from OpenCL 1.2. OpenCL 2.0 is not supported due to lack of support from NVidia. 
+At the core of this software is the cutting voxel projector [CVP](https://arxiv.org/abs/2110.09841), a highly efficient projector that calculates voxel contributions to pixel projections based on volume integrals of voxel cuts. The CVP projector, implemented with OpenCL local memory optimizations, achieves remarkable computational speed, making it one of the fastest projector implementations available for algebraic reconstruction. The package also includes implementations of the TT projector and Siddon projector, providing users with a versatile range of reconstruction tools.
+
+The software has been tested on multiple architectures, including AMD Radeon VII Vega 20 GPUs, NVIDIA GeForce RTX 2080 Ti GPUs, and Intel CPUs. Compatibility with [OpenCL 1.2](https://www.khronos.org/registry/OpenCL/specs/opencl-1.2.pdf) ensures portability, and the codebase leverages OpenCL 1.2 C++ wrappers for implementation. It could be compilled with OpenCL 2.2 even on NVIDIA GPUs. Specifically, testing has been conducted on NVIDIA's V100 and A100 GPUs, with CUDA 11.8 or CUDA 12.1 OpenCL runtime.
+
+Supported platforms include Red Hat Enterprise Linux 9 (with GCC 11) and Debian 12 (with GCC 12), ensuring compatibility with modern Linux distributions.
+
+Present and future development efforts focus on:
+
+- **Preconditioning for Krylov Methods:** Developing advanced preconditioning techniques to enhance convergence rates.
+- **Adaptive Voxel Grids:** Enabling computations on grids with variable voxel edge sizes to improve reconstruction quality in regions of interest.
+- **Regularization Techniques:** Integrating regularization methods, such as total variation (TV) minimization, to reduce noise and artifacts in reconstructed images.
+
+This software represents a powerful toolset for researchers and engineers in tomographic imaging, offering state-of-the-art performance across diverse hardware platforms while maintaining flexibility and scalability for ongoing advancements in the field.
 
 ## Algorithms
 
