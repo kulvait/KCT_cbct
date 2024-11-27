@@ -20,13 +20,18 @@ This software represents a powerful toolset for researchers and engineers in tom
 
 ## Algorithms
 
-Cutting voxel projector yet to be published.
+The following algorithms are implemented as part of this framework
 
-LSQR algorithm was implemented according to https://doi.org/10.1002/nla.611
+### Implemented iterative CT reconstruction algorithms
+CGLS algorithm with delayed residual computation as described in [Kulvait, Rose, 2011](https://doi.org/10.48550/arXiv.2110.13526)
+LSQR algorithm was implemented according to [Reichel, Ye 2008](https://doi.org/10.1002/nla.611)
+PSIRT algorithm was implemented according to [Gregor, Benson 2008](https://doi.org/10.1109/TMI.2008.923696)
+OS-SART algorithm was implemented according to [Jiang, Wang, 2003](https://doi.org/10.1109/TIP.2003.815295)
 
-CGLS algorithm with delayed residual computation as described in the proceedings of Fully3D conference 2021
-Software Implementation of the Krylov Methods Based Reconstruction for the 3D Cone Beam CT Operator
-Poster and extendend absract can be found in the publications directory
+### Implemented projectors
+Cutting voxel projector was implemented according to [Kulvait et al.](https://arxiv.org/abs/2110.09841)
+TT projector was implemented according to [Long et al., 2010](https://doi.org/10.1109/TMI.2010.2050898)
+Siddon projector was implemented according to [Siddon, 1985](https://doi.org/10.1118/1.595715)
 
 ## Repositories
 
