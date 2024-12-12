@@ -23,7 +23,7 @@ This software represents a powerful toolset for researchers and engineers in tom
 The following algorithms are implemented as part of this framework
 
 ### Implemented iterative CT reconstruction algorithms
-CGLS algorithm with delayed residual computation as described in [Kulvait, Rose, 2011](https://doi.org/10.48550/arXiv.2110.13526)
+CGLS algorithm with delayed residual computation as described in [Kulvait, Rose, 2021](https://doi.org/10.48550/arXiv.2110.13526)
 LSQR algorithm was implemented according to [Reichel, Ye 2008](https://doi.org/10.1002/nla.611)
 PSIRT algorithm was implemented according to [Gregor, Benson 2008](https://doi.org/10.1109/TMI.2008.923696)
 OS-SART algorithm was implemented according to [Jiang, Wang, 2003](https://doi.org/10.1109/TIP.2003.815295)
