@@ -221,6 +221,24 @@ OpenCL implementation cone beam CT reconstruction operator.  Git commit 697eecf
 ``
 Including this version ensures efficient debugging and resolution.
 
+## Cite this repository
+
+To cite this repository, you can use its Zenodo record or use the following BibTeX entry.
+
+[![DOI](https://zenodo.org/badge/405354358.svg)](https://doi.org/10.5281/zenodo.14641395)
+
+```
+@Misc{KCTCBCT2025,
+  author    = {Kulvait, Vojtěch},
+  title     = {Software for algebraic {CT} reconstruction {KCT CBCT}: Version 1.0},
+  year      = {2025},
+  copyright = {GNU General Public License v3.0},
+  doi       = {10.5281/ZENODO.14641395},
+  publisher = {Zenodo},
+  note = {Github repository \url{https://github.com/kulvait/KCT_cbct}}
+}
+```
+
 ## Licensing
 
 When there is no other licensing and/or copyright information in the source files of this project, the following apply for the source files in the directories include, src, opencl and for CMakeLists.txt file:
