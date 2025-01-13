@@ -2,8 +2,6 @@
 
 **Fast, accurate and reliable software for algebraic CT reconstruction.**
 
-[![DOI](https://zenodo.org/badge/405354358.svg)](https://doi.org/10.5281/zenodo.14641395)
-
 This software package provides a comprehensive suite of tools for modern CT and CBCT reconstruction, featuring highly optimized OpenCL implementations of advanced algorithms, including unpublished methods developed by the author. Initially focused on algebraic reconstruction using Krylov-based LSQR and CGLS methods, the package has since expanded to include other widely used techniques, such as OS-SIRT.
 
 At the core of this software is the cutting voxel projector [CVP](https://arxiv.org/abs/2110.09841), a highly efficient projector that calculates voxel contributions to pixel projections based on volume integrals of voxel cuts. The CVP projector, implemented with OpenCL local memory optimizations, achieves remarkable computational speed, making it one of the fastest projector implementations available for algebraic reconstruction. The package also includes implementations of the TT projector and Siddon projector, providing users with a versatile range of reconstruction tools.
@@ -223,9 +221,9 @@ Including this version ensures efficient debugging and resolution.
 
 ## Cite this repository
 
-To cite this repository, you can use its Zenodo record or use the following BibTeX entry.
-
 [![DOI](https://zenodo.org/badge/405354358.svg)](https://doi.org/10.5281/zenodo.14641395)
+
+To cite this repository, you can use its Zenodo record and the following BibTeX entry.
 
 ```
 @Misc{KCTCBCT2025,
