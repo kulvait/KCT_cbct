@@ -1,4 +1,4 @@
-//==============================backprojector.cl=====================================
+//==============================backprojector_cbct_cvp.cl=====================================
 //#ifndef RELAXED
 //#define RELAXED
 //#endif
@@ -836,4 +836,4 @@ void kernel FLOATcutting_voxel_backproject(global float* restrict volume,
         }
     }
 }
-//==============================END backprojector.cl=====================================
+//==============================END backprojector_cbct_cvp.cl=====================================

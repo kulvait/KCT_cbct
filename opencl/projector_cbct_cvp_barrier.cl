@@ -1,4 +1,4 @@
-//==============================projector_cvp_barrier.cl=====================================
+//==============================projector_cbct_cvp_barrier.cl=====================================
 
 #define LOCALMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                    \
     if(PJ_max >= pdims.y)                                                                          \
@@ -991,4 +991,4 @@ END DEBUG CODE */
     } while(!stopNextIteration);
     //} while(startIRange < projectorLocalRange[1]);
 }
-//==============================END projector_cvp_barrier.cl=====================================
+//==============================END projector_cbct_cvp_barrier.cl=====================================

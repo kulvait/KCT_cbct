@@ -1,4 +1,4 @@
-//==============================projector_tt.cl=====================================
+//==============================projector_cbct_tt.cl=====================================
 /**
  * Calculates the integral from a to b over the linear function vith a value 0 at 0 and 1 at
  * intervalLength.
@@ -464,4 +464,4 @@ void kernel FLOATta3_project(global const float* restrict volume,
         }
     }
 }
-//==============================END projector_tt.cl=====================================
+//==============================END projector_cbct_tt.cl=====================================

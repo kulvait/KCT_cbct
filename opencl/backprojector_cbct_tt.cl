@@ -1,4 +1,4 @@
-//==============================backprojector_tt.cl=====================================
+//==============================backprojector_cbct_tt.cl=====================================
 /// backprojectEdgeValues(INDEXfactor, V, P, projection, pdims);
 float inline backprojectVericalFootprints(global const float* projection,
                                           private double footprintX,
@@ -442,4 +442,4 @@ void kernel FLOATta3_backproject(global float* restrict volume,
     ADD = ADD * scalingFactor * A3;
     volume[IND] += ADD;
 }
-//==============================END backprojector_tt.cl=====================================
+//==============================END backprojector_cbct_tt.cl=====================================

@@ -1,4 +1,4 @@
-//==============================projector.cl=====================================
+//==============================projector_cbct_cvp.cl=====================================
 /**
  * We parametrize the line segment from A to B by parameter t such that t=0 for A and t=1 for B.
  * Then we will find the t corresponding to the point v = t*B+(1-t)A  that maps to the coordinate PX
@@ -871,4 +871,4 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         }
     }
 }
-//==============================END projector.cl=====================================
+//==============================END projector_cbct_cvp.cl=====================================

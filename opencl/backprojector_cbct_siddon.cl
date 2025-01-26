@@ -1,23 +1,23 @@
-//==============================projector_sidon.cl=====================================
-void kernel FLOATsidon_project(global const float* restrict volume,
-                               global float* restrict projection,
-                               private uint projectionOffset,
-                               private double16 ICM,
-                               private double3 sourcePosition,
-                               private double3 normalToDetector,
-                               private int3 vdims,
-                               private double3 voxelSizes,
-                               private double3 volumeCenter,
-                               private int2 pdims,
-                               private float scalingFactor,
-                               private uint2 raysPerPixel)
+//==============================backprojector_cbct_siddon.cl=====================================
+
+void kernel FLOATsidon_backproject(global float* restrict volume,
+                                   global const float* restrict projection,
+                                   private uint projectionOffset,
+                                   private double16 ICM,
+                                   private double3 sourcePosition,
+                                   private double3 normalToDetector,
+                                   private int3 vdims,
+                                   private double3 voxelSizes,
+                                   private double3 volumeCenter,
+                                   private int2 pdims,
+                                   private float scalingFactor,
+                                   private uint2 raysPerPixel)
 {
     uint px = get_global_id(0);
     uint py = get_global_id(1);
     double totalProbes = (double)raysPerPixel.x * raysPerPixel.y;
-    double VAL = 0.0;
-    //(double2)((double)px, (double)py) is the center of the pixel
-    // pixelCorner is a corner with minimal coordinates
+    uint pin = px * pdims.y + py;
+    float VAL = projection[projectionOffset + pin];
     double2 pixelCorner = (double2)((double)px, (double)py) - (double2)0.5;
     double2 pixelSamplingGap = (double2)(1.0) / convert_double2(raysPerPixel);
     double4 P = { 0.0, 0.0, 1.0, 0.0 },
@@ -25,16 +25,13 @@ void kernel FLOATsidon_project(global const float* restrict volume,
     const double3 zerocorner_xyz = { volumeCenter.x - 0.5 * (double)vdims.x * voxelSizes.x,
                                      volumeCenter.y - 0.5 * (double)vdims.y * voxelSizes.y,
                                      volumeCenter.z - 0.5 * (double)vdims.z * voxelSizes.z };
-    const double3 maxcorner_xyz = { volumeCenter.x + 0.5 * (double)vdims.x * voxelSizes.x,
-                                    volumeCenter.y + 0.5 * (double)vdims.y * voxelSizes.y,
-                                    volumeCenter.z + 0.5 * (double)vdims.z * voxelSizes.z };
+    const double3 maxcorner_xyz = -zerocorner_xyz;
     for(uint pi = 0; pi < raysPerPixel.x; pi++)
     {
         P.x = pixelCorner.x + (pi + 0.5) * pixelSamplingGap.x;
         for(uint pj = 0; pj < raysPerPixel.y; pj++)
         {
             P.y = pixelCorner.y + (pj + 0.5) * pixelSamplingGap.y;
-            // Using this formalism for P there is equidistant spacing of the whole detector area
             V.s0 = dot(ICM.s0123, P);
             V.s1 = dot(ICM.s4567, P);
             V.s2 = dot(ICM.s89ab, P);
@@ -203,61 +200,8 @@ void kernel FLOATsidon_project(global const float* restrict volume,
             double alphanext, LEN, pos;
             int3 ind;
             int IND;
-            if(alphasNext.x < alphasNext.y)
+            while(((double*)&alphasNext)[maximalAlphasIndex] - halfMinIncrement < maxalpha)
             {
-                if(alphasNext.x < alphasNext.z)
-                {
-                    alphanext = alphasNext.x;
-                    alphasNext.x += sidonIncrement.x;
-                } else // if(alphasNext.x > alphasNext.z)
-                {
-                    alphanext = alphasNext.z;
-                    alphasNext.z += sidonIncrement.z;
-                    /*
-                                        if(alphasNext.x == alphasNext.z)
-                                        {
-                                            alphasNext.x += sidonIncrement.x;
-                                        }*/
-                }
-            } else if(alphasNext.y < alphasNext.z)
-            {
-                alphanext = alphasNext.y;
-                alphasNext.y += sidonIncrement.y;
-                /*                if(alphasNext.x == alphasNext.y)
-                                {
-                                    alphasNext.x += sidonIncrement.x;
-                                }*/
-            } else
-            {
-                alphanext = alphasNext.z;
-                alphasNext.z += sidonIncrement.z;
-                /*                if(alphasNext.x == alphasNext.z)
-                                {
-                                    alphasNext.x += sidonIncrement.x;
-                                }
-                                if(alphasNext.y == alphasNext.z)
-                                {
-                                    alphasNext.y += sidonIncrement.y;
-                                }*/
-            }
-            LEN = alphanext - alphaprev;
-            pos = alphaprev + 0.5 * LEN; // Position in between
-            while(pos + zeroPrecisionTolerance < maxalpha)
-            {
-                ind = convert_int3_rtn(
-                    (sourcePosition + pos * a - zerocorner_xyz)
-                    / voxelSizes); // Not rounding but finds integer that is closest smaller
-                IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
-                VAL += volume[IND] * LEN;
-                // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
-                /*
-                                if(!(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims)))
-                                {
-                                    printf("PROBLEM (pi,pj)=(%d, %d)!!!!!!!!!!!! ind=(%d, %d, %d)
-                   pos=%f minalpha=%f maxalpha=%f", pi, pj, ind.x, ind.y, ind.z, pos, minalpha,
-                   maxalpha);
-                                }*/
-                alphaprev = alphanext;
                 if(alphasNext.x < alphasNext.y)
                 {
                     if(alphasNext.x < alphasNext.z)
@@ -268,38 +212,27 @@ void kernel FLOATsidon_project(global const float* restrict volume,
                     {
                         alphanext = alphasNext.z;
                         alphasNext.z += sidonIncrement.z;
-                        /*      if(alphasNext.x == alphasNext.z)
-                              {
-                                  alphasNext.x += sidonIncrement.x;
-                              }*/
                     }
                 } else if(alphasNext.y < alphasNext.z)
                 {
                     alphanext = alphasNext.y;
                     alphasNext.y += sidonIncrement.y;
-                    /*     if(alphasNext.x == alphasNext.y)
-                         {
-                             alphasNext.x += sidonIncrement.x;
-                         }*/
                 } else
                 {
                     alphanext = alphasNext.z;
                     alphasNext.z += sidonIncrement.z;
-                    /* if(alphasNext.x == alphasNext.z)
-                     {
-                         alphasNext.x += sidonIncrement.x;
-                     }
-                     if(alphasNext.y == alphasNext.z)
-                     {
-                         alphasNext.y += sidonIncrement.y;
-                     }*/
                 }
                 LEN = alphanext - alphaprev;
-                pos = alphaprev + 0.5 * LEN; // Position in between
+                pos = alphaprev + 0.5 * (alphanext - alphaprev);
+                ind = convert_int3_rtn(
+                    (sourcePosition + pos * a - zerocorner_xyz)
+                    / voxelSizes); // Not rounding but finds integer that is closest smaller
+                IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
+                AtomicAdd_g_f(&volume[IND], VAL * LEN / totalProbes);
+                // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+                alphaprev = alphanext;
             }
         }
     }
-    uint pin = px * pdims.y + py;
-    projection[projectionOffset + pin] = VAL / totalProbes;
 }
-//==============================END projector_sidon.cl=====================================
+//==============================END backprojector_cbct_siddon.cl=====================================

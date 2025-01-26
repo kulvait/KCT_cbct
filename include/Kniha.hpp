@@ -97,7 +97,7 @@ protected:
     uint32_t maxWorkGroupSize;
 
     // OpenCL functors
-    // backprojector.cl
+    // backprojector_cbct_cvp.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
@@ -141,7 +141,7 @@ protected:
                                                 bool blocking = false,
                                                 uint32_t QID = 0);
 
-    // backprojector_sidon.cl
+    // backprojector_cbct_siddon.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
@@ -156,7 +156,7 @@ protected:
                                     cl_uint2&>>
         FLOATsidon_backproject;
 
-    // backprojector_tt.cl
+    // backprojector_cbct_tt.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
@@ -226,7 +226,7 @@ protected:
                                     float&>>
         FLOATcutting_voxel_jacobiPreconditionerVector;
 
-    // projector.cl
+    // projector_cbct_cvp.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
@@ -240,7 +240,7 @@ protected:
                                     float&>>
         FLOATcutting_voxel_project;
 
-    // projector_cvp_barrier.cl
+    // projector_cbct_cvp_barrier.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     cl::LocalSpaceArg&,
@@ -285,7 +285,7 @@ protected:
                                     float&>>
         OLD_FLOATcutting_voxel_project;
 
-    // projector_sidon.cl
+    // projector_cbct_siddon.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,
@@ -300,7 +300,7 @@ protected:
                                     cl_uint2&>>
         FLOATsidon_project;
 
-    // projector_tt.cl
+    // projector_cbct_tt.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
                                     cl::Buffer&,
                                     unsigned int&,

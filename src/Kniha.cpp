@@ -186,7 +186,7 @@ int Kniha::initializeOpenCL(uint32_t platformID,
 void Kniha::CLINCLUDEbackprojector()
 {
 
-    insertCLFile("opencl/backprojector.cl");
+    insertCLFile("opencl/backprojector_cbct_cvp.cl");
     callbacks.emplace_back([this](cl::Program program) {
         auto& ptr = FLOATcutting_voxel_backproject;
         std::string str = "FLOATcutting_voxel_backproject";
@@ -214,7 +214,7 @@ void Kniha::CLINCLUDEbackprojector_minmax()
 
 void Kniha::CLINCLUDEbackprojector_sidon()
 {
-    insertCLFile("opencl/backprojector_sidon.cl");
+    insertCLFile("opencl/backprojector_cbct_siddon.cl");
     callbacks.emplace_back([this](cl::Program program) {
         auto& ptr = FLOATsidon_backproject;
         std::string str = "FLOATsidon_backproject";
@@ -228,7 +228,7 @@ void Kniha::CLINCLUDEbackprojector_sidon()
 
 void Kniha::CLINCLUDEbackprojector_tt()
 {
-    insertCLFile("opencl/backprojector_tt.cl");
+    insertCLFile("opencl/backprojector_cbct_tt.cl");
     callbacks.emplace_back([this](cl::Program program) {
         auto& ptr = FLOATta3_backproject;
         std::string str = "FLOATta3_backproject";
@@ -300,7 +300,7 @@ void Kniha::CLINCLUDEprecomputeJacobiPreconditioner()
 
 void Kniha::CLINCLUDEprojector()
 {
-    insertCLFile("opencl/projector.cl");
+    insertCLFile("opencl/projector_cbct_cvp.cl");
     callbacks.emplace_back([this](cl::Program program) {
         auto& ptr = FLOATcutting_voxel_project;
         std::string str = "FLOATcutting_voxel_project";
@@ -314,7 +314,7 @@ void Kniha::CLINCLUDEprojector()
 
 void Kniha::CLINCLUDEprojector_cvp_barrier()
 {
-    insertCLFile("opencl/projector_cvp_barrier.cl");
+    insertCLFile("opencl/projector_cbct_cvp_barrier.cl");
     callbacks.emplace_back([this](cl::Program program) {
         auto& ptr = FLOATcutting_voxel_project_barrier;
         std::string str = "FLOATcutting_voxel_project_barrier";
@@ -342,7 +342,7 @@ void Kniha::CLINCLUDEprojector_old()
 
 void Kniha::CLINCLUDEprojector_sidon()
 {
-    insertCLFile("opencl/projector_sidon.cl");
+    insertCLFile("opencl/projector_cbct_siddon.cl");
     callbacks.emplace_back([this](cl::Program program) {
         auto& ptr = FLOATsidon_project;
         std::string str = "FLOATsidon_project";
@@ -356,7 +356,7 @@ void Kniha::CLINCLUDEprojector_sidon()
 
 void Kniha::CLINCLUDEprojector_tt()
 {
-    insertCLFile("opencl/projector_tt.cl");
+    insertCLFile("opencl/projector_cbct_tt.cl");
     callbacks.emplace_back([this](cl::Program program) {
         auto& ptr = FLOATta3_project;
         std::string str = "FLOATta3_project";
