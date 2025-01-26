@@ -26,20 +26,30 @@ void findFirstPlatform()
         ERR = io::xprintf("No OpenCL platform available to this program.");
         LOGE << ERR;
     }
+    uint32_t devicesOnPlatform = 0;
     for(uint32_t platformID = 0; platformID != platformsOpenCL; platformID++)
     {
-        uint32_t devicesOnPlatform = util::OpenCLManager::deviceCount(platformID);
-        if(devicesOnPlatform > 0)
+        if(util::OpenCLManager::deviceCount(platformID) > devicesOnPlatform)
         {
+            devicesOnPlatform = util::OpenCLManager::deviceCount(platformID);
             CLplatformID = platformID;
-            CLdeviceID = 0;
-            return;
+            CLdeviceID = devicesOnPlatform - 1;
         }
+    }
+    if(devicesOnPlatform == 0)
+    {
+        ERR = io::xprintf("No OpenCL platform with devices available..");
+        LOGE << ERR;
+    } else
+    {
+        LOGI << io::xprintf("Selected platformID %d deviceID %d, there is %d devices on platform.",
+                            CLplatformID, CLdeviceID, devicesOnPlatform);
     }
 }
 
 /*
- *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details of the adjoint product test
+ *See http://sepwww.stanford.edu/sep/prof/pvi/conj/paper_html/node9.html for details of the adjoint
+ *product test
  */
 TEST_CASE("CVP.AdjointDotProduct.nobarrier", "[adjointop][cuttingvox][NOVIZ]")
 {
@@ -173,7 +183,8 @@ TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed", "[adjointop][cuttingvox][NOVI
     delete[] randomB;
 }
 
-TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed_elevationcorrection", "[adjointop][cuttingvox][NOVIZ]")
+TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed_elevationcorrection",
+          "[adjointop][cuttingvox][NOVIZ]")
 {
     findFirstPlatform();
     double tol = 1e-5;
@@ -239,7 +250,8 @@ TEST_CASE("CVP.AdjointDotProduct.barrier_relaxed_elevationcorrection", "[adjoint
     delete[] randomB;
 }
 
-TEST_CASE("CVP.AdjointDotProduct.nobarrier_norelaxed_elevationcorrection", "[adjointop][cuttingvox][NOVIZ]")
+TEST_CASE("CVP.AdjointDotProduct.nobarrier_norelaxed_elevationcorrection",
+          "[adjointop][cuttingvox][NOVIZ]")
 {
     findFirstPlatform();
     double tol = 1e-5;
@@ -305,7 +317,8 @@ TEST_CASE("CVP.AdjointDotProduct.nobarrier_norelaxed_elevationcorrection", "[adj
     delete[] randomB;
 }
 
-TEST_CASE("PerfusionOperator AdjointDotProduct TEST", "[adjointop][cuttingvox][NOVIZ][.][perfusionoperator]")
+TEST_CASE("PerfusionOperator AdjointDotProduct TEST",
+          "[adjointop][cuttingvox][NOVIZ][.][perfusionoperator]")
 {
     findFirstPlatform();
     double tol = 1e-5;
