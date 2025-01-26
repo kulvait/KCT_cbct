@@ -24,9 +24,9 @@
 #include "FUN/LegendrePolynomialsExplicit.hpp"
 #include "FUN/SplineInterpolatedFunction.hpp"
 #include "FUN/StepFunction.hpp"
+#include "PROG/ArgumentsForce.hpp"
 #include "PROG/Program.hpp"
 #include "PROG/RunTimeInfo.hpp"
-#include "PROG/ArgumentsForce.hpp"
 #include "Perfusion/CGLSPerfusionReconstructor.hpp"
 #include "Perfusion/GLSQRPerfusionReconstructor.hpp"
 
@@ -390,9 +390,9 @@ int main(int argc, char* argv[])
             ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
     }
     BPR->setReportingParameters(reportProgress, ARG.reportKthIteration, startPath);
-    if(ARG.useSidonProjector)
+    if(ARG.useSiddonProjector)
     {
-        BPR->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        BPR->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
     } else if(ARG.useTTProjector)
     {
 
@@ -415,8 +415,7 @@ int main(int argc, char* argv[])
     if(ecd != 0)
     {
         std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     // testing
     //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);

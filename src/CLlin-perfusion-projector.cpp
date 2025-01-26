@@ -250,9 +250,9 @@ int main(int argc, char* argv[])
                          ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
                          ARG.CLitemsPerWorkgroup);
     PO.setReportingParameters(true, ARG.reportKthIteration, startPath);
-    if(ARG.useSidonProjector)
+    if(ARG.useSiddonProjector)
     {
-        PO.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        PO.initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
     } else if(ARG.useTTProjector)
     {
 
@@ -275,8 +275,7 @@ int main(int argc, char* argv[])
     if(ecd != 0)
     {
         std::string ERR = io::xprintf("OpenCL buffers initialization failed.");
-        LOGE << ERR;
-        throw std::runtime_error(ERR);
+        KCTERR(ERR);
     }
     PO.project();
     // testing

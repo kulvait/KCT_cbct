@@ -59,7 +59,7 @@ public:
     }
 
     void initializeCVPProjector(bool barrierVariant, uint32_t LOCALARRAYSIZE = 7680);
-    void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
+    void initializeSiddonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
     void initializeVolumeConvolution();
     void initializeProximal();
@@ -124,7 +124,7 @@ protected:
     bool useCVPProjector = true;
     bool useBarrierImplementation = false;
     uint32_t LOCALARRAYSIZE = 0;
-    bool useSidonProjector = false;
+    bool useSiddonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;
     bool useVolumeAsInitialX0 = false;

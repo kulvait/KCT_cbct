@@ -52,7 +52,7 @@ public:
     void addOptString(std::string option);
     void CLINCLUDEbackprojector();
     void CLINCLUDEbackprojector_minmax();
-    void CLINCLUDEbackprojector_sidon();
+    void CLINCLUDEbackprojector_siddon();
     void CLINCLUDEbackprojector_tt();
     void CLINCLUDEcenterVoxelProjector();
     void CLINCLUDEinclude();
@@ -62,7 +62,7 @@ public:
     void CLINCLUDEprojector();
     void CLINCLUDEprojector_cvp_barrier();
     void CLINCLUDEprojector_old();
-    void CLINCLUDEprojector_sidon();
+    void CLINCLUDEprojector_siddon();
     void CLINCLUDEprojector_tt();
     void CLINCLUDErescaleProjections();
     void CLINCLUDEutils();
@@ -154,7 +154,7 @@ protected:
                                     cl_int2&,
                                     float&,
                                     cl_uint2&>>
-        FLOATsidon_backproject;
+        FLOATsiddon_backproject;
 
     // backprojector_cbct_tt.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,
@@ -298,7 +298,7 @@ protected:
                                     cl_int2&,
                                     float&,
                                     cl_uint2&>>
-        FLOATsidon_project;
+        FLOATsiddon_project;
 
     // projector_cbct_tt.cl
     std::shared_ptr<cl::make_kernel<cl::Buffer&,

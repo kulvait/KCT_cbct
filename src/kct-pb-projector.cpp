@@ -145,7 +145,7 @@ void Args::defineArguments()
     addFramespecArgs();
     addCuttingVoxelProjectorArgs(true);
     addTTProjectorArgs();
-    addSidonProjectorArgs();
+    addSiddonProjectorArgs();
     addCenterVoxelProjectorArgs();
     cliApp->add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
     cliApp->add_option(
@@ -211,9 +211,9 @@ int main(int argc, char* argv[])
                                     ARG.volumeSizeX, ARG.volumeSizeY, ARG.volumeSizeZ,
                                     ARG.CLitemsPerWorkgroup);
         // PBCVP.initializeAllAlgorithms();
-        if(ARG.useSidonProjector)
+        if(ARG.useSiddonProjector)
         {
-            PBCVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+            PBCVP.initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
         } else if(ARG.useTTProjector)
         {
 
@@ -268,9 +268,9 @@ int main(int argc, char* argv[])
                                            ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup,
                                            ARG.partialProjectorBytesize);
         // PBCVP.initializeAllAlgorithms();
-        if(ARG.useSidonProjector)
+        if(ARG.useSiddonProjector)
         {
-            PBCVP.getCTOperator()->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+            PBCVP.getCTOperator()->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
         } else if(ARG.useTTProjector)
         {
 

@@ -212,12 +212,12 @@ void Kniha::CLINCLUDEbackprojector_minmax()
     });
 }
 
-void Kniha::CLINCLUDEbackprojector_sidon()
+void Kniha::CLINCLUDEbackprojector_siddon()
 {
     insertCLFile("opencl/backprojector_cbct_siddon.cl");
     callbacks.emplace_back([this](cl::Program program) {
-        auto& ptr = FLOATsidon_backproject;
-        std::string str = "FLOATsidon_backproject";
+        auto& ptr = FLOATsiddon_backproject;
+        std::string str = "FLOATsiddon_backproject";
         if(ptr == nullptr)
         {
             ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(
@@ -340,12 +340,12 @@ void Kniha::CLINCLUDEprojector_old()
     });
 }
 
-void Kniha::CLINCLUDEprojector_sidon()
+void Kniha::CLINCLUDEprojector_siddon()
 {
     insertCLFile("opencl/projector_cbct_siddon.cl");
     callbacks.emplace_back([this](cl::Program program) {
-        auto& ptr = FLOATsidon_project;
-        std::string str = "FLOATsidon_project";
+        auto& ptr = FLOATsiddon_project;
+        std::string str = "FLOATsiddon_project";
         if(ptr == nullptr)
         {
             ptr = std::make_shared<std::remove_reference<decltype(*ptr)>::type>(

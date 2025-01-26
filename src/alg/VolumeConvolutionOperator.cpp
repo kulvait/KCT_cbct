@@ -53,8 +53,8 @@ void VolumeConvolutionOperator::initializeAllAlgorithms()
         CLINCLUDEinclude();
         CLINCLUDEprojector();
         CLINCLUDEbackprojector();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
         CLINCLUDEprojector_tt();
         CLINCLUDEbackprojector_tt();
         CLINCLUDEbackprojector_minmax();

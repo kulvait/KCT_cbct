@@ -516,21 +516,21 @@ void CArmArguments::addTTProjectorArgs()
                     optValue.c_str()));
 }
 
-void CArmArguments::addSidonProjectorArgs()
+void CArmArguments::addSiddonProjectorArgs()
 {
     addProjectorSettingsGroups();
     std::string optValue;
     CLI::Option* optSid;
     CLI::Option* optPPE;
-    optValue = (useSidonProjector ? "true" : "false");
+    optValue = (useSiddonProjector ? "true" : "false");
     optSid = og_projectortypesettings->add_flag(
-        "--siddon", useSidonProjector,
+        "--siddon", useSiddonProjector,
         io::xprintf("Use Siddon projector and backprojector pair instead of "
                     "cuting voxel projector, defaults to %s.",
                     optValue.c_str()));
     optPPE = og_projectorsettings
                  ->add_option("--probes-per-edge", probesPerEdge,
-                              io::xprintf("Number of probes in each pixel edge in Sidon raycaster, "
+                              io::xprintf("Number of probes in each pixel edge in Siddon raycaster, "
                                           "complexity scales with the "
                                           "square of this number. Defaults to %d.",
                                           probesPerEdge))
@@ -554,7 +554,7 @@ void CArmArguments::addProjectorArgs()
 {
     addCuttingVoxelProjectorArgs(false);
     addTTProjectorArgs();
-    addSidonProjectorArgs();
+    addSiddonProjectorArgs();
 }
 
 void CArmArguments::addBackprojectorScalingArgs()

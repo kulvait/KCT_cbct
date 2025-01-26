@@ -564,9 +564,9 @@ int main(int argc, char* argv[])
             // testing
             //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
             //       4);
-            if(ARG.useSidonProjector)
+            if(ARG.useSiddonProjector)
             {
-                cgls->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+                cgls->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
             } else if(ARG.useTTProjector)
             {
 
@@ -670,9 +670,9 @@ int main(int argc, char* argv[])
                     ARG.projectionSizeX, ARG.slabSize, ARG.projectionSizeZ, ARG.volumeSizeX,
                     ARG.volumeSizeY, ARG.slabSize, ARG.CLitemsPerWorkgroup);
             // pdhg > setReportingParameters(ARG.verbose, ARG.reportKthIteration, startPath);
-            if(ARG.useSidonProjector)
+            if(ARG.useSiddonProjector)
             {
-                pdhg->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+                pdhg->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
             } else if(ARG.useTTProjector)
             {
 

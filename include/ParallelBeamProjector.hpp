@@ -131,7 +131,7 @@ private:
     bool useCVPElevationCorrection = false;
     bool useBarrierImplementation = false;
     uint32_t LOCALARRAYSIZE = 0;
-    bool useSidonProjector = false;
+    bool useSiddonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;
 

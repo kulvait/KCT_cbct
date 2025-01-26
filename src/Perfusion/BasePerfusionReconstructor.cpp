@@ -17,7 +17,7 @@ void BasePerfusionReconstructor::initializeCVPProjector(bool useExactScaling)
     {
         useCVPProjector = true;
         exactProjectionScaling = useExactScaling;
-        useSidonProjector = false;
+        useSiddonProjector = false;
         pixelGranularity = { 1, 1 };
         useTTProjector = false;
         CLINCLUDEutils();
@@ -33,20 +33,20 @@ void BasePerfusionReconstructor::initializeCVPProjector(bool useExactScaling)
     }
 }
 
-void BasePerfusionReconstructor::initializeSidonProjector(uint32_t probesPerEdgeX,
-                                                          uint32_t probesPerEdgeY)
+void BasePerfusionReconstructor::initializeSiddonProjector(uint32_t probesPerEdgeX,
+                                                           uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
-        useSidonProjector = true;
+        useSiddonProjector = true;
         pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
         useCVPProjector = false;
         exactProjectionScaling = false;
         useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
     } else
     {
         std::string err = "Could not initialize projector when OpenCL was already initialized.";
@@ -62,7 +62,7 @@ void BasePerfusionReconstructor::initializeTTProjector()
         useTTProjector = true;
         useCVPProjector = false;
         exactProjectionScaling = false;
-        useSidonProjector = false;
+        useSiddonProjector = false;
         pixelGranularity = { 1, 1 };
         CLINCLUDEutils();
         CLINCLUDEinclude();
@@ -472,11 +472,11 @@ int BasePerfusionReconstructor::backproject_partial(cl::Buffer& B, cl::Buffer& X
     P->principalRayProjection((double*)&NORMALPROJECTION);
     P->sourcePosition((double*)&SOURCEPOSITION);
     VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
-    if(useSidonProjector)
+    if(useSiddonProjector)
     {
-        (*FLOATsidon_backproject)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
-                                  NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims,
-                                  FLOATONE, pixelGranularity);
+        (*FLOATsiddon_backproject)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
+                                   NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims,
+                                   FLOATONE, pixelGranularity);
     } else if(useTTProjector)
     {
         (*FLOATta3_backproject)(eargs, X, *tmp_b_buf, offset, CM, SOURCEPOSITION, NORMALTODETECTOR,
@@ -561,11 +561,11 @@ int BasePerfusionReconstructor::project(cl::Buffer& X, cl::Buffer& B)
         P->sourcePosition((double*)&SOURCEPOSITION);
         VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
-            (*FLOATsidon_project)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                  vdims, voxelSizes, volumeCenter, pdims, FLOATONE,
-                                  pixelGranularity);
+            (*FLOATsiddon_project)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                                   vdims, voxelSizes, volumeCenter, pdims, FLOATONE,
+                                   pixelGranularity);
         } else if(useTTProjector)
         {
             (*FLOATta3_project)(eargs, X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR, vdims,

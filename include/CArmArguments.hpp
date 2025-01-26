@@ -58,7 +58,7 @@ public:
     int barrierArraySize = -1; // Guess it
     // int barrierArraySize = 7680; ... To fit Intel
     bool useCenterVoxelProjector = false;
-    bool useSidonProjector = false;
+    bool useSiddonProjector = false;
     uint32_t probesPerEdge = 1;
     bool useTTProjector = false;
 
@@ -109,7 +109,7 @@ protected:
     void addProjectorSettingsGroups();
     void addCuttingVoxelProjectorArgs(bool includeNoScaling = false);
     void addTTProjectorArgs();
-    void addSidonProjectorArgs();
+    void addSiddonProjectorArgs();
     void addCenterVoxelProjectorArgs();
     void addProjectorArgs();
     void addBackprojectorScalingArgs();

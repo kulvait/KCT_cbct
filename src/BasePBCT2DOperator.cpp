@@ -37,7 +37,7 @@ void BasePBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t L
     {
         this->useCVPProjector = true;
         this->useBarrierImplementation = useBarrierCalls;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
@@ -58,19 +58,19 @@ void BasePBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t L
     }
 }
 
-void BasePBCT2DOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
+void BasePBCT2DOperator::initializeSiddonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
-        KCTERR("Sidon projector not yet implemented for PBCT2D!");
-        this->useSidonProjector = true;
+        KCTERR("Siddon projector not yet implemented for PBCT2D!");
+        this->useSiddonProjector = true;
         this->pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
         this->useCVPProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
     } else
     {
         KCTERR("Could not initialize projector when OpenCL was already initialized.");
@@ -84,7 +84,7 @@ void BasePBCT2DOperator::initializeTTProjector()
         KCTERR("TT projector not yet implemented for PBCT2D!");
         this->useTTProjector = true;
         this->useCVPProjector = false;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector();
@@ -351,7 +351,7 @@ int BasePBCT2DOperator::backproject(cl::Buffer& B,
         CM = PM3Vector[i];
         scalingFactor = scalingFactorVector[i] * additionalScaling;
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
             KCTERR("Siddon operators are not yet implemented for PBCT2D.");
         } else if(useTTProjector)
@@ -387,7 +387,7 @@ int BasePBCT2DOperator::backproject_kaczmarz(cl::Buffer& B,
         CM = PM3Vector[i];
         scalingFactor = scalingFactorVector[i] * additionalScaling;
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
             KCTERR("Siddon operators are not yet implemented for PBCT2D.");
         } else if(useTTProjector)
@@ -439,7 +439,7 @@ int BasePBCT2DOperator::project(cl::Buffer& X,
         CM = PM3Vector[i];
         scalingFactor = scalingFactorVector[i] * additionalScaling;
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
             KCTERR("Siddon operators are not yet implemented for PBCT.");
         } else if(useTTProjector)
@@ -502,7 +502,7 @@ int BasePBCT2DOperator::kaczmarz_product(cl::Buffer& K,
         // LOGD << io::xprintf("Scaling factor=%f square=%f",
         //                    scalingFactorVector[i] * additionalScaling, scalingFactor);
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
             KCTERR("Siddon operators are not yet implemented for PBCT.");
         } else if(useTTProjector)

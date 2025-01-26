@@ -15,7 +15,7 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling,
         this->useCVPExactProjectionsScaling = useExactScaling;
         this->useCVPElevationCorrection = useElevationCorrection;
         this->useBarrierImplementation = useBarrierCalls;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
@@ -40,18 +40,18 @@ void BaseReconstructor::initializeCVPProjector(bool useExactScaling,
     }
 }
 
-void BaseReconstructor::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
+void BaseReconstructor::initializeSiddonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
-        this->useSidonProjector = true;
+        this->useSiddonProjector = true;
         this->pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
         this->useCVPProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
     } else
     {
         KCTERR("Could not initialize projector when OpenCL was already initialized.");
@@ -64,7 +64,7 @@ void BaseReconstructor::initializeTTProjector()
     {
         this->useTTProjector = true;
         this->useCVPProjector = false;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector();
@@ -443,11 +443,11 @@ int BaseReconstructor::backproject(cl::Buffer& B,
         P->sourcePosition((double*)&SOURCEPOSITION);
         VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
-            (*FLOATsidon_backproject)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
-                                      NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims,
-                                      FLOATONE, pixelGranularity);
+            (*FLOATsiddon_backproject)(eargs2, X, *tmp_b_buf, offset, ICM, SOURCEPOSITION,
+                                       NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims,
+                                       FLOATONE, pixelGranularity);
         } else if(useTTProjector)
         {
             (*FLOATta3_backproject)(eargs, X, *tmp_b_buf, offset, CM, SOURCEPOSITION,
@@ -515,9 +515,9 @@ int BaseReconstructor::backproject_minmax(cl::Buffer& B,
         P->sourcePosition((double*)&SOURCEPOSITION);
         VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
-            err = "Minmax backprojector not implemented for Sidon projector.";
+            err = "Minmax backprojector not implemented for Siddon projector.";
             KCTERR(err);
         } else if(useTTProjector)
         {
@@ -585,11 +585,11 @@ int BaseReconstructor::project(cl::Buffer& X,
         P->sourcePosition((double*)&SOURCEPOSITION);
         VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
-            (*FLOATsidon_project)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
-                                  vdims, voxelSizes, volumeCenter, pdims, FLOATONE,
-                                  pixelGranularity);
+            (*FLOATsiddon_project)(eargs2, X, B, offset, ICM, SOURCEPOSITION, NORMALTODETECTOR,
+                                   vdims, voxelSizes, volumeCenter, pdims, FLOATONE,
+                                   pixelGranularity);
         } else if(useTTProjector)
         {
             (*FLOATta3_project)(eargs, X, B, offset, CM, SOURCEPOSITION, NORMALTODETECTOR, vdims,

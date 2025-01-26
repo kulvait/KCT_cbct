@@ -143,7 +143,7 @@ void Args::defineArguments()
     addFramespecArgs();
     addCuttingVoxelProjectorArgs(true);
     addTTProjectorArgs();
-    addSidonProjectorArgs();
+    addSiddonProjectorArgs();
     addCenterVoxelProjectorArgs();
     addProjectionSizeArgs();
     addVolumeCenterArgs();
@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
     if(uint64_t(ARG.projectionSizeX) * uint64_t(ARG.projectionSizeY) * uint64_t(pmi.dimz())
        > INT_MAX)
     {
-        io::throwerr(
+        KCTERR(
             "Implement indexing by uint64_t matrix dimension overflow of projection pixels count.");
     }
     // Write individual submatrices
@@ -210,9 +210,9 @@ int main(int argc, char* argv[])
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.voxelNumX,
                               ARG.voxelNumY, ARG.voxelNumZ);
     // CVP.initializeAllAlgorithms();
-    if(ARG.useSidonProjector)
+    if(ARG.useSiddonProjector)
     {
-        CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        CVP.initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
     } else if(ARG.useTTProjector)
     {
 

@@ -37,7 +37,7 @@ void PartialPBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_
     {
         this->useCVPProjector = true;
         this->useBarrierImplementation = useBarrierCalls;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
@@ -59,19 +59,19 @@ void PartialPBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_
     }
 }
 
-void PartialPBCT2DOperator::initializeSidonProjector(uint32_t probesPerEdgeX,
+void PartialPBCT2DOperator::initializeSiddonProjector(uint32_t probesPerEdgeX,
                                                      uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
-        this->useSidonProjector = true;
+        this->useSiddonProjector = true;
         this->pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
         this->useCVPProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
     } else
     {
         KCTERR("Could not initialize projector when OpenCL was already initialized.");
@@ -84,7 +84,7 @@ void PartialPBCT2DOperator::initializeTTProjector()
     {
         this->useTTProjector = true;
         this->useCVPProjector = false;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector();
@@ -319,7 +319,7 @@ int PartialPBCT2DOperator::backproject(cl::Buffer& B,
             CM = PM8Vector[i];
             scalingFactor = scalingFactorVector[i];
             offset = i * frameSize;
-            if(useSidonProjector)
+            if(useSiddonProjector)
             {
                 KCTERR("Siddon operators are not yet implemented for PBCT.");
             } else if(useTTProjector)
@@ -403,7 +403,7 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
             scalingFactor = scalingFactorVector[i];
             IND = i - geometries_from;
             offset = IND * frameSize;
-            if(useSidonProjector)
+            if(useSiddonProjector)
             {
                 KCTERR("Siddon operators are not yet implemented for PBCT.");
             } else if(useTTProjector)

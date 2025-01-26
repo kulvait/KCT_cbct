@@ -60,7 +60,7 @@ public:
     virtual ~BasePerfusionReconstructor() = default;
 
     void initializeCVPProjector(bool useExactScaling);
-    void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
+    void initializeSiddonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
 
     int problemSetup(std::vector<float*> projections,
@@ -142,7 +142,7 @@ protected:
     // Variables for projectors and openCL initialization
     bool useCVPProjector = false;
     bool exactProjectionScaling = false;
-    bool useSidonProjector = false;
+    bool useSiddonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;
     bool useVolumeAsInitialX0 = false;

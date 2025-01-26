@@ -356,9 +356,9 @@ int main(int argc, char* argv[])
         // testing
         //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize *
         //       4);
-        if(ARG.useSidonProjector)
+        if(ARG.useSiddonProjector)
         {
-            cgls->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+            cgls->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
         } else if(ARG.useTTProjector)
         {
 

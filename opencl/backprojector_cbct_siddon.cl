@@ -1,6 +1,6 @@
 //==============================backprojector_cbct_siddon.cl=====================================
 
-void kernel FLOATsidon_backproject(global float* restrict volume,
+void kernel FLOATsiddon_backproject(global float* restrict volume,
                                    global const float* restrict projection,
                                    private uint projectionOffset,
                                    private double16 ICM,
@@ -56,15 +56,15 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
             double minalphai, maxalphai, tmp;
             double3 cornera_minus_s = zerocorner_xyz - sourcePosition;
             double3 cornerb_minus_s = maxcorner_xyz - sourcePosition;
-            double3 sidonIncrement = 0.0;
-            double minSidonIncrement = DBL_MAX;
+            double3 siddonIncrement = 0.0;
+            double minSiddonIncrement = DBL_MAX;
             double3 alphasPrev; // Previous intersection with the plane in given direction
             int maximalAlphasIndex; // Pointer to the element in alphasPrev that at maxalphai is
                                     // on the boundary
             if(a.x != 0.0)
             {
-                sidonIncrement.x = fabs(voxelSizes.x / a.x);
-                minSidonIncrement = sidonIncrement.x;
+                siddonIncrement.x = fabs(voxelSizes.x / a.x);
+                minSiddonIncrement = siddonIncrement.x;
                 // As I know cornera_minus_s < cornerb_minus_s
                 if(a.x > 0.0)
                 {
@@ -82,8 +82,8 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
             }
             if(a.y != 0.0)
             {
-                sidonIncrement.y = fabs(voxelSizes.y / a.y);
-                minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.y);
+                siddonIncrement.y = fabs(voxelSizes.y / a.y);
+                minSiddonIncrement = fmin(minSiddonIncrement, siddonIncrement.y);
                 if(a.y > 0)
                 {
                     minalphai = cornera_minus_s.y / a.y;
@@ -100,28 +100,28 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
                     if(a.x != 0.0)
                     {
                         // Naive implementation
-                        // while(alphasPrev.x + sidonIncrement.x < minalpha)
+                        // while(alphasPrev.x + siddonIncrement.x < minalpha)
                         // {
-                        //     alphasPrev.x += sidonIncrement.x;
+                        //     alphasPrev.x += siddonIncrement.x;
                         // }
-                        if(minalpha - alphasPrev.x >= sidonIncrement.x)
+                        if(minalpha - alphasPrev.x >= siddonIncrement.x)
                         {
-                            alphasPrev.x += sidonIncrement.x
-                                * floor((minalpha - alphasPrev.x) / sidonIncrement.x);
+                            alphasPrev.x += siddonIncrement.x
+                                * floor((minalpha - alphasPrev.x) / siddonIncrement.x);
                         }
                     }
                 } else
                 {
                     alphasPrev.y = minalphai;
                     // Naive
-                    // while(alphasPrev.y + sidonIncrement.y < minalpha)
+                    // while(alphasPrev.y + siddonIncrement.y < minalpha)
                     //{
-                    //    alphasPrev.y += sidonIncrement.y;
+                    //    alphasPrev.y += siddonIncrement.y;
                     //}
-                    if(minalpha - alphasPrev.y >= sidonIncrement.y)
+                    if(minalpha - alphasPrev.y >= siddonIncrement.y)
                     {
-                        alphasPrev.y += sidonIncrement.y
-                            * floor((minalpha - alphasPrev.y) / sidonIncrement.y);
+                        alphasPrev.y += siddonIncrement.y
+                            * floor((minalpha - alphasPrev.y) / siddonIncrement.y);
                     }
                 }
                 if(maxalphai < maxalpha)
@@ -132,8 +132,8 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
             }
             if(a.z != 0.0)
             {
-                sidonIncrement.z = fabs(voxelSizes.z / a.z);
-                minSidonIncrement = fmin(minSidonIncrement, sidonIncrement.z);
+                siddonIncrement.z = fabs(voxelSizes.z / a.z);
+                minSiddonIncrement = fmin(minSiddonIncrement, siddonIncrement.z);
                 if(a.z > 0)
                 {
                     minalphai = cornera_minus_s.z / a.z;
@@ -150,41 +150,41 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
                     if(a.x != 0.0)
                     {
                         // Naive implementation
-                        // while(alphasPrev.x + sidonIncrement.x < minalpha)
+                        // while(alphasPrev.x + siddonIncrement.x < minalpha)
                         // {
-                        //     alphasPrev.x += sidonIncrement.x;
+                        //     alphasPrev.x += siddonIncrement.x;
                         // }
-                        if(minalpha - alphasPrev.x >= sidonIncrement.x)
+                        if(minalpha - alphasPrev.x >= siddonIncrement.x)
                         {
-                            alphasPrev.x += sidonIncrement.x
-                                * floor((minalpha - alphasPrev.x) / sidonIncrement.x);
+                            alphasPrev.x += siddonIncrement.x
+                                * floor((minalpha - alphasPrev.x) / siddonIncrement.x);
                         }
                     }
                     if(a.y != 0.0)
                     {
                         // Naive
-                        //    while(alphasPrev.y + sidonIncrement.y < minalpha)
+                        //    while(alphasPrev.y + siddonIncrement.y < minalpha)
                         //    {
-                        //        alphasPrev.y += sidonIncrement.y;
+                        //        alphasPrev.y += siddonIncrement.y;
                         //    }
-                        if(minalpha - alphasPrev.y >= sidonIncrement.y)
+                        if(minalpha - alphasPrev.y >= siddonIncrement.y)
                         {
-                            alphasPrev.y += sidonIncrement.y
-                                * floor((minalpha - alphasPrev.y) / sidonIncrement.y);
+                            alphasPrev.y += siddonIncrement.y
+                                * floor((minalpha - alphasPrev.y) / siddonIncrement.y);
                         }
                     }
                 } else
                 {
                     alphasPrev.z = minalphai;
                     // Naive
-                    // while(alphasPrev.z + sidonIncrement.z < minalpha)
+                    // while(alphasPrev.z + siddonIncrement.z < minalpha)
                     //{
-                    //    alphasPrev.z += sidonIncrement.z;
+                    //    alphasPrev.z += siddonIncrement.z;
                     //}
-                    if(minalpha - alphasPrev.z >= sidonIncrement.z)
+                    if(minalpha - alphasPrev.z >= siddonIncrement.z)
                     {
-                        alphasPrev.z += sidonIncrement.z
-                            * floor((minalpha - alphasPrev.z) / sidonIncrement.z);
+                        alphasPrev.z += siddonIncrement.z
+                            * floor((minalpha - alphasPrev.z) / siddonIncrement.z);
                     }
                 }
                 if(maxalphai < maxalpha)
@@ -193,8 +193,8 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
                     maximalAlphasIndex = 2;
                 }
             }
-            double halfMinIncrement = minSidonIncrement * 0.5;
-            double3 alphasNext = alphasPrev + sidonIncrement;
+            double halfMinIncrement = minSiddonIncrement * 0.5;
+            double3 alphasNext = alphasPrev + siddonIncrement;
 
             double alphaprev = minalpha;
             double alphanext, LEN, pos;
@@ -207,20 +207,20 @@ void kernel FLOATsidon_backproject(global float* restrict volume,
                     if(alphasNext.x < alphasNext.z)
                     {
                         alphanext = alphasNext.x;
-                        alphasNext.x += sidonIncrement.x;
+                        alphasNext.x += siddonIncrement.x;
                     } else
                     {
                         alphanext = alphasNext.z;
-                        alphasNext.z += sidonIncrement.z;
+                        alphasNext.z += siddonIncrement.z;
                     }
                 } else if(alphasNext.y < alphasNext.z)
                 {
                     alphanext = alphasNext.y;
-                    alphasNext.y += sidonIncrement.y;
+                    alphasNext.y += siddonIncrement.y;
                 } else
                 {
                     alphanext = alphasNext.z;
-                    alphasNext.z += sidonIncrement.z;
+                    alphasNext.z += siddonIncrement.z;
                 }
                 LEN = alphanext - alphaprev;
                 pos = alphaprev + 0.5 * (alphanext - alphaprev);

@@ -38,7 +38,7 @@ void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling,
         this->useCVPExactProjectionsScaling = useExactScaling;
         this->useCVPElevationCorrection = useElevationCorrection;
         this->useBarrierImplementation = useBarrierCalls;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         this->pixelGranularity = { 1, 1 };
         this->useTTProjector = false;
         CLINCLUDEutils();
@@ -64,19 +64,19 @@ void CuttingVoxelProjector::initializeCVPProjector(bool useExactScaling,
     }
 }
 
-void CuttingVoxelProjector::initializeSidonProjector(uint32_t probesPerEdgeX,
-                                                     uint32_t probesPerEdgeY)
+void CuttingVoxelProjector::initializeSiddonProjector(uint32_t probesPerEdgeX,
+                                                      uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
-        this->useSidonProjector = true;
+        this->useSiddonProjector = true;
         this->pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
         this->useCVPProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
     } else
     {
         KCTERR("Could not initialize projector when OpenCL was already initialized.");
@@ -89,7 +89,7 @@ void CuttingVoxelProjector::initializeTTProjector()
     {
         this->useTTProjector = true;
         this->useCVPProjector = false;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector();
@@ -110,8 +110,8 @@ void CuttingVoxelProjector::initializeAllAlgorithms()
         CLINCLUDEinclude();
         CLINCLUDEprojector();
         CLINCLUDEbackprojector();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
         CLINCLUDEprojector_tt();
         CLINCLUDEbackprojector_tt();
         CLINCLUDEbackprojector_minmax();
@@ -351,9 +351,9 @@ double CuttingVoxelProjector::normSquareDifference(float* v, uint32_t pdimx, uin
 
 int CuttingVoxelProjector::project(float* projection, std::shared_ptr<matrix::CameraI> pm)
 {
-    if(useSidonProjector)
+    if(useSiddonProjector)
     {
-        return projectSidon(projection, pm);
+        return projectSiddon(projection, pm);
     } else if(useTTProjector)
     {
         return projectTA3(projection, pm);
@@ -495,7 +495,7 @@ int CuttingVoxelProjector::projectExact(float* projection, std::shared_ptr<matri
     return 0;
 }
 
-int CuttingVoxelProjector::projectSidon(float* projection, std::shared_ptr<matrix::CameraI> P)
+int CuttingVoxelProjector::projectSiddon(float* projection, std::shared_ptr<matrix::CameraI> P)
 {
     initializeOrUpdateProjectionBuffer(pdimx, pdimy, 1);
     fillProjectionBufferByConstant(0.0f);
@@ -517,9 +517,9 @@ int CuttingVoxelProjector::projectSidon(float* projection, std::shared_ptr<matri
     P->sourcePosition((double*)&SOURCEPOSITION);
     VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
     offset = 0;
-    (*FLOATsidon_project)(eargs2, *volumeBuffer, *projectionBuffer, offset, ICM, SOURCEPOSITION,
-                          NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims, FLOATONE,
-                          pixelGranularity);
+    (*FLOATsiddon_project)(eargs2, *volumeBuffer, *projectionBuffer, offset, ICM, SOURCEPOSITION,
+                           NORMALTODETECTOR, vdims, voxelSizes, volumeCenter, pdims, FLOATONE,
+                           pixelGranularity);
     cl_int err = Q[0]->enqueueReadBuffer(*projectionBuffer, CL_TRUE, 0,
                                          sizeof(float) * pdimx * pdimy, projection);
     if(err != CL_SUCCESS)
@@ -663,11 +663,11 @@ int CuttingVoxelProjector::backproject(float* volume,
         P->sourcePosition((double*)&SOURCEPOSITION);
         VIRTUALPIXELSIZES = { 1.0 / focalLength[0], 1.0 / focalLength[1] };
         offset = baseOffset + i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
-            (*FLOATsidon_backproject)(eargs2, *volumeBuffer, *tmpBuffer, offset, ICM,
-                                      SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
-                                      volumeCenter, pdims, FLOATONE, pixelGranularity);
+            (*FLOATsiddon_backproject)(eargs2, *volumeBuffer, *tmpBuffer, offset, ICM,
+                                       SOURCEPOSITION, NORMALTODETECTOR, vdims, voxelSizes,
+                                       volumeCenter, pdims, FLOATONE, pixelGranularity);
         } else if(useTTProjector)
         {
             (*FLOATta3_backproject)(eargs, *volumeBuffer, *tmpBuffer, offset, CM, SOURCEPOSITION,

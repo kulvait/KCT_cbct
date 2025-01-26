@@ -384,9 +384,9 @@ int main(int argc, char* argv[])
             cgls->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
             // testing
             //    io::readBytesFrom("/tmp/X.den", 6, (uint8_t*)volume, ARG.totalVolumeSize * 4);
-            if(ARG.useSidonProjector)
+            if(ARG.useSiddonProjector)
             {
-                cgls->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+                cgls->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
             } else if(ARG.useTTProjector)
             {
 
@@ -453,9 +453,9 @@ int main(int argc, char* argv[])
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
                 ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
             glsqr->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
-            if(ARG.useSidonProjector)
+            if(ARG.useSiddonProjector)
             {
-                glsqr->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+                glsqr->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
             } else if(ARG.useTTProjector)
             {
 
@@ -502,9 +502,9 @@ int main(int argc, char* argv[])
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
                 ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
             psirt->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
-            if(ARG.useSidonProjector)
+            if(ARG.useSiddonProjector)
             {
-                psirt->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+                psirt->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
             } else if(ARG.useTTProjector)
             {
 
@@ -539,9 +539,9 @@ int main(int argc, char* argv[])
                 ARG.projectionSizeX, ARG.projectionSizeY, ARG.projectionSizeZ, ARG.volumeSizeX,
                 ARG.volumeSizeY, ARG.volumeSizeZ, ARG.CLitemsPerWorkgroup);
             psirt->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
-            if(ARG.useSidonProjector)
+            if(ARG.useSiddonProjector)
             {
-                psirt->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+                psirt->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
             } else if(ARG.useTTProjector)
             {
 
@@ -585,9 +585,9 @@ int main(int argc, char* argv[])
                 ossart->addUpperBoxCondition(ARG.upperBoxCondition, ARG.upperBoxCondition);
             }
             ossart->setReportingParameters(ARG.verbose, ARG.reportKthIteration, intermediatePrefix);
-            if(ARG.useSidonProjector)
+            if(ARG.useSiddonProjector)
             {
-                ossart->initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+                ossart->initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
             } else if(ARG.useTTProjector)
             {
 

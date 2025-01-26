@@ -123,7 +123,7 @@ void Args::defineArguments()
     addFramespecArgs();
     addCuttingVoxelProjectorArgs(true);
     addTTProjectorArgs();
-    addSidonProjectorArgs();
+    addSiddonProjectorArgs();
     addCenterVoxelProjectorArgs();
     cliApp->add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
     cliApp->add_option(
@@ -170,9 +170,9 @@ int main(int argc, char* argv[])
     CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX,
                               ARG.volumeSizeY, ARG.voxelSizeZ, projectorLocalNDRange);
     // CVP.initializeAllAlgorithms();
-    if(ARG.useSidonProjector)
+    if(ARG.useSiddonProjector)
     {
-        CVP.initializeSidonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
+        CVP.initializeSiddonProjector(ARG.probesPerEdge, ARG.probesPerEdge);
     } else if(ARG.useTTProjector)
     {
 
@@ -217,9 +217,9 @@ int main(int argc, char* argv[])
         uint32_t f = ARG.frames[i];
         using namespace KCT::matrix;
         std::shared_ptr<CameraI> P = std::make_shared<LightProjectionMatrix>(dr->readMatrix(f));
-        if(ARG.useSidonProjector)
+        if(ARG.useSiddonProjector)
         {
-            CVP.projectSidon(projection, P);
+            CVP.projectSiddon(projection, P);
         } else if(ARG.useTTProjector)
         {
             CVP.projectTA3(projection, P);

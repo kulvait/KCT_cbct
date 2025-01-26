@@ -627,7 +627,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TA3 projector TEST",
     delete[] vals;
 }
 
-TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjointop][sidon][NOVIZ]")
+TEST_CASE("GLSQRReconstructor AdjointDotProduct Siddon projector TEST", "[adjointop][siddon][NOVIZ]")
 {
     double tol = 1e-5;
     uint32_t projectionSizeX = 616;
@@ -653,7 +653,7 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
     std::shared_ptr<GLSQRReconstructor> glsqr = std::make_shared<GLSQRReconstructor>(
         projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX, volumeSizeY, volumeSizeZ,
         itemsPerWorkgroup);
-    glsqr->initializeSidonProjector(1, 1);
+    glsqr->initializeSiddonProjector(1, 1);
     int ecd = glsqr->initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {
@@ -688,8 +688,8 @@ TEST_CASE("GLSQRReconstructor AdjointDotProduct Sidon projector TEST", "[adjoint
     delete[] randomB;
 }
 
-TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST",
-          "[adjointop][sidon][NOVIZ][.][perfusionoperator]")
+TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Siddon projector TEST",
+          "[adjointop][siddon][NOVIZ][.][perfusionoperator]")
 {
     findFirstPlatform();
     double tol = 1e-5;
@@ -781,7 +781,7 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct Sidon projector TEST",
     PerfusionOperator PO(projectionSizeX, projectionSizeY, projectionSizeZ, volumeSizeX,
                          volumeSizeY, volumeSizeZ, itemsPerWorkgroup);
     PO.setReportingParameters(true);
-    PO.initializeSidonProjector(1, 1);
+    PO.initializeSiddonProjector(1, 1);
     int ecd = PO.initializeOpenCL(CLplatformID, &CLdeviceID, 1, xpath, debug, CLrelaxed);
     if(ecd < 0)
     {

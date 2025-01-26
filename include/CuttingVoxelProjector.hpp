@@ -88,7 +88,7 @@ public:
                                 bool useElevationCorrection,
                                 bool useBarrierCalls,
                                 uint32_t LOCALARRAYSIZE);
-    void initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
+    void initializeSiddonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY);
     void initializeTTProjector();
     void initializeAllAlgorithms();
     int problemSetup(double voxelSizeX,
@@ -152,7 +152,7 @@ public:
     int projectExact(float* projection, std::shared_ptr<matrix::CameraI> pm);
     int projectTA3(float* projection, std::shared_ptr<matrix::CameraI> pm);
 
-    int projectSidon(float* projection, std::shared_ptr<matrix::CameraI> pm);
+    int projectSiddon(float* projection, std::shared_ptr<matrix::CameraI> pm);
 
     double normSquare(float* projection, uint32_t pdimx, uint32_t pdimy);
     double normSquareDifference(float* projection, uint32_t pdimx, uint32_t pdimy);
@@ -184,7 +184,7 @@ private:
     bool useCVPElevationCorrection = false;
     bool useBarrierImplementation = false;
     uint32_t LOCALARRAYSIZE = 0;
-    bool useSidonProjector = false;
+    bool useSiddonProjector = false;
     cl_uint2 pixelGranularity = { 1, 1 };
     bool useTTProjector = false;
 

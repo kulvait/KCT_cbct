@@ -37,7 +37,7 @@ void BasePBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOC
     {
         this->useCVPProjector = true;
         this->useBarrierImplementation = useBarrierCalls;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
@@ -59,18 +59,18 @@ void BasePBCTOperator::initializeCVPProjector(bool useBarrierCalls, uint32_t LOC
     }
 }
 
-void BasePBCTOperator::initializeSidonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
+void BasePBCTOperator::initializeSiddonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
-        this->useSidonProjector = true;
+        this->useSiddonProjector = true;
         this->pixelGranularity = { probesPerEdgeX, probesPerEdgeY };
         this->useCVPProjector = false;
         this->useTTProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
-        CLINCLUDEprojector_sidon();
-        CLINCLUDEbackprojector_sidon();
+        CLINCLUDEprojector_siddon();
+        CLINCLUDEbackprojector_siddon();
     } else
     {
         KCTERR("Could not initialize projector when OpenCL was already initialized.");
@@ -83,7 +83,7 @@ void BasePBCTOperator::initializeTTProjector()
     {
         this->useTTProjector = true;
         this->useCVPProjector = false;
-        this->useSidonProjector = false;
+        this->useSiddonProjector = false;
         CLINCLUDEutils();
         CLINCLUDEinclude();
         CLINCLUDEprojector();
@@ -315,7 +315,7 @@ int BasePBCTOperator::backproject(cl::Buffer& B,
         CM = PM8Vector[i];
         scalingFactor = scalingFactorVector[i] * additionalScaling;
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
             KCTERR("Siddon operators are not yet implemented for PBCT.");
         } else if(useTTProjector)
@@ -365,7 +365,7 @@ int BasePBCTOperator::project(cl::Buffer& X,
         CM = PM8Vector[i];
         scalingFactor = scalingFactorVector[i] * additionalScaling;
         offset = i * frameSize;
-        if(useSidonProjector)
+        if(useSiddonProjector)
         {
             KCTERR("Siddon operators are not yet implemented for PBCT.");
         } else if(useTTProjector)
