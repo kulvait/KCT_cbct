@@ -19,31 +19,17 @@ bool CVPBarierImplementation = false;
 
 void findFirstPlatform()
 {
-    uint32_t platformsOpenCL = util::OpenCLManager::platformCount();
     std::string ERR;
-    if(platformsOpenCL == 0)
+    std::optional<std::pair<uint32_t, uint32_t>> platformAndDevice;
+    platformAndDevice = util::OpenCLManager::chooseSuitablePlatformAndDevice();
+    if(platformAndDevice.has_value())
+    {
+        CLplatformID = platformAndDevice.value().first;
+        CLdeviceID = platformAndDevice.value().second;
+    } else
     {
         ERR = io::xprintf("No OpenCL platform available to this program.");
         LOGE << ERR;
-    }
-    uint32_t devicesOnPlatform = 0;
-    for(uint32_t platformID = 0; platformID != platformsOpenCL; platformID++)
-    {
-        if(util::OpenCLManager::deviceCount(platformID) > devicesOnPlatform)
-        {
-            devicesOnPlatform = util::OpenCLManager::deviceCount(platformID);
-            CLplatformID = platformID;
-            CLdeviceID = devicesOnPlatform - 1;
-        }
-    }
-    if(devicesOnPlatform == 0)
-    {
-        ERR = io::xprintf("No OpenCL platform with devices available..");
-        LOGE << ERR;
-    } else
-    {
-        LOGI << io::xprintf("Selected platformID %d deviceID %d, there is %d devices on platform.",
-                            CLplatformID, CLdeviceID, devicesOnPlatform);
     }
 }
 
@@ -627,7 +613,8 @@ TEST_CASE("GLSQRPerfusionReconstructor AdjointDotProduct TA3 projector TEST",
     delete[] vals;
 }
 
-TEST_CASE("GLSQRReconstructor AdjointDotProduct Siddon projector TEST", "[adjointop][siddon][NOVIZ]")
+TEST_CASE("GLSQRReconstructor AdjointDotProduct Siddon projector TEST",
+          "[adjointop][siddon][NOVIZ]")
 {
     double tol = 1e-5;
     uint32_t projectionSizeX = 616;
