@@ -78,19 +78,16 @@ uint64_t CArmArguments::parsePlatformString(bool verbose)
     CLdeviceIDs.clear();
     if(CLplatformString.empty())
     {
-        for(uint32_t platformID = 0; platformID != platformsOpenCL; platformID++)
+        std::optional<std::pair<uint32_t, uint32_t>> platformAndDevice;
+        platformAndDevice = util::OpenCLManager::chooseSuitablePlatformAndDevice();
+        if(platformAndDevice.has_value())
         {
-            uint32_t devicesOnPlatform = util::OpenCLManager::deviceCount(platformID);
-            if(devicesOnPlatform > 0)
-            {
-                CLplatformID = platformID;
-                CLdeviceIDs.push_back(0);
-                if(verbose)
-                {
-                    LOGD << io::xprintf("Selected device %d on platform %d.", 0, CLplatformID);
-                }
-                break;
-            }
+            CLplatformID = platformAndDevice.value().first;
+            CLdeviceIDs.push_back(platformAndDevice.value().second);
+        } else
+        {
+            ERR = io::xprintf("No OpenCL platform available to this program.");
+            KCTERR(ERR);
         }
     } else
     {
@@ -413,9 +410,9 @@ void CArmArguments::addSettingsArgs()
             io::xprintf("Maximum number of PDHG iterations, defaults to %d.", maxIterationPDHG))
         ->check(CLI::Range(1, 65535));
     og_settings
-        ->add_option("--stopping-relative-error-pdhg", stoppingRelativePDHG,
-                     io::xprintf("Stopping relative error of PDHG, defaults to %f.",
-                                 stoppingRelativePDHG))
+        ->add_option(
+            "--stopping-relative-error-pdhg", stoppingRelativePDHG,
+            io::xprintf("Stopping relative error of PDHG, defaults to %f.", stoppingRelativePDHG))
         ->check(CLI::Range(0.0, 1.0));
 }
 
@@ -528,13 +525,14 @@ void CArmArguments::addSiddonProjectorArgs()
         io::xprintf("Use Siddon projector and backprojector pair instead of "
                     "cuting voxel projector, defaults to %s.",
                     optValue.c_str()));
-    optPPE = og_projectorsettings
-                 ->add_option("--probes-per-edge", probesPerEdge,
-                              io::xprintf("Number of probes in each pixel edge in Siddon raycaster, "
-                                          "complexity scales with the "
-                                          "square of this number. Defaults to %d.",
-                                          probesPerEdge))
-                 ->check(CLI::Range(1, 1000));
+    optPPE
+        = og_projectorsettings
+              ->add_option("--probes-per-edge", probesPerEdge,
+                           io::xprintf("Number of probes in each pixel edge in Siddon raycaster, "
+                                       "complexity scales with the "
+                                       "square of this number. Defaults to %d.",
+                                       probesPerEdge))
+              ->check(CLI::Range(1, 1000));
     optPPE->needs(optSid);
 }
 
@@ -565,9 +563,8 @@ void CArmArguments::addBackprojectorScalingArgs()
     CLI::Option_group* op_bpx = og_projectorsettings->add_option_group(
         "Backprojector scaling",
         "Scaling method for backprojection output, which can modify A^T output.");
-    op_bpx->add_flag(
-        "--backprojector-no-scaling", backprojectorNoScaling,
-        io::xprintf("No scaling applied to A^T, defaults scaling."));
+    op_bpx->add_flag("--backprojector-no-scaling", backprojectorNoScaling,
+                     io::xprintf("No scaling applied to A^T, defaults scaling."));
     op_bpx->add_flag("--backprojector-fbp-scaling", backprojectorFBPScaling,
                      io::xprintf("Perform fbp scaling of backprojected values, which is normally "
                                  "used when performing FBP. If true scaling "
