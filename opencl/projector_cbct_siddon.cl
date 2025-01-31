@@ -1,16 +1,16 @@
 //==============================projector_cbct_siddon.cl=====================================
 void kernel FLOATsiddon_project(global const float* restrict volume,
-                               global float* restrict projection,
-                               private uint projectionOffset,
-                               private double16 ICM,
-                               private double3 sourcePosition,
-                               private double3 normalToDetector,
-                               private int3 vdims,
-                               private double3 voxelSizes,
-                               private double3 volumeCenter,
-                               private int2 pdims,
-                               private float scalingFactor,
-                               private uint2 raysPerPixel)
+                                global float* restrict projection,
+                                private uint projectionOffset,
+                                private double16 ICM,
+                                private double3 sourcePosition,
+                                private double3 normalToDetector,
+                                private int3 vdims,
+                                private double3 voxelSizes,
+                                private double3 volumeCenter,
+                                private int2 pdims,
+                                private float scalingFactor,
+                                private uint2 raysPerPixel)
 {
     uint px = get_global_id(0);
     uint py = get_global_id(1);
@@ -244,11 +244,14 @@ void kernel FLOATsiddon_project(global const float* restrict volume,
             pos = alphaprev + 0.5 * LEN; // Position in between
             while(pos + zeroPrecisionTolerance < maxalpha)
             {
-                ind = convert_int3_rtn(
-                    (sourcePosition + pos * a - zerocorner_xyz)
-                    / voxelSizes); // Not rounding but finds integer that is closest smaller
-                IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
-                VAL += volume[IND] * LEN;
+                if(LEN > zeroPrecisionTolerance) // prevent corner colisions
+                {
+                    ind = convert_int3_rtn(
+                        (sourcePosition + pos * a - zerocorner_xyz)
+                        / voxelSizes); // Not rounding but finds integer that is closest smaller
+                    IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
+                    VAL += volume[IND] * LEN;
+                }
                 // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
                 /*
                                 if(!(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims)))

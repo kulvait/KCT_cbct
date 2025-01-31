@@ -181,7 +181,6 @@ public:
     float relaxationParameter = 1.0f;
     bool verbose = true;
     bool disableExpensiveReporting = false;
-    bool elevationCorrection = false;
 };
 
 /**Argument parsing

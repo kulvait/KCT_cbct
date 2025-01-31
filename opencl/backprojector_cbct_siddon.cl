@@ -1,17 +1,17 @@
 //==============================backprojector_cbct_siddon.cl=====================================
 
 void kernel FLOATsiddon_backproject(global float* restrict volume,
-                                   global const float* restrict projection,
-                                   private uint projectionOffset,
-                                   private double16 ICM,
-                                   private double3 sourcePosition,
-                                   private double3 normalToDetector,
-                                   private int3 vdims,
-                                   private double3 voxelSizes,
-                                   private double3 volumeCenter,
-                                   private int2 pdims,
-                                   private float scalingFactor,
-                                   private uint2 raysPerPixel)
+                                    global const float* restrict projection,
+                                    private uint projectionOffset,
+                                    private double16 ICM,
+                                    private double3 sourcePosition,
+                                    private double3 normalToDetector,
+                                    private int3 vdims,
+                                    private double3 voxelSizes,
+                                    private double3 volumeCenter,
+                                    private int2 pdims,
+                                    private float scalingFactor,
+                                    private uint2 raysPerPixel)
 {
     uint px = get_global_id(0);
     uint py = get_global_id(1);
@@ -223,16 +223,21 @@ void kernel FLOATsiddon_backproject(global float* restrict volume,
                     alphasNext.z += siddonIncrement.z;
                 }
                 LEN = alphanext - alphaprev;
-                pos = alphaprev + 0.5 * (alphanext - alphaprev);
-                ind = convert_int3_rtn(
-                    (sourcePosition + pos * a - zerocorner_xyz)
-                    / voxelSizes); // Not rounding but finds integer that is closest smaller
-                IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
-                AtomicAdd_g_f(&volume[IND], VAL * LEN / totalProbes);
-                // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+                if(LEN > zeroPrecisionTolerance) // prevent corner colisions
+                {
+                    pos = alphaprev + 0.5 * LEN;
+                    ind = convert_int3_rtn(
+                        (sourcePosition + pos * a - zerocorner_xyz)
+                        / voxelSizes); // Not rounding but finds integer that is closest smaller
+                                       // convert_int_rtn(-0.1)=-1, convert_int_rtn(0.9)=0
+                    IND = ind.x + ind.y * vdims.x + ind.z * vdims.x * vdims.y;
+
+                    AtomicAdd_g_f(&volume[IND], VAL * LEN / totalProbes);
+                    // assert(all(ind >= (int3)(0, 0, 0)) && all(ind < vdims));
+                }
                 alphaprev = alphanext;
             }
         }
     }
 }
-//==============================END backprojector_cbct_siddon.cl=====================================
+//==============================END backprojector_cbct_siddon.cl====================================
