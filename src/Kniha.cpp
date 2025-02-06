@@ -25,6 +25,7 @@ int Kniha::initializeOpenCL(uint32_t platformID,
     }
     // Select the first available platform.
     platform = util::OpenCLManager::getPlatform(platformID, true);
+    std::string platformName = util::OpenCLManager::getPlatformName(platformID);
     if(platform == nullptr)
     {
         return -1;
@@ -87,7 +88,14 @@ int Kniha::initializeOpenCL(uint32_t platformID,
     }
     if(debug)
     {
-        optstrings.emplace_back(io::xprintf("-g -s \"%s\"", clFile.c_str()));
+        optstrings.emplace_back("-cl-opt-disable");
+        if(platformName.find("Intel") != std::string::npos)
+        { // On Intel platform add sources like this
+            optstrings.emplace_back(io::xprintf("-g -s \"%s\"", clFile.c_str()));
+        } else
+        {
+            optstrings.emplace_back("-g");
+        }
     } else
     {
         optstrings.emplace_back("-Werror");
@@ -1394,7 +1402,8 @@ std::string Kniha::infoString(cl_int cl_info_id)
         return "CL_INVALID_DEVICE_PARTITION_COUNT";
     } else if(cl_info_id == -9999)
     {
-        return "Illegal read or write to a buffer on clEnqueueNDRangeKernel, NVIDIA specific error";
+        return "Illegal read or write to a buffer on clEnqueueNDRangeKernel, NVIDIA "
+               "specific error";
     } else
     {
         return io::xprintf("Unknown ID %d=0x%x, see "
@@ -1463,10 +1472,10 @@ int Kniha::handleKernelExecution(cl::Event exe, bool blocking, std::string& erro
             } else
             {
 
-                errout = io::xprintf(
-                    "Unblocking COMMAND_EXECUTION_STATUS=%s that is different from CL_COMPLETE. "
-                    "Request to CL_EVENT_COMMAND_TYPE failed with code %s!",
-                    status.c_str(), infoString(ing).c_str());
+                errout = io::xprintf("Unblocking COMMAND_EXECUTION_STATUS=%s that is "
+                                     "different from CL_COMPLETE. "
+                                     "Request to CL_EVENT_COMMAND_TYPE failed with code %s!",
+                                     status.c_str(), infoString(ing).c_str());
             }
             return 2;
         }
@@ -2352,10 +2361,10 @@ int Kniha::algFLOAT_pbct_cutting_voxel_project_barrier(cl::Buffer& volume,
     if(cl_info_id != CL_SUCCESS)
     {
         std::string command_type_string = infoString(cl_info_id);
-        err = io::xprintf(
-            "Error in enqueueNDRangeKernel FLOAT_pbct_cutting_voxel_project_barrier cl_info_id=%d, "
-            "command_type_string=%s!",
-            cl_info_id, command_type_string.c_str());
+        err = io::xprintf("Error in enqueueNDRangeKernel "
+                          "FLOAT_pbct_cutting_voxel_project_barrier cl_info_id=%d, "
+                          "command_type_string=%s!",
+                          cl_info_id, command_type_string.c_str());
         KCTERR(err);
     }
     if(handleKernelExecution(exe, blocking, err))
@@ -2411,10 +2420,10 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_project(cl::Buffer& volume,
     if(cl_info_id != CL_SUCCESS)
     {
         std::string command_type_string = infoString(cl_info_id);
-        err = io::xprintf(
-            "Error in enqueueNDRangeKernel FLOAT_pbct2d_cutting_voxel_project cl_info_id=%d, "
-            "command_type_string=%s!",
-            cl_info_id, command_type_string.c_str());
+        err = io::xprintf("Error in enqueueNDRangeKernel "
+                          "FLOAT_pbct2d_cutting_voxel_project cl_info_id=%d, "
+                          "command_type_string=%s!",
+                          cl_info_id, command_type_string.c_str());
         KCTERR(err);
     }
 
@@ -2469,10 +2478,10 @@ int Kniha::algFLOAT_pbct2d_cutting_voxel_kaczmarz_product(
     if(cl_info_id != CL_SUCCESS)
     {
         std::string command_type_string = infoString(cl_info_id);
-        err = io::xprintf(
-            "Error in enqueueNDRangeKernel FLOAT_pbct2d_cutting_voxel_project cl_info_id=%d, "
-            "command_type_string=%s!",
-            cl_info_id, command_type_string.c_str());
+        err = io::xprintf("Error in enqueueNDRangeKernel "
+                          "FLOAT_pbct2d_cutting_voxel_project cl_info_id=%d, "
+                          "command_type_string=%s!",
+                          cl_info_id, command_type_string.c_str());
         KCTERR(err);
     }
 
@@ -2654,8 +2663,6 @@ int Kniha::algFLOATvector_distL1ProxSoftThreasholding(
     }
     return 0;
 }
-
-
 
 // gradient.cl
 
