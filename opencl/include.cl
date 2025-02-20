@@ -595,15 +595,17 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
 // printf routines for debugging are in bbdb59
 void inline exactEdgeValues0ElevationCorrection(
     global float* projection,
-    private REAL16 CM,
-    private REAL3 v,
-    private int PX,
-    private REAL value,
-    private REAL3 voxelSizes,
-    private int2 pdims,
-    private REAL corLength) // corLength is scaled to the size of lambda
+    private REAL16 CM, // Projective transform coefficients
+    private REAL3 v, // Central point of the voxel
+    private int PX, // Current pixel in the x-direction
+    private REAL value, // Value to add to the projection
+    private REAL3 voxelSizes, // Sizes of the voxel along x, y, z
+    private int2 pdims, // Projection dimensions
+    private REAL corLength) // Correction length scaled to voxel height
 {
+    // Step 1: Adjust pointer to the current pixel column
     projection = projection + PX * pdims.y;
+
     const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
     const REAL3 v_plus = v + distanceToEdge;
     const REAL3 v_minus = v - distanceToEdge;
@@ -655,6 +657,11 @@ void inline exactEdgeValues0ElevationCorrection(
 
     if(PJ_max_cor_max > 0 && PJ_min_cor_min < pdims.y)
     {
+        if(PJ_max_cor_max == PJ_min_cor_min)
+        {
+            AtomicAdd_g_f(projection + PJ_min_cor_min, value);
+            return;
+        }
         REAL lambda;
         // To model v_min + lambda (v_max - v_min)
         REAL lastLambda = ZERO;
