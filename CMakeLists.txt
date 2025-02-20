@@ -34,70 +34,26 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 set(GLOBAL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 include_directories(${GLOBAL_INCLUDE_DIR})
 
-
-# Conditionally find and configure CUDA
-#set(CUDA_VERSION "11.8") # Change to "11.8" for CUDA 11.x
-#include(CheckLanguage)
-#check_language(CUDA)
-#if(CMAKE_CUDA_COMPILER)
-#  message(STATUS "CUDA compiler found: ${CMAKE_CUDA_COMPILER}")
-#  enable_language(CUDA)
-#  find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED)
-#else()
-#  message(STATUS "No CUDA compiler found, attempting to find CUDA toolkit")
-#  find_package(CUDAToolkit ${CUDA_VERSION} REQUIRED)
-
-#  if(CUDAToolkit_FOUND)
-#    set(CMAKE_CUDA_COMPILER ${CUDAToolkit_NVCC_EXECUTABLE})
-#    message(STATUS "CUDA compiler set to: ${CMAKE_CUDA_COMPILER}")
-#    enable_language(CUDA)
-#  else()
-#    message(FATAL_ERROR "CUDA toolkit not found or CUDA compiler not set")
-#  endif()
-#endif()
-#This way I can also link against CUDA::opencl instead of OpenCL::OpenCL
-
-
 #OpenCL
 find_package(OpenCL REQUIRED)
 IF(OpenCL_FOUND)
-    add_definitions("-DCL_HPP_TARGET_OPENCL_VERSION=220")
-    add_definitions("-DCL_TARGET_OPENCL_VERSION=220")
-#possible values 100,110,120,200,210,220,300 for 120 and older uncomment the next line    
+	get_target_property(OPENCL_LIB_PATH OpenCL::OpenCL IMPORTED_LOCATION)
+    message("Found OpenCL ${OpenCL_VERSION_STRING} with header ${OpenCL_INCLUDE_DIRS}/CL/cl.h and library ${OPENCL_LIB_PATH}")
+	include_directories(${OpenCL_INCLUDE_DIRS})
+
+#possible values 100,110,120,200,210,220,300 for 120 and older uncomment the following line    
 #add_definitions("-DCL_USE_DEPRECATED_OPENCL_1_2_APIS")
-    message("Found OpenCL_INCLUDE_DIRS ${OpenCL_INCLUDE_DIRS}")
-    message("Found path OpenCL_LIBRARY ${OpenCL_LIBRARY} and OpenCL_LIBRARIES ${OpenCL_LIBRARIES}")
-    include_directories(${OpenCL_INCLUDE_DIRS})
-ENDIF()
-
-#For OpenCL on Intel processors the following might be necessary
-SET(INTELLIBDIR "/opt/kulvait/intel/opencl_compilers_and_libraries_18.1.0.015/linux/compiler/lib/intel64_lin/")
-IF(EXISTS ${INTELLIBDIR})
-SET(INTELLIBRARIES "/opt/kulvait/intel/opencl_compilers_and_libraries_18.1.0.015/linux/compiler/lib/intel64_lin/libOpenCL.so")
-SET(OpenCL_LIBRARY "${INTELLIBDIR}")
-SET(OpenCL_LIBRARIES "${INTELLIBRARIES}")
-SET(OpenCL_INCLUDE_DIRS "/home/kulvait/intel/system_studio_2020/opencl/SDK/include/")
-ENDIF()
-include_directories(OpenCL_INCLUDE_DIRS)
-message("USE OpenCL_INCLUDE_DIRS ${OpenCL_INCLUDE_DIRS}")
-message("USE path OpenCL_LIBRARY ${OpenCL_LIBRARY} and OpenCL_LIBRARIES ${OpenCL_LIBRARIES}")
-
-
-#target_include_directories(kct-pb2d-projector PUBLIC ${OpenCL_INCLUDE_DIRS})
-#target_compile_definitions(kct-pb2d-projector PUBLIC CL_USE_DEPRECATED_OPENCL_1_2_APIS)
-#target_compile_definitions(kct-pb2d-projector PUBLIC CL_TARGET_OPENCL_VERSION=120)
-
-SET(CUDA_INCLUDE_DIR "/opt/cuda/include")
-IF(EXISTS ${CUDA_INCLUDE_DIR})
-include_directories(${CUDA_INCLUDE_DIR})
-ENDIF()
-#set(AMDGPUPRO_INCLUDE_DIR "/opt/amdgpu-pro/include/")
-#IF(EXISTS ${AMDGPUPRO_INCLUDE_DIR})
-#include_directories(${AMDGPUPRO_INCLUDE_DIR})
-#ENDIF()
-set(ROCMINCLUDEDIR "/opt/rocm-4.3.0/opencl/include/")
-IF(EXISTS ${ROCMINCLUDEDIR})
-include_directories(${ROCMINCLUDEDIR})
+    if(OpenCL_VERSION_MAJOR GREATER_EQUAL 3)
+        add_definitions("-DCL_HPP_TARGET_OPENCL_VERSION=300")
+        add_definitions("-DCL_TARGET_OPENCL_VERSION=300")
+    elseif(OpenCL_VERSION_MAJOR EQUAL 2 AND OpenCL_VERSION_MINOR EQUAL 2)
+        add_definitions("-DCL_HPP_TARGET_OPENCL_VERSION=220")
+        add_definitions("-DCL_TARGET_OPENCL_VERSION=220")
+    else()
+        add_definitions("-DCL_HPP_TARGET_OPENCL_VERSION=120")
+        add_definitions("-DCL_TARGET_OPENCL_VERSION=120")
+        add_definitions("-DCL_USE_DEPRECATED_OPENCL_1_2_APIS")
+    endif()
 ENDIF()
 
 
