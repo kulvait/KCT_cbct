@@ -2,10 +2,7 @@
 
 namespace KCT {
 
-int PartialParallelBeam2DProjector::arrayIntoBuffer(uint32_t QID,
-                                                  float* c_array,
-                                                  cl::Buffer cl_buffer,
-                                                  uint64_t size)
+int PartialParallelBeam2DProjector::arrayIntoBuffer(uint32_t QID, float* c_array, cl::Buffer cl_buffer, uint64_t size)
 {
     uint64_t bufferSize = size * sizeof(float);
     std::shared_ptr<cl::CommandQueue> Q = CT->getCommandQueues()[QID];
@@ -25,10 +22,7 @@ int PartialParallelBeam2DProjector::arrayIntoBuffer(uint32_t QID,
     return 0;
 }
 
-int PartialParallelBeam2DProjector::bufferIntoArray(uint32_t QID,
-                                                  cl::Buffer cl_buffer,
-                                                  float* c_array,
-                                                  uint64_t size)
+int PartialParallelBeam2DProjector::bufferIntoArray(uint32_t QID, cl::Buffer cl_buffer, float* c_array, uint64_t size)
 {
     std::shared_ptr<cl::CommandQueue> Q = CT->getCommandQueues()[QID];
     uint64_t bufferSize = size * sizeof(float);
@@ -48,10 +42,7 @@ int PartialParallelBeam2DProjector::bufferIntoArray(uint32_t QID,
     return 0;
 }
 
-int PartialParallelBeam2DProjector::fillBufferByConstant(uint32_t QID,
-                                                       cl::Buffer cl_buffer,
-                                                       float constant,
-                                                       uint64_t bytecount)
+int PartialParallelBeam2DProjector::fillBufferByConstant(uint32_t QID, cl::Buffer cl_buffer, float constant, uint64_t bytecount)
 {
     std::shared_ptr<cl::CommandQueue> Q = CT->getCommandQueues()[QID];
     return Q->enqueueFillBuffer<cl_float>(cl_buffer, constant, 0, bytecount);
@@ -63,17 +54,15 @@ std::condition_variable gpuavail;
 
 int PartialParallelBeam2DProjector::project_pzblock(float* volume, float* projection, uint64_t PIN)
 {
-    std::mt19937_64 eng{std::random_device{}()};  // Randomizing I/O
-    std::uniform_int_distribution<> dist{0, 3000};
-    std::this_thread::sleep_for(std::chrono::milliseconds{dist(eng)});
-
+    std::mt19937_64 eng{ std::random_device{}() }; // Randomizing I/O
+    std::uniform_int_distribution<> dist{ 0, 3000 };
+    std::this_thread::sleep_for(std::chrono::milliseconds{ dist(eng) });
 
     float *volumePtr, *projectionPtr;
     uint64_t geometriesFrom;
     uint64_t geometriesTo;
     uint64_t projectionArrayOffset;
-    float voxelzCenterOffset;
-    uint32_t pdimz_partial_now, vdimz_partial_now;
+    uint32_t pdimz_partial_now;
     uint64_t BDIM_now;
     projectionArrayOffset = PIN * pFrameSize * (uint64_t)pdimz_partial;
     projectionPtr = projection + projectionArrayOffset;
@@ -106,31 +95,27 @@ int PartialParallelBeam2DProjector::project_pzblock(float* volume, float* projec
     b_buf = CT->getBBuffer(QID);
     // Projection buffer is filled by zeros
     fillBufferByConstant(QID, *b_buf, 0.0f, BDIM_now * sizeof(float));
+    int k_offset_now, xslab_vdimz_now; // Index of the volume from which to project
     for(uint64_t VIN = 0; VIN != vzblocks; VIN++)
     {
         volumePtr = volume + VIN * vFrameSize * (uint64_t)vdimz_partial;
         if(VIN != vzblocks - 1)
         {
-            vdimz_partial_now = vdimz_partial;
+            xslab_vdimz_now = vdimz_partial;
             arrayIntoBuffer(QID, volumePtr, *x_buf, XDIM_partial);
         } else
         {
-            vdimz_partial_now = vdimz_partial_last;
+            xslab_vdimz_now = vdimz_partial_last;
             arrayIntoBuffer(QID, volumePtr, *x_buf, XDIM_partial_last);
         }
-        voxelzCenterOffset
-            = float(vdimz) * 0.5f - (float(VIN * vdimz_partial) + float(vdimz_partial_now) * 0.5f);
-        // CT->updateReductionParameters(pdimx, pdimy, pdimz_partial_now, vdimx, vdimy,
-        //                              vdimz_partial_now, workGroupSize);
-
-        CT->project_partial(QID, *x_buf, *b_buf, vdimz_partial_now, voxelzCenterOffset,
-                            geometriesFrom, geometriesTo);
+        k_offset_now = VIN * vdimz_partial;
+        CT->project_partial(QID, *x_buf, *b_buf, k_offset_now, xslab_vdimz_now, geometriesFrom, geometriesTo);
     }
 
     bufferIntoArray(QID, *b_buf, projectionPtr, BDIM_now);
 
-    LOGD << io::xprintf("END PIN %d [0,%d) written %lu values to [%lu, %lu).", PIN, pzblocks,
-                        BDIM_now, projectionArrayOffset, projectionArrayOffset + BDIM_now);
+    LOGD << io::xprintf("END PIN %d [0,%d) written %lu values to [%lu, %lu).", PIN, pzblocks, BDIM_now, projectionArrayOffset,
+                        projectionArrayOffset + BDIM_now);
     // Push QID into the queue and notify waiting threads
     {
         std::unique_lock qll(ql);
@@ -170,9 +155,7 @@ int PartialParallelBeam2DProjector::project_partial(float* volume, float* projec
     std::vector<std::future<int>> computedTasks;
     for(uint64_t PIN = 0; PIN != pzblocks; PIN++)
     {
-        std::future<int> future
-            = std::async(std::launch::async, &PartialParallelBeam2DProjector::project_pzblock, this,
-                         volume, projection, PIN);
+        std::future<int> future = std::async(std::launch::async, &PartialParallelBeam2DProjector::project_pzblock, this, volume, projection, PIN);
         computedTasks.emplace_back(std::move(future));
     }
     for(std::future<int>& f : computedTasks)
@@ -181,9 +164,8 @@ int PartialParallelBeam2DProjector::project_partial(float* volume, float* projec
     }
     return 0;
 }
-int PartialParallelBeam2DProjector::project_print_discrepancy(float* volume,
-                                                            float* projection,
-                                                            float* rhs)
+
+int PartialParallelBeam2DProjector::project_print_discrepancy(float* volume, float* projection, float* rhs)
 {
     /*
         CT->allocateXBuffers(1);
@@ -205,6 +187,7 @@ int PartialParallelBeam2DProjector::project_print_discrepancy(float* volume,
     LOGE << "Unimplemented";
     return 0;
 }
+
 int PartialParallelBeam2DProjector::backproject(float* projection, float* volume)
 {
     /*

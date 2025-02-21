@@ -1,28 +1,25 @@
 #include "PartialPBCT2DOperator.hpp"
 
+
 namespace KCT {
 
 int PartialPBCT2DOperator::initializeOpenCL(uint32_t platformID,
-                                       uint32_t* deviceIds,
-                                       uint32_t deviceIdsLength,
-                                       std::string xpath,
-                                       bool debug,
-                                       bool relaxed,
-                                       cl::NDRange projectorLocalNDRange,
-                                       cl::NDRange backprojectorLocalNDRange)
+                                            uint32_t* deviceIds,
+                                            uint32_t deviceIdsLength,
+                                            std::string xpath,
+                                            bool debug,
+                                            bool relaxed,
+                                            cl::NDRange projectorLocalNDRange,
+                                            cl::NDRange backprojectorLocalNDRange)
 {
-    int val
-        = Kniha::initializeOpenCL(platformID, deviceIds, deviceIdsLength, xpath, debug, relaxed);
+    int val = Kniha::initializeOpenCL(platformID, deviceIds, deviceIdsLength, xpath, debug, relaxed);
     if(val == 0)
     {
         PBCT2DLocalNDRangeFactory localRangeFactory(vdimx, vdimy, maxWorkGroupSize);
         bool verbose = true;
-        this->projectorLocalNDRange
-            = localRangeFactory.getProjectorLocalNDRange(projectorLocalNDRange, verbose);
-        this->projectorLocalNDRangeBarrier
-            = localRangeFactory.getProjectorBarrierLocalNDRange(projectorLocalNDRange, verbose);
-        this->backprojectorLocalNDRange
-            = localRangeFactory.getBackprojectorLocalNDRange(backprojectorLocalNDRange, verbose);
+        this->projectorLocalNDRange = localRangeFactory.getProjectorLocalNDRange(projectorLocalNDRange, verbose);
+        this->projectorLocalNDRangeBarrier = localRangeFactory.getProjectorBarrierLocalNDRange(projectorLocalNDRange, verbose);
+        this->backprojectorLocalNDRange = localRangeFactory.getBackprojectorLocalNDRange(backprojectorLocalNDRange, verbose);
         return 0;
     } else
     {
@@ -59,8 +56,7 @@ void PartialPBCT2DOperator::initializeCVPProjector(bool useBarrierCalls, uint32_
     }
 }
 
-void PartialPBCT2DOperator::initializeSiddonProjector(uint32_t probesPerEdgeX,
-                                                     uint32_t probesPerEdgeY)
+void PartialPBCT2DOperator::initializeSiddonProjector(uint32_t probesPerEdgeX, uint32_t probesPerEdgeY)
 {
     if(!isOpenCLInitialized())
     {
@@ -104,8 +100,7 @@ void PartialPBCT2DOperator::initializeVolumeConvolution()
         CLINCLUDEconvolution();
     } else
     {
-        std::string err
-            = "Could not initialize volume convolution when OpenCL was already initialized.";
+        std::string err = "Could not initialize volume convolution when OpenCL was already initialized.";
         LOGE << err;
         throw std::runtime_error(err.c_str());
     }
@@ -124,20 +119,17 @@ void PartialPBCT2DOperator::useJacobiVectorCLCode()
     }
 }
 
-int PartialPBCT2DOperator::problemSetup(
-    std::vector<std::shared_ptr<geometry::Geometry3DParallelI>> geometries,
-    double voxelSpacingX,
-    double voxelSpacingY,
-    double voxelSpacingZ,
-    double volumeCenterX,
-    double volumeCenterY,
-    double volumeCenterZ)
+int PartialPBCT2DOperator::problemSetup(std::vector<std::shared_ptr<geometry::Geometry3DParallelI>> geometries,
+                                        double voxelSpacingX,
+                                        double voxelSpacingY,
+                                        double voxelSpacingZ,
+                                        double volumeCenterX,
+                                        double volumeCenterY,
+                                        double volumeCenterZ)
 {
     if(geometries.size() != pzblock_maxsize)
     {
-        std::string ERR
-            = io::xprintf("The pzblock_maxsize=%d and the size of camera geometries vector is %d.",
-                          pzblock_maxsize, geometries.size());
+        std::string ERR = io::xprintf("The pzblock_maxsize=%d and the size of camera geometries vector is %d.", pzblock_maxsize, geometries.size());
         if(geometries.size() < pzblock_maxsize)
         {
             KCTERR(ERR);
@@ -245,8 +237,7 @@ std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getXBuffer(uint32_t i)
         return x_buffers[i];
     } else
     {
-        std::string err = io::xprintf(
-            "Index %d is out of range of the x_buffers vector of size %d!", i, x_buffers.size());
+        std::string err = io::xprintf("Index %d is out of range of the x_buffers vector of size %d!", i, x_buffers.size());
         LOGE << err;
         throw std::runtime_error(err);
     }
@@ -259,8 +250,7 @@ std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getBBuffer(uint32_t i)
         return b_buffers[i];
     } else
     {
-        std::string err = io::xprintf(
-            "Index %d is out of range of the b_buffers vector of size %d!", i, b_buffers.size());
+        std::string err = io::xprintf("Index %d is out of range of the b_buffers vector of size %d!", i, b_buffers.size());
         LOGE << err;
         throw std::runtime_error(err);
     }
@@ -273,9 +263,7 @@ std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getTmpXBuffer(uint32_t i)
         return tmp_x_buffers[i];
     } else
     {
-        std::string err
-            = io::xprintf("Index %d is out of range of the tmp_x_buffers vector of size %d!", i,
-                          tmp_x_buffers.size());
+        std::string err = io::xprintf("Index %d is out of range of the tmp_x_buffers vector of size %d!", i, tmp_x_buffers.size());
         KCTERR(err);
     }
 }
@@ -287,9 +275,7 @@ std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getTmpBBuffer(uint32_t i)
         return tmp_b_buffers[i];
     } else
     {
-        std::string err
-            = io::xprintf("Index %d is out of range of the tmp_b_buffers vector of size %d!", i,
-                          tmp_b_buffers.size());
+        std::string err = io::xprintf("Index %d is out of range of the tmp_b_buffers vector of size %d!", i, tmp_b_buffers.size());
         KCTERR(err);
     }
 }
@@ -299,10 +285,7 @@ std::shared_ptr<cl::Buffer> PartialPBCT2DOperator::getTmpBBuffer(uint32_t i)
  * @param projectionIncrement For OS SART 1 by default
  *
  */
-int PartialPBCT2DOperator::backproject(cl::Buffer& B,
-                                       cl::Buffer& X,
-                                       uint32_t initialProjectionIndex,
-                                       uint32_t projectionIncrement)
+int PartialPBCT2DOperator::backproject(cl::Buffer& B, cl::Buffer& X, uint32_t initialProjectionIndex, uint32_t projectionIncrement)
 {
     std::string ERR = "Not yet implemented";
     KCTERR(ERR);
@@ -343,8 +326,8 @@ int PartialPBCT2DOperator::backproject(cl::Buffer& B,
 int PartialPBCT2DOperator::project_partial(uint32_t QID,
                                            cl::Buffer& X,
                                            cl::Buffer& B,
-                                           uint32_t vdimz_local,
-                                           float voxelzCenterOffset,
+                                           uint32_t xslab_z_offset,
+                                           uint32_t xslab_vdimz_local,
                                            uint32_t geometries_from,
                                            uint32_t geometries_to,
                                            uint32_t initialProjectionIndex,
@@ -354,19 +337,18 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
     if(useBarrierImplementation)
     {
         localRange = projectorLocalNDRangeBarrier;
-        if(vdimz_local != vzblock_maxsize)
+        if(xslab_vdimz_local != vzblock_maxsize)
         {
-            std::string err
-                = io::xprintf("Barrier calls are not implemented for uneven partitioning of the "
-                              "volume vdimz_local=%d vzblock_maxsize=%d.",
-                              vdimz_local, vzblock_maxsize);
+            std::string err = io::xprintf("Barrier calls are not implemented for uneven partitioning of the "
+                                          "volume xslab_vdimz_local=%d vzblock_maxsize=%d.",
+                                          xslab_vdimz_local, vzblock_maxsize);
             KCTERR(err);
         }
     } else
     {
         localRange = projectorLocalNDRange;
     }
-    cl_int3 vdims = cl_int3({ int(vdimx), int(vdimy), int(vdimz_local) });
+    cl_int3 vdims = cl_int3({ int(vdimx), int(vdimy), int(xslab_vdimz_local) });
     // clang-format off
     // cl::NDRange barrierGlobalRange = cl::NDRange(vdimx, vdimy, vdimz);
     // std::shared_ptr<cl::NDRange> barrierLocalRange
@@ -376,13 +358,11 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
     float scalingFactor;
     unsigned long frameSize = pdimx * pdimy;
     unsigned long offset;
-    cl_double3 volumeCenter_local = volumeCenter;
     cl_double2 volumeCenter2D = { volumeCenter.x, volumeCenter.y };
-    volumeCenter_local.z -= (voxelzCenterOffset * voxelSizes.z);
     uint64_t IND;
     uint32_t i_start, i_stop;
     int k_from = 0;
-    int k_count = vdimz_local;
+    int k_count = xslab_vdimz_local;
     if(initialProjectionIndex == 0 && projectionIncrement == 1)
     {
         i_start = geometries_from;
@@ -399,10 +379,10 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
         if(i >= geometries_from && i < geometries_to)
         {
             G = geometries[i];
-            G->projectionMatrixPXAsVector3((double*)&CM, voxelzCenterOffset);
+            G->projectionMatrixPXAsVector3((double*)&CM, 0.0);
             scalingFactor = scalingFactorVector[i];
             IND = i - geometries_from;
-            offset = IND * frameSize;
+            offset = IND * frameSize + xslab_z_offset;
             if(useSiddonProjector)
             {
                 KCTERR("Siddon operators are not yet implemented for PBCT.");
@@ -423,9 +403,8 @@ int PartialPBCT2DOperator::project_partial(uint32_t QID,
                 } else
                 {
                     cl::NDRange globalRange(vdimx, vdimy);
-                    algFLOAT_pbct2d_cutting_voxel_project(
-                        X, B, offset, CM, vdims, voxelSizes, volumeCenter2D, pdims, scalingFactor,
-                        k_from, k_count, globalRange, localRange, false, QID);
+                    algFLOAT_pbct2d_cutting_voxel_project(X, B, offset, CM, vdims, voxelSizes, volumeCenter2D, pdims, scalingFactor, k_from, k_count,
+                                                          globalRange, localRange, false, QID);
                 }
             }
         }
@@ -484,8 +463,7 @@ void PartialPBCT2DOperator::setTimestamp(bool finishCommandQueue)
 }
 std::chrono::milliseconds PartialPBCT2DOperator::millisecondsFromTimestamp(bool setNewTimestamp)
 {
-    std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - timestamp);
+    std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - timestamp);
     if(setNewTimestamp)
     {
         setTimestamp(false);
@@ -493,8 +471,7 @@ std::chrono::milliseconds PartialPBCT2DOperator::millisecondsFromTimestamp(bool 
     return ms;
 }
 
-std::string
-PartialPBCT2DOperator::printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
+std::string PartialPBCT2DOperator::printTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
 {
     if(finishCommandQueue)
     {
@@ -504,9 +481,7 @@ PartialPBCT2DOperator::printTime(std::string msg, bool finishCommandQueue, bool 
     return io::xprintf("%s: %0.2fs", msg.c_str(), duration.count() / 1000.0);
 }
 
-void PartialPBCT2DOperator::reportTime(std::string msg,
-                                       bool finishCommandQueue,
-                                       bool setNewTimestamp)
+void PartialPBCT2DOperator::reportTime(std::string msg, bool finishCommandQueue, bool setNewTimestamp)
 {
     if(finishCommandQueue)
     {
