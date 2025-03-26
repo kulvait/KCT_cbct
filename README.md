@@ -29,7 +29,7 @@ PSIRT algorithm was implemented according to [Gregor, Benson 2008](https://doi.o
 OS-SART algorithm was implemented according to [Jiang, Wang, 2003](https://doi.org/10.1109/TIP.2003.815295)
 
 ### Implemented projectors
-Cutting voxel projector was implemented according to [Kulvait et al.](https://arxiv.org/abs/2110.09841)
+Cutting voxel projector was implemented according to [Kulvait et al., 2025](https://doi.org/10.1016/j.jocs.2025.102573)
 TT projector was implemented according to [Long et al., 2010](https://doi.org/10.1109/TMI.2010.2050898)
 Siddon projector was implemented according to [Siddon, 1985](https://doi.org/10.1118/1.595715)
 
