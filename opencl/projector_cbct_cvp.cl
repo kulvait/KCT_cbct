@@ -513,6 +513,99 @@ double computeSquareSize(double2 abc)
     return 0; // This is not gonna happen
 }
 
+/**
+ * Function to invert a reduced 3x3 projective transform matrix (camera matrix)
+ * from the pinhole camera model. The original 3x4 camera matrix (CM) represents
+ * a projective transformation of 3D points onto a 2D plane (e.g., the detector).
+ * By subtracting the source position from the coordinates, the transformation can
+ * be reduced to a 3x3 matrix, avoiding unnecessary multiplications and focusing
+ * only on the regular part of the matrix.
+ *
+ * This function performs the following:
+ * - Takes a 3x3 submatrix of the original camera matrix (stored in CM) and computes
+ *   its inverse.
+ * - Returns the inverse matrix in the same layout (REAL16 type) as the original.
+ *
+ * Usage:
+ * - To invert the position on the detector (PX, PY, 1), multiply it with the inverted
+ *   3x3 matrix (stored in ICM). This gives the corresponding coordinates in the
+ *   source-centered coordinate system.
+ * - For consistency, the relevant 3x3 matrix is returned in the same layout (ICM) as
+ *   the original 3x4 camera matrix (CM), filling unused components with zero.
+ *
+ * Input:
+ * - CM: A 3x3 submatrix of the 3x4 projective transform matrix, stored in REAL16 format.
+ *
+ * Output:
+ * - A REAL16 structure containing the inverted 3x3 matrix, formatted consistently with
+ *   the original layout.
+ *
+ * Preconditions:
+ * - The input matrix must be regular (non-singular). If the determinant is zero, the
+ *   function returns a matrix of all zeros.
+ */
+REAL16 inline invert_CM(const REAL16 CM)
+{
+    // Precompute terms to avoid recomputation
+    REAL ei_fh = CM.s5 * CM.sa - CM.s6 * CM.s9; // e*i - f*h
+    REAL di_fg = CM.s4 * CM.sa - CM.s6 * CM.s8; // d*i - f*g
+    REAL dh_eg = CM.s4 * CM.s9 - CM.s5 * CM.s8; // d*h - e*g
+    REAL bi_ch = CM.s1 * CM.sa - CM.s2 * CM.s9; // b*i - c*h
+    REAL ai_cg = CM.s0 * CM.sa - CM.s2 * CM.s8; // a*i - c*g
+    REAL ah_bg = CM.s0 * CM.s9 - CM.s1 * CM.s8; // a*h - b*g
+    REAL bf_ce = CM.s1 * CM.s6 - CM.s2 * CM.s5; // b*f - c*e
+    REAL af_cd = CM.s0 * CM.s6 - CM.s2 * CM.s4; // a*f - c*d
+    REAL ae_bd = CM.s0 * CM.s5 - CM.s1 * CM.s4; // a*e - b*d
+
+    // Calculate the determinant
+    REAL det = CM.s0 * ei_fh - CM.s1 * di_fg + CM.s2 * dh_eg;
+
+    // If determinant is zero, return the preallocated ICM
+    if(det == ZERO)
+        return (REAL16)ZERO;
+
+    // Calculate the inverse determinant
+    REAL inv_det = ONE / det;
+
+    // Fill in the inverted matrix directly
+    return (REAL16)(ei_fh * inv_det, // ICM.s0
+                    -di_fg * inv_det, // ICM.s1
+                    dh_eg * inv_det, // ICM.s2
+                    ZERO, // ICM.s3 (not used, remains zero)
+                    -bi_ch * inv_det, // ICM.s4
+                    ai_cg * inv_det, // ICM.s5
+                    -ah_bg * inv_det, // ICM.s6
+                    ZERO, // ICM.s7 (not used, remains zero)
+                    bf_ce * inv_det, // ICM.s8
+                    -af_cd * inv_det, // ICM.s9
+                    ae_bd * inv_det, // ICM.sa
+                    ZERO, // ICM.sb (not used, remains zero)
+                    ZERO, ZERO, ZERO, ZERO // Remaining fields set to zero
+    );
+}
+
+REAL inline squared_focal_length(const REAL16 CM)
+{
+    // Precompute the dot products
+    REAL p0 = dot(CM.s012, CM.s89a); // dot(CM.s012, CM.s89a)
+    REAL p1 = dot(CM.s456, CM.s89a); // dot(CM.s456, CM.s89a)
+    REAL p22 = dot(CM.s89a, CM.s89a); // dot(CM.s89a, CM.s89a)
+    REAL16 CMX = CM;
+    // Orthogonalize CMX.s012 with respect to CMX.s89a
+    CMX.s012 -= CMX.s89a * p0 / p22; // Subtract projection of CMX.s012 onto CMX.s89a
+
+    // Orthogonalize CMX.s456 with respect to CMX.s89a
+    CMX.s456 -= CMX.s89a * p1 / p22; // Subtract projection of CMX.s456 onto CMX.s89a
+
+    // Compute the squared magnitudes (lengths) of the orthogonalized rows
+    p0 = dot(CMX.s012, CMX.s012); // dot(CMX.s012, CMX.s012) -> squared length of orthogonalized row
+    p1 = dot(CMX.s456, CMX.s456); // dot(CMX.s456, CMX.s456) -> squared length of orthogonalized row
+
+    // Return the product of the focal lengths f_x * f_y, which is the square root of this value
+    // (We return the product of the focal lengths in the same unit.)
+    return sqrt(p0 * p1) / p22; // sqrt(f_x^2 * f_y^2) = f_x * f_y
+}
+
 /** Project given volume using cutting voxel projector.
  *
  *

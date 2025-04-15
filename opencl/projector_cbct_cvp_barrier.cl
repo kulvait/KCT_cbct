@@ -1,41 +1,36 @@
 //==============================projector_cbct_cvp_barrier.cl=====================================
 
-#define LOCALMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                    \
-    if(PJ_max >= pdims.y)                                                                          \
-    {                                                                                              \
-        PJ_max = pdims.y - 1;                                                                      \
-        Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;                                             \
-        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
-    } else                                                                                         \
-    {                                                                                              \
-        leastLambda = ONE;                                                                         \
-    }                                                                                              \
-    if(PJ_min < 0)                                                                                 \
-    {                                                                                              \
-        J = 0;                                                                                     \
-        Fvector = CM.s456 + HALF * CM.s89a;                                                        \
-        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                     \
-    } else                                                                                         \
-    {                                                                                              \
-        J = PJ_min;                                                                                \
-        Fvector = CM.s456 - (J - HALF) * CM.s89a;                                                  \
-    }                                                                                              \
-    for(; J < PJ_max; J++)                                                                         \
-    {                                                                                              \
-        Fvector -= CM.s89a;                                                                        \
-        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                         \
-        AtomicAdd_l_f(&projection[J], (lambda - lastLambda) * value);                              \
-        lastLambda = lambda;                                                                       \
-    }                                                                                              \
+#define LOCALMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                                                                      \
+    if(PJ_max >= pdims.y)                                                                                                                            \
+    {                                                                                                                                                \
+        PJ_max = pdims.y - 1;                                                                                                                        \
+        Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;                                                                                               \
+        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                                                                      \
+    } else                                                                                                                                           \
+    {                                                                                                                                                \
+        leastLambda = ONE;                                                                                                                           \
+    }                                                                                                                                                \
+    if(PJ_min < 0)                                                                                                                                   \
+    {                                                                                                                                                \
+        J = 0;                                                                                                                                       \
+        Fvector = CM.s456 + HALF * CM.s89a;                                                                                                          \
+        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                                                                       \
+    } else                                                                                                                                           \
+    {                                                                                                                                                \
+        J = PJ_min;                                                                                                                                  \
+        Fvector = CM.s456 - (J - HALF) * CM.s89a;                                                                                                    \
+    }                                                                                                                                                \
+    for(; J < PJ_max; J++)                                                                                                                           \
+    {                                                                                                                                                \
+        Fvector -= CM.s89a;                                                                                                                          \
+        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                                                                           \
+        AtomicAdd_l_f(&projection[J], (lambda - lastLambda) * value);                                                                                \
+        lastLambda = lambda;                                                                                                                         \
+    }                                                                                                                                                \
     AtomicAdd_l_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
 
-void inline localEdgeValues0(local float* projection,
-                             private REAL16 CM,
-                             private REAL3 v,
-                             private int PX,
-                             private REAL value,
-                             private REAL3 voxelSizes,
-                             private int2 pdims)
+void inline localEdgeValues0(
+    local float* projection, private REAL16 CM, private REAL3 v, private int PX, private REAL value, private REAL3 voxelSizes, private int2 pdims)
 {
     projection = projection + PX * pdims.y;
     const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
@@ -72,15 +67,14 @@ void inline localEdgeValues0(local float* projection,
 }
 #ifdef ELEVATIONCORRECTION
 
-void inline localEdgeValues0ElevationCorrection(
-    local float* projection,
-    private REAL16 CM,
-    private REAL3 v,
-    private int PX,
-    private REAL value,
-    private REAL3 voxelSizes,
-    private int2 pdims,
-    private REAL corLength) // corLength is scaled to the size of lambda
+void inline localEdgeValues0ElevationCorrection(local float* projection,
+                                                private REAL16 CM,
+                                                private REAL3 v,
+                                                private int PX,
+                                                private REAL value,
+                                                private REAL3 voxelSizes,
+                                                private int2 pdims,
+                                                private REAL corLength) // corLength is scaled to the size of lambda
 {
     projection = projection + PX * pdims.y;
     const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
@@ -179,24 +173,19 @@ void inline localEdgeValues0ElevationCorrection(
                 if(lastLambdaShifted > -corLength)
                 {
                     corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier
-                            * (lastLambdaShifted * lastLambdaShifted
-                               - lambdaShifted * lambdaShifted);
+                        + corQuarterMultiplier * (lastLambdaShifted * lastLambdaShifted - lambdaShifted * lambdaShifted);
                     lastCorMaxLambdaShifted = lambdaShifted;
                 } else
                 {
-                    corFactor = (-corLength - lastLambdaShifted)
-                        + HALF * (lambdaShifted + corLength)
-                        + corQuarterMultiplier
-                            * (corLength * corLength - lambdaShifted * lambdaShifted);
+                    corFactor = (-corLength - lastLambdaShifted) + HALF * (lambdaShifted + corLength)
+                        + corQuarterMultiplier * (corLength * corLength - lambdaShifted * lambdaShifted);
                     lastCorMaxLambdaShifted = lambdaShifted;
                 }
             } else // lastLambda < corLength
             {
                 if(lambda < corLength)
                 {
-                    corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
+                    corFactor = HALF * (lambda - lastLambda) + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
                 } else
                 {
                     corFactor = HALF * (corLength - lastLambda) + (lambda - corLength)
@@ -213,15 +202,11 @@ void inline localEdgeValues0ElevationCorrection(
         } else if(lastLambdaShifted > -corLength)
         {
             corFactor = HALF * (leastCorMaxLambdaShifted - lastLambdaShifted)
-                + corQuarterMultiplier
-                    * (lastLambdaShifted * lastLambdaShifted
-                       - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+                + corQuarterMultiplier * (lastLambdaShifted * lastLambdaShifted - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
         } else
         {
-            corFactor = (-corLength - lastLambdaShifted)
-                + HALF * (leastCorMaxLambdaShifted + corLength)
-                + corQuarterMultiplier
-                    * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+            corFactor = (-corLength - lastLambdaShifted) + HALF * (leastCorMaxLambdaShifted + corLength)
+                + corQuarterMultiplier * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
         }
         AtomicAdd_l_f(projection + PJ_max, corFactor * value);
     }
@@ -302,30 +287,25 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
 #define volumeCenter _volumeCenter
 #endif
     const REAL3 halfVoxelSizes = HALF * voxelSizes;
-    const REAL3 volumeCenter_voxelcenter_offset
-        = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
+    const REAL3 volumeCenter_voxelcenter_offset = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
 #ifdef ELEVATIONCORRECTION
-    const REAL tgelevation = fabs(voxelcenter_xyz.z)
-        / sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
+    const REAL tgelevation = fabs(voxelcenter_xyz.z) / sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
 #endif
     if(LID == 0) // Get dimension
     {
         // LID==0
         const REAL3 volumeCenter_localVoxelcenter_offset
-            = (REAL3)(2 * i + lis - vdims.x, 2 * j + ljs - vdims.y, 2 * k + lks - vdims.z)
-            * halfVoxelSizes;
+            = (REAL3)(2 * i + lis - vdims.x, 2 * j + ljs - vdims.y, 2 * k + lks - vdims.z) * halfVoxelSizes;
         /*
             // LID==LIX
             const REAL3 volumeCenter_localVoxelcenter_offset = (REAL3)(2 * i + 2 - lis -
                         vdims.x, 2 * j + 2 - ljs - vdims.y, 2 * k + 2 - lks - vdims.z) *
                                         halfVoxelSizes;
         */
-        const REAL3 voxelcenter_local_xyz
-            = volumeCenter + volumeCenter_localVoxelcenter_offset - sourcePosition;
+        const REAL3 voxelcenter_local_xyz = volumeCenter + volumeCenter_localVoxelcenter_offset - sourcePosition;
 
-        const REAL3 halfLocalSizes
-            = { HALF * lis * voxelSizes.x, HALF * ljs * voxelSizes.y, HALF * lks * voxelSizes.z };
+        const REAL3 halfLocalSizes = { HALF * lis * voxelSizes.x, HALF * ljs * voxelSizes.y, HALF * lks * voxelSizes.z };
         positiveShift[0] = halfLocalSizes; // X direction
         positiveShift[1] = halfLocalSizes; // Y direction
         if(all(fabs(voxelcenter_local_xyz) > halfLocalSizes)) // Increase or decrease of the value
@@ -378,8 +358,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             //       voxelcenter_local_xyz.s0, voxelcenter_local_xyz.s1, voxelcenter_local_xyz.s2,
             //       halfLocalSizes.s0, halfLocalSizes.s1, halfLocalSizes.s2);
             offAxisPosition = false;
-            getVoxelRanges(voxelcenter_local_xyz, 2 * halfLocalSizes, CM, &PILocalMin, &PILocalMax,
-                           &PJLocalMin, &PJLocalMax);
+            getVoxelRanges(voxelcenter_local_xyz, 2 * halfLocalSizes, CM, &PILocalMin, &PILocalMax, &PJLocalMin, &PJLocalMax);
         }
         // printf("i,j,k=(%d, %d, %d) localSizes=(%d %d %d), PIRANGE=[%d %d] PJRANGE=[%d %d]\n", i,
         // j,
@@ -388,8 +367,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
         {
             fullyOffProjectorPosition = true;
             partlyOffProjectorPosition = true;
-        } else if(PILocalMin < 0 || PILocalMax >= pdims.x || PJLocalMin < 0
-                  || PJLocalMax >= pdims.y)
+        } else if(PILocalMin < 0 || PILocalMax >= pdims.x || PJLocalMin < 0 || PJLocalMax >= pdims.y)
         {
             fullyOffProjectorPosition = false;
             partlyOffProjectorPosition = true;
@@ -425,8 +403,7 @@ void kernel FLOATcutting_voxel_project_barrier(global const float* restrict volu
             }
             projectorLocalRange[4] = ILocalRange;
             projectorLocalRange[5] = Jrange;
-            projectorLocalRange[6]
-                = projectorLocalRange[0]; // Where current local array has start IRange
+            projectorLocalRange[6] = projectorLocalRange[0]; // Where current local array has start IRange
 
             // 0..PIMIN, 1..PIMAX, 2..PJMIN, 3..PJMAX, 4 .. ILocalRange, 5 .. PJMAX-PJMIN, 6
             // CurrentPISTART
@@ -811,6 +788,22 @@ px11 = PROJECTX0(CML, vx11);*/
                 REAL corlambda, corLenEstimate;
                 // Typically voxelSizes.x == voxelSizes.y
                 const REAL corLenLimit = HALF * (voxelSizes.x + voxelSizes.y);
+                // corLenLimit is typical length
+                const REAL xxplusyy = sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
+                const REAL voxelcenter_xy_sin = fabs(voxelcenter_xyz.x) / xxplusyy;
+                const REAL voxelcenter_xy_cos = fabs(voxelcenter_xyz.y) / xxplusyy;
+                const REAL xpath = voxelSizes.x * voxelcenter_xy_cos;
+                const REAL ypath = voxelSizes.y * voxelcenter_xy_sin;
+                REAL path;
+                if(xpath < ypath)
+                {
+                    path = voxelSizes.x / voxelcenter_xy_sin;
+                } else
+                {
+                    path = voxelSizes.y / voxelcenter_xy_cos;
+                }
+                // corLenLimit=2.0*corLenLimit;
+                // corLenLimit=1.0*voxelSizes.x;
 #endif
                 if(max_PX <= min_PX) // These indices are in the admissible range
                 {
@@ -818,12 +811,9 @@ px11 = PROJECTX0(CML, vx11);*/
 #ifdef ELEVATIONCORRECTION
                     corLenEstimate = corLenLimit; // Probably better estimate might exist
                     corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-                    localEdgeValues0ElevationCorrection(localProjection, CML, voxelcenter_xyz,
-                                                        min_PX, value, voxelSizes, Lpdims,
-                                                        corlambda);
+                    localEdgeValues0ElevationCorrection(localProjection, CML, voxelcenter_xyz, min_PX, value, voxelSizes, Lpdims, corlambda);
 #else
-                    localEdgeValues0(localProjection, CML, HALF * (vx00 + vx11), min_PX, value,
-                                     voxelSizes, Lpdims);
+                    localEdgeValues0(localProjection, CML, HALF * (vx00 + vx11), min_PX, value, voxelSizes, Lpdims);
 #endif
                 } else
                 {
@@ -837,9 +827,8 @@ px11 = PROJECTX0(CML, vx11);*/
                     // Section of the square that corresponds to the indices < i
                     // CCW and CW coordinates of the last intersection on the lines
                     // specified by the points in V_ccw
-                    sectionSize_prev = exactIntersectionPolygons0(
-                        ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3],
-                        CML, voxelSizes, &CENTROID_prev, &llength_prev);
+                    sectionSize_prev = exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CML,
+                                                                  voxelSizes, &CENTROID_prev, &llength_prev);
                     if(I >= 0)
                     {
                         factor = value * sectionSize_prev;
@@ -853,33 +842,68 @@ px11 = PROJECTX0(CML, vx11);*/
                             corLenEstimate = llength_prev;
                         }
                         corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor,
-                                                            voxelSizes, Lpdims, corlambda);
+                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor, voxelSizes, Lpdims, corlambda);
 #else
                         localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
 #endif
                     }
                     for(I = I + 1; I < I_STOP; I++)
                     {
-                        sectionSize_cur = exactIntersectionPolygons0(
-                            ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2],
-                            PX_xyx[3], CML, voxelSizes, &CENTROID_cur, &llength_cur);
+                        sectionSize_cur = exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CML,
+                                                                     voxelSizes, &CENTROID_cur, &llength_cur);
                         polygonSize = sectionSize_cur - sectionSize_prev;
-                        CENTROID
-                            = (sectionSize_cur * CENTROID_cur - sectionSize_prev * CENTROID_prev)
-                            / polygonSize;
+                        CENTROID = (sectionSize_cur * CENTROID_cur - sectionSize_prev * CENTROID_prev) / polygonSize;
                         Int = (REAL3)(CENTROID, vx00.z);
                         factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
                         corLenEstimate = HALF * (llength_cur + llength_prev);
-                        if(llength_cur < ONETHIRD * corLenLimit
-                           || llength_prev < ONETHIRD * corLenLimit) // heuristic
+                        /*						if(llength_cur < corLenLimit &&
+                           llength_prev < corLenLimit)
+                                                                        {
+                                                                                if(polygonSize <
+                           HALF)
+                                                                                {
+                                                        corLenEstimate = TWOTHIRDS*fmax(llength_cur,
+                           llength_prev); }else
+                                                                                {
+                                                                                        corLenEstimate
+                           = corLenLimit; corLenEstimate = fmax(llength_cur, llength_prev);
+                                                                                        corLenEstimate
+                           = path;
+                                                                                }
+                                                                        }else if(llength_cur <
+                           corLenLimit)
+                                                                        {
+                                                                                corLenEstimate =
+                           corLenLimit; }else if(llength_prev < corLenLimit)
+                                                                        {
+                                                                                //corLenEstimate =
+                           llength_cur;
+                                                                                //corLenEstimate =
+                           TWOTHIRDS*llength_cur; corLenEstimate = HALF*(llength_cur+corLenLimit);
+                                                                                if(sectionSize_cur <
+                           HALF)
+                                                                                {
+                                                                                        corLenEstimate
+                           = corLenLimit;
+                                                                                //corLenEstimate =
+                           TWOTHIRDS*llength_cur;
+                                                                                }
+                                                                        }*/
+                        /*if(polygonSize > ONETHIRD)
+                        {
+                                corLenEstimate = fmax(llength_cur, llength_prev);
+                        }*/
+                        // if(corLenLimit > corLenEstimate)
+                        //	corLenEstimate = HALF*(corLenEstimate+corLenLimit); // Probably
+                        // better estimate might exist
+
+                        if(llength_cur < ONETHIRD * corLenLimit || llength_prev < ONETHIRD * corLenLimit) // heuristic
                         {
                             corLenEstimate = fmax(llength_cur, llength_prev);
                         }
                         corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor,
-                                                            voxelSizes, Lpdims, corlambda);
+                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor, voxelSizes, Lpdims, corlambda);
                         llength_prev = llength_cur;
 #else
                         localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
@@ -904,10 +928,10 @@ px11 = PROJECTX0(CML, vx11);*/
                         } else // Typically not triangle
                         {
                             corLenEstimate = llength_prev;
+                            // corLenEstimate = corLenLimit;
                         }
                         corlambda = corLenEstimate * tgelevation * HALF / voxelSizes.z;
-                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor,
-                                                            voxelSizes, Lpdims, corlambda);
+                        localEdgeValues0ElevationCorrection(localProjection, CML, Int, I, factor, voxelSizes, Lpdims, corlambda);
 #else
                         localEdgeValues0(localProjection, CML, Int, I, factor, voxelSizes, Lpdims);
 #endif
@@ -991,4 +1015,4 @@ END DEBUG CODE */
     } while(!stopNextIteration);
     //} while(startIRange < projectorLocalRange[1]);
 }
-//==============================END projector_cbct_cvp_barrier.cl=====================================
+//==============================END projector_cbct_cvp_barrier.cl====================================
