@@ -81,7 +81,7 @@ inline void AtomicMin_g_f(volatile __global float* adr, const float v)
 }
 
 // CVP Projector routines
-//#define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
+// #define LOCALARRAYSIZE Theoretical maximum of 65536 bytes AMD, 49152 NVIDIA, 32768 Intel
 
 #define DROPCENTEROFFPROJECTORVOXELS
 // DROPINCOMPLETEVOXELS is not implemented the same in barrier implementation
@@ -142,33 +142,33 @@ typedef double16 REAL16;
 #define INDEX(f) convert_int_rtn(f + HALF)
 
 // For extracting edge values
-#define EDGEMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                     \
-    if(PJ_max >= pdims.y)                                                                          \
-    {                                                                                              \
-        PJ_max = pdims.y - 1;                                                                      \
-        Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;                                             \
-        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                    \
-    } else                                                                                         \
-    {                                                                                              \
-        leastLambda = ONE;                                                                         \
-    }                                                                                              \
-    if(PJ_min < 0)                                                                                 \
-    {                                                                                              \
-        J = 0;                                                                                     \
-        Fvector = CM.s456 + HALF * CM.s89a;                                                        \
-        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                     \
-    } else                                                                                         \
-    {                                                                                              \
-        J = PJ_min;                                                                                \
-        Fvector = CM.s456 - (J - HALF) * CM.s89a;                                                  \
-    }                                                                                              \
-    for(; J < PJ_max; J++)                                                                         \
-    {                                                                                              \
-        Fvector -= CM.s89a;                                                                        \
-        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                         \
-        AtomicAdd_g_f(&projection[J], (lambda - lastLambda) * value);                              \
-        lastLambda = lambda;                                                                       \
-    }                                                                                              \
+#define EDGEMINMAX(PJ_min, PJ_max, v_min, v_min_minus_v_max_y)                                                                                       \
+    if(PJ_max >= pdims.y)                                                                                                                            \
+    {                                                                                                                                                \
+        PJ_max = pdims.y - 1;                                                                                                                        \
+        Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;                                                                                               \
+        leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                                                                      \
+    } else                                                                                                                                           \
+    {                                                                                                                                                \
+        leastLambda = ONE;                                                                                                                           \
+    }                                                                                                                                                \
+    if(PJ_min < 0)                                                                                                                                   \
+    {                                                                                                                                                \
+        J = 0;                                                                                                                                       \
+        Fvector = CM.s456 + HALF * CM.s89a;                                                                                                          \
+        lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                                                                       \
+    } else                                                                                                                                           \
+    {                                                                                                                                                \
+        J = PJ_min;                                                                                                                                  \
+        Fvector = CM.s456 - (J - HALF) * CM.s89a;                                                                                                    \
+    }                                                                                                                                                \
+    for(; J < PJ_max; J++)                                                                                                                           \
+    {                                                                                                                                                \
+        Fvector -= CM.s89a;                                                                                                                          \
+        lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);                                                                           \
+        AtomicAdd_g_f(&projection[J], (lambda - lastLambda) * value);                                                                                \
+        lastLambda = lambda;                                                                                                                         \
+    }                                                                                                                                                \
     AtomicAdd_g_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
 
 /** Projection of a volume point v0 onto X coordinate on projector.
@@ -178,10 +178,7 @@ typedef double16 REAL16;
  * @param v0 Volume point in source based coordinates
  * @param PX_out Output
  */
-inline double projectX0(private const double16 CM, private const double3 v0)
-{
-    return dot(v0, CM.s012) / dot(v0, CM.s89a);
-}
+inline double projectX0(private const double16 CM, private const double3 v0) { return dot(v0, CM.s012) / dot(v0, CM.s89a); }
 
 /** Projection of a volume point v0 onto Y coordinate on projector.
  * No checks for boundaries.
@@ -190,10 +187,7 @@ inline double projectX0(private const double16 CM, private const double3 v0)
  * @param v0 Volume point in source based coordinates
  * @param PY_out Output
  */
-inline double projectY0(private const double16 CM, private const double3 v0)
-{
-    return dot(v0, CM.s456) / dot(v0, CM.s89a);
-}
+inline double projectY0(private const double16 CM, private const double3 v0) { return dot(v0, CM.s456) / dot(v0, CM.s89a); }
 
 /** Projection of a volume point v onto X coordinate on projector.
  * No checks for boundaries.
@@ -202,10 +196,7 @@ inline double projectY0(private const double16 CM, private const double3 v0)
  * @param v Volume point
  * @param PX_out Output
  */
-inline double projectX(private const double16 CM, private const double3 v)
-{
-    return (dot(v, CM.s012) + CM.s3) / (dot(v, CM.s89a) + CM.sb);
-}
+inline double projectX(private const double16 CM, private const double3 v) { return (dot(v, CM.s012) + CM.s3) / (dot(v, CM.s89a) + CM.sb); }
 
 /** Projection of a volume point v onto Y coordinate on projector.
  * No checks for boundaries.
@@ -214,10 +205,7 @@ inline double projectX(private const double16 CM, private const double3 v)
  * @param v Volume point
  * @param PY_out Output
  */
-inline double projectY(private const double16 CM, private const double3 v)
-{
-    return (dot(v, CM.s456) + CM.s7) / (dot(v, CM.s89a) + CM.sb);
-}
+inline double projectY(private const double16 CM, private const double3 v) { return (dot(v, CM.s456) + CM.s7) / (dot(v, CM.s89a) + CM.sb); }
 
 inline int projectionIndex(private double16 CM, private double3 v, int2 pdims)
 {
@@ -288,15 +276,14 @@ inline int projectionIndexF0(private const float16 CMF, private const float3 v0,
  * This shall be correct implementation, is here just for reference, because its slow and probably
  * faster what is below.
  */
-void inline exactEdgeValues0ElevationCorrectionFORK(
-    global float* projection,
-    private REAL16 CM,
-    private REAL3 v,
-    private int PX,
-    private REAL value,
-    private REAL3 voxelSizes,
-    private int2 pdims,
-    private REAL corlambda) // corlambda is scaled to the size of lambda
+void inline exactEdgeValues0ElevationCorrectionFORK(global float* projection,
+                                                    private REAL16 CM,
+                                                    private REAL3 v,
+                                                    private int PX,
+                                                    private REAL value,
+                                                    private REAL3 voxelSizes,
+                                                    private int2 pdims,
+                                                    private REAL corlambda) // corlambda is scaled to the size of lambda
 {
     projection = projection + PX * pdims.y;
     const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
@@ -361,7 +348,7 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
         J = PJ_min;
         Fvector = CM.s456 - (J - HALF) * CM.s89a;
     }
-    REAL corQuarterMultiplier = QUARTER / corlambda;
+    REAL QUARTER_div_corLength = QUARTER / corlambda;
     REAL corFactor;
     bool correctMin = (PJ_min_cor_min != PJ_min_cor_max && PJ_min_cor_max >= 0);
     bool correctMax = (PJ_max_cor_min != PJ_max_cor_max && PJ_max_cor_min < pdims.y);
@@ -396,10 +383,8 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
         for(; PJ_min_cor_min < J; PJ_min_cor_min++)
         {
             Qvector -= CM.s89a;
-            lambda = dot(v_min, Qvector)
-                / (v_min_minus_v_max_y * Qvector.s2); // Shall be negative here as we are before J
-            corFactor = HALF * (lambda - lastCorLambda)
-                + corQuarterMultiplier * (lambda * lambda - lastCorLambda * lastCorLambda);
+            lambda = dot(v_min, Qvector) / (v_min_minus_v_max_y * Qvector.s2); // Shall be negative here as we are before J
+            corFactor = HALF * (lambda - lastCorLambda) + QUARTER_div_corLength * (lambda * lambda - lastCorLambda * lastCorLambda);
             AtomicAdd_g_f(projection + PJ_min_cor_min, corFactor * value);
             lastCorLambda = lambda;
         }
@@ -415,14 +400,12 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
             {
                 if(lambda < corlambda)
                 {
-                    corFactor = HALF * (lambda - lastCorLambda)
-                        + corQuarterMultiplier * (lambda * lambda - lastCorLambda * lastCorLambda);
+                    corFactor = HALF * (lambda - lastCorLambda) + QUARTER_div_corLength * (lambda * lambda - lastCorLambda * lastCorLambda);
                     lastCorLambda = lambda;
                 } else
                 {
                     corFactor = HALF * (corlambda - lastCorLambda) + (lambda - corlambda)
-                        + corQuarterMultiplier
-                            * (corlambda * corlambda - lastCorLambda * lastCorLambda);
+                        + QUARTER_div_corLength * (corlambda * corlambda - lastCorLambda * lastCorLambda);
                 }
                 AtomicAdd_g_f(&projection[J], value * corFactor);
                 lastLambda = lambda;
@@ -433,17 +416,14 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
             AtomicAdd_g_f(&projection[PJ_max], (leastLambda - lastLambda) * value);
         } else
         {
-            if(leastLambda
-               < corlambda) // Highly unprobable and I will not correct further in this situation
+            if(leastLambda < corlambda) // Highly unprobable and I will not correct further in this situation
             {
-                corFactor = HALF * (leastLambda - lastCorLambda)
-                    + corQuarterMultiplier
-                        * (leastLambda * leastLambda - lastCorLambda * lastCorLambda);
+                corFactor
+                    = HALF * (leastLambda - lastCorLambda) + QUARTER_div_corLength * (leastLambda * leastLambda - lastCorLambda * lastCorLambda);
             } else
             {
                 corFactor = HALF * (corlambda - lastCorLambda) + (leastLambda - corlambda)
-                    + corQuarterMultiplier
-                        * (corlambda * corlambda - lastCorLambda * lastCorLambda);
+                    + QUARTER_div_corLength * (corlambda * corlambda - lastCorLambda * lastCorLambda);
             }
             AtomicAdd_g_f(&projection[PJ_max], corFactor * value);
         }
@@ -457,8 +437,7 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
         {
             PJ_max_cor_max = pdims.y - 1;
             Qvector = CM.s456 - (PJ_max_cor_max + HALF) * CM.s89a;
-            leastCorMaxLambdaShifted
-                = (dot(v_min, Qvector) / (v_min_minus_v_max_y * Qvector.s2)) - ONE;
+            leastCorMaxLambdaShifted = (dot(v_min, Qvector) / (v_min_minus_v_max_y * Qvector.s2)) - ONE;
         } else
         {
             leastCorMaxLambdaShifted = corlambda;
@@ -475,16 +454,12 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
                 if(lastLambdaShifted > -corlambda)
                 {
                     corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier
-                            * (lastLambdaShifted * lastLambdaShifted
-                               - lambdaShifted * lambdaShifted);
+                        + QUARTER_div_corLength * (lastLambdaShifted * lastLambdaShifted - lambdaShifted * lambdaShifted);
                     corMaxLambdaShifted = lambdaShifted;
                 } else
                 {
-                    corFactor = (-corlambda - lastLambdaShifted)
-                        + HALF * (lambdaShifted + corlambda)
-                        + corQuarterMultiplier
-                            * (corlambda * corlambda - lambdaShifted * lambdaShifted);
+                    corFactor = (-corlambda - lastLambdaShifted) + HALF * (lambdaShifted + corlambda)
+                        + QUARTER_div_corLength * (corlambda * corlambda - lambdaShifted * lambdaShifted);
                     corMaxLambdaShifted = lambdaShifted;
                 }
             } else
@@ -498,15 +473,11 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
         if(lastLambdaShifted > -corlambda)
         {
             corFactor = HALF * (leastCorMaxLambdaShifted - lastLambdaShifted)
-                + corQuarterMultiplier
-                    * (lastLambdaShifted * lastLambdaShifted
-                       - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+                + QUARTER_div_corLength * (lastLambdaShifted * lastLambdaShifted - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
         } else
         {
-            corFactor = (-corlambda - lastLambdaShifted)
-                + HALF * (leastCorMaxLambdaShifted + corlambda)
-                + corQuarterMultiplier
-                    * (corlambda * corlambda - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+            corFactor = (-corlambda - lastLambdaShifted) + HALF * (leastCorMaxLambdaShifted + corlambda)
+                + QUARTER_div_corLength * (corlambda * corlambda - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
         }
         AtomicAdd_g_f(projection + PJ_max_cor_max, corFactor * value);
     } else // correctMin and correctMax
@@ -547,28 +518,23 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
                 if(lastLambdaShifted > -corlambda)
                 {
                     corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier
-                            * (lastLambdaShifted * lastLambdaShifted
-                               - lambdaShifted * lambdaShifted);
+                        + QUARTER_div_corLength * (lastLambdaShifted * lastLambdaShifted - lambdaShifted * lambdaShifted);
                     lastCorMaxLambdaShifted = lambdaShifted;
                 } else
                 {
-                    corFactor = (-corlambda - lastLambdaShifted)
-                        + HALF * (lambdaShifted + corlambda)
-                        + corQuarterMultiplier
-                            * (corlambda * corlambda - lambdaShifted * lambdaShifted);
+                    corFactor = (-corlambda - lastLambdaShifted) + HALF * (lambdaShifted + corlambda)
+                        + QUARTER_div_corLength * (corlambda * corlambda - lambdaShifted * lambdaShifted);
                     lastCorMaxLambdaShifted = lambdaShifted;
                 }
             } else // lastLambda < corlambda
             {
                 if(lambda < corlambda)
                 {
-                    corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
+                    corFactor = HALF * (lambda - lastLambda) + QUARTER_div_corLength * (lambda * lambda - lastLambda * lastLambda);
                 } else
                 {
                     corFactor = HALF * (corlambda - lastLambda) + (lambda - corlambda)
-                        + corQuarterMultiplier * (corlambda * corlambda - lastLambda * lastLambda);
+                        + QUARTER_div_corLength * (corlambda * corlambda - lastLambda * lastLambda);
                 }
             }
             AtomicAdd_g_f(&projection[J], corFactor * value);
@@ -578,191 +544,212 @@ void inline exactEdgeValues0ElevationCorrectionFORK(
         if(lastLambdaShifted > -corlambda)
         {
             corFactor = HALF * (leastCorMaxLambdaShifted - lastLambdaShifted)
-                + corQuarterMultiplier
-                    * (lastLambdaShifted * lastLambdaShifted
-                       - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+                + QUARTER_div_corLength * (lastLambdaShifted * lastLambdaShifted - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
         } else
         {
-            corFactor = (-corlambda - lastLambdaShifted)
-                + HALF * (leastCorMaxLambdaShifted + corlambda)
-                + corQuarterMultiplier
-                    * (corlambda * corlambda - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+            corFactor = (-corlambda - lastLambdaShifted) + HALF * (leastCorMaxLambdaShifted + corlambda)
+                + QUARTER_div_corLength * (corlambda * corlambda - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
         }
         AtomicAdd_g_f(projection + PJ_max_cor_max, corFactor * value);
     }
 }
 
-// printf routines for debugging are in bbdb59
-void inline exactEdgeValues0ElevationCorrection(
-    global float* projection,
-    private REAL16 CM, // Projective transform coefficients
-    private REAL3 v, // Central point of the voxel
-    private int PX, // Current pixel in the x-direction
-    private REAL value, // Value to add to the projection
-    private REAL3 voxelSizes, // Sizes of the voxel along x, y, z
-    private int2 pdims, // Projection dimensions
-    private REAL corLength) // Correction length scaled to voxel height
+// Function for elevation correction in voxel projection
+void inline exactEdgeValues0ElevationCorrection(global float* projection, // Pointer to projection array
+                                                private REAL16 CM, // Projective transform coefficients
+                                                private REAL3 v, // Center of the voxel
+                                                private int PX, // Current pixel index in the x-direction
+                                                private REAL value, // Value to be added to the projection
+                                                private REAL3 voxelSizes, // Dimensions of the voxel in x, y, and z
+                                                private int2 pdims, // Projection dimensions (width, height)
+                                                private REAL corLength) // Correction length scaled to voxel height
 {
-    // Step 1: Adjust pointer to the current pixel column
+    // Step 1: Adjust projection pointer for the current x column
     projection = projection + PX * pdims.y;
 
-    const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
-    const REAL3 v_plus = v + distanceToEdge;
-    const REAL3 v_minus = v - distanceToEdge;
-    const REAL PY_plus = PROJECTY0(CM, v_plus);
-    const REAL PY_minus = PROJECTY0(CM, v_minus);
-    // const REAL3 v_diff = v_down - v_up;
-    int PJ_min, PJ_max;
-    int J;
-    REAL3 v_min;
-    REAL v_min_minus_v_max_y;
-    if(PY_plus < PY_minus) // Classical geometry setup
-    {
-        PJ_max = convert_int_rtn(PY_minus + HALF);
-        PJ_min = convert_int_rtn(PY_plus + HALF);
-        v_min = v_plus;
-        v_min_minus_v_max_y = voxelSizes.s2;
-    } else
-    {
-        PJ_max = convert_int_rtn(PY_plus + HALF);
-        PJ_min = convert_int_rtn(PY_minus + HALF);
-        v_min = v_minus;
-        v_min_minus_v_max_y = -voxelSizes.s2;
-    }
-    // We will correct just in the regions [-corLength, corLength] and [1-corLength, 1+corLength]
-    REAL corQuarterMultiplier;
-    if(corLength < zeroPrecisionTolerance)
-    {
-        corQuarterMultiplier = ZERO;
-        corLength = ZERO;
-    } else
-    {
-        corQuarterMultiplier = QUARTER / corLength;
-    }
-    // PY = (dot(CM.s456, v_min) - lambda * CM.s6 * v_min_minus_v_max_y)/(dot(CM.s89a, v_min) -
-    // lambda *CM.sa * v_min_minus_v_max_y)
-    // PY = (A + lambda * B) / (C + lamdba * D), where
-    REAL A = dot(CM.s456, v_min);
-    REAL B = -CM.s6 * v_min_minus_v_max_y;
-    REAL C = dot(CM.s89a, v_min);
-    REAL D = -CM.sa * v_min_minus_v_max_y;
-    REAL PY_min_cor_min = (A - corLength * B) / (C - corLength * D);
-    int PJ_min_cor_min = convert_int_rtn(PY_min_cor_min + HALF);
-    // REAL PY_min_cor_max = (A + corLength * B) / (C + corLength * D);
-    // int PJ_min_cor_max = convert_int_rtn(PY_min_cor_max + HALF);
-    // REAL PY_max_cor_min = (A + (ONE - corLength) * B) / (C - (ONE - corLength) * D);
-    // int PJ_max_cor_min = convert_int_rtn(PY_max_cor_min + HALF);
-    REAL PY_max_cor_max = (A + (ONE + corLength) * B) / (C + (ONE + corLength) * D);
-    int PJ_max_cor_max = convert_int_rtn(PY_max_cor_max + HALF);
+    const REAL QUARTER_div_corLength = (corLength < zeroPrecisionTolerance) ? ZERO : QUARTER / corLength;
+    const REAL TWO_times_corLength = TWO * corLength;
 
-    if(PJ_max_cor_max > 0 && PJ_min_cor_min < pdims.y)
+    // Step 2: Determine the direction of pixel index change
+    const REAL A = dot(CM.s456, v);
+    const REAL B = dot(CM.s89a, v);
+    const REAL derivativeOfProjectiveTransform = CM.s6 * B - CM.sa * A;
+
+    // Normalize the pixel index increment direction to voxelHeight
+    const REAL signedVoxelHeight = (derivativeOfProjectiveTransform < 0) ? -voxelSizes.s2 : voxelSizes.s2;
+    const REAL HALF_minus_corLength = HALF - corLength;
+    const REAL HALF_plus_corLength = HALF + corLength;
+
+    // Step 3: Compute distances for correction
+    const REAL distanceToCorMax = HALF_plus_corLength * signedVoxelHeight;
+
+    // Step 4: Define coefficients for corrected voxel edges using pixelIndexDirection
+    const REAL C = CM.s6 * distanceToCorMax;
+    const REAL D = CM.sa * distanceToCorMax;
+
+    // Step 5: Compute corrected pixel boundaries
+    const REAL PY_min = (A - C) / (B - D); // Minimum pixel index (lower bound of correction)
+    const REAL PY_max = (A + C) / (B + D); // Maximum pixel index (upper bound of correction)
+
+    // Convert to integer pixel indices
+    int PJ_min = convert_int_rtn(PY_min + HALF); // Integer minimal pixel
+    int PJ_max = convert_int_rtn(PY_max + HALF); // Integer maximal pixel
+
+    int J;
+
+    if(PJ_max > 0 && PJ_min < pdims.y)
     {
-        if(PJ_max_cor_max == PJ_min_cor_min)
+        if(PJ_max == PJ_min)
         {
-            AtomicAdd_g_f(projection + PJ_min_cor_min, value);
+            AtomicAdd_g_f(projection + PJ_min, value);
             return;
         }
-        REAL lambda;
-        // To model v_min + lambda (v_max - v_min)
-        REAL lastLambda = ZERO;
-        REAL leastLambda;
+
         REAL3 Fvector;
-        REAL corFactor;
-        REAL lambdaShifted, lastLambdaShifted, lastCorMaxLambdaShifted, leastCorMaxLambdaShifted;
-        if(PJ_max_cor_max >= pdims.y)
+        REAL corFactor, corPrefactor;
+        REAL lambda, lastLambda, leastLambda;
+        // To model v_lambda = v + lambda (v_max - v)
+        // Precompute the initial lambda and Fvector for PJ_max
+        if(PJ_max >= pdims.y)
         {
             PJ_max = pdims.y - 1;
             Fvector = CM.s456 - (PJ_max + HALF) * CM.s89a;
-            leastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
-            leastCorMaxLambdaShifted = leastLambda - ONE;
+            leastLambda = -dot(v, Fvector) / (signedVoxelHeight * Fvector.s2);
         } else
         {
-            leastLambda = ONE + corLength;
-            leastCorMaxLambdaShifted = corLength;
-            PJ_max = PJ_max_cor_max;
+            leastLambda = HALF_plus_corLength;
         }
-        if(PJ_min_cor_min < 0)
+
+        // Precompute the initial lambda and Fvector for PJ_min
+        if(PJ_min < 0)
         {
             J = 0;
             Fvector = CM.s456 + HALF * CM.s89a;
-            lastLambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
-            lastLambdaShifted = lastLambda - ONE;
+            lastLambda = -dot(v, Fvector) / (signedVoxelHeight * Fvector.s2);
         } else
         {
-            J = PJ_min_cor_min;
+            J = PJ_min;
             Fvector = CM.s456 - (J - HALF) * CM.s89a;
-            lastLambda = -corLength;
-            lastLambdaShifted = lastLambda - ONE;
+            lastLambda = -HALF_plus_corLength;
         }
+
         for(; J < PJ_max; J++)
         {
             Fvector -= CM.s89a;
-            lambda = dot(v_min, Fvector) / (v_min_minus_v_max_y * Fvector.s2);
-            lambdaShifted = lambda - ONE;
-            if(lastLambda >= corLength && lambdaShifted <= -corLength)
+            lambda = -dot(v, Fvector) / (signedVoxelHeight * Fvector.s2);
+            if(lastLambda >= -HALF_minus_corLength && lambda <= HALF_minus_corLength)
             {
                 corFactor = lambda - lastLambda;
-            } else if(lambdaShifted > -corLength)
+            } else if(lambda > HALF_minus_corLength)
             {
-                if(lastLambdaShifted > -corLength)
+                if(lastLambda < -HALF_minus_corLength)
                 {
-                    corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier
-                            * (lastLambdaShifted * lastLambdaShifted
-                               - lambdaShifted * lambdaShifted);
-                    lastCorMaxLambdaShifted = lambdaShifted;
+                    corFactor = TWO * HALF_minus_corLength; // For normal correction
+                    // Contribution of tail [lastLambda, -HALF_minus_corLength]
+                    // corFactor += (-HALF + corlength - lastLambda) * HALF
+                    //    * (ONE + (TWO*corLength - (-HALF + corlength - lastLambda)) / (2 * corLength));
+                    corPrefactor = -HALF_minus_corLength - lastLambda;
+                    corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
+                    // Contribution of tail [HALF_minus_corLength, lambda]
+                    // corFactor += (lambda - HALF + corlength) * HALF
+                    //    * (ONE + (TWO*corLength - (lambda - HALF + corlength)) / (TWO * corLength));
+                    corPrefactor = lambda - HALF_minus_corLength;
+                    corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
+                } else if(lastLambda < HALF_minus_corLength)
+                {
+                    corFactor = HALF_minus_corLength - lastLambda;
+                    // Contribution of tail [HALF_minus_corLength, lambda]
+                    // corFactor += (lambda - HALF + corlength) * HALF
+                    //    * (ONE + (TWO*corLength - (lambda - HALF + corlength)) / (TWO * corLength));
+                    corPrefactor = lambda - HALF_minus_corLength;
+                    corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
                 } else
                 {
-                    corFactor = (-corLength - lastLambdaShifted)
-                        + HALF * (lambdaShifted + corLength)
-                        + corQuarterMultiplier
-                            * (corLength * corLength - lambdaShifted * lambdaShifted);
-                    lastCorMaxLambdaShifted = lambdaShifted;
+                    // Contribution of [lastLambda, lambda] in [HALF_minus_corLength,
+                    // HALF_plus_corLength] corFactor = (lambda - lastLambda) * HALF
+                    //    * ((HALF + corLength - lastLambda) + (HALF + corLength - lambda)) / (2 * corLength);
+                    corFactor = (lambda - lastLambda) * (HALF + QUARTER_div_corLength * (ONE - lambda - lastLambda));
                 }
-            } else // lastLambda < corLength
+            } else // lambda < HALF - corlength
             {
-                if(lambda < corLength)
+                if(lambda < -HALF_minus_corLength)
                 {
-                    corFactor = HALF * (lambda - lastLambda)
-                        + corQuarterMultiplier * (lambda * lambda - lastLambda * lastLambda);
-                } else
+                    // Contribution of [lastLambda, lambda] in [-HALF_plus_corLength,
+                    // -HALF_minus_corLength] corFactor = (lambda - lastLambda) * HALF
+                    //    * ((HALF + corLength + lastLambda) + (HALF + corLength + lambda)) / (2 * corLength);
+                    corFactor = (lambda - lastLambda) * (HALF + QUARTER_div_corLength * (lastLambda + lambda + ONE));
+                } else // lastLambda < -HALF_minus_corLength
                 {
-                    corFactor = HALF * (corLength - lastLambda) + (lambda - corLength)
-                        + corQuarterMultiplier * (corLength * corLength - lastLambda * lastLambda);
+                    corFactor = lambda + HALF_minus_corLength;
+                    // Contribution of tail [lastLambda, -HALF_minus_corLength]
+                    // corFactor += (-HALF + corlength - lastLambda) * HALF
+                    //    * (ONE + (TWO*corLength - (-HALF + corlength - lastLambda)) / (2 * corLength));
+                    corPrefactor = -HALF_minus_corLength - lastLambda;
+                    corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
                 }
             }
             AtomicAdd_g_f(&projection[J], corFactor * value);
             lastLambda = lambda;
-            lastLambdaShifted = lastLambda - ONE;
         }
-        if(corLength == ZERO || leastCorMaxLambdaShifted < -corLength)
+        lambda = leastLambda;
+        if(lastLambda >= -HALF_minus_corLength && lambda <= HALF_minus_corLength)
         {
-            corFactor = leastCorMaxLambdaShifted - lastLambdaShifted;
-        } else if(lastLambdaShifted > -corLength)
+            corFactor = lambda - lastLambda;
+        } else if(lambda > HALF_minus_corLength)
         {
-            corFactor = HALF * (leastCorMaxLambdaShifted - lastLambdaShifted)
-                + corQuarterMultiplier
-                    * (lastLambdaShifted * lastLambdaShifted
-                       - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
-        } else
+            if(lastLambda < -HALF_minus_corLength)
+            {
+                corFactor = TWO * HALF_minus_corLength; // For normal correction
+                // Contribution of tail [lastLambda, -HALF_minus_corLength]
+                // corFactor += (-HALF + corlength - lastLambda) * HALF
+                //    * (ONE + (TWO*corLength - (-HALF + corlength - lastLambda)) / (2 * corLength));
+                corPrefactor = -HALF_minus_corLength - lastLambda;
+                corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
+                // Contribution of tail [HALF_minus_corLength, lambda]
+                // corFactor += (lambda - HALF + corlength) * HALF
+                //    * (ONE + (TWO*corLength - (lambda - HALF + corlength)) / (TWO * corLength));
+                corPrefactor = lambda - HALF_minus_corLength;
+                corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
+            } else if(lastLambda < HALF_minus_corLength)
+            {
+                corFactor = HALF_minus_corLength - lastLambda;
+                // Contribution of tail [HALF_minus_corLength, lambda]
+                // corFactor += (lambda - HALF + corlength) * HALF
+                //    * (ONE + (TWO*corLength - (lambda - HALF + corlength)) / (TWO * corLength));
+                corPrefactor = lambda - HALF_minus_corLength;
+                corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
+            } else
+            {
+                // Contribution of [lastLambda, lambda] in [HALF_minus_corLength,
+                // HALF_plus_corLength] corFactor = (lambda - lastLambda) * HALF
+                //    * ((HALF + corLength - lastLambda) + (HALF + corLength - lambda)) / (2 * corLength);
+                corFactor = (lambda - lastLambda) * (HALF + QUARTER_div_corLength * (ONE - lambda - lastLambda));
+            }
+        } else // lambda < HALF - corlength
         {
-            corFactor = (-corLength - lastLambdaShifted)
-                + HALF * (leastCorMaxLambdaShifted + corLength)
-                + corQuarterMultiplier
-                    * (corLength * corLength - leastCorMaxLambdaShifted * leastCorMaxLambdaShifted);
+            if(lambda < -HALF_minus_corLength)
+            {
+                // Contribution of [lastLambda, lambda] in [-HALF_plus_corLength,
+                // -HALF_minus_corLength] corFactor = (lambda - lastLambda) * HALF
+                //    * ((HALF + corLength + lastLambda) + (HALF + corLength + lambda)) / (2 * corLength);
+                corFactor = (lambda - lastLambda) * (HALF + QUARTER_div_corLength * (lastLambda + lambda + ONE));
+            } else // lastLambda < -HALF_minus_corLength
+            {
+                corFactor = lambda + HALF_minus_corLength;
+                // Contribution of tail [lastLambda, -HALF_minus_corLength]
+                // corFactor += (-HALF + corlength - lastLambda) * HALF
+                //    * (ONE + (TWO*corLength - (-HALF + corlength - lastLambda)) / (2 * corLength));
+                corPrefactor = -HALF_minus_corLength - lastLambda;
+                corFactor += corPrefactor * (ONE - QUARTER_div_corLength * corPrefactor);
+            }
         }
         AtomicAdd_g_f(projection + PJ_max, corFactor * value);
     }
 }
 #endif
 
-void inline exactEdgeValues0(global float* projection,
-                             private REAL16 CM,
-                             private REAL3 v,
-                             private int PX,
-                             private REAL value,
-                             private REAL3 voxelSizes,
-                             private int2 pdims)
+void inline exactEdgeValues0(
+    global float* projection, private REAL16 CM, private REAL3 v, private int PX, private REAL value, private REAL3 voxelSizes, private int2 pdims)
 {
     projection = projection + PX * pdims.y;
     const REAL3 distanceToEdge = (REAL3)(ZERO, ZERO, HALF * voxelSizes.s2);
@@ -907,8 +894,7 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             NAREA = ONE - NAREA_complement;
             w = HALF / NAREA;
             wcomplement = ONETHIRD * NAREA_complement / NAREA;
-            CENTROID = (REAL2)(vd1 * (ONE - w + p_complement * wcomplement),
-                               vd3 * (w - q * wcomplement));
+            CENTROID = (REAL2)(vd1 * (ONE - w + p_complement * wcomplement), vd3 * (w - q * wcomplement));
             (*centroid) = v0->s01 + CENTROID;
             return NAREA;
         }
@@ -953,8 +939,7 @@ inline REAL exactIntersectionPolygons0(const REAL PX,
             NAREA = ONE - NAREA_complement;
             w = HALF / NAREA;
             wcomplement = ONETHIRD * NAREA_complement / NAREA;
-            CENTROID
-                = (REAL2)(vd1 * (ONE - w + q * wcomplement), vd3 * (ONE - w + p * wcomplement));
+            CENTROID = (REAL2)(vd1 * (ONE - w + q * wcomplement), vd3 * (ONE - w + p * wcomplement));
             (*centroid) = v0->s01 + CENTROID;
             return NAREA;
         }
@@ -1103,8 +1088,7 @@ inline REAL exactIntersectionPoints0_extended(const REAL PX,
             //    - (HALF * w + (p * (1 - w)) / 3.0) * vd3;
             w = HALF / A;
             wcomplement = TWOTHIRDS * (HALF - w);
-            (*centroid)
-                = (*v2) + (REAL3)(-vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement), ZERO);
+            (*centroid) = (*v2) + (REAL3)(-vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement), ZERO);
             // (*centroid) = (*v2) - (w + q * wcomplement) * vd1 - (w + p * wcomplement) * vd3;
             return A;
         }
@@ -1128,16 +1112,12 @@ inline REAL exactIntersectionPoints0_extended(const REAL PX,
         w = HALF / A;
         wcomplement = TWOTHIRDS * (HALF - w);
         //(*centroid) = (*v3) + (w + p * wcomplement) * vd1 - (w + q * wcomplement) * vd3;
-        (*centroid)
-            = (*v3) + (REAL3)(vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement), ZERO);
+        (*centroid) = (*v3) + (REAL3)(vd1 * (w + q * wcomplement), -vd3 * (w + p * wcomplement), ZERO);
         return A;
     }
 }
 
-inline uint voxelIndex(uint i, uint j, uint k, int3 vdims)
-{
-    return i + j * vdims.x + k * vdims.x * vdims.y;
-}
+inline uint voxelIndex(uint i, uint j, uint k, int3 vdims) { return i + j * vdims.x + k * vdims.x * vdims.y; }
 
 /**
  * @brief Finds ranges of corners when center voxel v is given
@@ -1150,8 +1130,7 @@ inline uint voxelIndex(uint i, uint j, uint k, int3 vdims)
  * @param J_min OUT j range
  * @param J_max OUT j range inclusive
  */
-inline void
-getVoxelRanges(REAL3 v, REAL3 voxelSizes, REAL16 CM, int* I_min, int* I_max, int* J_min, int* J_max)
+inline void getVoxelRanges(REAL3 v, REAL3 voxelSizes, REAL16 CM, int* I_min, int* I_max, int* J_min, int* J_max)
 {
     REAL nI = dot(CM.s012, v);
     REAL nJ = dot(CM.s456, v);
@@ -1211,31 +1190,6 @@ getVoxelRanges(REAL3 v, REAL3 voxelSizes, REAL16 CM, int* I_min, int* I_max, int
     *J_max = max(max(max(JND1, JND2), max(JND3, JND4)), max(max(JND5, JND6), max(JND7, JND8)));
 }
 
-/** Kernel to precompute projection indices to spare some redundancy.
- *
- * @param vertexProjectionIndices
- * @param CM
- * @param voxelSizes
- * @param vdims
- *
- * @return
- */
-void kernel computeProjectionIndices(global int* vertexProjectionIndices,
-                                     private double16 CM,
-                                     double3 voxelSizes,
-                                     int3 vdims,
-                                     int2 pdims)
-{
-    uint i = get_global_id(2);
-    uint j = get_global_id(1);
-    uint k = get_global_id(0); // This is more effective from the perspective of atomic colisions
-    const double3 IND_ijk = { (double)(i), (double)(j), (double)(k) };
-    const double3 zerocorner_xyz = { -0.5 * (double)vdims.x, -0.5 * (double)vdims.y,
-                                     -0.5 * (double)vdims.z }; // -convert_double3(vdims) / 2.0;
-    vertexProjectionIndices[i + j * (vdims.x + 1) + k * (vdims.x + 1) * (vdims.y + 1)]
-        = projectionIndex(CM, zerocorner_xyz + voxelSizes * IND_ijk, pdims);
-}
-
 // Parallel beam geometry specific includes
 
 /**
@@ -1249,13 +1203,8 @@ void kernel computeProjectionIndices(global int* vertexProjectionIndices,
  * @param voxelSizes
  * @param pdims
  */
-void inline PBexactEdgeValues(global float* projection,
-                              private REAL8 CM,
-                              private REAL3 v,
-                              private int PX,
-                              private REAL value,
-                              private REAL3 voxelSizes,
-                              private int2 pdims)
+void inline PBexactEdgeValues(
+    global float* projection, private REAL8 CM, private REAL3 v, private int PX, private REAL value, private REAL3 voxelSizes, private int2 pdims)
 {
     projection = projection + PX * pdims.y;
     const REAL PY_diff = CM.s6 * voxelSizes.s2;
@@ -1324,12 +1273,8 @@ void inline PBexactEdgeValues(global float* projection,
  *
  * @return
  */
-float inline PBbackprojectExactEdgeValues(global const float* projection,
-                                          private REAL8 CM,
-                                          private REAL3 v,
-                                          private int PX,
-                                          private REAL3 voxelSizes,
-                                          private int2 pdims)
+float inline PBbackprojectExactEdgeValues(
+    global const float* projection, private REAL8 CM, private REAL3 v, private int PX, private REAL3 voxelSizes, private int2 pdims)
 {
     projection = projection + PX * pdims.y;
     const REAL PY_diff = CM.s6 * voxelSizes.s2;
@@ -1460,7 +1405,7 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
                 q = DST / FX; // From v3 to v2
             else
                 q = ONE;
-            //CENTROID = (REAL2)((q - p) * vd1, voxelSizes.y);
+            // CENTROID = (REAL2)((q - p) * vd1, voxelSizes.y);
             NAREA = THREE * (p + q);
             if(NAREA > ZERO)
             {
@@ -1495,7 +1440,7 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
                 q = DST / FY; // v0 to v3
             else
                 q = ONE;
-            //CENTROID = (REAL2)(voxelSizes.x, (q - p) * vd3);
+            // CENTROID = (REAL2)(voxelSizes.x, (q - p) * vd3);
             NAREA = THREE * (p + q);
             if(NAREA > ZERO)
             {
@@ -1514,13 +1459,12 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
                 q = DST / -FX; // v2 to v3
             else
                 q = ZERO;
-            //CENTROID = (REAL2)(q * vd1, p * vd3);
+            // CENTROID = (REAL2)(q * vd1, p * vd3);
             NAREA_complement = HALF * p * q;
             NAREA = ONE - NAREA_complement;
             w = HALF / NAREA;
             wcomplement = ONETHIRD * NAREA_complement / NAREA;
-            CENTROID
-                = (REAL2)(vd1 * (ONE - w + q * wcomplement), vd3 * (ONE - w + p * wcomplement));
+            CENTROID = (REAL2)(vd1 * (ONE - w + q * wcomplement), vd3 * (ONE - w + p * wcomplement));
             (*centroid) = v0->s01 + CENTROID;
             return NAREA;
         }
@@ -1560,14 +1504,14 @@ inline REAL PBexactIntersectionPolygons(const REAL PX,
 // I put it int the way to greedy select the biggest area possible
 // simplified version, no computation of centroid
 inline REAL PBintersectionPolygons(const REAL PX,
-                                        const REAL vd1,
-                                        const REAL vd3,
-                                        const REAL PX_xyx0,
-                                        const REAL PX_xyx1,
-                                        const REAL PX_xyx2,
-                                        const REAL PX_xyx3,
-                                        const REAL8 CM,
-                                        REAL3 voxelSizes)
+                                   const REAL vd1,
+                                   const REAL vd3,
+                                   const REAL PX_xyx0,
+                                   const REAL PX_xyx1,
+                                   const REAL PX_xyx2,
+                                   const REAL PX_xyx3,
+                                   const REAL8 CM,
+                                   REAL3 voxelSizes)
 {
     REAL FX = vd1 * CM.s0;
     REAL FY = vd3 * CM.s1;
