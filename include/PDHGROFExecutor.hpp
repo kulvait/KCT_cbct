@@ -59,7 +59,7 @@ private:
                                                std::shared_ptr<cl::Buffer> x_vector_dx,
                                                std::shared_ptr<cl::Buffer> x_vector_dy,
                                                std::shared_ptr<cl::Buffer> x_0);
-    bool proximalOperatorVerbose = true;
+    bool proximalOperatorVerbose = false;
 };
 
 } // namespace KCT

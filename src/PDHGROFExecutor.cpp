@@ -12,27 +12,20 @@ std::array<double, 2> PDHGROFExecutor::computeSolutionNorms(std::shared_ptr<cl::
     if(x_0 != nullptr)
     {
         std::shared_ptr<cl::Buffer> differenceVector_xbuf = discrepancy_bbuf_xpart_L2;
-        algFLOATvector_C_equals_Ad_plus_Be(*x_vector, *x_0, *differenceVector_xbuf, -1.0f, 1.0f,
-                                           XDIM);
+        algFLOATvector_C_equals_Ad_plus_Be(*x_vector, *x_0, *differenceVector_xbuf, -1.0f, 1.0f, XDIM);
         DifferenceNorm = normXBuffer_barrier_double(*differenceVector_xbuf);
     }
     return { TVNorm, DifferenceNorm };
 }
 
-int PDHGROFExecutor::reconstruct(float mu,
-                                 float tau,
-                                 float sigma,
-                                 float theta,
-                                 uint32_t maxPDHGIterations,
-                                 float errConditionPDHG)
+int PDHGROFExecutor::reconstruct(float mu, float tau, float sigma, float theta, uint32_t maxPDHGIterations, float errConditionPDHG)
 {
     uint32_t iteration = 1;
     // Initialization of primal and dual variables
     double TVNorm = 0.0, DifferenceNorm = 0.0;
     double hsquare = voxelSizesF.x * voxelSizesF.x;
 
-    std::shared_ptr<cl::Buffer> primal_xbuf, primal_xbuf_prime, primal_xbuf_dx, primal_xbuf_dy,
-        dual_xbuf_x, dual_xbuf_y, divergence_xbuf;
+    std::shared_ptr<cl::Buffer> primal_xbuf, primal_xbuf_prime, primal_xbuf_dx, primal_xbuf_dy, dual_xbuf_x, dual_xbuf_y, divergence_xbuf;
     // Primal and dual buffers
     allocateXBuffers(11);
     primal_xbuf = getXBuffer(0); // Primal variable (x)
@@ -81,23 +74,17 @@ int PDHGROFExecutor::reconstruct(float mu,
     {
         // INFO As primal_xbuf_dx and primal_xbuf_dy are computed I can report norms
         volume_gradient2D(*primal_xbuf, *primal_xbuf_dx, *primal_xbuf_dy);
-        if(iteration == 1)
+        if(iteration == 1 && proximalOperatorVerbose)
         {
-            BaseROFOperator::writeVolume(
-                *primal_xbuf_dx,
-                io::xprintf("%s_xbuf_x_it%02d.den", intermediatePrefix.c_str(), iteration));
-            BaseROFOperator::writeVolume(
-                *primal_xbuf_dy,
-                io::xprintf("%s_xbuf_y_it%02d.den", intermediatePrefix.c_str(), iteration));
+            BaseROFOperator::writeVolume(*primal_xbuf_dx, io::xprintf("%s_xbuf_x_it%02d.den", intermediatePrefix.c_str(), iteration));
+            BaseROFOperator::writeVolume(*primal_xbuf_dy, io::xprintf("%s_xbuf_y_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
-        std::array<double, 2> norms
-            = computeSolutionNorms(primal_xbuf, primal_xbuf_dx, primal_xbuf_dy, rof_u0_xbuf);
+        std::array<double, 2> norms = computeSolutionNorms(primal_xbuf, primal_xbuf_dx, primal_xbuf_dy, rof_u0_xbuf);
         TVNorm = norms[0];
         DifferenceNorm = norms[1];
         LOGI << io::xprintf_green("Iteration %d: mu TV(x)=%0.2e, |x-x_0|=%0.2e, mu "
                                   "TV(x)/|x-x_0|=%f |x-x_0| + mu*TV(x)=%e",
-                                  iteration - 1, mu * TVNorm, DifferenceNorm,
-                                  mu * TVNorm / DifferenceNorm, mu * TVNorm + DifferenceNorm);
+                                  iteration - 1, mu * TVNorm, DifferenceNorm, mu * TVNorm / DifferenceNorm, mu * TVNorm + DifferenceNorm);
         // INFO
         // Step 1: Update Dual Variable (p^k+1 = Proj_Dual(p^k + sigma * Grad(x^k)))
         volume_gradient2D(*primal_xbuf_prime, *primal_xbuf_dx, *primal_xbuf_dy);
@@ -143,20 +130,17 @@ int PDHGROFExecutor::reconstruct(float mu,
         // BaseROFOperator::writeVolume(
         //     *proximal_arg_xbuf,
         //     io::xprintf("%s_proximal_arg_it%02d.den", intermediatePrefix.c_str(), iteration));
-        std::shared_ptr<cl::Buffer> primal_xbuf_new
-            = primal_xbuf_dx; // primal_xbuf_dx is to be used as a temporary buffer since it is
-                              // fully initialized in the first step
+        std::shared_ptr<cl::Buffer> primal_xbuf_new = primal_xbuf_dx; // primal_xbuf_dx is to be used as a temporary buffer since it is
+                                                                      // fully initialized in the first step
         // ROF proximal operator (1/(2*tau)) * ||u - rof_u0||_2^2 +  ||u -
         // proximal_arg_xbuf||_2^2 primal_xbuf_new = (1/(2*tau))/(1/(2*tau) + 1) * rof_u0 +
         // (1/(1/(2*tau) + 1)) * proximal_arg_xbuf
         float rof_prefactor = 1.0f / (1.0f / (2.0f * tau) + 1.0f);
         float arg_prefactor = 1.0f - rof_prefactor;
-        LOGD << io::xprintf("ROF proximal operator: arg_prefactor=%f, rof_prefactor=%f",
-                            arg_prefactor, rof_prefactor);
+        LOGD << io::xprintf("ROF proximal operator: arg_prefactor=%f, rof_prefactor=%f", arg_prefactor, rof_prefactor);
         if(!L1ROF)
         {
-            algFLOATvector_C_equals_Ad_plus_Be(*rof_u0_xbuf, *proximal_arg_xbuf, *primal_xbuf_new,
-                                               rof_prefactor, arg_prefactor, XDIM);
+            algFLOATvector_C_equals_Ad_plus_Be(*rof_u0_xbuf, *proximal_arg_xbuf, *primal_xbuf_new, rof_prefactor, arg_prefactor, XDIM);
         } else
         {
             LOGE << io::xprintf("algFLOATvector_distL1ProxSoftThreasholding with tau=%f", tau);
@@ -176,8 +160,7 @@ int PDHGROFExecutor::reconstruct(float mu,
         if(theta > 0.0f)
         {
             primal_xbuf_prime = residualVector_xbuf; // It is not used right now
-            algFLOATvector_C_equals_Ad_plus_Be(*primal_xbuf, *primal_xbuf_new, *primal_xbuf_prime,
-                                               -theta, 1.0f + theta, XDIM);
+            algFLOATvector_C_equals_Ad_plus_Be(*primal_xbuf, *primal_xbuf_new, *primal_xbuf_prime, -theta, 1.0f + theta, XDIM);
         } else
         {
             primal_xbuf_prime = primal_xbuf_new; // They are the same
@@ -189,10 +172,9 @@ int PDHGROFExecutor::reconstruct(float mu,
         primal_xbuf = primal_xbuf_new;
         primal_xbuf_dx = temp;
 
-        if(iteration % 50 == 0)
+        if(iteration % 50 == 0 && proximalOperatorVerbose)
         {
-            BaseROFOperator::writeVolume(
-                *primal_xbuf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+            BaseROFOperator::writeVolume(*primal_xbuf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         //    BaseROFOperator::writeVolume(
         //        *primal_xbuf_prime,
@@ -205,16 +187,13 @@ int PDHGROFExecutor::reconstruct(float mu,
     }
     // INFO As primal_xbuf_dx and primal_xbuf_dy are computed I can report norms
     volume_gradient2D(*primal_xbuf, *primal_xbuf_dx, *primal_xbuf_dy);
-    std::array<double, 2> norms
-        = computeSolutionNorms(primal_xbuf, primal_xbuf_dx, primal_xbuf_dy, rof_u0_xbuf);
+    std::array<double, 2> norms = computeSolutionNorms(primal_xbuf, primal_xbuf_dx, primal_xbuf_dy, rof_u0_xbuf);
     TVNorm = norms[0];
     DifferenceNorm = norms[1];
     // norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf)); // Norm of Ax - b
-    LOGI << io::xprintf_green(
-        "Finished iteration %d: "
-        "TV(x)=%0.2e, |x-x_0|=%0.2e, mu TV(x)/|x-x_0|=%f |x-x_0| + mu*TV(x)=%e",
-        iteration, mu * TVNorm, DifferenceNorm, mu * TVNorm / DifferenceNorm,
-        mu * TVNorm + DifferenceNorm);
+    LOGI << io::xprintf_green("Finished iteration %d: "
+                              "TV(x)=%0.2e, |x-x_0|=%0.2e, mu TV(x)/|x-x_0|=%f |x-x_0| + mu*TV(x)=%e",
+                              iteration, mu * TVNorm, DifferenceNorm, mu * TVNorm / DifferenceNorm, mu * TVNorm + DifferenceNorm);
     // INFO
     Q[0]->enqueueReadBuffer(*primal_xbuf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
