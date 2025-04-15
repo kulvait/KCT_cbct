@@ -182,8 +182,7 @@ inline double exactIntersectionPoints0(const double PX,
                 //    (*centroid) = (*v0)
                 //        + mad(p, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-q, w, q) / 3.0) * (vd1)
                 //        + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd3);
-                (*centroid) = (*v0) + (p * (2.0 / 3.0 - w / 6.0) + q * (1 - w) / 3.0) * (vd1)
-                    + (2.0 / 3.0 - w / 6.0) * (vd3);
+                (*centroid) = (*v0) + (p * (2.0 / 3.0 - w / 6.0) + q * (1 - w) / 3.0) * (vd1) + (2.0 / 3.0 - w / 6.0) * (vd3);
             } else
             {
                 (*centroid) = (*v0);
@@ -197,8 +196,7 @@ inline double exactIntersectionPoints0(const double PX,
             w = 1.0 / A;
             //(*centroid) = (*v0) - mad(0.5, w, mad(p, -w, p) / 3.0) * vd1
             //    + mad(0.5, w, mad(q, -w, q) / 3.0) * vd3;
-            (*centroid) = (*v1) - (0.5 * w + (p * (1 - w)) / 3.0) * vd1
-                + (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
+            (*centroid) = (*v1) - (0.5 * w + (p * (1 - w)) / 3.0) * vd1 + (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
             return A;
         }
     } else if(PX < (*PX_xyx2))
@@ -217,8 +215,7 @@ inline double exactIntersectionPoints0(const double PX,
                 //(*centroid) = (*v0)
                 //    + mad(q, mad(-1.0 / 6.0, w, 2.0 / 3.0), mad(-p, w, p) / 3.0) * (vd3)
                 //    + mad(-1.0 / 6.0, w, 2.0 / 3.0) * (vd1);
-                (*centroid) = (*v0) + (q * (2.0 / 3.0 - w / 6.0) + p * (1 - w) / 3.0) * (vd3)
-                    + (2.0 / 3.0 - w / 6.0) * (vd1);
+                (*centroid) = (*v0) + (q * (2.0 / 3.0 - w / 6.0) + p * (1 - w) / 3.0) * (vd3) + (2.0 / 3.0 - w / 6.0) * (vd1);
             } else
             {
                 (*centroid) = (*v0);
@@ -231,8 +228,7 @@ inline double exactIntersectionPoints0(const double PX,
             w = 1.0 / A;
             //(*centroid) = (*v2) - mad(0.5, w, mad(q, -w, q) / 3.0) * vd1
             //    - mad(0.5, w, mad(p, -w, p) / 3.0) * vd3;
-            (*centroid) = (*v2) - (0.5 * w + (q * (1 - w)) / 3.0) * vd1
-                - (0.5 * w + (p * (1 - w)) / 3.0) * vd3;
+            (*centroid) = (*v2) - (0.5 * w + (q * (1 - w)) / 3.0) * vd1 - (0.5 * w + (p * (1 - w)) / 3.0) * vd3;
             return A;
         }
     } else if(PX >= *PX_xyx3)
@@ -249,8 +245,7 @@ inline double exactIntersectionPoints0(const double PX,
         w = 1.0 / A;
         //(*centroid) = (*v3) + mad(0.5, w, mad(q, -w, q) / 3.0) * vd1
         //    - mad(0.5, w, mad(p, -w, p) / 3.0) * vd3;
-        (*centroid)
-            = (*v3) + (0.5 * w + (p * (1 - w)) / 3.0) * vd1 - (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
+        (*centroid) = (*v3) + (0.5 * w + (p * (1 - w)) / 3.0) * vd1 - (0.5 * w + (q * (1 - w)) / 3.0) * vd3;
         return A;
     }
 }
@@ -456,8 +451,7 @@ inline double findIntersectionPoints(const double PX,
  * @param V_xyx2
  * @param V_xyx3
  */
-double3
-intersectionPoint(double p, double3* V_xyx0, double3* V_xyx1, double3* V_xyx2, double3* V_xyx3)
+double3 intersectionPoint(double p, double3* V_xyx0, double3* V_xyx1, double3* V_xyx2, double3* V_xyx3)
 {
     double3 v;
     if(p <= 1.0)
@@ -563,8 +557,7 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
 #define volumeCenter _volumeCenter
 #endif
     const REAL3 halfVoxelSizes = HALF * voxelSizes;
-    const REAL3 volumeCenter_voxelcenter_offset
-        = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
+    const REAL3 volumeCenter_voxelcenter_offset = (REAL3)(2 * i + 1 - vdims.x, 2 * j + 1 - vdims.y, 2 * k + 1 - vdims.z) * halfVoxelSizes;
     const REAL3 voxelcenter_xyz = volumeCenter + volumeCenter_voxelcenter_offset - sourcePosition;
 
     const uint IND = voxelIndex(i, j, k, vdims);
@@ -574,8 +567,7 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
         return;
     }
 #ifdef ELEVATIONCORRECTION
-    const REAL tgelevation = fabs(voxelcenter_xyz.z)
-        / sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
+    const REAL tgelevation = fabs(voxelcenter_xyz.z) / sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
 #endif
 #ifdef DROPCENTEROFFPROJECTORVOXELS
     int xindex = INDEX(PROJECTX0(CM, voxelcenter_xyz));
@@ -757,7 +749,23 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
 #ifdef ELEVATIONCORRECTION
         REAL corlambda, corLenEstimate;
         // Typically voxelSizes.x == voxelSizes.y
-        const REAL corLenLimit = HALF * (voxelSizes.x + voxelSizes.y);
+        REAL corLenLimit = HALF * (voxelSizes.x + voxelSizes.y);
+        // corLenLimit is typical length
+        const REAL xxplusyy = sqrt(voxelcenter_xyz.x * voxelcenter_xyz.x + voxelcenter_xyz.y * voxelcenter_xyz.y);
+        const REAL voxelcenter_xy_sin = fabs(voxelcenter_xyz.x) / xxplusyy;
+        const REAL voxelcenter_xy_cos = fabs(voxelcenter_xyz.y) / xxplusyy;
+        const REAL xpath = voxelSizes.x * voxelcenter_xy_cos;
+        const REAL ypath = voxelSizes.y * voxelcenter_xy_sin;
+        REAL path;
+        if(xpath < ypath)
+        {
+            path = voxelSizes.x / voxelcenter_xy_sin;
+        } else
+        {
+            path = voxelSizes.y / voxelcenter_xy_cos;
+        }
+        corLenLimit = path;
+
 #endif
         if(max_PX <= min_PX) // These indices are in the admissible range
         {
@@ -765,11 +773,9 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
 #ifdef ELEVATIONCORRECTION
             corLenEstimate = corLenLimit; // Probably better estimate might exist
             corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-            exactEdgeValues0ElevationCorrection(projection, CM, (vx00 + vx11) * HALF, min_PX, value,
-                                                voxelSizes, pdims, corlambda);
+            exactEdgeValues0ElevationCorrection(projection, CM, (vx00 + vx11) * HALF, min_PX, value, voxelSizes, pdims, corlambda);
 #else
-            exactEdgeValues0(projection, CM, (vx00 + vx11) * HALF, min_PX, value, voxelSizes,
-                             pdims);
+            exactEdgeValues0(projection, CM, (vx00 + vx11) * HALF, min_PX, value, voxelSizes, pdims);
 #endif
         } else
 #ifdef DROPINCOMPLETEVOXELS
@@ -787,9 +793,8 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
             int I = max(-1, min_PX);
             int I_STOP = min(max_PX, pdims.x);
             // Section of the square that corresponds to the indices < i
-            sectionSize_prev = exactIntersectionPolygons0(
-                ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
-                voxelSizes, &CENTROID_prev, &llength_prev);
+            sectionSize_prev = exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM, voxelSizes,
+                                                          &CENTROID_prev, &llength_prev);
             if(I >= 0)
             {
                 factor = value * sectionSize_prev;
@@ -807,34 +812,29 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                     corLenEstimate = llength_prev;
                 }
                 corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
-                                                    pdims, corlambda);
+                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes, pdims, corlambda);
 #else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
 #endif
             }
             for(I = I + 1; I < I_STOP; I++)
             {
-                sectionSize_cur = exactIntersectionPolygons0(
-                    ((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
-                    voxelSizes, &CENTROID_cur, &llength_cur);
+                sectionSize_cur = exactIntersectionPolygons0(((REAL)I) + HALF, vd1, vd3, V0, PX_xyx[0], PX_xyx[1], PX_xyx[2], PX_xyx[3], CM,
+                                                             voxelSizes, &CENTROID_cur, &llength_cur);
                 polygonSize = sectionSize_cur - sectionSize_prev;
-                CENTROID = (sectionSize_cur * CENTROID_cur - sectionSize_prev * CENTROID_prev)
-                    / polygonSize;
+                CENTROID = (sectionSize_cur * CENTROID_cur - sectionSize_prev * CENTROID_prev) / polygonSize;
                 Int = (REAL3)(CENTROID, vx00.z);
                 factor = value * polygonSize;
 #ifdef ELEVATIONCORRECTION
                 // corlambda = QUARTER * (llength_cur + llength_prev) * tgelevation / voxelSizes.z;
                 // underestimate corlambda in edge vicinities
                 corLenEstimate = HALF * (llength_cur + llength_prev);
-                if(llength_cur < ONETHIRD * corLenLimit
-                   || llength_prev < ONETHIRD * corLenLimit) // heuristic
+                if(llength_cur < ONETHIRD * corLenLimit || llength_prev < ONETHIRD * corLenLimit) // heuristic
                 {
                     corLenEstimate = fmax(llength_cur, llength_prev);
                 }
                 corlambda = HALF * corLenEstimate * tgelevation / voxelSizes.z;
-                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
-                                                    pdims, corlambda);
+                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes, pdims, corlambda);
                 llength_prev = llength_cur;
 #else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
@@ -862,8 +862,7 @@ void kernel FLOATcutting_voxel_project(global const float* restrict volume,
                     corLenEstimate = llength_prev;
                 }
                 corlambda = corLenEstimate * tgelevation * HALF / voxelSizes.z;
-                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes,
-                                                    pdims, corlambda);
+                exactEdgeValues0ElevationCorrection(projection, CM, Int, I, factor, voxelSizes, pdims, corlambda);
 #else
                 exactEdgeValues0(projection, CM, Int, I, factor, voxelSizes, pdims);
 #endif
