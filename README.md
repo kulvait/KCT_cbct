@@ -1,5 +1,3 @@
-# KCT CBCT
-
 <img src="./logo/kct_cbct_logob.png" alt="KCT CBCT Logo" width="250"/>
 
 **Fast, accurate and reliable software for algebraic CT reconstruction.**
