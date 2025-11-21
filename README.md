@@ -1,5 +1,7 @@
 # KCT CBCT
 
+<img src="./logo/kct_cbct_logob.png" alt="KCT CBCT Logo" width="250"/>
+
 **Fast, accurate and reliable software for algebraic CT reconstruction.**
 
 This software package provides a comprehensive suite of tools for modern CT and CBCT reconstruction, featuring highly optimized OpenCL implementations of advanced algorithms, including unpublished methods developed by the author. Initially focused on algebraic reconstruction using Krylov-based LSQR and CGLS methods, the package has since expanded to include other widely used techniques, such as OS-SIRT.
