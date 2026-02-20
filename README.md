@@ -161,7 +161,7 @@ When having multiple OpenCL runtimes, additional configuration might be needed t
 Switch `-p PlatformID:DeviceID` is supported by KCT tools to run it on selected platforms and devices.
 
 #### Python Integration
-The **Python development libraries** such as `python3-dev` might be required.
+The **Python development libraries** such as `python3-dev` and NumPy development headers are required for Python support. To satisfy some HPC environments hint is provided `set(Python3_EXECUTABLE /path/to/python)` to point to the correct Python executable. Note that the first version to be found by CMake is tested against presence of development libraries and Numpy development headers.
 
 #### Threading
 Most tools link against `${CMAKE_THREAD_LIBS_INIT}` for multi-threading support. Ensure you have development libraries for threading installed on your system, such as `pthread` e.g., `libpthread-dev` on Linux systems.
@@ -172,14 +172,13 @@ Intel MKL is a third-party library used primarily by the CTMAL library for LAPAC
 **Downloading and Installing MKL**
 Intel MKL is a third-party library and is not bundled with this project. It must be downloaded and installed separately from the official Intel website. On Linux systems, MKL is often installed in nonstandard locations, so additional configuration may be required for the project to locate the necessary files. MKL is part of the Intel oneAPI or oneMKL bundle, and users will need to ensure that the appropriate libraries and include files are accessible. Specifically, the project requires access to the `mkl_lapacke.h` header file and the MKL libraries, which are typically found in directories like `${MKL_BASE_DIR}/lib/intel64_lin/`.
 
-
-The project provides a custom CMake module file (`cmake/FindMKL.cmake`) to help locate the MKL installation. During configuration you might need to adjust directories specified in `cmake/FindMKL.cmake` so that cmake finds MKL instalation.
+The file `cmake/FindMKL.cmake` is provided by CTIOL package and you can edit it to include your nonstandard instalation directories. It also read environment variables `MKL_ROOT` and `ONEAPI_ROOT` to find MKL installation. If you have MKL installed in a nonstandard location, you can set these environment variables to point to the correct directories.
 
 **Troubleshooting MKL**
 
 - **Header File Not Found:** If CMake cannot locate the `mkl_lapacke.h` file, ensure the `MKL_INCLUDE_DIR` is correctly set to the path containing the MKL headers. 
 - **Library File Not Found:** If the MKL libraries are missing or in a nonstandard location, set the `MKL_LIBRARY_DIR` to point to the directory containing the library files. In this directory shall be `libmkl_rt.so` for dynamic linking or `libmkl_intel_lp64.a`, `libmkl_core.a` amd `libmkl_sequential.a` for static linking.
-- **Compatibility:** KCT framework was tested against MKL versions 2019, 2022.0, and 2023.1.
+- **Compatibility:** KCT framework was tested against MKL versions 2022.0, and 2023.1, 2025.3.
 
 You might wish to provide your directories directly to cmake using e.g.
 

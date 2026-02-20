@@ -1,9 +1,10 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.19)
 project(CBCT)
 #Ignore PATH to ignore conda env or anything in path
 set(CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH false)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+#Source modules as FindMKL.cmake from CTIOL submodule
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/submodules/CTIOL/cmake")
 #When you want a different install folder
 #cmake -DCMAKE_INSTALL_PREFIX:PATH=/usr/local/bin ..
 IF(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -73,6 +74,7 @@ include_directories(${CMAKE_SOURCE_DIR}/submodules/matplotlib-cpp)
 #Python for matplotlib
 #find_package(PythonLibs 2.7)
 #include_directories(${PYTHON_INCLUDE_DIRS})
+set(Python3_EXECUTABLE /usr/bin/python)
 find_package (Python3 COMPONENTS Interpreter Development NumPy)
 include_directories(${Python3_INCLUDE_DIRS})
 include_directories(${Python3_NumPy_INCLUDE_DIRS})
