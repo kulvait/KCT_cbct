@@ -58,8 +58,7 @@ public:
         volumeSizeY = inf.dimy();
         volumeSizeZ = inf.dimz();
         totalVolumeSize = uint64_t(volumeSizeX) * uint64_t(volumeSizeY) * uint64_t(volumeSizeZ);
-        totalProjectionSize
-            = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
+        totalProjectionSize = uint64_t(projectionSizeX) * uint64_t(projectionSizeY) * uint64_t(projectionSizeZ);
         if(totalVolumeSize > INT_MAX)
         {
             LOGE << "Implement indexing by uint64_t matrix dimension overflow of voxels count.";
@@ -109,9 +108,7 @@ public:
 void Args::defineArguments()
 {
 
-    cliApp->add_option("input_volume", inputVolume, "Volume to project")
-        ->required()
-        ->check(CLI::ExistingFile);
+    cliApp->add_option("input_volume", inputVolume, "Volume to project")->required()->check(CLI::ExistingFile);
     cliApp
         ->add_option("input_projection_matrices", inputProjectionMatrices,
                      "Projection matrices to be input of the computation."
@@ -126,10 +123,9 @@ void Args::defineArguments()
     addSiddonProjectorArgs();
     addCenterVoxelProjectorArgs();
     cliApp->add_option("-b,--base_offset", baseOffset, "Base offset of projections indexing.");
-    cliApp->add_option(
-        "--right-hand-side", rightHandSide,
-        "If the parameter is specified, then we also compute the norm of the right hand "
-        "side from the projected vector.");
+    cliApp->add_option("--right-hand-side", rightHandSide,
+                       "If the parameter is specified, then we also compute the norm of the right hand "
+                       "side from the projected vector.");
     addProjectionSizeArgs();
     addProjectorLocalNDRangeArgs();
     addVolumeCenterArgs();
@@ -161,14 +157,11 @@ int main(int argc, char* argv[])
     }
     PRG.startLog(true);
     std::string xpath = PRG.getRunTimeInfo().getExecutableDirectoryPath();
-    std::shared_ptr<io::DenProjectionMatrixReader> dr
-        = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
-    cl::NDRange projectorLocalNDRange = cl::NDRange(
-        ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1], ARG.projectorLocalNDRange[2]);
+    std::shared_ptr<io::DenProjectionMatrixReader> dr = std::make_shared<io::DenProjectionMatrixReader>(ARG.inputProjectionMatrices);
+    cl::NDRange projectorLocalNDRange = cl::NDRange(ARG.projectorLocalNDRange[0], ARG.projectorLocalNDRange[1], ARG.projectorLocalNDRange[2]);
 
     // Construct projector and initialize OpenCL
-    CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX,
-                              ARG.volumeSizeY, ARG.voxelSizeZ, projectorLocalNDRange);
+    CuttingVoxelProjector CVP(ARG.projectionSizeX, ARG.projectionSizeY, ARG.volumeSizeX, ARG.volumeSizeY, ARG.voxelSizeZ, projectorLocalNDRange);
     // CVP.initializeAllAlgorithms();
     if(ARG.useSiddonProjector)
     {
@@ -179,18 +172,15 @@ int main(int argc, char* argv[])
         CVP.initializeTTProjector();
     } else
     {
-        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection,
-                                   ARG.useBarrierCalls, ARG.barrierArraySize);
+        CVP.initializeCVPProjector(ARG.useExactScaling, ARG.useElevationCorrection, ARG.useBarrierCalls, ARG.barrierArraySize);
     }
-    int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(),
-                                   xpath, ARG.CLdebug, ARG.CLrelaxed);
+    int ecd = CVP.initializeOpenCL(ARG.CLplatformID, &ARG.CLdeviceIDs[0], ARG.CLdeviceIDs.size(), xpath, ARG.CLdebug, ARG.CLrelaxed);
     if(ecd < 0)
     {
         std::string ERR = io::xprintf("Could not initialize OpenCL platform %d.", ARG.CLplatformID);
         KCTERR(ERR);
     }
-    CVP.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX,
-                     ARG.volumeCenterY, ARG.volumeCenterZ);
+    CVP.problemSetup(ARG.voxelSizeX, ARG.voxelSizeY, ARG.voxelSizeZ, ARG.volumeCenterX, ARG.volumeCenterY, ARG.volumeCenterZ);
     // Write individual submatrices
     LOGD << io::xprintf("Number of projections to process is %d.", ARG.frames.size());
     // End parsing arguments
@@ -210,8 +200,7 @@ int main(int argc, char* argv[])
         LOGD << io::xprintf("Initialize RHS");
         dpr = std::make_shared<io::DenFrame2DReader<float>>(ARG.rightHandSide);
     }
-    io::DenAsyncFrame2DWritter<float> projectionWritter(ARG.outputProjection, ARG.projectionSizeX,
-                                                        ARG.projectionSizeY, ARG.frames.size());
+    io::DenAsyncFrame2DWritter<float> projectionWritter(ARG.outputProjection, ARG.projectionSizeX, ARG.projectionSizeY, ARG.frames.size());
     for(uint32_t i = 0; i != ARG.frames.size(); i++)
     {
         uint32_t f = ARG.frames[i];
@@ -238,14 +227,11 @@ int main(int argc, char* argv[])
         }
         if(dpr != nullptr)
         {
-            std::shared_ptr<io::BufferedFrame2D<float>> fr = dpr->readBufferedFrame(f);
-            normSquare += CVP.normSquare((float*)fr->getDataPointer(), ARG.projectionSizeX,
-                                         ARG.projectionSizeY);
-            normSquareDifference += CVP.normSquareDifference(
-                (float*)fr->getDataPointer(), ARG.projectionSizeX, ARG.projectionSizeY);
+            std::shared_ptr<io::BufferedFrame2DI<float>> fr = dpr->readBufferedFrame(f);
+            normSquare += CVP.normSquare((float*)fr->data(), ARG.projectionSizeX, ARG.projectionSizeY);
+            normSquareDifference += CVP.normSquareDifference((float*)fr->data(), ARG.projectionSizeX, ARG.projectionSizeY);
         }
-        io::BufferedFrame2D<float> transposedFrame(projection, ARG.projectionSizeY,
-                                                   ARG.projectionSizeX);
+        io::BufferedFrame2D<float> transposedFrame(projection, ARG.projectionSizeY, ARG.projectionSizeX);
         std::shared_ptr<io::Frame2DI<float>> frame = transposedFrame.transposed();
         projectionWritter.writeFrame(*frame, i);
         std::fill_n(projection, projectionElementsCount, float(0.0));
@@ -254,10 +240,8 @@ int main(int argc, char* argv[])
     delete[] projection;
     if(dpr != nullptr)
     {
-        LOGI << io::xprintf(
-            "Initial norm is %f, norm of the difference  is %f that is %f%% of the initial norm.",
-            std::sqrt(normSquare), std::sqrt(normSquareDifference),
-            std::sqrt(normSquareDifference / normSquare) * 100);
+        LOGI << io::xprintf("Initial norm is %f, norm of the difference  is %f that is %f%% of the initial norm.", std::sqrt(normSquare),
+                            std::sqrt(normSquareDifference), std::sqrt(normSquareDifference / normSquare) * 100);
     }
     PRG.endLog(true);
 }
