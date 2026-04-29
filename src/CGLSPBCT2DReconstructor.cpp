@@ -43,8 +43,7 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
     NR0 = std::sqrt(residualNorm2_old);
     if(useVolumeAsInitialX0)
     {
-        LOGI << io::xprintf_green("\n|b|=%0.1f, |Ax_0-b|=%0.1f, %0.1f%% of |b|, |AT(Ax0-b)|=%0.1f",
-                                  NB0, norm, 100.0 * norm / NB0, NR0);
+        LOGI << io::xprintf_green("\n|b|=%0.1f, |Ax_0-b|=%0.1f, %0.1f%% of |b|, |AT(Ax0-b)|=%0.1f", NB0, norm, 100.0 * norm / NB0, NR0);
     } else
     {
         LOGI << io::xprintf_green("\n|b|=%0.1f, |AT b|=%0.1f", NB0, NR0);
@@ -61,10 +60,8 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
-                                iteration);
-            BasePBCT2DReconstructor::writeVolume(
-                *x_buf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(), iteration);
+            BasePBCT2DReconstructor::writeVolume(*x_buf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         // DEBUG
         if(iteration % 1000 == 0)
@@ -75,8 +72,7 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
             reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
             LOGI << io::xprintf_green("\nReorthogonalization in iteration %d: |Ax-b|=%0.1f "
                                       "representing %0.2f%% of |b|, loss of orthogonality %f%%.",
-                                      iteration, norm_, 100.0 * norm_ / NB0,
-                                      100 * std::abs(norm - norm_) / norm);
+                                      iteration, norm_, 100.0 * norm_ / NB0, 100 * std::abs(norm - norm_) / norm);
         }
         // DEBUG
         backproject(*discrepancy_bbuf, *residualVector_xbuf);
@@ -100,52 +96,80 @@ int CGLSPBCT2DReconstructor::reconstruct(uint32_t maxIterations, float errCondit
         algFLOATvector_A_equals_A_plus_cB(*x_buf, *directionVector_xbuf, alpha, XDIM);
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
-        LOGD << io::xprintf("Iteration %d: alpha = %f, beta = %f, |Ax-b| = %f, |AT(Ax-b)| = %f",
-                            iteration, alpha, beta, norm, NX);
+        LOGD << io::xprintf("Iteration %d: alpha = %f, beta = %f, |Ax-b| = %f, |AT(Ax-b)| = %f", iteration, alpha, beta, norm, NX);
         // BasePBCT2DReconstructor::writeVolume(*x_buf,
         //                                      io::xprintf("cgls_x_buf_it%02d.den", iteration));
     }
-    LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.",
-                              iteration, norm, 100.0 * norm / NB0);
+    LOGI << io::xprintf_green("\nIteration %d: |Ax-b|=%0.1f representing %0.2f%% of |b|.", iteration, norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 
 /**
- * @brief WLS reconstruction using CGLS
+ * @brief Weighted Least Squares (WLS) reconstruction using CGLS.
  *
- * @param maxIterations maximum number of iterations
- * @param errCondition stopping condition based on the relative norm of discrepancy w.r.t. the norm
- * of initial vector b
- * @param weightsBDIM weights for the weighted least squares, the size of the array should be BDIM
+ * This method solves the weighted least squares problem
  *
- * @return
+ *     min_x (Ax - b)^T W (Ax - b),
+ *
+ * where W is a diagonal matrix of statistical weights. Internally, the problem
+ * is reformulated as
+ *
+ *     min_x || sqrt(W) (Ax - b) ||_2^2,
+ *
+ * and CGLS is applied to the left-preconditioned system with
+ * sqrt(W) acting as the left preconditioner.
+ *
+ * The weights are typically chosen as the inverse variance of the data,
+ * e.g. proportional to flat-field intensity in CT, so that measurements
+ * with higher reliability have larger influence on the reconstruction.
+ *
+ * NOTE: weightsBDIM is modified in place and will contain sqrt(W) after return.
+ *
+ * @param maxIterations  Maximum number of CGLS iterations.
+ * @param errCondition   Stopping criterion based on the relative norm of the
+ *                       preconditioned discrepancy w.r.t. the initial norm.
+ * @param weightsBDIM    Array of statistical weights W_i for WLS. The array is
+ *                       modified in place: its square root sqrt(W_i) is computed
+ *                       and used as the left preconditioner. The length of the
+ *                       array must be BDIM.
+ *
+ * @return 1 on success, 0 on failure.
  */
-int CGLSPBCT2DReconstructor::reconstructWLS(uint32_t maxIterations,
-                                            float errCondition,
-                                            float* weightsBDIM)
+int CGLSPBCT2DReconstructor::reconstructWLS(uint32_t maxIterations, float errCondition, float* weightsBDIM)
 {
     cl_int err;
+    // Disable any Tikhonov regularization: this routine performs pure WLS.
     removeTikhonovRegularization();
-    weighting_bbuf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                       sizeof(float) * BDIM, (void*)weightsBDIM, &err);
-    err = reconstructTikhonov(maxIterations, errCondition, nullptr, weighting_bbuf);
-    if(err != CL_SUCCESS)
-    {
-        return 0;
-    } else
-    {
-        return 1;
-    }
+    /**
+     * Convert statistical weights W_i to their square root in place.
+     *
+     * In CGLS, WLS is implemented by left-preconditioning the system
+     * with C = sqrt(W), such that the solver minimizes
+     *
+     *     || C (Ax - b) ||_2^2 = (Ax - b)^T W (Ax - b).
+     *
+     * Negative or zero weights are clamped to zero to preserve numerical
+     * stability and the positive semidefinite character of W.
+     */
+    std::transform(weightsBDIM, weightsBDIM + BDIM, weightsBDIM, [](float w) { return (w > 0.0f) ? std::sqrt(w) : 0.0f; });
+    std::shared_ptr<cl::Buffer> leftPreconditioner_bbuf
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(float) * BDIM, (void*)weightsBDIM, &err);
+    /**
+     * Execute CGLS on the left-preconditioned system with no right
+     * preconditioning and no Tikhonov regularization.
+     */
+    err = reconstructTikhonov(maxIterations, errCondition,
+                              nullptr, // no right preconditioner
+                              leftPreconditioner_bbuf); // left preconditioner C = sqrt(W)
+    return (err == CL_SUCCESS) ? 1 : 0;
 }
 
 int CGLSPBCT2DReconstructor::preconditionnedLeastSquares(float* preconditionerXDIM)
 {
     cl_int err;
     preconditioning_xbuf
-        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                       sizeof(float) * XDIM, (void*)preconditionerXDIM, &err);
+        = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(float) * XDIM, (void*)preconditionerXDIM, &err);
     if(err != CL_SUCCESS)
     {
         return 0;
@@ -218,13 +242,11 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffe
     {
         if(gradient3D)
         {
-            algFLOATvector_3DisotropicGradient(
-                XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
-                *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_3DisotropicGradient(XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y,
+                                               *AdirectionVector_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
         } else
         {
-            algFLOATvector_2DisotropicGradient(XIN, *AdirectionVector_bbuf_xpart_V2x,
-                                               *AdirectionVector_bbuf_xpart_V2y, vdims, voxelSizesF,
+            algFLOATvector_2DisotropicGradient(XIN, *AdirectionVector_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2y, vdims, voxelSizesF,
                                                globalRange, localRange);
         }
         algFLOATvector_scale(*AdirectionVector_bbuf_xpart_V2x, effectSizeV2, XDIM);
@@ -236,16 +258,11 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToAdirectionAndScale(cl::Buffe
 
         if(laplace3D)
         {
-            algFLOATvector_3DconvolutionLaplaceZeroBoundary(
-                XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims, voxelSizesF, globalRange,
-                localRange);
+            algFLOATvector_3DconvolutionLaplaceZeroBoundary(XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims, voxelSizesF, globalRange, localRange);
         } else
         {
-            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                                             0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *AdirectionVector_bbuf_xpart_Laplace,
-                                                        vdims, convolutionKernel, globalRange,
-                                                        localRange);
+            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f, 0.25f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *AdirectionVector_bbuf_xpart_Laplace, vdims, convolutionKernel, globalRange, localRange);
         }
         algFLOATvector_scale(*AdirectionVector_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
@@ -265,15 +282,13 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buff
     {
         if(gradient3D)
         {
-            algFLOATvector_3DisotropicGradient(
-                XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y,
-                *discrepancy_bbuf_xpart_V2z, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_3DisotropicGradient(XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y, *discrepancy_bbuf_xpart_V2z, vdims,
+                                               voxelSizesF, globalRange, localRange);
         } else
         {
             algFLOATvector_2DisotropicGradient(
 
-                XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y, vdims, voxelSizesF,
-                globalRange, localRange);
+                XIN, *discrepancy_bbuf_xpart_V2x, *discrepancy_bbuf_xpart_V2y, vdims, voxelSizesF, globalRange, localRange);
         }
         algFLOATvector_scale(*discrepancy_bbuf_xpart_V2x, effectSizeV2, XDIM);
         algFLOATvector_scale(*discrepancy_bbuf_xpart_V2y, effectSizeV2, XDIM);
@@ -283,22 +298,18 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionToDiscrepancyAndScale(cl::Buff
     {
         if(laplace3D)
         {
-            algFLOATvector_3DconvolutionLaplaceZeroBoundary(
-                XIN, *discrepancy_bbuf_xpart_Laplace, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_3DconvolutionLaplaceZeroBoundary(XIN, *discrepancy_bbuf_xpart_Laplace, vdims, voxelSizesF, globalRange, localRange);
         } else
         {
-            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                                             0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *discrepancy_bbuf_xpart_Laplace, vdims,
-                                                        convolutionKernel, globalRange, localRange);
+            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f, 0.25f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+            algFLOATvector_2Dconvolution3x3ZeroBoundary(XIN, *discrepancy_bbuf_xpart_Laplace, vdims, convolutionKernel, globalRange, localRange);
         }
         algFLOATvector_scale(*discrepancy_bbuf_xpart_Laplace, effectSizeLaplace, XDIM);
     }
 }
 
 // int discrepancyCount = 0;
-void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(
-    cl::Buffer residualVector)
+void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(cl::Buffer residualVector)
 {
     cl::NDRange globalRange(vdimx, vdimy, vdimz);
     cl::NDRange localRange = cl::NullRange;
@@ -306,8 +317,7 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualV
     if(tikhonovRegularizationL2)
     {
         algFLOATvector_copy(*discrepancy_bbuf_xpart_L2, *residualVector_xbuf_L2add, XDIM);
-        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_L2add, effectSizeL2,
-                                          XDIM);
+        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_L2add, effectSizeL2, XDIM);
     }
     if(tikhonovRegularizationV2)
     {
@@ -317,18 +327,12 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualV
         // be exact with reflection conditions
         if(gradient3D)
         {
-            algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
-                                           vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_isotropicBackDy(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd,
-                                           vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_isotropicBackDz(*discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2zadd,
-                                           vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd,
-                                              effectSizeV2, XDIM);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd,
-                                              effectSizeV2, XDIM);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2zadd,
-                                              effectSizeV2, XDIM);
+            algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_isotropicBackDy(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_isotropicBackDz(*discrepancy_bbuf_xpart_V2z, *residualVector_xbuf_V2zadd, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd, effectSizeV2, XDIM);
+            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd, effectSizeV2, XDIM);
+            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2zadd, effectSizeV2, XDIM);
             /*DEBUG CODE
                         BasePBCT2DReconstructor::writeVolume(
                             *discrepancy_bbuf_xpart_V2x,
@@ -343,60 +347,46 @@ void CGLSPBCT2DReconstructor::tikhonovMatrixActionOnDiscrepancyToUpdateResidualV
             */
         } else
         {
-            algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd,
-                                           vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_isotropicBackDy(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd,
-                                           vdims, voxelSizesF, globalRange, localRange);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd,
-                                              effectSizeV2, XDIM);
-            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd,
-                                              effectSizeV2, XDIM);
+            algFLOATvector_isotropicBackDx(*discrepancy_bbuf_xpart_V2x, *residualVector_xbuf_V2xadd, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_isotropicBackDy(*discrepancy_bbuf_xpart_V2y, *residualVector_xbuf_V2yadd, vdims, voxelSizesF, globalRange, localRange);
+            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2xadd, effectSizeV2, XDIM);
+            algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_V2yadd, effectSizeV2, XDIM);
         }
     }
     if(tikhonovRegularizationLaplace)
     {
         if(laplace3D)
         {
-            algFLOATvector_3DconvolutionLaplaceZeroBoundary(*discrepancy_bbuf_xpart_Laplace,
-                                                            *residualVector_xbuf_Laplaceadd, vdims,
-                                                            voxelSizesF, globalRange, localRange);
+            algFLOATvector_3DconvolutionLaplaceZeroBoundary(*discrepancy_bbuf_xpart_Laplace, *residualVector_xbuf_Laplaceadd, vdims, voxelSizesF,
+                                                            globalRange, localRange);
         } else
         {
-            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f,
-                                             0.25f, 0.0f, 0.0f,  0.0f, 0.0f,  0.0f, 0.0f,  0.0f };
-            algFLOATvector_2Dconvolution3x3ZeroBoundary(*discrepancy_bbuf_xpart_Laplace,
-                                                        *residualVector_xbuf_Laplaceadd, vdims,
-                                                        convolutionKernel, globalRange, localRange);
+            cl_float16 convolutionKernel = { 0.25f, 0.5f, 0.25f, 0.5f, -3.0f, 0.5f, 0.25f, 0.5f, 0.25f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+            algFLOATvector_2Dconvolution3x3ZeroBoundary(*discrepancy_bbuf_xpart_Laplace, *residualVector_xbuf_Laplaceadd, vdims, convolutionKernel,
+                                                        globalRange, localRange);
         }
-        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_Laplaceadd,
-                                          effectSizeLaplace, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(residualVector, *residualVector_xbuf_Laplaceadd, effectSizeLaplace, XDIM);
     }
 }
 
-void CGLSPBCT2DReconstructor::tikhonov_discrepancy_equals_discrepancy_minus_alphaAdirection(
-    double alpha)
+void CGLSPBCT2DReconstructor::tikhonov_discrepancy_equals_discrepancy_minus_alphaAdirection(double alpha)
 {
     if(tikhonovRegularizationL2)
     {
-        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_L2,
-                                          *AdirectionVector_bbuf_xpart_L2, -alpha, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_L2, *AdirectionVector_bbuf_xpart_L2, -alpha, XDIM);
     }
     if(tikhonovRegularizationV2)
     {
-        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2x,
-                                          *AdirectionVector_bbuf_xpart_V2x, -alpha, XDIM);
-        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2y,
-                                          *AdirectionVector_bbuf_xpart_V2y, -alpha, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2x, *AdirectionVector_bbuf_xpart_V2x, -alpha, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2y, *AdirectionVector_bbuf_xpart_V2y, -alpha, XDIM);
         if(gradient3D)
         {
-            algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2z,
-                                              *AdirectionVector_bbuf_xpart_V2z, -alpha, XDIM);
+            algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_V2z, *AdirectionVector_bbuf_xpart_V2z, -alpha, XDIM);
         }
     }
     if(tikhonovRegularizationLaplace)
     {
-        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_Laplace,
-                                          *AdirectionVector_bbuf_xpart_Laplace, -alpha, XDIM);
+        algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf_xpart_Laplace, *AdirectionVector_bbuf_xpart_Laplace, -alpha, XDIM);
     }
 }
 
@@ -427,22 +417,17 @@ void CGLSPBCT2DReconstructor::tikhonovZeroDiscrepancyBuffers()
 {
     if(tikhonovRegularizationL2)
     {
-        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_L2, FLOATZERO, 0,
-                                          XDIM * sizeof(float));
+        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_L2, FLOATZERO, 0, XDIM * sizeof(float));
     }
     if(tikhonovRegularizationV2)
     {
-        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_V2x, FLOATZERO, 0,
-                                          XDIM * sizeof(float));
-        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_V2y, FLOATZERO, 0,
-                                          XDIM * sizeof(float));
-        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_V2z, FLOATZERO, 0,
-                                          XDIM * sizeof(float));
+        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_V2x, FLOATZERO, 0, XDIM * sizeof(float));
+        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_V2y, FLOATZERO, 0, XDIM * sizeof(float));
+        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_V2z, FLOATZERO, 0, XDIM * sizeof(float));
     }
     if(tikhonovRegularizationLaplace)
     {
-        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_Laplace, FLOATZERO, 0,
-                                          XDIM * sizeof(float));
+        Q[0]->enqueueFillBuffer<cl_float>(*discrepancy_bbuf_xpart_Laplace, FLOATZERO, 0, XDIM * sizeof(float));
     }
 }
 
@@ -486,11 +471,10 @@ void CGLSPBCT2DReconstructor::tikhonovSetRegularizingBuffersNull()
  *
  * @return 0 if success, 1 if error
  */
-int CGLSPBCT2DReconstructor::reconstructTikhonov(
-    uint32_t maxIterations,
-    float errCondition,
-    std::shared_ptr<cl::Buffer> invCpr_xbuf,
-    std::shared_ptr<cl::Buffer> leftPreconditioner_bbuf)
+int CGLSPBCT2DReconstructor::reconstructTikhonov(uint32_t maxIterations,
+                                                 float errCondition,
+                                                 std::shared_ptr<cl::Buffer> invCpr_xbuf,
+                                                 std::shared_ptr<cl::Buffer> leftPreconditioner_bbuf)
 {
     std::string INFO;
     INFO = "CGLS, ";
@@ -523,15 +507,13 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
     }
     INFO = io::xprintf("%s init", INFO.c_str());
     tikhonovSetRegularizingBuffersNull();
-    allocateXBuffers(2 + 3 * additionalRegularizationVectors
-                     + additionalPreconditioning_xbuf); // We neeed three new X buffers per
-                                                        // one regularization vector
+    allocateXBuffers(2 + 3 * additionalRegularizationVectors + additionalPreconditioning_xbuf); // We neeed three new X buffers per
+                                                                                                // one regularization vector
     allocateBBuffers(2 + additionalPreconditioning_bbuf);
     LOGD << printTime(INFO, false, true);
     uint32_t iteration = 1;
     // Initialization
-    double norm, normDiscrepancy2 = 0.0, normL22 = 0.0, normV2x2 = 0.0, normV2y2 = 0.0,
-                 normV2z2 = 0.0, normLaplace2 = 0.0;
+    double norm, normDiscrepancy2 = 0.0, normL22 = 0.0, normV2x2 = 0.0, normV2y2 = 0.0, normV2z2 = 0.0, normLaplace2 = 0.0;
 
     double residualNorm2_old, residualNorm2_now, AdirectionNorm2, AdirectionNorm2Xpart;
     double alpha, beta;
@@ -609,8 +591,7 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
     if(leftPreconditioner_bbuf != nullptr)
     {
         algFLOATvector_A_equals_A_times_B(*discrepancy_bbuf, *leftPreconditioner_bbuf, BDIM);
-        algFLOATvector_C_equals_A_times_B(*discrepancy_bbuf, *leftPreconditioner_bbuf, *tmp_b_buf,
-                                          BDIM);
+        algFLOATvector_C_equals_A_times_B(*discrepancy_bbuf, *leftPreconditioner_bbuf, *tmp_b_buf, BDIM);
         backproject(*tmp_b_buf, *residualVector_xbuf);
     } else
     {
@@ -619,11 +600,9 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
     tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(*residualVector_xbuf);
     if(invCpr_xbuf != nullptr)
     {
-        algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invCpr_xbuf,
-                                          *preconditionedResidualVector_xbuf, XDIM);
+        algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invCpr_xbuf, *preconditionedResidualVector_xbuf, XDIM);
         algFLOATvector_copy(*preconditionedResidualVector_xbuf, *directionVector_xbuf, XDIM);
-        residualNorm2_old = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
-                                                                *preconditionedResidualVector_xbuf);
+        residualNorm2_old = scalarProductXBuffer_barrier_double(*residualVector_xbuf, *preconditionedResidualVector_xbuf);
     } else
     {
         algFLOATvector_copy(*residualVector_xbuf, *directionVector_xbuf, XDIM);
@@ -664,10 +643,8 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
-                                iteration);
-            writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(), iteration);
+            writeVolume(*x_buf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         // DEBUG
         if(iteration % 1000 == 0)
@@ -676,8 +653,7 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
             tikhonovMatrixActionToDiscrepancyAndScale(*x_buf);
             algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
             // Comparing the following with alredy computed to estimate LOO
-            double normDiscrepancy2_, normL22_ = 0.0, normV2x2_ = 0.0, normV2y2_ = 0.0,
-                                      normV2z2_ = 0.0, normLaplace2_ = 0.0, norm_;
+            double normDiscrepancy2_, normL22_ = 0.0, normV2x2_ = 0.0, normV2y2_ = 0.0, normV2z2_ = 0.0, normLaplace2_ = 0.0, norm_;
             normDiscrepancy2_ = normBBuffer_barrier_double(*discrepancy_bbuf);
             if(tikhonovRegularizationL2)
             {
@@ -693,26 +669,22 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
             {
                 normLaplace2_ = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_Laplace);
             }
-            norm_ = std::sqrt(normDiscrepancy2_ + normL22_ + normV2x2_ + normV2y2_ + normV2z2_
-                              + normLaplace2_);
+            norm_ = std::sqrt(normDiscrepancy2_ + normL22_ + normV2x2_ + normV2y2_ + normV2z2_ + normLaplace2_);
             reportTime(io::xprintf("Reothrogonalization projection %d", iteration), false, true);
-            LOGI << io::xprintf_green(
-                "\nReorthogonalization in iteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing "
-                "%0.2f%% of |b|, "
-                "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
-                "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
-                "|Laplace|=%0.1f, loss of orthogonality %f%%.",
-                iteration, norm_, 100.0 * norm_ / NB0, std::sqrt(normDiscrepancy2_),
-                100.0 * std::sqrt(normDiscrepancy2_) / NB0, std::sqrt(normDiscrepancy2_),
-                std::sqrt(normL22_), std::sqrt(normV2x2_ + normV2y2_ + normV2z2_),
-                std::sqrt(normV2x2_), std::sqrt(normV2y2_), std::sqrt(normV2z2_),
-                std::sqrt(normLaplace2_), 100 * std::abs(norm - norm_) / norm);
+            LOGI << io::xprintf_green("\nReorthogonalization in iteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing "
+                                      "%0.2f%% of |b|, "
+                                      "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
+                                      "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
+                                      "|Laplace|=%0.1f, loss of orthogonality %f%%.",
+                                      iteration, norm_, 100.0 * norm_ / NB0, std::sqrt(normDiscrepancy2_), 100.0 * std::sqrt(normDiscrepancy2_) / NB0,
+                                      std::sqrt(normDiscrepancy2_), std::sqrt(normL22_), std::sqrt(normV2x2_ + normV2y2_ + normV2z2_),
+                                      std::sqrt(normV2x2_), std::sqrt(normV2y2_), std::sqrt(normV2z2_), std::sqrt(normLaplace2_),
+                                      100 * std::abs(norm - norm_) / norm);
         }
         // DEBUG
         if(leftPreconditioner_bbuf != nullptr)
         {
-            algFLOATvector_C_equals_A_times_B(*discrepancy_bbuf, *leftPreconditioner_bbuf,
-                                              *tmp_b_buf, BDIM);
+            algFLOATvector_C_equals_A_times_B(*discrepancy_bbuf, *leftPreconditioner_bbuf, *tmp_b_buf, BDIM);
             backproject(*tmp_b_buf, *residualVector_xbuf);
         } else
         {
@@ -721,10 +693,8 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
         tikhonovMatrixActionOnDiscrepancyToUpdateResidualVector(*residualVector_xbuf);
         if(invCpr_xbuf != nullptr)
         {
-            algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invCpr_xbuf,
-                                              *preconditionedResidualVector_xbuf, XDIM);
-            residualNorm2_now = scalarProductXBuffer_barrier_double(
-                *residualVector_xbuf, *preconditionedResidualVector_xbuf);
+            algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invCpr_xbuf, *preconditionedResidualVector_xbuf, XDIM);
+            residualNorm2_now = scalarProductXBuffer_barrier_double(*residualVector_xbuf, *preconditionedResidualVector_xbuf);
         } else
         {
             residualNorm2_now = normXBuffer_barrier_double(*residualVector_xbuf);
@@ -733,26 +703,21 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         NX = std::sqrt(residualNorm2_now);
-        LOGI << io::xprintf_green(
-            "\nIteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing %0.2f%% of |b|, "
-            "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
-            "sqrt(|AT(Ax-b)|^2 + |TTTx|^2)=%0.2f representing %0.3f%% of "
-            "sqrt(|AT(Ax0-b)|^2+|TTTx0|^2), "
-            "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
-            "|Laplace|=%0.1f.",
-            iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2),
-            100.0 * std::sqrt(normDiscrepancy2) / NB0, NX, 100 * NX / NR0,
-            std::sqrt(normDiscrepancy2), std::sqrt(normL22),
-            std::sqrt(normV2x2 + normV2y2 + normV2z2), std::sqrt(normV2x2), std::sqrt(normV2y2),
-            std::sqrt(normV2z2), std::sqrt(normLaplace2));
+        LOGI << io::xprintf_green("\nIteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing %0.2f%% of |b|, "
+                                  "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
+                                  "sqrt(|AT(Ax-b)|^2 + |TTTx|^2)=%0.2f representing %0.3f%% of "
+                                  "sqrt(|AT(Ax0-b)|^2+|TTTx0|^2), "
+                                  "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
+                                  "|Laplace|=%0.1f.",
+                                  iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2), 100.0 * std::sqrt(normDiscrepancy2) / NB0, NX,
+                                  100 * NX / NR0, std::sqrt(normDiscrepancy2), std::sqrt(normL22), std::sqrt(normV2x2 + normV2y2 + normV2z2),
+                                  std::sqrt(normV2x2), std::sqrt(normV2y2), std::sqrt(normV2z2), std::sqrt(normLaplace2));
         if(invCpr_xbuf != nullptr)
         {
-            algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf,
-                                              *preconditionedResidualVector_xbuf, beta, XDIM);
+            algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *preconditionedResidualVector_xbuf, beta, XDIM);
         } else
         {
-            algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta,
-                                              XDIM);
+            algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *residualVector_xbuf, beta, XDIM);
         }
         // Delayed update of direction vector
         iteration = iteration + 1;
@@ -761,8 +726,7 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
         project(*directionVector_xbuf, *AdirectionVector_bbuf);
         if(leftPreconditioner_bbuf != nullptr)
         {
-            algFLOATvector_A_equals_A_times_B(*AdirectionVector_bbuf, *leftPreconditioner_bbuf,
-                                              BDIM);
+            algFLOATvector_A_equals_A_times_B(*AdirectionVector_bbuf, *leftPreconditioner_bbuf, BDIM);
         }
         AdirectionNorm2 = normBBuffer_barrier_double(*AdirectionVector_bbuf);
         AdirectionNorm2Xpart = tikhonovSumOfAdirectionNorms2();
@@ -786,31 +750,26 @@ int CGLSPBCT2DReconstructor::reconstructTikhonov(
         {
             normLaplace2 = normXBuffer_barrier_double(*discrepancy_bbuf_xpart_Laplace);
         }
-        norm
-            = std::sqrt(normDiscrepancy2 + normL22 + normV2x2 + normV2y2 + normV2z2 + normLaplace2);
+        norm = std::sqrt(normDiscrepancy2 + normL22 + normV2x2 + normV2y2 + normV2z2 + normLaplace2);
     }
-    LOGI << io::xprintf_green(
-        "\nIteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing %0.2f%% of |b|, "
-        "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
-        "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
-        "|Laplace|=%0.1f.",
-        iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2),
-        100.0 * std::sqrt(normDiscrepancy2) / NB0, std::sqrt(normDiscrepancy2), std::sqrt(normL22),
-        std::sqrt(normV2x2 + normV2y2 + normV2z2), std::sqrt(normV2x2), std::sqrt(normV2y2),
-        std::sqrt(normV2z2), std::sqrt(normLaplace2));
+    LOGI << io::xprintf_green("\nIteration %d: sqrt(|Ax-b|^2+|Tx|^2)=%0.1f representing %0.2f%% of |b|, "
+                              "|Ax-b|=%0.1f representing %0.2f%% of |b|, "
+                              "|Ax-b|=%0.1f, |L2|=%0.1f, |V2|=%0.1f, |V2x|=%0.1f, |V2y|=%0.1f, |V2z|=%0.1f, "
+                              "|Laplace|=%0.1f.",
+                              iteration, norm, 100.0 * norm / NB0, std::sqrt(normDiscrepancy2), 100.0 * std::sqrt(normDiscrepancy2) / NB0,
+                              std::sqrt(normDiscrepancy2), std::sqrt(normL22), std::sqrt(normV2x2 + normV2y2 + normV2z2), std::sqrt(normV2x2),
+                              std::sqrt(normV2y2), std::sqrt(normV2z2), std::sqrt(normLaplace2));
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 
-int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(
-    std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
-    uint32_t maxIterations,
-    float errCondition)
+int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(std::shared_ptr<cl::Buffer> invertedpreconditioner_xbuf,
+                                                               uint32_t maxIterations,
+                                                               float errCondition)
 {
     bool blockingReport = true;
     reportTime("WELCOME TO CGLS WITH PRECONDITIONING, init", blockingReport, true);
-    LOGI << io::xprintf("Maximum number of iterations is set to %d and errCondition %f",
-                        maxIterations, errCondition);
+    LOGI << io::xprintf("Maximum number of iterations is set to %d and errCondition %f", maxIterations, errCondition);
     uint32_t iteration = 1;
 
     // Initialization
@@ -848,11 +807,9 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(
     setTimestamp(blockingReport);
     backproject(*discrepancy_bbuf, *residualVector_xbuf);
     reportTime("Backprojection 0", blockingReport, true);
-    algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invertedpreconditioner_xbuf,
-                                      *preconditionedResidualVector_xbuf, XDIM);
+    algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invertedpreconditioner_xbuf, *preconditionedResidualVector_xbuf, XDIM);
     algFLOATvector_copy(*preconditionedResidualVector_xbuf, *directionVector_xbuf, XDIM);
-    residualNorm2_old = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
-                                                            *preconditionedResidualVector_xbuf);
+    residualNorm2_old = scalarProductXBuffer_barrier_double(*residualVector_xbuf, *preconditionedResidualVector_xbuf);
     NR0 = std::sqrt(residualNorm2_old);
     // DEBUG
     NR0 = std::sqrt(normXBuffer_barrier_double(*residualVector_xbuf));
@@ -868,31 +825,26 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(
     {
         if(reportKthIteration > 0 && iteration % reportKthIteration == 0)
         {
-            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(),
-                                iteration);
-            writeVolume(*x_buf,
-                        io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
+            LOGD << io::xprintf("Writing file %sx_it%02d.den", intermediatePrefix.c_str(), iteration);
+            writeVolume(*x_buf, io::xprintf("%sx_it%02d.den", intermediatePrefix.c_str(), iteration));
         }
         // DEBUG
         if(iteration % 10 == 0)
         {
             setTimestamp(blockingReport);
             project(*x_buf, *discrepancy_bbuf);
-            reportTime(io::xprintf("Reothrogonalization projection %d", iteration), blockingReport,
-                       true);
+            reportTime(io::xprintf("Reothrogonalization projection %d", iteration), blockingReport, true);
             algFLOATvector_A_equals_Ac_plus_B(*discrepancy_bbuf, *b_buf, -1.0, BDIM);
             double norm2 = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
 
-            LOGI << io::xprintf_green(
-                "Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
-                "loss of orthogonality %f%%.",
-                iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
+            LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|, norms "
+                                      "loss of orthogonality %f%%.",
+                                      iteration, norm2, 100.0 * norm2 / NB0, 100 * (norm2 - norm) / norm);
         }
         // DEBUG
         setTimestamp(blockingReport);
         backproject(*discrepancy_bbuf, *residualVector_xbuf);
-        algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invertedpreconditioner_xbuf,
-                                          *preconditionedResidualVector_xbuf, XDIM);
+        algFLOATvector_C_equals_A_times_B(*residualVector_xbuf, *invertedpreconditioner_xbuf, *preconditionedResidualVector_xbuf, XDIM);
         //        writeVolume(
         //            *residualVector_xbuf,
         //            io::xprintf("%sresidualVector_xbuf_it%02d.den", intermediatePrefix.c_str(),
@@ -901,8 +853,7 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(
         //                    io::xprintf("%spreconditionedResidualVector_xbuf_it%02d.den",
         //                                intermediatePrefix.c_str(), iteration));
         reportTime(io::xprintf("Backprojection %d", iteration), blockingReport, true);
-        residualNorm2_now = scalarProductXBuffer_barrier_double(*residualVector_xbuf,
-                                                                *preconditionedResidualVector_xbuf);
+        residualNorm2_now = scalarProductXBuffer_barrier_double(*residualVector_xbuf, *preconditionedResidualVector_xbuf);
         // Delayed update of residual vector
         beta = residualNorm2_now / residualNorm2_old;
         LOGI << io::xprintf("Beta=%f/%f is %f", residualNorm2_now, residualNorm2_old, beta);
@@ -910,12 +861,10 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(
         // DEBUG
         NX = std::sqrt(normXBuffer_barrier_double(*residualVector_xbuf));
         // DEBUG
-        LOGI << io::xprintf_green(
-            "Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
-            "that is %0.3f%% of |AT(Ax0-b)|.",
-            iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
-        algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *preconditionedResidualVector_xbuf,
-                                          beta, XDIM);
+        LOGI << io::xprintf_green("Iteration %d: |Ax-b|=%0.1f that is %0.2f%% of |b|, |AT(Ax-b)|=%0.2f "
+                                  "that is %0.3f%% of |AT(Ax0-b)|.",
+                                  iteration, norm, 100.0 * norm / NB0, NX, 100 * NX / NR0);
+        algFLOATvector_A_equals_Ac_plus_B(*directionVector_xbuf, *preconditionedResidualVector_xbuf, beta, XDIM);
         // Delayed update of direction vector
         iteration = iteration + 1;
         residualNorm2_old = residualNorm2_now;
@@ -928,16 +877,14 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(
         algFLOATvector_A_equals_A_plus_cB(*discrepancy_bbuf, *AdirectionVector_bbuf, -alpha, BDIM);
         norm = std::sqrt(normBBuffer_barrier_double(*discrepancy_bbuf));
     }
-    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.",
-                              iteration, norm, 100.0 * norm / NB0);
+    LOGI << io::xprintf_green("Iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of |b|.", iteration, norm, 100.0 * norm / NB0);
     Q[0]->enqueueReadBuffer(*x_buf, CL_TRUE, 0, sizeof(float) * XDIM, x);
     return 0;
 }
 
 int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, float errCondition)
 {
-    LOGI << io::xprintf(
-        "WELCOME TO Experimental implementation CGLS using nonstandard cone beam operator");
+    LOGI << io::xprintf("WELCOME TO Experimental implementation CGLS using nonstandard cone beam operator");
     std::shared_ptr<cl::Buffer> v_buf, w_buf; // X buffers
     allocateXBuffers(2);
     v_buf = getXBuffer(0);
@@ -962,33 +909,27 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
     norm = std::sqrt(normBBuffer_barrier_double(*tmp_b_buf));
     // Experimental
     cl_int err;
-    std::shared_ptr<cl::Buffer> v_proj = std::make_shared<cl::Buffer>(
-        *context, CL_MEM_READ_WRITE, sizeof(float) * pdimx * pdimy, nullptr, &err);
+    std::shared_ptr<cl::Buffer> v_proj = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * pdimx * pdimy, nullptr, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-    std::shared_ptr<cl::Buffer> w_proj = std::make_shared<cl::Buffer>(
-        *context, CL_MEM_READ_WRITE, sizeof(float) * pdimx * pdimy, nullptr, &err);
+    std::shared_ptr<cl::Buffer> w_proj = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * pdimx * pdimy, nullptr, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-    std::shared_ptr<cl::Buffer> x_proj = std::make_shared<cl::Buffer>(
-        *context, CL_MEM_READ_WRITE, sizeof(float) * pdimx * pdimy, nullptr, &err);
+    std::shared_ptr<cl::Buffer> x_proj = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * pdimx * pdimy, nullptr, &err);
     if(err != CL_SUCCESS)
     {
         LOGE << io::xprintf("Unsucessful initialization of buffer with error code %d!", err);
         return -1;
     }
-    Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0,
-                                      uint32_t(pdimx) * pdimy * sizeof(float));
-    Q[0]->enqueueFillBuffer<cl_float>(*w_proj, FLOATZERO, 0,
-                                      uint32_t(pdimx) * pdimy * sizeof(float));
-    Q[0]->enqueueFillBuffer<cl_float>(*x_proj, FLOATZERO, 0,
-                                      uint32_t(pdimx) * pdimy * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*w_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
+    Q[0]->enqueueFillBuffer<cl_float>(*x_proj, FLOATZERO, 0, uint32_t(pdimx) * pdimy * sizeof(float));
     // Experimental
     LOGI << io::xprintf("Initial norm of b is %f and initial |Ax-b| is %f.", NB0, norm);
     // INITIALIZATION x_0 is initialized typically by zeros but in general by supplied array
@@ -1001,8 +942,7 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
     Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, pdimx * pdimy * sizeof(float));
     for(unsigned int i = 0; i != pdimz; i++)
     {
-        algFLOATvector_B_equals_A_plus_B_offsets(*c_buf, i * pdimx * pdimy, *v_proj, 0,
-                                                 uint32_t(pdimx) * pdimy);
+        algFLOATvector_B_equals_A_plus_B_offsets(*c_buf, i * pdimx * pdimy, *v_proj, 0, uint32_t(pdimx) * pdimy);
     }
     // Experimental
     reportTime("v_0 backprojection", false, true);
@@ -1031,8 +971,7 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
     // Experimental
     for(unsigned int i = 0; i != pdimz; i++)
     {
-        algFLOATvector_B_equals_A_plus_B_offsets(*w_proj, 0, *d_buf, i * pdimx * pdimy,
-                                                 pdimx * pdimy);
+        algFLOATvector_B_equals_A_plus_B_offsets(*w_proj, 0, *d_buf, i * pdimx * pdimy, pdimx * pdimy);
     }
     // Experimental
     reportTime("d_0 projection", false, true);
@@ -1046,8 +985,7 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
         // Iteration
         iteration = iteration + 1;
         alpha = vnorm2_old / dnorm2_old;
-        LOGI << io::xprintf("After iteration %d, |v|^2=%E, |d|^2=%E, alpha=%E", iteration - 1,
-                            vnorm2_old, dnorm2_old, float(alpha));
+        LOGI << io::xprintf("After iteration %d, |v|^2=%E, |d|^2=%E, alpha=%E", iteration - 1, vnorm2_old, dnorm2_old, float(alpha));
         algFLOATvector_A_equals_A_plus_cB(*x_buf, *w_buf, alpha, XDIM);
         // EXPERIMENTAL
         algFLOATvector_A_equals_A_plus_cB(*x_proj, *w_proj, alpha, pdimx * pdimy);
@@ -1068,8 +1006,7 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
         Q[0]->enqueueFillBuffer<cl_float>(*v_proj, FLOATZERO, 0, pdimx * pdimy * sizeof(float));
         for(unsigned int i = 0; i != pdimz; i++)
         {
-            algFLOATvector_B_equals_A_plus_B_offsets(*c_buf, i * pdimx * pdimy, *v_proj, 0,
-                                                     pdimx * pdimy);
+            algFLOATvector_B_equals_A_plus_B_offsets(*c_buf, i * pdimx * pdimy, *v_proj, 0, pdimx * pdimy);
         }
         // Experimental
         reportTime(io::xprintf("v_%d backprojection", iteration), false, true);
@@ -1087,8 +1024,7 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
         vnorm2_now += sum;
         // EXPERIMENTAL
         beta = vnorm2_now / vnorm2_old;
-        LOGI << io::xprintf("In iteration %d, |v_now|^2=%E, |v_old|^2=%E, beta=%0.2f", iteration,
-                            vnorm2_now, vnorm2_old, beta);
+        LOGI << io::xprintf("In iteration %d, |v_now|^2=%E, |v_old|^2=%E, beta=%0.2f", iteration, vnorm2_now, vnorm2_old, beta);
         vnorm2_old = vnorm2_now;
         algFLOATvector_A_equals_Ac_plus_B(*w_buf, *v_buf, beta, XDIM);
         // EXPERIMENTAL
@@ -1104,8 +1040,7 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
         // EXPERIMENTAL
         for(unsigned int i = 0; i != pdimz; i++)
         {
-            algFLOATvector_B_equals_A_plus_B_offsets(*w_proj, 0, *d_buf, i * pdimx * pdimy,
-                                                     pdimx * pdimy);
+            algFLOATvector_B_equals_A_plus_B_offsets(*w_proj, 0, *d_buf, i * pdimx * pdimy, pdimx * pdimy);
         }
         // EXPERIMENTAL
         reportTime(io::xprintf("d_%d projection", iteration), false, true);
@@ -1118,14 +1053,11 @@ int CGLSPBCT2DReconstructor::reconstruct_experimental(uint32_t maxIterations, fl
         dnorm2_old = normBBuffer_barrier_double(*d_buf);
 
         norm = std::sqrt(normBBuffer_barrier_double(*tmp_b_buf));
-        LOGI << io::xprintf_green(
-            "After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.", iteration, norm,
-            100.0 * norm / NB0);
+        LOGI << io::xprintf_green("After iteration %d, the norm of |Ax-b| is %f that is %0.2f%% of NB0.", iteration, norm, 100.0 * norm / NB0);
     }
     // Optionally write even more converged solution
     alpha = vnorm2_old / dnorm2_old;
-    LOGI << io::xprintf("Finally |v|^2=%E, |d|^2=%E, alpha=%E", iteration - 1, vnorm2_old,
-                        dnorm2_old, float(alpha));
+    LOGI << io::xprintf("Finally |v|^2=%E, |d|^2=%E, alpha=%E", iteration - 1, vnorm2_old, dnorm2_old, float(alpha));
     algFLOATvector_A_equals_A_plus_cB(*x_buf, *w_buf, alpha, XDIM);
     // EXPERIMENTAL
     algFLOATvector_A_equals_A_plus_cB(*x_proj, *w_proj, alpha, pdimx * pdimy);
@@ -1154,20 +1086,14 @@ int CGLSPBCT2DReconstructor::reconstructJacobi(uint32_t maxIterations, float err
         algFLOATvector_A_equals_A_times_B(*preconditioner_xbuf, *minmax_xbuf, XDIM);
     }
     LOGD << io::xprintf("Writing file %s_preconditioner.inv", intermediatePrefix.c_str());
-    writeVolume(*preconditioner_xbuf,
-                io::xprintf("%sx_preconditioner.inv", intermediatePrefix.c_str()));
+    writeVolume(*preconditioner_xbuf, io::xprintf("%sx_preconditioner.inv", intermediatePrefix.c_str()));
     reconstructDiagonalPreconditioner(preconditioner_xbuf, maxIterations, errCondition);
     return 0;
 }
 
-void CGLSPBCT2DReconstructor::precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X)
-{
-    KCTERR("Not implemented for parallel ray geometry.");
-}
+void CGLSPBCT2DReconstructor::precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X) { KCTERR("Not implemented for parallel ray geometry."); }
 
-int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(float* invertedpreconditioner,
-                                                               uint32_t maxIterations,
-                                                               float errCondition)
+int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(float* invertedpreconditioner, uint32_t maxIterations, float errCondition)
 {
     std::shared_ptr<cl::Buffer> preconditioner_xbuf; // X buffers
     allocateXBuffers(4);
@@ -1179,14 +1105,11 @@ int CGLSPBCT2DReconstructor::reconstructDiagonalPreconditioner(float* invertedpr
     return 0;
 }
 
-int CGLSPBCT2DReconstructor::reconstructSumPreconditioning(uint32_t maxIterations,
-                                                           float errCondition)
+int CGLSPBCT2DReconstructor::reconstructSumPreconditioning(uint32_t maxIterations, float errCondition)
 {
     cl_int err;
-    std::shared_ptr<cl::Buffer> invSqrtRpr_bbuf = std::make_shared<cl::Buffer>(
-        *context, CL_MEM_READ_WRITE, sizeof(float) * BDIM, nullptr, &err);
-    std::shared_ptr<cl::Buffer> invCpr_xbuf = std::make_shared<cl::Buffer>(
-        *context, CL_MEM_READ_WRITE, sizeof(float) * XDIM, nullptr, &err);
+    std::shared_ptr<cl::Buffer> invSqrtRpr_bbuf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * BDIM, nullptr, &err);
+    std::shared_ptr<cl::Buffer> invCpr_xbuf = std::make_shared<cl::Buffer>(*context, CL_MEM_READ_WRITE, sizeof(float) * XDIM, nullptr, &err);
     allocateXBuffers(1);
     std::shared_ptr<cl::Buffer> ones_xbuf = getXBuffer(0);
     Q[0]->enqueueFillBuffer<cl_float>(*ones_xbuf, FLOATONE, 0, XDIM * sizeof(float));

@@ -33,13 +33,8 @@ public:
      * @param xpath Path of cl kernel files
      * @param debug Should debugging be used by suppliing source and -g as options
      */
-    CGLSPBCT2DReconstructor(uint32_t pdimx,
-                            uint32_t pdimy,
-                            uint32_t pdimz,
-                            uint32_t vdimx,
-                            uint32_t vdimy,
-                            uint32_t vdimz,
-                            uint32_t workGroupSize = 256)
+    CGLSPBCT2DReconstructor(
+        uint32_t pdimx, uint32_t pdimy, uint32_t pdimz, uint32_t vdimx, uint32_t vdimy, uint32_t vdimz, uint32_t workGroupSize = 256)
         : BasePBCT2DOperator(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
         , BasePBCT2DReconstructor(pdimx, pdimy, pdimz, vdimx, vdimy, vdimz, workGroupSize)
 
@@ -83,17 +78,13 @@ public:
                                           uint32_t maxIterations = 100,
                                           float errCondition = 0.01);
 
-    int reconstructDiagonalPreconditioner(float* invertedpreconditioner,
-                                          uint32_t maxIterations = 100,
-                                          float errCondition = 0.01);
+    int reconstructDiagonalPreconditioner(float* invertedpreconditioner, uint32_t maxIterations = 100, float errCondition = 0.01);
 
     int reconstructJacobi(uint32_t maxIterations = 100, float errCondition = 0.01);
 
     int reconstructSumPreconditioning(uint32_t maxIterations = 100, float errCondition = 0.01);
 
-    int reconstructWLS(uint32_t maxIterations = 100,
-                       float errCondition = 0.01,
-                       float* weighs_BDIM = nullptr);
+    int reconstructWLS(uint32_t maxIterations = 100, float errCondition = 0.01, float* weighs_BDIM = nullptr);
 
     void precomputeJacobiPreconditioner(std::shared_ptr<cl::Buffer> X);
 
@@ -115,16 +106,13 @@ private:
     int preconditionnedLeastSquares(float* preconditionerXDIM);
     double tikhonovSumOfAdirectionNorms2();
 
-    std::shared_ptr<cl::Buffer> residualVector_xbuf_L2add, residualVector_xbuf_V2xadd,
-        residualVector_xbuf_V2yadd, residualVector_xbuf_V2zadd,
+    std::shared_ptr<cl::Buffer> residualVector_xbuf_L2add, residualVector_xbuf_V2xadd, residualVector_xbuf_V2yadd, residualVector_xbuf_V2zadd,
         residualVector_xbuf_Laplaceadd; // X buffers
-    std::shared_ptr<cl::Buffer> discrepancy_bbuf_xpart_L2, discrepancy_bbuf_xpart_V2x,
-        discrepancy_bbuf_xpart_V2y, discrepancy_bbuf_xpart_V2z,
+    std::shared_ptr<cl::Buffer> discrepancy_bbuf_xpart_L2, discrepancy_bbuf_xpart_V2x, discrepancy_bbuf_xpart_V2y, discrepancy_bbuf_xpart_V2z,
         discrepancy_bbuf_xpart_Laplace; // X buffers
-    std::shared_ptr<cl::Buffer> AdirectionVector_bbuf_xpart_L2, AdirectionVector_bbuf_xpart_V2x,
-        AdirectionVector_bbuf_xpart_V2y, AdirectionVector_bbuf_xpart_V2z,
+    std::shared_ptr<cl::Buffer> AdirectionVector_bbuf_xpart_L2, AdirectionVector_bbuf_xpart_V2x, AdirectionVector_bbuf_xpart_V2y,
+        AdirectionVector_bbuf_xpart_V2z,
         AdirectionVector_bbuf_xpart_Laplace; // X buffers
-    std::shared_ptr<cl::Buffer> weighting_bbuf = nullptr;
     std::shared_ptr<cl::Buffer> preconditioning_xbuf = nullptr;
     bool tikhonovRegularization;
     bool tikhonovRegularizationL2;
